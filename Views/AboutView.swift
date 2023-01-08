@@ -1,0 +1,111 @@
+import SwiftUI
+
+struct AboutView: View {
+    
+    // For dismissing the SettingsView sheet
+    @Environment(\.dismiss) var dismiss
+    
+    // Contribute section links
+    let suggestABusinessEmail = URL(string:"mailto:joey.castagnaro@me.com")!
+    
+    // Contact section links
+    let generalSupportInquiriesEmail = URL(string:"mailto:joey.castagnaro@me.com")!
+    let reportABugEmail = URL(string:"mailto:joey.castagnaro@me.com")!
+    let suggestAFeatureEmail = URL(string:"mailto:joey.castagnaro@me.com")!
+    
+    // Socials section links
+    let twitterURL = URL(string:"https://twitter.com/joeycast")!
+    let discordURL = URL(string:"https://twitter.com/joeycast")!
+    let nostrURL = URL(string:"https://twitter.com/joeycast")!
+    
+    // Other section links
+    let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
+    let privacyPolicyURL = URL(string: "https://twitter.com/joeycast")!
+    let termsofServiceURL = URL(string: "https://twitter.com/joeycast")!
+    
+    // Support Development links
+    let tipJarURL = URL(string: "https://twitter.com/joeycast")!
+    
+    // Settings Page
+    var body: some View {
+        
+        NavigationView {
+            Form {
+                // Header section
+                Section {
+                    Text("\(ContentView().appName) is an app developed by Joey Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the Bitcoin community. \(ContentView().appName) is built entirely on iPad.")
+                }
+                // Contribute section
+                Section(header: Text("Contribute"), 
+                        footer: Text("At this time, adding businesses is not supported in-app but is being considered as a feature for a future release. Until then, email us by tapping \"Suggest a Business\" above.")) {
+                    Link(destination: suggestABusinessEmail, label: {
+                        Label("Suggest a Business", systemImage: "bag")
+                    })                    
+                }
+                // Contact section
+                Section(header: Text("Contact")) {
+                    Link(destination: generalSupportInquiriesEmail, label: {
+                        Label("General Support Inquiries", systemImage: "paperplane")
+                    })
+                    Link(destination: reportABugEmail, label: {
+                        Label("Report a Bug", systemImage: "ladybug")
+                    })
+                    Link(destination: suggestAFeatureEmail, label: {
+                        Label("Suggest a Feature", systemImage: "plus.app")
+                    })                    
+                }
+                // Socials section
+                Section(header: Text("Socials")) {
+                    Link(destination: twitterURL, 
+                         label: {
+                        Label("Twitter", systemImage: "link")    
+                    })
+                    Link(destination: discordURL, 
+                         label: {
+                        Label("Discord", systemImage: "link")    
+                    })
+                    Link(destination: nostrURL, 
+                         label: {
+                        Label("Nostr", systemImage: "link")    
+                    })
+                }
+                // Other section
+                Section(header: Text("Other")) {
+                    Link(destination: bitcoinResourcesURL, 
+                         label: {
+                        Label("Bitcoin Resources", systemImage: "bitcoinsign.circle")    
+                    })
+                    Link(destination: privacyPolicyURL, 
+                         label: {
+                        Label("Privacy Policy", systemImage: "hand.raised")    
+                    })
+                    Link(destination: termsofServiceURL, 
+                         label: {
+                        Label("Terms of Service", systemImage: "link")    
+                    })
+                }
+                // Support Development section
+                Section(header: Text("Support Development"), 
+                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
+                    Label("Tip Jar", systemImage: "bolt.circle.fill")
+                }
+            }
+            // About page title
+            // TODO: Figure out how to use the appName constant here
+            .navigationTitle("About BitLocal")
+            
+            // Dismiss sheet when tapping Done.
+            .navigationBarItems(trailing: 
+                                    Button("Done") {
+                dismiss()
+            })
+        }
+    }
+}
+
+// View preview
+struct AboutView_Previews: PreviewProvider {
+    static var previews: some View {
+        AboutView()
+    }
+}
