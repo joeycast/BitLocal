@@ -7,8 +7,10 @@ struct ContentView: View {
     @StateObject private var viewModel = ContentViewModel()
     @State public var showingAbout = false
     @State public var userSearchText = ""
+    @State public var elements: [Element]?
     
     let appName = "BitLocal"   
+    let apiManager = APIManager()
     
     var body: some View {
         
@@ -16,13 +18,22 @@ struct ContentView: View {
         ZStack() {    
             // **** Map ****
             // Sets the map as the background in the ZStack.
-            Map(coordinateRegion: $viewModel.region, 
-                showsUserLocation: true,
-                annotationItems: LocationList.locations) {
-                location in MapMarker(coordinate: location.coordinate)
+            if let elements = elements {
+                Map(coordinateRegion: $viewModel.region,
+                    showsUserLocation: true,
+                    annotationItems: elements) { element -> MapMarker in
+                    guard let osmJSON = element.osmJSON, let latitude = osmJSON.lat, let longitude = osmJSON.lon else {
+                        return MapMarker(coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0), tint: .orange) // replace with default location or no marker
+                    }
+                    let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+                    return MapMarker(coordinate: coordinate, tint: .orange)
+                }
+                    .tint(.orange)
+                    .ignoresSafeArea()
+                    .clusteredAnnotation(spread: .perCluster(.absolute(40)), radius: .absolute(40))
             }
-                .tint(.orange) // Sets user location circle to orange
-                .ignoresSafeArea()
+
+
 
             // **** Background Header Rectangle ****
             GeometryReader { geometry in 
@@ -49,6 +60,7 @@ struct ContentView: View {
                     .bold(true)
                     .padding()
                     .padding(.leading, 5)
+                    // .shadow(radius: 10) // Use if change to logo
                 
                 // **** About Button ****            
                 // Sets about button and toggles showingAbout when tapped. .frame, .contentShape, and .clipShape help increase the tappable area of the button.
@@ -132,6 +144,13 @@ struct ContentView: View {
         }
         // Prevents location button from moving with keyboard. Need to make sure this doesn't mess anything up when searching is introduced.
         .ignoresSafeArea(.keyboard)
+        .onAppear {
+            apiManager.getElements { elements in
+                DispatchQueue.main.async {
+                    self.elements = elements
+                }
+            }
+        }
     }    
 }
 

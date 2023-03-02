@@ -36,9 +36,15 @@ let package = Package(
             appCategory: "public.app-category.shopping"
         )
     ],
+    dependencies: [
+        .package(url: "https://github.com/stephencelis/SQLite.swift.git", "0.14.1"..<"1.0.0")
+    ],
     targets: [
         .executableTarget(
             name: "AppModule",
+            dependencies: [
+                .product(name: "SQLite", package: "SQLite.swift")
+            ],
             path: "."
         )
     ]
