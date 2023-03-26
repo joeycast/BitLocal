@@ -138,39 +138,39 @@ class APIManager {
     }
 }
 
-struct BtcMapAPIView: View {
-    @State public var elements: [Element]?
-    let apiManager = APIManager()
-    
-    var body: some View {
-        VStack {
-            if let elements = elements {
-                List(elements, id: \.id) { element in
-                    VStack(alignment: .leading) {
-                        Text("Element ID: \(element.id)")
-                            .font(.headline)
-                        Text("Created At: \(element.createdAt)")
-                        Text("Latitude: \(element.osmJSON?.lat ?? 0.0)")
-                        Text("Longitude: \(element.osmJSON?.lon ?? 0.0)")
-                        Text("Longitude: \(element.osmJSON?.tags)" as String)
-                        //                        Text("Tags: \(element.tags)" as String)
-                        if let osmJSON = element.osmJSON, let tags = osmJSON.tags, tags["payment:lightning_contactless"] == "yes" {
-                            Text("Accepts Lightning Contactless")
-                        } else {
-                        }
-                        
-                    }
-                }
-            } else {
-                Text("Loading...")
-            }
-        }
-        .onAppear {
-            apiManager.getElements { elements in
-                DispatchQueue.main.async {
-                    self.elements = elements
-                }
-            }
-        }
-    }
-}
+//struct BtcMapAPIView: View {
+//    @State public var elements: [Element]?
+//    let apiManager = APIManager()
+//    
+//    var body: some View {
+//        VStack {
+//            if let elements = elements {
+//                List(elements, id: \.id) { element in
+//                    VStack(alignment: .leading) {
+//                        Text("Element ID: \(element.id)")
+//                            .font(.headline)
+//                        Text("Created At: \(element.createdAt)")
+//                        Text("Latitude: \(element.osmJSON?.lat ?? 0.0)")
+//                        Text("Longitude: \(element.osmJSON?.lon ?? 0.0)")
+//                        Text("Longitude: \(element.osmJSON?.tags)" as String)
+//                        //                        Text("Tags: \(element.tags)" as String)
+//                        if let osmJSON = element.osmJSON, let tags = osmJSON.tags, tags["payment:lightning_contactless"] == "yes" {
+//                            Text("Accepts Lightning Contactless")
+//                        } else {
+//                        }
+//                        
+//                    }
+//                }
+//            } else {
+//                Text("Loading...")
+//            }
+//        }
+//        .onAppear {
+//            apiManager.getElements { elements in
+//                DispatchQueue.main.async {
+//                    self.elements = elements
+//                }
+//            }
+//        }
+//    }
+//}

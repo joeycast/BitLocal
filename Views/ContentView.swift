@@ -1,3 +1,4 @@
+import UIKit
 import SwiftUI
 import MapKit
 import CoreLocationUI
@@ -19,22 +20,13 @@ struct ContentView: View {
             // **** Map ****
             // Sets the map as the background in the ZStack.
             if let elements = elements {
-                Map(coordinateRegion: $viewModel.region,
-                    showsUserLocation: true,
-                    annotationItems: elements) { element -> MapMarker in
-                    guard let osmJSON = element.osmJSON, let latitude = osmJSON.lat, let longitude = osmJSON.lon else {
-                        return MapMarker(coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0), tint: .orange) // replace with default location or no marker
-                    }
-                    let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-                    return MapMarker(coordinate: coordinate, tint: .orange)
-                }
-                    .tint(.orange)
+                mapView(elements: elements)
                     .ignoresSafeArea()
-                    .clusteredAnnotation(spread: .perCluster(.absolute(40)), radius: .absolute(40))
+                    .onAppear {
+                        viewModel.requestAllowOnceLocationPermission()
+                    }
             }
-
-
-
+            
             // **** Background Header Rectangle ****
             GeometryReader { geometry in 
                 let screenSize = geometry.frame(in: .global)
@@ -45,7 +37,7 @@ struct ContentView: View {
                     .cornerRadius(CGFloat(roundedRectangleRadius))
                     .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
                     .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius))
-                    //.padding(.bottom, CGFloat(roundedRectangleRadius))
+                //.padding(.bottom, CGFloat(roundedRectangleRadius))
                     .padding(.top, -CGFloat(roundedRectangleRadius))
                     .ignoresSafeArea()
             }
@@ -60,7 +52,7 @@ struct ContentView: View {
                     .bold(true)
                     .padding()
                     .padding(.leading, 5)
-                    // .shadow(radius: 10) // Use if change to logo
+                // .shadow(radius: 10) // Use if change to logo
                 
                 // **** About Button ****            
                 // Sets about button and toggles showingAbout when tapped. .frame, .contentShape, and .clipShape help increase the tappable area of the button.
@@ -70,7 +62,7 @@ struct ContentView: View {
                     .padding(.top, 5)
                     .frame(width: 88, height: 50, alignment: .center)
                     .foregroundColor(.orange)
-                    //.background(Color.white) // Reveals tappable area (for testing)
+                //.background(Color.white) // Reveals tappable area (for testing)
                     .contentShape(Circle())
                     .clipShape(Circle())
                     .onTapGesture {
@@ -152,14 +144,55 @@ struct ContentView: View {
             }
         }
     }    
+    
+    func mapView(elements: [Element]) -> some View {
+        MapView(elements: $elements)
+            .environmentObject(viewModel)
+    }
+    
+    struct MapView: UIViewRepresentable {
+        @Binding var elements: [Element]?
+        @EnvironmentObject var viewModel: ContentViewModel
+        
+        func makeCoordinator() -> ContentViewModel {
+            viewModel
+        }
+        
+        func makeUIView(context: Context) -> MKMapView {
+            let mapView = MKMapView()
+            mapView.delegate = context.coordinator
+            setupCluster(mapView: mapView)
+            return mapView
+        }
+        
+        func updateUIView(_ mapView: MKMapView, context: Context) {
+            mapView.removeAnnotations(mapView.annotations)
+            
+            if let elements = elements {
+                mapView.addAnnotations(elements.compactMap { element -> Annotation? in
+                    guard let _ = element.osmJSON?.lat, let _ = element.osmJSON?.lon else { return nil }
+                    let annotation = Annotation(element: element)
+                    return annotation
+                })
+            }
+        }
+        
+        // Setup Cluster
+        private func setupCluster(mapView: MKMapView) {
+            let clusteringIdentifier = "Cluster"
+            mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: clusteringIdentifier)
+        }
+    }
 }
 
 // Getting user's location
-final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate {
+final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1))
     
     let locationManager = CLLocationManager()
+    
+    weak var mapView: MKMapView?
     
     override init() {
         super.init()
@@ -183,9 +216,90 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         
     }
     
+    // locationManager Function
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // TODO: Need better error handling
         print(error.localizedDescription)
     }
     
+    // mapView Function
+    func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+        let reuseIdentifier = "AnnotationView"
+        var view: MKMarkerAnnotationView?
+        
+        if let cluster = annotation as? MKClusterAnnotation {
+            view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
+            view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+            view?.markerTintColor = .orange
+            view?.glyphText = String(cluster.memberAnnotations.count)
+        } else if let annotation = annotation as? Annotation {
+            if annotation.element == nil {
+                fatalError("Failed to get element from annotation.")
+            }
+            view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
+            view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+            view?.canShowCallout = true
+            view?.markerTintColor = .orange
+            view?.glyphText = nil
+            view?.glyphTintColor = .white
+            view?.glyphImage = UIImage(systemName: "location.circle.fill")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+            view?.displayPriority = .required
+        }
+        return view
+    }
+}
+
+// Annotation Class
+class Annotation: NSObject, Identifiable, MKAnnotation {
+    static func == (lhs: Annotation, rhs: Annotation) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    let id = UUID()
+    let element: Element?
+    
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: element?.osmJSON?.lat ?? 0, longitude: element?.osmJSON?.lon ?? 0)
+    }
+    
+    var title: String? {
+        element?.osmJSON?.tags?["name"]
+    }
+    
+    init(element: Element) {
+        self.element = element
+    }
+}
+
+// AnnotationView Class
+class AnnotationView: MKMarkerAnnotationView {
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        updateView()
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override var annotation: MKAnnotation? {
+        willSet {
+            updateView()
+        }
+    }
+    
+    // UpdateView Function
+    private func updateView() {
+        guard let annotation = annotation else { return }
+        if let _ = annotation as? Annotation {
+            clusteringIdentifier = "element"
+        } else if let cluster = annotation as? MKClusterAnnotation {
+            clusteringIdentifier = nil
+            displayPriority = .defaultHigh
+            let totalCount = cluster.memberAnnotations.count
+            markerTintColor = totalCount < 5 ? .orange : totalCount < 10 ? .yellow : .red
+            glyphText = "\(totalCount)"
+        }
+        canShowCallout = true
+    }
 }
