@@ -1,22 +1,45 @@
 import SwiftUI
+import CoreLocation
 
 // MARK: - Element
 struct Element: Codable, Identifiable {
-    //let UUID = UUID()
     let id: String
+    let uuid: UUID
     let osmJSON: OsmJSON?
     let tags: Tags?
     let createdAt: String
     let updatedAt, deletedAt: String?
+    var address: Address?
     
     enum CodingKeys: String, CodingKey {
         case id
+        case uuid 
         case osmJSON = "osm_json"
         case tags
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"
     }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        uuid = UUID() // generate UUID during initialization
+        osmJSON = try container.decodeIfPresent(OsmJSON.self, forKey: .osmJSON)
+        tags = try container.decodeIfPresent(Tags.self, forKey: .tags)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+    }
+}
+
+// MARK: - Address
+struct Address {
+    let streetNameAndNumber: String?
+    let cityOrTownName: String?
+    let postalCode: String?
+    let regionOrStateName: String?
+    let countryName: String?
 }
 
 // MARK: - OsmJSON
@@ -117,6 +140,9 @@ enum CategoryPlural: String, Codable {
 }
 
 class APIManager {
+    
+    private let geocoder = CLGeocoder()
+    
     func getElements(completion: @escaping ([Element]?) -> Void) {
         guard let url = URL(string: "https://api.btcmap.org/v2/elements/") else {
             completion(nil)
@@ -128,7 +154,27 @@ class APIManager {
                 return
             }
             do {
-                let elements = try JSONDecoder().decode([Element].self, from: data)
+                var elements = try JSONDecoder().decode([Element].self, from: data)
+                
+                // Determine the address based on the coordinates and store in the address field of the array
+                for index in 0..<elements.count {
+                    guard let lat = elements[index].osmJSON?.lat, let lon = elements[index].osmJSON?.lon else {
+                        continue
+                    }
+                    let location = CLLocation(latitude: lat, longitude: lon)
+                    self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+                        if let placemark = placemarks?.first {
+                            let address = Address(
+                                streetNameAndNumber: (placemark.subThoroughfare ?? "") + " " + (placemark.thoroughfare ?? ""),
+                                cityOrTownName: placemark.locality,
+                                postalCode: placemark.postalCode,
+                                regionOrStateName: placemark.administrativeArea,
+                                countryName: placemark.country
+                            )
+                            elements[index].address = address
+                        }
+                    }
+                }
                 completion(elements)
             } catch let error {
                 print(error)
@@ -138,39 +184,3 @@ class APIManager {
     }
 }
 
-//struct BtcMapAPIView: View {
-//    @State public var elements: [Element]?
-//    let apiManager = APIManager()
-//    
-//    var body: some View {
-//        VStack {
-//            if let elements = elements {
-//                List(elements, id: \.id) { element in
-//                    VStack(alignment: .leading) {
-//                        Text("Element ID: \(element.id)")
-//                            .font(.headline)
-//                        Text("Created At: \(element.createdAt)")
-//                        Text("Latitude: \(element.osmJSON?.lat ?? 0.0)")
-//                        Text("Longitude: \(element.osmJSON?.lon ?? 0.0)")
-//                        Text("Longitude: \(element.osmJSON?.tags)" as String)
-//                        //                        Text("Tags: \(element.tags)" as String)
-//                        if let osmJSON = element.osmJSON, let tags = osmJSON.tags, tags["payment:lightning_contactless"] == "yes" {
-//                            Text("Accepts Lightning Contactless")
-//                        } else {
-//                        }
-//                        
-//                    }
-//                }
-//            } else {
-//                Text("Loading...")
-//            }
-//        }
-//        .onAppear {
-//            apiManager.getElements { elements in
-//                DispatchQueue.main.async {
-//                    self.elements = elements
-//                }
-//            }
-//        }
-//    }
-//}

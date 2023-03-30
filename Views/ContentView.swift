@@ -125,7 +125,7 @@ struct ContentView: View {
             {
                 // **** Bottom Sheet Scroll View ****
                 // Set the bottom sheet content in a VStack.                    
-                BusinessesListView()
+                BusinessesListView(elements: elements ?? [])
                 
                 // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
                     .sheet(isPresented: $showingAbout) {
@@ -170,9 +170,14 @@ struct ContentView: View {
             
             if let elements = elements {
                 mapView.addAnnotations(elements.compactMap { element -> Annotation? in
-                    guard let _ = element.osmJSON?.lat, let _ = element.osmJSON?.lon else { return nil }
-                    let annotation = Annotation(element: element)
-                    return annotation
+                    guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
+                    let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                    let distance = viewModel.distanceFromCenter(location: location)
+                    if distance <= 25 * 1609.344 { // miles to meters
+                        let annotation = Annotation(element: element)
+                        return annotation
+                    }
+                    return nil
                 })
             }
         }
@@ -246,6 +251,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             view?.displayPriority = .required
         }
         return view
+    }
+    
+    func distanceFromCenter(location: CLLocationCoordinate2D) -> CLLocationDistance {
+        let centerLocation = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+        let annotationLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
+        return centerLocation.distance(from: annotationLocation)
     }
 }
 
