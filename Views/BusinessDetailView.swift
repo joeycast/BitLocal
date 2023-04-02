@@ -31,7 +31,7 @@ struct BusinessDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
-                    if let website = element.osmJSON?.tags?["website"] {
+                    if let website = element.osmJSON?.tags?["website"] ?? element.osmJSON?.tags?["contact:website"] {
                         Link(destination: URL(string: website)!) {
                             Text(website)
                                 .lineLimit(1)
@@ -49,7 +49,7 @@ struct BusinessDetailView: View {
                     
                     // TODO: Apply formatting to phone
                     // TODO: Strip the junk out of phone numbers before storing instead of here.
-                    if let phone = element.osmJSON?.tags?["phone"], let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
+                    if let phone = element.osmJSON?.tags?["phone"] ?? element.osmJSON?.tags?["contact:phone"], let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
                         Link(destination: url) {
                             Text(phone)
                                 .lineLimit(1)
@@ -57,6 +57,7 @@ struct BusinessDetailView: View {
                     } else {
                         Text("No phone number available.")
                     }
+
                 }
                 VStack (alignment: .leading, spacing: 3) {
                     Text("Opening Hours")
