@@ -9,10 +9,12 @@ struct BusinessesListView: View {
         NavigationView {
             List(elements.prefix(100), id: \.uuid) { element in
                 let viewModel = ElementCellViewModel(element: element)
-                ElementCell(viewModel: viewModel)
-                    .onAppear {
-                        viewModel.updateAddress()
-                    }
+                NavigationLink(destination: BusinessDetailView(element: element), label: {
+                    ElementCell(viewModel: viewModel)
+                        .onAppear {
+                            viewModel.updateAddress()
+                        }
+                })
             }
             .listStyle(.plain)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -51,12 +53,18 @@ struct ElementCell: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
-                if (viewModel.element.osmJSON?.tags?["payment:onchain"] == "yes" || viewModel.element.osmJSON?.tags?["payment:bitcoin"] == "yes") && viewModel.element.osmJSON?.tags?["payment:lightning"] == nil {
+                // Accepts Bitcoin on Chain only
+                if (acceptsBitcoinOnChain(element: viewModel.element) && 
+                    !acceptsLightning(element: viewModel.element) &&
+                    !acceptsContactlessLightning(element: viewModel.element)) {
                     Image(systemName: "bitcoinsign.circle.fill")
                         .foregroundColor(.orange)
                         .frame(alignment: .trailing)
                 }
-                else if (viewModel.element.osmJSON?.tags?["payment:onchain"] == "yes" || viewModel.element.osmJSON?.tags?["payment:bitcoin"] == "yes") && viewModel.element.osmJSON?.tags?["payment:lightning"] == "yes" {
+                // Accepts Bitcoin on Chain and Lightning
+                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
+                         acceptsLightning(element: viewModel.element) &&
+                         !acceptsContactlessLightning(element: viewModel.element)) {
                     
                     Image(systemName: "bitcoinsign.circle.fill")
                         .foregroundColor(.orange)
@@ -65,10 +73,62 @@ struct ElementCell: View {
                     Image(systemName: "bolt.circle.fill")
                         .foregroundColor(.orange)
                 }
-                else if (viewModel.element.osmJSON?.tags?["payment:onchain"] == nil || viewModel.element.osmJSON?.tags?["payment:bitcoin"] == nil ) && viewModel.element.osmJSON?.tags?["payment:lightning"] == "yes" {
+                // Accepts Bitcoin on Chain, Lightning, and Contactless Lightning
+                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
+                         acceptsLightning(element: viewModel.element) &&
+                         acceptsContactlessLightning(element: viewModel.element)) {
+                    
+                    Image(systemName: "bitcoinsign.circle.fill")
+                        .foregroundColor(.orange)
+                        .frame(alignment: .trailing)
+                    
+                    Image(systemName: "bolt.circle.fill")
+                        .foregroundColor(.orange)
+                    
+                    Image(systemName: "wave.3.right.circle.fill")
+                        .foregroundColor(.orange)
+                }
+                // Accepts Lightning only
+                else if (!acceptsBitcoinOnChain(element: viewModel.element) && 
+                         acceptsLightning(element: viewModel.element) &&
+                         !acceptsContactlessLightning(element: viewModel.element)) {
+                    
                     Image(systemName: "bolt.circle.fill")
                         .foregroundColor(.orange)
                         .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                // Accepts Lightning and Contactless Lightning
+                else if (!acceptsBitcoinOnChain(element: viewModel.element) && 
+                         acceptsLightning(element: viewModel.element) &&
+                         acceptsContactlessLightning(element: viewModel.element)) {
+                    
+                    Image(systemName: "bolt.circle.fill")
+                        .foregroundColor(.orange)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    
+                    Image(systemName: "wave.3.right.circle.fill")
+                        .foregroundColor(.orange)
+                }
+                // Accepts Bitcoin on Chain and Contactless Lightning
+                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
+                         !acceptsLightning(element: viewModel.element) &&
+                         acceptsContactlessLightning(element: viewModel.element)) {
+                    
+                    Image(systemName: "bitcoinsign.circle.fill")
+                        .foregroundColor(.orange)
+                        .frame(alignment: .trailing)
+                    
+                    Image(systemName: "wave.3.right.circle.fill")
+                        .foregroundColor(.orange)
+                }
+                // Accepts Contactless Lightning only
+                else if (!acceptsBitcoinOnChain(element: viewModel.element) && 
+                         !acceptsLightning(element: viewModel.element) &&
+                         acceptsContactlessLightning(element: viewModel.element)) {
+                    
+                    Image(systemName: "wave.3.right.circle.fill")
+                        .foregroundColor(.orange)
+                        .frame(alignment: .trailing)
                 }
             }
         }
@@ -98,10 +158,10 @@ class ElementCellViewModel: ObservableObject {
             if let placemark = placemarks?.first {
                 let address = Address(
                     streetNameAndNumber: (placemark.subThoroughfare ?? "") + " " + (placemark.thoroughfare ?? ""),
-                    cityOrTownName: placemark.locality,
-                    postalCode: placemark.postalCode,
-                    regionOrStateName: placemark.administrativeArea,
-                    countryName: placemark.country
+                    cityOrTownName: placemark.locality ?? "",
+                    postalCode: placemark.postalCode ?? "",
+                    regionOrStateName: placemark.administrativeArea ?? "",
+                    countryName: placemark.country ?? ""
                 )
                 DispatchQueue.main.async {
                     self.address = address
@@ -110,19 +170,3 @@ class ElementCellViewModel: ObservableObject {
         }
     }
 }
-
-//struct BusinessesListView_Previews: PreviewProvider {
-//    static var previews: some View {
-//        let elements = [Element](repeating: Element(id: UUID().uuidString, 
-//                                                    uuid: UUID(), 
-//                                                    osmJSON: nil, 
-//                                                    tags: nil, 
-//                                                    createdAt: "", 
-//                                                    updatedAt: "", 
-//                                                    deletedAt: "", 
-//                                                    address: Address(street: "", city: "", zip: "", state: "", country: "")), 
-//                                                     count: 100)
-//        return BusinessesListView(elements: elements)
-//    }
-//}
-

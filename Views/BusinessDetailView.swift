@@ -2,12 +2,12 @@ import SwiftUI
 
 struct BusinessDetailView: View {
     
-    var location: Location
+    var element: Element
     
     var body: some View {
         List {
             // Business Description Section
-            Text(location.businessDescription)
+            Text(element.osmJSON?.tags?["description"] ?? "No description available.")
             
             // Business Details Section
             // TODO: Allow Business Detail elements to be copied.
@@ -18,12 +18,9 @@ struct BusinessDetailView: View {
                     Text("Address")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    
-                    HStack {
-                        // TODO: Add country?
-                        Link(destination: URL(string: "maps://?saddr=&daddr=\(location.coordinate.latitude),\(location.coordinate.longitude)")!) {
-                            Text("\(location.street) \(location.street2)\n\(location.city), \(location.state) \(location.zip)")
-                        }
+            
+                    Link(destination: URL(string: "maps://?saddr=&daddr=\(element.osmJSON?.lat ?? 0.0),\(element.osmJSON?.lon ?? 0.0)")!) {
+                        Text("\(element.address?.streetNameAndNumber ?? "")\n\(element.address?.cityOrTownName ?? ""), \(element.address?.regionOrStateName ?? "") \(element.address?.postalCode ?? "")")
                     }
                 }
                 
@@ -34,9 +31,13 @@ struct BusinessDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
-                    Link(destination: URL(string:"\(location.website)")!) {
-                        Text(location.website)
-                            .lineLimit(1)
+                    if let website = element.osmJSON?.tags?["website"] {
+                        Link(destination: URL(string: website)!) {
+                            Text(website)
+                                .lineLimit(1)
+                        }
+                    } else {
+                        Text("No website available.")
                     }
                 }
                 
@@ -47,8 +48,25 @@ struct BusinessDetailView: View {
                         .foregroundColor(.secondary)
                     
                     // TODO: Apply formatting to phone
-                    Link(destination: URL(string:"tel://\(location.phone)")!) {
-                        Text(location.phone)
+                    // TODO: Strip the junk out of phone numbers before storing instead of here.
+                    if let phone = element.osmJSON?.tags?["phone"], let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
+                        Link(destination: url) {
+                            Text(phone)
+                                .lineLimit(1)
+                        }
+                    } else {
+                        Text("No phone number available.")
+                    }
+                }
+                VStack (alignment: .leading, spacing: 3) {
+                    Text("Opening Hours")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    if let openingHours = element.osmJSON?.tags?["opening_hours"] {
+                        Text(openingHours)
+                    } else {
+                        Text("No opening hour data available.")
                     }
                 }
             }
@@ -56,33 +74,55 @@ struct BusinessDetailView: View {
             // Payment Details Section
             Section(header: Text("Payment Details")) {
                 // Business Accepts Bitcoin
-                if location.acceptsBitcoin == true {
+                if acceptsBitcoinOnChain(element: element) {
                     HStack {
                         Image(systemName: "bitcoinsign.circle.fill")
                             .foregroundColor(.orange)
-                        Text("Accepts Bitcoin")
+                        Text("Accepts Bitcoin on Chain")
                     }
                 }
                 
                 // Business Accepts Lightning
-                if location.acceptsLightning == true {
+                if acceptsLightning(element: element) {
                     HStack {
                         Image(systemName: "bolt.circle.fill")
                             .foregroundColor(.orange)
                         Text("Accepts Bitcoin over Lightning")
                     }
                 }  
+                if acceptsContactlessLightning(element: element) {
+                    HStack {
+                        Image(systemName: "wave.3.right.circle.fill")
+                            .foregroundColor(.orange)
+                        Text("Accepts Contactless Lightning")
+                    }
+                }  
+            }
+            Section(header: Text("Troubleshooting")) {
+                Text("ID: \(element.id)")
+                Text("Created at: \(element.createdAt)")
+                Text("Updated at: \(element.updatedAt ?? "")")
+                Text("Deleted at: \(element.deletedAt ?? "")")
+                Text("Description: \(element.osmJSON?.tags?["description"] ?? "")")                
+                Text("Phone: \(element.osmJSON?.tags?["phone"] ?? "")")
+                //Text("Contact:Phone: \(element.osmJSON?.tags?["contact:phone"] ?? "")")
+                Text("Website: \(element.osmJSON?.tags?["website"] ?? "")")
+                //Text("Contact:Website: \(element.osmJSON?.tags?["contact:website"] ?? "")")
+                //Text("Opening Hours: \(element.osmJSON?.tags?["opening_hours"] ?? "")")
+                Text("Accepts Bitcoin on Chain: \(element.osmJSON?.tags?["payment:onchain"] ?? "no")")
+                Text("Accepts Lightning: \(element.osmJSON?.tags?["payment:lightning"] ?? "no")")
+                Text("Accepts Contactless Lightning: \(element.osmJSON?.tags?["payment:lightning_contactless"] ?? "no")")
             }
         }
         // Business Name
-        .navigationTitle(location.name)
+        .navigationTitle(element.osmJSON?.tags?["name"] ?? "[Name Not Available]")
         .navigationBarTitleDisplayMode(.large)
-        //.listStyle(.grouped)
+        //.listStyle(.grouped)I
     }
 }
 
-struct BusinessDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        BusinessDetailView(location: LocationList.locations.first!)
-    }
-}
+//struct BusinessDetailView_Previews: PreviewProvider {
+//    static var previews: some View {
+//        BusinessDetailView(element: Element)
+//    }
+//}

@@ -96,6 +96,7 @@ struct Tags: Codable {
     let paymentProvider: String?
     let paymentURI: String?
     
+    // TODO: Add more here, like bitcoin/lightning/phone/website?
     enum CodingKeys: String, CodingKey {
         case category
         case iconAndroid = "icon:android"

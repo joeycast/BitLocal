@@ -228,6 +228,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     // mapView Function
+    // TODO: Need to update to not show records that have been deleted. There seem to be some records that have a update date that is later than a deleted date. Why?
     func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
         let reuseIdentifier = "AnnotationView"
         var view: MKMarkerAnnotationView?
