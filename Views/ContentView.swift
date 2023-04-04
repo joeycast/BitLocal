@@ -165,6 +165,7 @@ struct ContentView: View {
             return mapView
         }
         
+        // Update annotations on map
         func updateUIView(_ mapView: MKMapView, context: Context) {
             mapView.removeAnnotations(mapView.annotations)
             
@@ -173,7 +174,8 @@ struct ContentView: View {
                     guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
                     let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                     let distance = viewModel.distanceFromCenter(location: location)
-                    if distance <= 25 * 1609.344 { // miles to meters
+                    if distance <= (25 * 1609.344), // miles to meters
+                        elementShouldBeShownAsAnnotation(element: element) { 
                         let annotation = Annotation(element: element)
                         return annotation
                     }

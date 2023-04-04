@@ -1,6 +1,6 @@
 import SwiftUI
 
-// if on chain, lightning and contactless are missing or no and payment:bitcoin or currency:XBT = yes, Accepts Bitcoin = true
+// If on chain, lightning and contactless are missing or no and payment:bitcoin or currency:XBT = yes, Accepts Bitcoin = true
 func acceptsBitcoin(element: Element) -> Bool {
     if ((element.osmJSON?.tags?["payment:bitcoin"] == "yes") || 
         (element.osmJSON?.tags?["currency:XBT"] == "yes")) && 
