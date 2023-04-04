@@ -7,7 +7,9 @@ struct BusinessDetailView: View {
     var body: some View {
         List {
             // Business Description Section
-            Text(element.osmJSON?.tags?["description"] ?? "No description available.")
+            Text(element.osmJSON?.tags?["description"] ?? 
+                 element.osmJSON?.tags?["description:en"] ?? 
+                 "No description available.")
             
             // Business Details Section
             // TODO: Allow Business Detail elements to be copied.
@@ -74,6 +76,16 @@ struct BusinessDetailView: View {
             
             // Payment Details Section
             Section(header: Text("Payment Details")) {
+                
+                // Accepts Bitcoin (details regarding on chain/lightning/contactless lightning not available)
+                if acceptsBitcoin(element: element) {
+                    HStack {
+                        Image(systemName: "bitcoinsign.circle.fill")
+                            .foregroundColor(.orange)
+                        Text("Accepts Bitcoin")
+                    }
+                }
+                
                 // Business Accepts Bitcoin
                 if acceptsBitcoinOnChain(element: element) {
                     HStack {

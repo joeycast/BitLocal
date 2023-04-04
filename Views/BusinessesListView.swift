@@ -53,8 +53,15 @@ struct ElementCell: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
+                // Accepts Bitcoin (details regarding on chain/lightning/contactless lightning not available)
+                if (acceptsBitcoin(element: viewModel.element)) {
+                    Image(systemName: "bitcoinsign.circle.fill")
+                        .foregroundColor(.orange)
+                        .frame(alignment: .trailing)
+                }
+                
                 // Accepts Bitcoin on Chain only
-                if (acceptsBitcoinOnChain(element: viewModel.element) && 
+                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
                     !acceptsLightning(element: viewModel.element) &&
                     !acceptsContactlessLightning(element: viewModel.element)) {
                     Image(systemName: "bitcoinsign.circle.fill")
