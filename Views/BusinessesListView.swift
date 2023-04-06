@@ -22,7 +22,6 @@ struct BusinessesListView: View {
     }
 }
 
-
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
@@ -31,6 +30,7 @@ struct ElementCell: View {
         VStack(alignment: .leading, spacing: 2) {
             
             HStack {
+                // Business Name
                 Text(viewModel.element.osmJSON?.tags?["name"] ?? "name not available")
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -38,13 +38,21 @@ struct ElementCell: View {
                     .padding(.vertical, 5)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
+                // Distance from location
                 Text("2.1 Miles")
                     .frame(maxWidth: 70, alignment: .trailing)
             }
             
-            Text(viewModel.address?.streetNameAndNumber ?? "")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            // Street number and name
+            if let streetNumber = viewModel.address?.streetNumber {
+                Text("\(streetNumber) \(viewModel.address?.streetName ?? "")".trimmingCharacters(in: .whitespaces))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("\(viewModel.address?.streetName ?? "")")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
             
             HStack {
                 Text("\(viewModel.address?.cityOrTownName ?? ""), \(viewModel.address?.regionOrStateName ?? "") \(viewModel.address?.postalCode ?? "")")
@@ -52,6 +60,7 @@ struct ElementCell: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
+
                 
                 // Accepts Bitcoin (details regarding on chain/lightning/contactless lightning not available)
                 if (acceptsBitcoin(element: viewModel.element)) {
@@ -163,13 +172,22 @@ class ElementCellViewModel: ObservableObject {
         let location = CLLocation(latitude: lat, longitude: lon)
         geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
             if let placemark = placemarks?.first {
+                let streetNumber = placemark.subThoroughfare ?? ""
+                let streetName = placemark.thoroughfare ?? ""
+                let cityOrTownName = placemark.locality ?? ""
+                let postalCode = placemark.postalCode ?? ""
+                let regionOrStateName = placemark.administrativeArea ?? ""
+                let countryName = placemark.country ?? ""
+                
                 let address = Address(
-                    streetNameAndNumber: (placemark.subThoroughfare ?? "") + " " + (placemark.thoroughfare ?? ""),
-                    cityOrTownName: placemark.locality ?? "",
-                    postalCode: placemark.postalCode ?? "",
-                    regionOrStateName: placemark.administrativeArea ?? "",
-                    countryName: placemark.country ?? ""
+                    streetNumber: streetNumber,
+                    streetName: streetName,
+                    cityOrTownName: cityOrTownName,
+                    postalCode: postalCode,
+                    regionOrStateName: regionOrStateName,
+                    countryName: countryName
                 )
+                
                 DispatchQueue.main.async {
                     self.address = address
                 }

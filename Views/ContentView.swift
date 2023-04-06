@@ -3,6 +3,7 @@ import SwiftUI
 import MapKit
 import CoreLocationUI
 
+@available(iOS 16.4, *)
 struct ContentView: View {
     
     @StateObject private var viewModel = ContentViewModel()
@@ -175,7 +176,7 @@ struct ContentView: View {
                     let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                     let distance = viewModel.distanceFromCenter(location: location)
                     if distance <= (25 * 1609.344), // miles to meters
-                        elementShouldBeShownAsAnnotation(element: element) { 
+                       elementShouldBeShownAsAnnotation(element: element) { 
                         let annotation = Annotation(element: element)
                         return annotation
                     }

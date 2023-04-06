@@ -6,6 +6,7 @@ struct BusinessDetailView: View {
     
     var body: some View {
         List {
+
             // Business Description Section
             Text(element.osmJSON?.tags?["description"] ?? 
                  element.osmJSON?.tags?["description:en"] ?? 
@@ -22,7 +23,7 @@ struct BusinessDetailView: View {
                         .foregroundColor(.secondary)
             
                     Link(destination: URL(string: "maps://?saddr=&daddr=\(element.osmJSON?.lat ?? 0.0),\(element.osmJSON?.lon ?? 0.0)")!) {
-                        Text("\(element.address?.streetNameAndNumber ?? "")\n\(element.address?.cityOrTownName ?? ""), \(element.address?.regionOrStateName ?? "") \(element.address?.postalCode ?? "")")
+                        Text("\(element.address?.streetNumber ?? "") \(element.address?.streetName ?? "")\n\(element.address?.cityOrTownName ?? ""), \(element.address?.regionOrStateName ?? "") \(element.address?.postalCode ?? "")")
                     }
                 }
                 
@@ -51,7 +52,7 @@ struct BusinessDetailView: View {
                     
                     // TODO: Apply formatting to phone
                     // TODO: Strip the junk out of phone numbers before storing instead of here.
-                    if let phone = element.osmJSON?.tags?["phone"] ?? element.osmJSON?.tags?["contact:phone"], let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
+                    if let phone = element.osmJSON?.tags?["phone"] ?? element.osmJSON?.tags?["contact:phone"], let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "+", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
                         Link(destination: url) {
                             Text(phone)
                                 .lineLimit(1)
@@ -59,7 +60,6 @@ struct BusinessDetailView: View {
                     } else {
                         Text("No phone number available.")
                     }
-
                 }
                 VStack (alignment: .leading, spacing: 3) {
                     Text("Opening Hours")

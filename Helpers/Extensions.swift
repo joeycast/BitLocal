@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 
+@available(iOS 16.4, *)
 // Bottom Sheet
 extension View {
     @ViewBuilder
@@ -22,18 +23,23 @@ extension View {
                     .presentationDetents(presentationDetents)
                     .presentationDragIndicator(dragIndicator)
                     .interactiveDismissDisabled(interactiveDisabled)
+                    .presentationBackgroundInteraction(.enabled)
                     .onAppear {
                         guard let windows = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
                             return
                         }
-                        if let controller = windows.windows.first?.rootViewController?.presentedViewController, let sheet = controller.presentationController as? UISheetPresentationController {
+                        if let controller = windows.windows.first?.rootViewController?.presentedViewController, 
+                            let sheet = controller.presentationController as? UISheetPresentationController {
+                            
+                            // Ensures About sheet button does not inadvertently change to dimmed 
+                            controller.presentedViewController?.view.tintAdjustmentMode = .normal
+                            
                             sheet.largestUndimmedDetentIdentifier = largestUndimmedIdentifier
                             sheet.preferredCornerRadius = sheetCornerRadius
                         } else {
                             print("NO CONTROLLER FOUND")
                         }
                     }
-                
             }
     }
 }

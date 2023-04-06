@@ -35,11 +35,21 @@ struct Element: Codable, Identifiable {
 
 // MARK: - Address
 struct Address {
-    let streetNameAndNumber: String?
+    let streetNumber: String?
+    let streetName: String?
     let cityOrTownName: String?
     let postalCode: String?
     let regionOrStateName: String?
     let countryName: String?
+    
+    init(streetNumber: String?, streetName: String?, cityOrTownName: String?, postalCode: String?, regionOrStateName: String?, countryName: String?) {
+        self.streetNumber = streetNumber
+        self.streetName = streetName
+        self.cityOrTownName = cityOrTownName
+        self.postalCode = postalCode
+        self.regionOrStateName = regionOrStateName
+        self.countryName = countryName
+    }
 }
 
 // MARK: - OsmJSON
@@ -165,13 +175,22 @@ class APIManager {
                     let location = CLLocation(latitude: lat, longitude: lon)
                     self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
                         if let placemark = placemarks?.first {
+                            let streetNumber = placemark.subThoroughfare
+                            let streetName = placemark.thoroughfare
+                            let cityOrTownName = placemark.locality
+                            let postalCode = placemark.postalCode
+                            let regionOrStateName = placemark.administrativeArea
+                            let countryName = placemark.country
+                            
                             let address = Address(
-                                streetNameAndNumber: (placemark.subThoroughfare ?? "") + " " + (placemark.thoroughfare ?? ""),
-                                cityOrTownName: placemark.locality,
-                                postalCode: placemark.postalCode,
-                                regionOrStateName: placemark.administrativeArea,
-                                countryName: placemark.country
+                                streetNumber: streetNumber,
+                                streetName: streetName,
+                                cityOrTownName: cityOrTownName,
+                                postalCode: postalCode,
+                                regionOrStateName: regionOrStateName,
+                                countryName: countryName
                             )
+                            
                             elements[index].address = address
                         }
                     }
