@@ -168,6 +168,7 @@ struct ContentView: View {
         
         // Update annotations on map
         func updateUIView(_ mapView: MKMapView, context: Context) {
+            mapView.setRegion(viewModel.region, animated: true) // Makes sure region is set on map.
             mapView.removeAnnotations(mapView.annotations)
             
             if let elements = elements {
@@ -196,7 +197,7 @@ struct ContentView: View {
 // Getting user's location
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
-    @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1))
+    @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3))
     
     let locationManager = CLLocationManager()
     
@@ -231,7 +232,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     // mapView Function
-    // TODO: Need to update to not show records that have been deleted. There seem to be some records that have a update date that is later than a deleted date. Why?
     func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
         let reuseIdentifier = "AnnotationView"
         var view: MKMarkerAnnotationView?
