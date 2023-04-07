@@ -2,14 +2,20 @@ import UIKit
 import SwiftUI
 import MapKit
 import CoreLocationUI
+import Combine
 
 @available(iOS 16.4, *)
 struct ContentView: View {
     
     @StateObject private var viewModel = ContentViewModel()
+    
     @State public var showingAbout = false
     @State public var userSearchText = ""
     @State public var elements: [Element]?
+    @State public var visibleElements: [Element] = []
+    
+    @State private var cancellable: Cancellable?
+    @State private var mapStoppedMovingCancellable: Cancellable?
     
     let appName = "BitLocal"   
     let apiManager = APIManager()
@@ -126,7 +132,7 @@ struct ContentView: View {
             {
                 // **** Bottom Sheet Scroll View ****
                 // Set the bottom sheet content in a VStack.                    
-                BusinessesListView(elements: elements ?? [])
+                BusinessesListView(elements: visibleElements)
                 
                 // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
                     .sheet(isPresented: $showingAbout) {
@@ -143,6 +149,12 @@ struct ContentView: View {
                     self.elements = elements
                 }
             }
+            cancellable = viewModel.visibleElementsSubject.sink(receiveValue: { updatedVisibleElements in
+                visibleElements = updatedVisibleElements
+            })
+            mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {
+                // Any additional logic that should be executed when the map stops moving can be added here.
+            })
         }
     }    
     
@@ -200,7 +212,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3))
     
     let locationManager = CLLocationManager()
+    let visibleElementsSubject = PassthroughSubject<[Element], Never>()
+    let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
     
+    private var debounceTimer: Cancellable?
     weak var mapView: MKMapView?
     
     override init() {
@@ -261,6 +276,18 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let centerLocation = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
         let annotationLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
         return centerLocation.distance(from: annotationLocation)
+    }
+    
+    func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
+        debounceTimer?.cancel()
+        debounceTimer = Just(())
+            .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
+                let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
+                self?.visibleElementsSubject.send(visibleElements)
+                self?.mapStoppedMovingSubject.send(())
+            }
     }
 }
 
