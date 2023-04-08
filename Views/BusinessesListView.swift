@@ -8,17 +8,24 @@ struct BusinessesListView: View {
     
     var body: some View {
         NavigationView {
-            List(elements.prefix(100), id: \.uuid) { element in
-                let viewModel = ElementCellViewModel(element: element, userLocation: userLocation)
-                NavigationLink(destination: BusinessDetailView(element: element, userLocation: userLocation), label: {
-                    ElementCell(viewModel: viewModel)
-                        .onAppear {
-                            viewModel.updateAddress()
-                        }
-                })
+            if elements.isEmpty {
+                Text("No locations found.")
+                    .foregroundColor(.gray)
+                    .font(.title3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else {
+                List(elements.prefix(100), id: \.uuid) { element in
+                    let viewModel = ElementCellViewModel(element: element, userLocation: userLocation)
+                    NavigationLink(destination: BusinessDetailView(element: element, userLocation: userLocation), label: {
+                        ElementCell(viewModel: viewModel)
+                            .onAppear {
+                                viewModel.updateAddress()
+                            }
+                    })
+                }
+                .listStyle(.plain)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .listStyle(.plain)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
