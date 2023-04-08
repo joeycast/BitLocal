@@ -78,91 +78,7 @@ struct ElementCell: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                
-                // Accepts Bitcoin (details regarding on chain/lightning/contactless lightning not available)
-                if (acceptsBitcoin(element: viewModel.element)) {
-                    Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(alignment: .trailing)
-                }
-                
-                // Accepts Bitcoin on Chain only
-                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
-                    !acceptsLightning(element: viewModel.element) &&
-                    !acceptsContactlessLightning(element: viewModel.element)) {
-                    Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(alignment: .trailing)
-                }
-                // Accepts Bitcoin on Chain and Lightning
-                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
-                         acceptsLightning(element: viewModel.element) &&
-                         !acceptsContactlessLightning(element: viewModel.element)) {
-                    
-                    Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(alignment: .trailing)
-                    
-                    Image(systemName: "bolt.circle.fill")
-                        .foregroundColor(.orange)
-                }
-                // Accepts Bitcoin on Chain, Lightning, and Contactless Lightning
-                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
-                         acceptsLightning(element: viewModel.element) &&
-                         acceptsContactlessLightning(element: viewModel.element)) {
-                    
-                    Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(alignment: .trailing)
-                    
-                    Image(systemName: "bolt.circle.fill")
-                        .foregroundColor(.orange)
-                    
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .foregroundColor(.orange)
-                }
-                // Accepts Lightning only
-                else if (!acceptsBitcoinOnChain(element: viewModel.element) && 
-                         acceptsLightning(element: viewModel.element) &&
-                         !acceptsContactlessLightning(element: viewModel.element)) {
-                    
-                    Image(systemName: "bolt.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-                // Accepts Lightning and Contactless Lightning
-                else if (!acceptsBitcoinOnChain(element: viewModel.element) && 
-                         acceptsLightning(element: viewModel.element) &&
-                         acceptsContactlessLightning(element: viewModel.element)) {
-                    
-                    Image(systemName: "bolt.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .foregroundColor(.orange)
-                }
-                // Accepts Bitcoin on Chain and Contactless Lightning
-                else if (acceptsBitcoinOnChain(element: viewModel.element) && 
-                         !acceptsLightning(element: viewModel.element) &&
-                         acceptsContactlessLightning(element: viewModel.element)) {
-                    
-                    Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(alignment: .trailing)
-                    
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .foregroundColor(.orange)
-                }
-                // Accepts Contactless Lightning only
-                else if (!acceptsBitcoinOnChain(element: viewModel.element) && 
-                         !acceptsLightning(element: viewModel.element) &&
-                         acceptsContactlessLightning(element: viewModel.element)) {
-                    
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .foregroundColor(.orange)
-                        .frame(alignment: .trailing)
-                }
+                PaymentIcons(element: viewModel.element)
             }
         }
         .onAppear {
@@ -184,32 +100,62 @@ class ElementCellViewModel: ObservableObject {
         self.userLocation = userLocation
     }
     
+    private var geocodeTimer: Timer?
+    
     func updateAddress() {
         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
             return
         }
-        let location = CLLocation(latitude: lat, longitude: lon)
-        geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-            if let placemark = placemarks?.first {
-                let streetNumber = placemark.subThoroughfare ?? ""
-                let streetName = placemark.thoroughfare ?? ""
-                let cityOrTownName = placemark.locality ?? ""
-                let postalCode = placemark.postalCode ?? ""
-                let regionOrStateName = placemark.administrativeArea ?? ""
-                let countryName = placemark.country ?? ""
-                
-                let address = Address(
-                    streetNumber: streetNumber,
-                    streetName: streetName,
-                    cityOrTownName: cityOrTownName,
-                    postalCode: postalCode,
-                    regionOrStateName: regionOrStateName,
-                    countryName: countryName
-                )
-                
-                DispatchQueue.main.async {
-                    self.address = address
+        
+        geocodeTimer?.invalidate()
+        geocodeTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+            let location = CLLocation(latitude: lat, longitude: lon)
+            self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+                if let placemark = placemarks?.first {
+                    let streetNumber = placemark.subThoroughfare ?? ""
+                    let streetName = placemark.thoroughfare ?? ""
+                    let cityOrTownName = placemark.locality ?? ""
+                    let postalCode = placemark.postalCode ?? ""
+                    let regionOrStateName = placemark.administrativeArea ?? ""
+                    let countryName = placemark.country ?? ""
+                    
+                    let address = Address(
+                        streetNumber: streetNumber,
+                        streetName: streetName,
+                        cityOrTownName: cityOrTownName,
+                        postalCode: postalCode,
+                        regionOrStateName: regionOrStateName,
+                        countryName: countryName
+                    )
+                    
+                    DispatchQueue.main.async {
+                        self.address = address
+                    }
                 }
+            }
+        }
+    }
+}
+
+// Payment icons
+struct PaymentIcons: View {
+    let element: Element
+    
+    var body: some View {
+        HStack {
+            if acceptsBitcoin(element: element) {
+                Image(systemName: "bitcoinsign.circle.fill")
+                    .foregroundColor(.orange)
+            }
+            
+            if acceptsLightning(element: element) {
+                Image(systemName: "bolt.circle.fill")
+                    .foregroundColor(.orange)
+            }
+            
+            if acceptsContactlessLightning(element: element) {
+                Image(systemName: "wave.3.right.circle.fill")
+                    .foregroundColor(.orange)
             }
         }
     }
