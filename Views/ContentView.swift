@@ -14,8 +14,10 @@ struct ContentView: View {
     @State public var elements: [Element]?
     @State public var visibleElements: [Element] = []
     
+    @State private var userLocation: CLLocation?
     @State private var cancellable: Cancellable?
     @State private var mapStoppedMovingCancellable: Cancellable?
+    @State private var cancellableUserLocation: Cancellable?
     
     let appName = "BitLocal"   
     let apiManager = APIManager()
@@ -30,7 +32,8 @@ struct ContentView: View {
                 mapView(elements: elements)
                     .ignoresSafeArea()
                     .onAppear {
-                        viewModel.requestAllowOnceLocationPermission()
+                        viewModel.locationManager.requestWhenInUseAuthorization()
+                        viewModel.locationManager.startUpdatingLocation()
                     }
             }
             
@@ -102,7 +105,7 @@ struct ContentView: View {
             }
             
             // **** Location Button ****            
-            // Get current location button. Run requestAllowOnceLocationPermission on tap.
+            // Get current location button. Run requestWhenInUseAuthorization() on tap.
             // TODO: How to make iPad cursor snap to button?
             GeometryReader { geometry in
                 // Use the geometry to determine the size of the screen so I can set the location button at a location that is a percentage of the user's screen size.
@@ -111,7 +114,9 @@ struct ContentView: View {
                 let screenHeight = screenSize.height
                 
                 LocationButton(.currentLocation) {
-                    viewModel.requestAllowOnceLocationPermission()
+                    viewModel.locationManager.requestWhenInUseAuthorization()
+                    viewModel.isUpdatingLocation = true
+                    viewModel.locationManager.startUpdatingLocation()
                 }
                 .tint(.orange)
                 .foregroundColor(.white)
@@ -119,7 +124,19 @@ struct ContentView: View {
                 .labelStyle(.iconOnly)
                 .symbolVariant(.fill)
                 .position(x: screenWidth - 45, y: screenHeight * 0.66)
-                
+                .overlay(
+                    // Progress indicator overlay while the app is checking for the user's location
+                    Group {
+                        if viewModel.isUpdatingLocation {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .opacity(1)
+                        }
+                    }
+                        .animation(.easeInOut, value: viewModel.isUpdatingLocation)
+                        .opacity(viewModel.isUpdatingLocation ? 1 : 0)
+                        .transition(.opacity)
+                )
             }
             
             // **** Bottom Sheet ****            
@@ -152,6 +169,11 @@ struct ContentView: View {
             cancellable = viewModel.visibleElementsSubject.sink(receiveValue: { updatedVisibleElements in
                 visibleElements = updatedVisibleElements
             })
+            
+            cancellableUserLocation = viewModel.userLocationSubject.sink(receiveValue: { updatedUserLocation in
+                userLocation = updatedUserLocation
+            })
+            
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {
                 // Any additional logic that should be executed when the map stops moving can be added here.
             })
@@ -206,12 +228,15 @@ struct ContentView: View {
     }
 }
 
-// Getting user's location
+// ContentViewModel
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3))
+    @Published var userLocation: CLLocation?
+    @Published var isUpdatingLocation = false
     
     let locationManager = CLLocationManager()
+    let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
     let visibleElementsSubject = PassthroughSubject<[Element], Never>()
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
     
@@ -224,9 +249,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     // Request location
-    func requestAllowOnceLocationPermission() {
-        locationManager.requestLocation()
+    func requestWhenInUseLocationPermission() {
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.startUpdatingLocation()
     }
+    
     // Get latest location
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let latestLocation = locations.first else {
@@ -236,8 +263,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         // Update map view to show user location
         DispatchQueue.main.async {
             self.region = MKCoordinateRegion(center: latestLocation.coordinate, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
+            self.userLocation = latestLocation
+            self.userLocationSubject.send(latestLocation)
         }
-        
+        manager.stopUpdatingLocation() // Stop updating location once we have the user's location
+        userLocation = locations.last // Set the user's location in the view model
+        isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
     }
     
     // locationManager Function

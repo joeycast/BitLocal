@@ -18,7 +18,7 @@ let package = Package(
             targets: ["AppModule"],
             displayVersion: "0.1",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .lightningBolt),
+            appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
                 .pad,
@@ -31,7 +31,7 @@ let package = Package(
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
-                .locationWhenInUse(purposeString: "This app needs your location to find businesses local to you.")
+                .locationWhenInUse(purposeString: "BitLocal asks for your location to find businesses near you. Location sharing is not required to use BitLocal.")
             ],
             appCategory: "public.app-category.shopping"
         )

@@ -4,12 +4,13 @@ import MapKit
 struct BusinessesListView: View {
     
     var elements: [Element]
+    var userLocation: CLLocation?
     
     var body: some View {
         NavigationView {
             List(elements.prefix(100), id: \.uuid) { element in
-                let viewModel = ElementCellViewModel(element: element)
-                NavigationLink(destination: BusinessDetailView(element: element), label: {
+                let viewModel = ElementCellViewModel(element: element, userLocation: userLocation)
+                NavigationLink(destination: BusinessDetailView(element: element, userLocation: userLocation), label: {
                     ElementCell(viewModel: viewModel)
                         .onAppear {
                             viewModel.updateAddress()
@@ -39,8 +40,17 @@ struct ElementCell: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 // Distance from location
-                Text("2.1 Miles")
-                    .frame(maxWidth: 70, alignment: .trailing)
+//                Text("2.1 Miles")
+//                    .frame(maxWidth: 70, alignment: .trailing)
+                if let userLocation = viewModel.userLocation,
+                   let lat = viewModel.element.osmJSON?.lat,
+                   let lon = viewModel.element.osmJSON?.lon {
+                    let location = CLLocation(latitude: lat, longitude: lon)
+                    let distanceInMeters = userLocation.distance(from: location)
+                    let distanceInKilometers = distanceInMeters / 1000
+                    Text("\(distanceInKilometers, specifier: "%.2f") km")
+                        .font(.footnote)
+                }
             }
             
             // Street number and name
@@ -158,11 +168,13 @@ class ElementCellViewModel: ObservableObject {
     
     let element: Element
     @Published var address: Address?
+    @Published var userLocation: CLLocation?
     
     private let geocoder = CLGeocoder()
     
-    init(element: Element) {
+    init(element: Element, userLocation: CLLocation?) {
         self.element = element
+        self.userLocation = userLocation
     }
     
     func updateAddress() {

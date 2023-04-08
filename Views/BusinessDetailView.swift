@@ -1,13 +1,18 @@
 import SwiftUI
+import CoreLocation
 
 struct BusinessDetailView: View {
     
     var element: Element
+    var userLocation: CLLocation?
+    
     @StateObject var viewModel: ElementCellViewModel
     
-    init(element: Element) {
+    
+    init(element: Element, userLocation: CLLocation?) {
         self.element = element
-        self._viewModel = StateObject(wrappedValue: ElementCellViewModel(element: element))
+        self.userLocation = userLocation
+        self._viewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation))
     }
     
     var body: some View {
