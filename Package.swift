@@ -16,6 +16,8 @@ let package = Package(
         .iOSApplication(
             name: "BitLocal",
             targets: ["AppModule"],
+            bundleIdentifier: "app.bitlocal.bitlocal",
+            teamIdentifier: "5YUMLYCFT8",
             displayVersion: "0.1",
             bundleVersion: "1",
             appIcon: .asset("AppIcon"),

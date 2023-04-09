@@ -7,17 +7,17 @@ struct AboutView: View {
     @Environment(\.dismiss) var dismiss
     
     // Contribute section links
-    let suggestABusinessEmail = URL(string:"mailto:joey.castagnaro@me.com")!
+    let suggestABusinessEmail = URL(string:"mailto:joe@bitlocal.app")!
     
     // Contact section links
-    let generalSupportInquiriesEmail = URL(string:"mailto:joey.castagnaro@me.com")!
-    let reportABugEmail = URL(string:"mailto:joey.castagnaro@me.com")!
-    let suggestAFeatureEmail = URL(string:"mailto:joey.castagnaro@me.com")!
+    let generalSupportInquiriesEmail = URL(string:"mailto:joe@bitlocal.app")!
+    let reportABugEmail = URL(string:"mailto:joe@bitlocal.app")!
+    let suggestAFeatureEmail = URL(string:"mailto:joe@bitlocal.app")!
     
     // Socials section links
-    let twitterURL = URL(string:"https://twitter.com/joeycast")!
-    let discordURL = URL(string:"https://twitter.com/joeycast")!
-    let nostrURL = URL(string:"https://twitter.com/joeycast")!
+    let twitterURL = URL(string:"https://twitter.com/bitlocal_app")!
+//    let discordURL = URL(string:"https://twitter.com/joeycast")!
+//    let nostrURL = URL(string:"https://twitter.com/joeycast")!
     
     // Other section links
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
@@ -34,7 +34,7 @@ struct AboutView: View {
             Form {
                 // Header section
                 Section {
-                    Text("\(ContentView().appName) is an app developed by Joey Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the Bitcoin community. \(ContentView().appName) is built entirely on iPad.")
+                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the Bitcoin community. \(ContentView().appName) is built entirely on iPad using Swift Playgrounds.")
                 }
                 // Contribute section
                 Section(header: Text("Contribute"), 
@@ -59,16 +59,16 @@ struct AboutView: View {
                 Section(header: Text("Socials")) {
                     Link(destination: twitterURL, 
                          label: {
-                        Label("Twitter", systemImage: "link")    
+                        Label("Twitter", systemImage: "bird")    
                     })
-                    Link(destination: discordURL, 
-                         label: {
-                        Label("Discord", systemImage: "link")    
-                    })
-                    Link(destination: nostrURL, 
-                         label: {
-                        Label("Nostr", systemImage: "link")    
-                    })
+//                    Link(destination: discordURL, 
+//                         label: {
+//                        Label("Discord", systemImage: "link")    
+//                    })
+//                    Link(destination: nostrURL, 
+//                         label: {
+//                        Label("Nostr", systemImage: "link")    
+//                    })
                 }
                 // Other section
                 Section(header: Text("Other")) {
