@@ -203,21 +203,28 @@ struct ContentView: View {
         
         // Update annotations on map
         func updateUIView(_ mapView: MKMapView, context: Context) {
-            mapView.setRegion(viewModel.region, animated: true) // Makes sure region is set on map.
-            mapView.removeAnnotations(mapView.annotations)
-            
-            if let elements = elements {
-                mapView.addAnnotations(elements.compactMap { element -> Annotation? in
-                    guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
-                    let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                    let distance = viewModel.distanceFromCenter(location: location)
-                    if distance <= (25 * 1609.344), // miles to meters
-                       elementShouldBeShownAsAnnotation(element: element) { 
-                        let annotation = Annotation(element: element)
-                        return annotation
+            if mapView.region != viewModel.region {
+                mapView.setRegion(viewModel.region, animated: true) // Makes sure region is set on map.
+                
+                if let elements = elements {
+                    let newAnnotations = elements.compactMap { element -> Annotation? in
+                        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
+                        let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                        let distance = viewModel.distanceFromCenter(location: location)
+                        if distance <= (25 * 1609.344) { // miles to meters
+                            let annotation = Annotation(element: element)
+                            return annotation
+                        }
+                        return nil
                     }
-                    return nil
-                })
+                    
+                    // Remove old annotations
+                    let oldAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+                    mapView.removeAnnotations(oldAnnotations)
+                    
+                    // Add new annotations
+                    mapView.addAnnotations(newAnnotations)
+                }
             }
         }
         
@@ -263,7 +270,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         // Update map view to show user location
         DispatchQueue.main.async {
-            self.region = MKCoordinateRegion(center: latestLocation.coordinate, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
+            self.updateMapRegion(center: latestLocation.coordinate)
             self.userLocation = latestLocation
             self.userLocationSubject.send(latestLocation)
         }
@@ -271,7 +278,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         userLocation = locations.last // Set the user's location in the view model
         isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
     }
-    
+
     // locationManager Function
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // TODO: Need better error handling
@@ -310,15 +317,21 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return centerLocation.distance(from: annotationLocation)
     }
     
+    func updateMapRegion(center: CLLocationCoordinate2D) {
+        self.region = MKCoordinateRegion(center: center, span: region.span)
+    }
+    
     func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
         debounceTimer?.cancel()
         debounceTimer = Just(())
             .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.updateMapRegion(center: mapView.region.center)
                 let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
                 let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-                self?.visibleElementsSubject.send(visibleElements)
-                self?.mapStoppedMovingSubject.send(())
+                self.visibleElementsSubject.send(visibleElements)
+                self.mapStoppedMovingSubject.send(())
             }
     }
 }
