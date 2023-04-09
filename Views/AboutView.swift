@@ -7,12 +7,12 @@ struct AboutView: View {
     @Environment(\.dismiss) var dismiss
     
     // Contribute section links
-    let suggestABusinessEmail = URL(string:"mailto:joe@bitlocal.app")!
+    let suggestABusinessEmail = URL(string:"mailto:support@bitlocal.app")!
     
     // Contact section links
-    let generalSupportInquiriesEmail = URL(string:"mailto:joe@bitlocal.app")!
-    let reportABugEmail = URL(string:"mailto:joe@bitlocal.app")!
-    let suggestAFeatureEmail = URL(string:"mailto:joe@bitlocal.app")!
+    let generalSupportInquiriesEmail = URL(string:"mailto:support@bitlocal.app")!
+    let reportABugEmail = URL(string:"mailto:support@bitlocal.app")!
+    let suggestAFeatureEmail = URL(string:"mailto:support@bitlocal.app")!
     
     // Socials section links
     let twitterURL = URL(string:"https://twitter.com/bitlocal_app")!
@@ -22,10 +22,10 @@ struct AboutView: View {
     // Other section links
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
     let privacyPolicyURL = URL(string: "https://twitter.com/joeycast")!
-    let termsofServiceURL = URL(string: "https://twitter.com/joeycast")!
+//    let termsofServiceURL = URL(string: "https://twitter.com/joeycast")!
     
     // Support Development links
-    let tipJarURL = URL(string: "https://twitter.com/joeycast")!
+    let tipJarURL = URL(string: "")!
     
     // Settings Page
     var body: some View {
@@ -80,10 +80,10 @@ struct AboutView: View {
                          label: {
                         Label("Privacy Policy", systemImage: "hand.raised")    
                     })
-                    Link(destination: termsofServiceURL, 
-                         label: {
-                        Label("Terms of Service", systemImage: "link")    
-                    })
+//                    Link(destination: termsofServiceURL, 
+//                         label: {
+//                        Label("Terms of Service", systemImage: "link")    
+//                    })
                 }
                 // Support Development section
                 Section(header: Text("Support Development"), 
