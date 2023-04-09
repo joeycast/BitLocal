@@ -10,7 +10,7 @@ struct ContentView: View {
     @StateObject private var viewModel = ContentViewModel()
     
     @State public var showingAbout = false
-    @State public var userSearchText = ""
+    // @State public var userSearchText = ""
     @State public var elements: [Element]?
     @State public var visibleElements: [Element] = []
     
@@ -46,7 +46,8 @@ struct ContentView: View {
                 Rectangle()
                     .cornerRadius(CGFloat(roundedRectangleRadius))
                     .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-                    .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius))
+                    // .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius)) // Use after reintroducing Search
+                    .frame(width: screenWidth, height: CGFloat(80 + roundedRectangleRadius)) 
                 //.padding(.bottom, CGFloat(roundedRectangleRadius))
                     .padding(.top, -CGFloat(roundedRectangleRadius))
                     .ignoresSafeArea()
@@ -81,28 +82,28 @@ struct ContentView: View {
                     .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing) 
             }
             
-            // **** Search Bar ****
-            // Uses GeometryReader to dynamically set search bar position based on device screen size.
-            GeometryReader { geometry in
-                // Use the geometry to determine the size of the screen
-                let screenSize = geometry.frame(in: .global)
-                let screenWidth = screenSize.width
-                
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .padding(.leading)
-                    TextField("Search", text: $userSearchText)
-                        .frame(maxWidth: 450, minHeight: 35)
-                }
-                .background(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.gray.opacity(0.33), lineWidth: 1)
-                )
-                .padding(.top)
-                .padding(.horizontal)
-                .position(x: screenWidth * 0.5, y: 57)
-            }
+//            // **** Search Bar ****
+//            // Uses GeometryReader to dynamically set search bar position based on device screen size.
+//            GeometryReader { geometry in
+//                // Use the geometry to determine the size of the screen
+//                let screenSize = geometry.frame(in: .global)
+//                let screenWidth = screenSize.width
+//                
+//                HStack {
+//                    Image(systemName: "magnifyingglass")
+//                        .padding(.leading)
+//                    TextField("Search", text: $userSearchText)
+//                        .frame(maxWidth: 450, minHeight: 35)
+//                }
+//                .background(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
+//                .overlay(
+//                    RoundedRectangle(cornerRadius: 10)
+//                        .stroke(Color.gray.opacity(0.33), lineWidth: 1)
+//                )
+//                .padding(.top)
+//                .padding(.horizontal)
+//                .position(x: screenWidth * 0.5, y: 57)
+//            }
             
             // **** Location Button ****            
             // Get current location button. Run requestWhenInUseAuthorization() on tap.
