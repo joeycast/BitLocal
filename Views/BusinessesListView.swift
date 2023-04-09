@@ -100,37 +100,31 @@ class ElementCellViewModel: ObservableObject {
         self.userLocation = userLocation
     }
     
-    private var geocodeTimer: Timer?
-    
     func updateAddress() {
         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
             return
         }
-        
-        geocodeTimer?.invalidate()
-        geocodeTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
-            let location = CLLocation(latitude: lat, longitude: lon)
-            self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-                if let placemark = placemarks?.first {
-                    let streetNumber = placemark.subThoroughfare ?? ""
-                    let streetName = placemark.thoroughfare ?? ""
-                    let cityOrTownName = placemark.locality ?? ""
-                    let postalCode = placemark.postalCode ?? ""
-                    let regionOrStateName = placemark.administrativeArea ?? ""
-                    let countryName = placemark.country ?? ""
-                    
-                    let address = Address(
-                        streetNumber: streetNumber,
-                        streetName: streetName,
-                        cityOrTownName: cityOrTownName,
-                        postalCode: postalCode,
-                        regionOrStateName: regionOrStateName,
-                        countryName: countryName
-                    )
-                    
-                    DispatchQueue.main.async {
-                        self.address = address
-                    }
+        let location = CLLocation(latitude: lat, longitude: lon)
+        geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+            if let placemark = placemarks?.first {
+                let streetNumber = placemark.subThoroughfare ?? ""
+                let streetName = placemark.thoroughfare ?? ""
+                let cityOrTownName = placemark.locality ?? ""
+                let postalCode = placemark.postalCode ?? ""
+                let regionOrStateName = placemark.administrativeArea ?? ""
+                let countryName = placemark.country ?? ""
+                
+                let address = Address(
+                    streetNumber: streetNumber,
+                    streetName: streetName,
+                    cityOrTownName: cityOrTownName,
+                    postalCode: postalCode,
+                    regionOrStateName: regionOrStateName,
+                    countryName: countryName
+                )
+                
+                DispatchQueue.main.async {
+                    self.address = address
                 }
             }
         }

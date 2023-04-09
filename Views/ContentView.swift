@@ -197,6 +197,7 @@ struct ContentView: View {
             let mapView = MKMapView()
             mapView.delegate = context.coordinator
             setupCluster(mapView: mapView)
+            mapView.showsUserLocation = true
             return mapView
         }
         
