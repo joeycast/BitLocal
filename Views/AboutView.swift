@@ -25,7 +25,7 @@ struct AboutView: View {
 //    let termsofServiceURL = URL(string: "https://twitter.com/joeycast")!
     
     // Support Development links
-    let tipJarURL = URL(string: "")!
+    // let tipJarURL = URL(string: "")!
     
     // Settings Page
     var body: some View {
