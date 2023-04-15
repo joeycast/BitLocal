@@ -25,7 +25,7 @@ struct BusinessDetailView: View {
         .onAppear {
             elementCellViewModel.updateAddress()
         }
-        .navigationTitle(element.osmJSON?.tags?["name"] ?? element.osmJSON?.tags?["operator"] ?? "Name Not Available")
+        .navigationTitle(element.osmJSON?.tags?["name"] ?? element.osmJSON?.tags?["operator"] ?? "Name not available")
         .navigationBarTitleDisplayMode(.large)
     }
 }
@@ -35,11 +35,15 @@ struct BusinessDescriptionSection: View {
     var element: Element
     
     var body: some View {
-        Text(element.osmJSON?.tags?["description"] ?? 
-             element.osmJSON?.tags?["description:en"] ?? 
-             "No description available.")
+        if let description = element.osmJSON?.tags?["description"] ?? element.osmJSON?.tags?["description:en"] {
+            Section(header: Text("Description")) {
+                Text(description)   
+            }
+        } else {
+        }
     }
 }
+
 
 // Business Details Section
 struct BusinessDetailsSection: View {

@@ -48,7 +48,7 @@ struct ContentView: View {
                     .cornerRadius(CGFloat(roundedRectangleRadius))
                     .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
                 // .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius)) // Use after reintroducing Search
-                    .frame(width: screenWidth, height: CGFloat(100 + roundedRectangleRadius)) 
+                    .frame(width: screenWidth, height: CGFloat(110 + roundedRectangleRadius)) 
                 //.padding(.bottom, CGFloat(roundedRectangleRadius))
                     .padding(.top, -CGFloat(roundedRectangleRadius))
                     .ignoresSafeArea()
@@ -163,20 +163,24 @@ struct ContentView: View {
         }
         // Prevents location button from moving with keyboard. Need to make sure this doesn't mess anything up when searching is introduced.
         .ignoresSafeArea(.keyboard)
+        
+        // On View Appear Actions
         .onAppear {
+            // Get elements
             apiManager.getElements { elements in
                 DispatchQueue.main.async {
                     self.elements = elements
                 }
             }
+            // Determine elements visible in user view
             cancellable = viewModel.visibleElementsSubject.sink(receiveValue: { updatedVisibleElements in
                 visibleElements = updatedVisibleElements
             })
-            
+            // Update user location
             cancellableUserLocation = viewModel.userLocationSubject.sink(receiveValue: { updatedUserLocation in
                 userLocation = updatedUserLocation
             })
-            
+            // When user stops moving map
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {
                 // Any additional logic that should be executed when the map stops moving can be added here.
             })
@@ -207,8 +211,10 @@ struct ContentView: View {
         // Update annotations on map
         func updateUIView(_ mapView: MKMapView, context: Context) {
             if mapView.region != viewModel.region {
-                mapView.setRegion(viewModel.region, animated: true) // Makes sure region is set on map.
+                // Makes sure region is set on map.
+                mapView.setRegion(viewModel.region, animated: true) 
                 
+                // Only show annotations within 25 miles of center of current map view
                 if let elements = elements {
                     let newAnnotations = elements.compactMap { element -> Annotation? in
                         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
@@ -242,7 +248,7 @@ struct ContentView: View {
 // ContentViewModel
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
-    @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3))
+    @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
     @Published var isUpdatingLocation = false
     
@@ -282,7 +288,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
     }
 
-    // locationManager Function
+    // locationManager failure scenario (could not get user location)
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // TODO: Need better error handling
         print(error.localizedDescription)
@@ -327,16 +333,19 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return view
     }
     
+    // Determining distance from center
     func distanceFromCenter(location: CLLocationCoordinate2D) -> CLLocationDistance {
         let centerLocation = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
         let annotationLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
         return centerLocation.distance(from: annotationLocation)
     }
     
+    // Update map region
     func updateMapRegion(center: CLLocationCoordinate2D) {
         self.region = MKCoordinateRegion(center: center, span: region.span)
     }
     
+    // Detecting when map view visible region changes
     func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
         debounceTimer?.cancel()
         debounceTimer = Just(())
