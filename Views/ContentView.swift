@@ -38,6 +38,7 @@ struct ContentView: View {
             }
             
             // **** Background Header Rectangle ****
+            // TODO: Make rectangle more dynamic
             GeometryReader { geometry in 
                 let screenSize = geometry.frame(in: .global)
                 let screenWidth = screenSize.width
@@ -46,8 +47,8 @@ struct ContentView: View {
                 Rectangle()
                     .cornerRadius(CGFloat(roundedRectangleRadius))
                     .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-                    // .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius)) // Use after reintroducing Search
-                    .frame(width: screenWidth, height: CGFloat(80 + roundedRectangleRadius)) 
+                // .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius)) // Use after reintroducing Search
+                    .frame(width: screenWidth, height: CGFloat(100 + roundedRectangleRadius)) 
                 //.padding(.bottom, CGFloat(roundedRectangleRadius))
                     .padding(.top, -CGFloat(roundedRectangleRadius))
                     .ignoresSafeArea()
@@ -151,6 +152,7 @@ struct ContentView: View {
                 // **** Bottom Sheet Scroll View ****
                 // Set the bottom sheet content in a VStack.                    
                 BusinessesListView(elements: visibleElements)
+                    .environmentObject(viewModel)
                 
                 // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
                     .sheet(isPresented: $showingAbout) {
@@ -284,6 +286,19 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // TODO: Need better error handling
         print(error.localizedDescription)
+    }
+    
+    // Calculate distance between element and user location
+    func distanceInMiles(element: Element) -> Double? {
+        guard let userLocation = userLocation,
+              let lat = element.osmJSON?.lat,
+              let lon = element.osmJSON?.lon else {
+            return nil
+        }
+        let location = CLLocation(latitude: lat, longitude: lon)
+        let distanceInMeters = userLocation.distance(from: location)
+        let distanceInMiles = distanceInMeters / 1609.34
+        return distanceInMiles
     }
     
     // mapView Function

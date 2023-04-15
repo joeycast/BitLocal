@@ -34,7 +34,7 @@ struct AboutView: View {
             Form {
                 // Header section
                 Section {
-                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the Bitcoin community. \(ContentView().appName) is built entirely on iPad using Swift Playgrounds.")
+                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the Bitcoin community. Location data displayed in \(ContentView().appName) is retreived from OpenStreetMap through the BTC Map API. \(ContentView().appName) is built entirely on iPad using Swift Playgrounds.")
                 }
                 // Contribute section
                 Section(header: Text("Contribute"), 
@@ -86,10 +86,10 @@ struct AboutView: View {
 //                    })
                 }
                 // Support Development section
-                Section(header: Text("Support Development"), 
-                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
-                    Label("Tip Jar", systemImage: "bolt.circle.fill")
-                }
+//                Section(header: Text("Support Development"), 
+//                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
+//                    Label("Tip Jar", systemImage: "bolt.circle.fill")
+//                }
             }
             // About page title
             // TODO: Figure out how to use the appName constant here

@@ -3,8 +3,20 @@ import MapKit
 
 struct BusinessesListView: View {
     
+    @EnvironmentObject var viewModel: ContentViewModel
+    
     var elements: [Element]
     var userLocation: CLLocation?
+    
+    private var sortedElements: [Element] {
+        elements.sorted { (element1, element2) -> Bool in
+            guard let distance1 = viewModel.distanceInMiles(element: element1),
+                  let distance2 = viewModel.distanceInMiles(element: element2) else {
+                return false
+            }
+            return distance1 < distance2
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -14,12 +26,12 @@ struct BusinessesListView: View {
                     .font(.title3)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
-                List(elements.prefix(100), id: \.uuid) { element in
-                    let viewModel = ElementCellViewModel(element: element, userLocation: userLocation)
-                    NavigationLink(destination: BusinessDetailView(element: element, userLocation: userLocation), label: {
-                        ElementCell(viewModel: viewModel)
+                List(sortedElements.prefix(100), id: \.uuid) { element in
+                    let cellViewModel = ElementCellViewModel(element: element, userLocation: viewModel.userLocation, viewModel: viewModel)
+                    NavigationLink(destination: BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel), label: { 
+                        ElementCell(viewModel: cellViewModel)
                             .onAppear {
-                                viewModel.updateAddress()
+                                cellViewModel.updateAddress()
                             }
                     })
                 }
@@ -39,25 +51,16 @@ struct ElementCell: View {
             
             HStack {
                 // Business Name
-                Text(viewModel.element.osmJSON?.tags?["name"] ?? "name not available")
+                Text(viewModel.element.osmJSON?.tags?["name"] ?? viewModel.element.osmJSON?.tags?["operator"] ?? "Name not available")
                     .fontWeight(.semibold)
                     .lineLimit(1)
                     .minimumScaleFactor(1)
                     .padding(.vertical, 5)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                
+        
                 // Distance from location
-//                Text("2.1 Miles")
-//                    .frame(maxWidth: 70, alignment: .trailing)
-                if let userLocation = viewModel.userLocation,
-                   let lat = viewModel.element.osmJSON?.lat,
-                   let lon = viewModel.element.osmJSON?.lon {
-                    let location = CLLocation(latitude: lat, longitude: lon)
-                    let distanceInMeters = userLocation.distance(from: location)
-                    let distanceInKilometers = distanceInMeters / 1000
-                    Text("\(distanceInKilometers, specifier: "%.2f") km")
-                        .font(.footnote)
-                }
+                distanceText
+                    .font(.subheadline)
             }
             
             // Street number and name
@@ -81,9 +84,24 @@ struct ElementCell: View {
                 PaymentIcons(element: viewModel.element)
             }
         }
-        .onAppear {
-            viewModel.updateAddress()
-        }
+    }
+    private var distanceText: some View {
+        let distanceInMiles = viewModel.viewModel.distanceInMiles(element: viewModel.element)
+        
+        let formattedDistance: String? = {
+            guard let distance = distanceInMiles else { return nil }
+            
+            if distance < 1 {
+                return String(format: "%.2f", distance)
+            } else if distance >= 1 && distance <= 50 {
+                return String(format: "%.1f", distance)
+            } else {
+                return String(format: "%.0f", distance)
+            }
+        }()
+        
+        return Text(formattedDistance != nil ? "\(formattedDistance!) mi" : "")
+            .opacity(formattedDistance != nil ? 1 : 0)
     }
 }
 
@@ -91,13 +109,20 @@ class ElementCellViewModel: ObservableObject {
     
     let element: Element
     @Published var address: Address?
-    @Published var userLocation: CLLocation?
+    @Published var userLocation: CLLocation? {
+        didSet {
+            print("User location set: \(userLocation?.coordinate.latitude ?? 0), \(userLocation?.coordinate.longitude ?? 0)")
+        }
+    }
     
     private let geocoder = CLGeocoder()
     
-    init(element: Element, userLocation: CLLocation?) {
+    let viewModel: ContentViewModel
+    
+    init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
         self.userLocation = userLocation
+        self.viewModel = viewModel
     }
     
     func updateAddress() {

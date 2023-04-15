@@ -6,26 +6,26 @@ struct BusinessDetailView: View {
     var element: Element
     var userLocation: CLLocation?
     
-    @StateObject var viewModel: ElementCellViewModel
+    @StateObject var elementCellViewModel: ElementCellViewModel
+    @EnvironmentObject var contentViewModel: ContentViewModel
     
-    
-    init(element: Element, userLocation: CLLocation?) {
+    init(element: Element, userLocation: CLLocation?, contentViewModel: ContentViewModel) {
         self.element = element
         self.userLocation = userLocation
-        self._viewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation))
+        self._elementCellViewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation, viewModel: contentViewModel))
     }
     
     var body: some View {
         List {
             BusinessDescriptionSection(element: element)
-            BusinessDetailsSection(element: element, viewModel: viewModel)
+            BusinessDetailsSection(element: element, elementCellViewModel: elementCellViewModel)
             PaymentDetailsSection(element: element)
             TroubleshootingSection(element: element)
         }
         .onAppear {
-            viewModel.updateAddress()
+            elementCellViewModel.updateAddress()
         }
-        .navigationTitle(element.osmJSON?.tags?["name"] ?? "[Name Not Available]")
+        .navigationTitle(element.osmJSON?.tags?["name"] ?? element.osmJSON?.tags?["operator"] ?? "Name Not Available")
         .navigationBarTitleDisplayMode(.large)
     }
 }
@@ -44,7 +44,7 @@ struct BusinessDescriptionSection: View {
 // Business Details Section
 struct BusinessDetailsSection: View {
     var element: Element
-    @ObservedObject var viewModel: ElementCellViewModel
+    @ObservedObject var elementCellViewModel: ElementCellViewModel
     
     var body: some View {
         Section(header: Text("Business Details")) {
@@ -56,7 +56,7 @@ struct BusinessDetailsSection: View {
                 
                 // TODO: Fix display issues when certain address elements are nil
                 Link(destination: URL(string: "maps://?saddr=&daddr=\(element.osmJSON?.lat ?? 0.0),\(element.osmJSON?.lon ?? 0.0)")!) {
-                    Text("\(viewModel.address?.streetNumber ?? "") \(viewModel.address?.streetName ?? "")\n\(viewModel.address?.cityOrTownName ?? ""), \(viewModel.address?.regionOrStateName ?? "") \(viewModel.address?.postalCode ?? "")")
+                    Text("\(elementCellViewModel.address?.streetNumber ?? "") \(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? ""), \(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
                 }
             }
             
