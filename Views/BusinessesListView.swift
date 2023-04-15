@@ -137,7 +137,7 @@ struct PaymentIcons: View {
     
     var body: some View {
         HStack {
-            if acceptsBitcoin(element: element) {
+            if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
                     .foregroundColor(.orange)
             }

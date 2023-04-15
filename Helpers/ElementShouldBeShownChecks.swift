@@ -1,5 +1,7 @@
 import SwiftUI
  
+// TODO: This logic seems to be slightly off. Some elements that do not accept bitcoin are showing.
+
 // deletedAt is nil, and updatedAt is not nil: the function will return true.
 // deletedAt is nil, and updatedAt is nil: the function will return true.
 // deletedAt is not nil, updatedAt is not nil, and deletedAt is after or equal to updatedAt: the function will return false.
