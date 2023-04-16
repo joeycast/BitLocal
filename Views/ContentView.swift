@@ -119,6 +119,25 @@ struct ContentView: View {
                     viewModel.locationManager.requestWhenInUseAuthorization()
                     viewModel.isUpdatingLocation = true
                     viewModel.locationManager.startUpdatingLocation()
+                    
+                    // Set a timeout for the location update process
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                        // Check if location is still being updated
+                        if viewModel.isUpdatingLocation {
+                            // If location update is still in progress after 10 seconds, show an alert
+                            let alert = UIAlertController(title: "Location could not be determined. Please check if location permissions have been granted.", message: nil, preferredStyle: .alert)
+                            alert.addAction(UIAlertAction(title: "OK", style: .default))
+                            
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let rootViewController = windowScene.windows.first?.rootViewController {
+                                rootViewController.topMostViewController().present(alert, animated: true, completion: nil)
+                            }
+                            
+                            // Stop location update process
+                            viewModel.locationManager.stopUpdatingLocation()
+                            viewModel.isUpdatingLocation = false
+                        }
+                    }
                 }
                 .tint(.orange)
                 .foregroundColor(.white)
@@ -132,12 +151,11 @@ struct ContentView: View {
                         if viewModel.isUpdatingLocation {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .opacity(1)
+                                .frame(width: 20, height: 20)
                         }
                     }
                         .animation(.easeInOut, value: viewModel.isUpdatingLocation)
-                        .opacity(viewModel.isUpdatingLocation ? 1 : 0)
-                        .transition(.opacity)
+                        .position(x: screenWidth - 45, y: screenHeight * 0.66)
                 )
             }
             

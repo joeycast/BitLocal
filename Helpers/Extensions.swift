@@ -61,4 +61,19 @@ extension MKCoordinateRegion: Equatable {
     }
 }
 
+// Determine topmost view for displaying alerts
+extension UIViewController {
+    func topMostViewController() -> UIViewController {
+        if let presented = self.presentedViewController {
+            return presented.topMostViewController()
+        }
+        if let nav = self as? UINavigationController {
+            return nav.visibleViewController?.topMostViewController() ?? self
+        }
+        if let tab = self as? UITabBarController {
+            return tab.selectedViewController?.topMostViewController() ?? self
+        }
+        return self
+    }
+}
 
