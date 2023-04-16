@@ -1,38 +1,30 @@
 import SwiftUI
- 
-// TODO: This logic seems to be slightly off. Some elements that do not accept bitcoin are showing.
 
-// deletedAt is nil, and updatedAt is not nil: the function will return true.
-// deletedAt is nil, and updatedAt is nil: the function will return true.
-// deletedAt is not nil, updatedAt is not nil, and deletedAt is after or equal to updatedAt: the function will return false.
-// deletedAt is not nil, updatedAt is not nil, and deletedAt is before updatedAt: the function will return true.
-// deletedAt is not nil, and updatedAt is nil: the function will return false.
-// No deletedAt or updatedAt are present: the function will return true.
+// If any accepts any form of bitcoin, perform deletedAt and updatedAt checks.
+    // If deletedAt is nil, updatedAt is not nil: return true. 
+    // If deletedAt is nil, updatedAt is nil: return true.
+    // If deletedAt is not nil, updatedAt is not nil, perform deletedAt/updatedAt comparison.
+        // If deletedAt is greater than or equal to updatedAt: return false.
+        // If deletedAt is less than updatedAt: return true.
+    // If deletedAt is not nil, updatedAt is nil: return false.
+// If none of payment:bitcoin, currency:XBT, payment:onchain, payment:lightning, payment:lightning_contactless are "yes": return false.
 func elementShouldBeShownAsAnnotation(element: Element) -> Bool {
     
     let dateFormatter = ISO8601DateFormatter()
     
-    if ((element.osmJSON?.tags?["payment:bitcoin"] == "yes" ||
-         element.osmJSON?.tags?["currency:XBT"] == "yes" ||
-         element.osmJSON?.tags?["payment:onchain"] == "yes" ||
-         element.osmJSON?.tags?["payment:lightning"] == "yes" ||
-         element.osmJSON?.tags?["payment:lightning_contactless"] == "yes") &&
-        ((element.deletedAt == nil && element.updatedAt != nil) ||
-         (element.deletedAt == nil && element.updatedAt == nil) ||
-         (element.deletedAt != nil && element.updatedAt != nil)) ||
-        (element.deletedAt != nil && element.updatedAt != nil && {
-        if let deletedDate = dateFormatter.date(from: element.deletedAt!),
-           let updatedDate = dateFormatter.date(from: element.updatedAt!),
-           deletedDate >= updatedDate {
-            return false
-        } else {
+    if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) || acceptsLightning(element: element) || acceptsContactlessLightning(element: element) {
+        
+        if let deletedAt = element.deletedAt, let updatedAt = element.updatedAt {
+            if let deletedDate = dateFormatter.date(from: deletedAt), let updatedDate = dateFormatter.date(from: updatedAt) {
+                return updatedDate > deletedDate
+            }
+        } else if element.deletedAt == nil && element.updatedAt != nil {
             return true
+        } else if element.deletedAt == nil && element.updatedAt == nil {
+            return true
+        } else if element.deletedAt != nil && element.updatedAt == nil {
+            return false
         }
-    }()) ||
-        (element.deletedAt != nil && element.updatedAt == nil)) {
-        return true
-    } else {
-        return false
     }
+    return false
 }
-

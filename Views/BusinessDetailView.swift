@@ -1,11 +1,13 @@
 import SwiftUI
 import CoreLocation
+import MapKit
 
 struct BusinessDetailView: View {
     
     var element: Element
     var userLocation: CLLocation?
     
+    @State private var region = MKCoordinateRegion()
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
     
@@ -20,6 +22,7 @@ struct BusinessDetailView: View {
             BusinessDescriptionSection(element: element)
             BusinessDetailsSection(element: element, elementCellViewModel: elementCellViewModel)
             PaymentDetailsSection(element: element)
+            BusinessMapSection(element: element)         
             TroubleshootingSection(element: element)
         }
         .onAppear {
@@ -152,6 +155,82 @@ struct PaymentDetailsSection: View {
                     Text("Accepts Contactless Lightning")
                 }
             }  
+        }
+    }
+}
+
+// BusinessMapSection
+struct BusinessMapSection: View {
+    var element: Element
+    
+    var body: some View {
+        MapView(element: element)
+            .frame(height: 200)
+            .cornerRadius(10)
+    }
+}
+
+// Map View
+// TODO: Refactor to reuse annotation customization code from ContentViewModel
+struct MapView: UIViewRepresentable {
+    var element: Element
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        return mapView
+    }
+    
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        updateAnnotations(from: uiView)
+    }
+    
+    private func updateAnnotations(from mapView: MKMapView) {
+        mapView.removeAnnotations(mapView.annotations)
+        
+        let annotation = MKPointAnnotation()
+        if let latitude = element.osmJSON?.lat,
+           let longitude = element.osmJSON?.lon {
+            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            annotation.coordinate = coordinate
+            annotation.title = element.osmJSON?.tags?["name"] ?? element.osmJSON?.tags?["operator"] ?? "Name not available"
+            
+            mapView.addAnnotation(annotation)
+            
+            let region = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005))
+            mapView.setRegion(region, animated: true)
+        }
+    }
+    
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: MapView
+        
+        init(_ parent: MapView) {
+            self.parent = parent
+        }
+        
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard annotation is MKPointAnnotation else { return nil }
+            
+            let identifier = "customPin"
+            var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+            
+            if annotationView == nil {
+                annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                
+                // Set the glyph image to "location.circle.fill"
+                annotationView?.glyphImage = UIImage(systemName: "location.circle.fill")
+                // Set the marker tint color to orange
+                annotationView?.markerTintColor = .orange
+            } else {
+                annotationView?.annotation = annotation
+            }
+            
+            return annotationView
         }
     }
 }

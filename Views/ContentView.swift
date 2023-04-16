@@ -233,6 +233,7 @@ struct ContentView: View {
                 mapView.setRegion(viewModel.region, animated: true) 
                 
                 // Only show annotations within 25 miles of center of current map view
+                // TODO: Use elementShouldBeShownAsAnnotation function result here.
                 if let elements = elements {
                     let newAnnotations = elements.compactMap { element -> Annotation? in
                         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
@@ -305,7 +306,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         userLocation = locations.last // Set the user's location in the view model
         isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
     }
-
+    
     // locationManager failure scenario (could not get user location)
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // TODO: Need better error handling
