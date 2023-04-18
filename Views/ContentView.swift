@@ -83,29 +83,6 @@ struct ContentView: View {
                     .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing) 
             }
             
-//            // **** Search Bar ****
-//            // Uses GeometryReader to dynamically set search bar position based on device screen size.
-//            GeometryReader { geometry in
-//                // Use the geometry to determine the size of the screen
-//                let screenSize = geometry.frame(in: .global)
-//                let screenWidth = screenSize.width
-//                
-//                HStack {
-//                    Image(systemName: "magnifyingglass")
-//                        .padding(.leading)
-//                    TextField("Search", text: $userSearchText)
-//                        .frame(maxWidth: 450, minHeight: 35)
-//                }
-//                .background(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-//                .overlay(
-//                    RoundedRectangle(cornerRadius: 10)
-//                        .stroke(Color.gray.opacity(0.33), lineWidth: 1)
-//                )
-//                .padding(.top)
-//                .padding(.horizontal)
-//                .position(x: screenWidth * 0.5, y: 57)
-//            }
-            
             // **** Location Button ****            
             // Get current location button. Run requestWhenInUseAuthorization() on tap.
             // TODO: How to make iPad cursor snap to button?

@@ -75,12 +75,12 @@ struct ElementCell: View {
             }
             
             HStack {
-                Text("\(viewModel.address?.cityOrTownName ?? ""), \(viewModel.address?.regionOrStateName ?? "") \(viewModel.address?.postalCode ?? "")")
+                Text("\(viewModel.address?.cityOrTownName ?? "")\(viewModel.address?.cityOrTownName != nil && viewModel.address?.cityOrTownName != "" ? ", " : "")\(viewModel.address?.regionOrStateName ?? "") \(viewModel.address?.postalCode ?? "")")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-
+                
                 PaymentIcons(element: viewModel.element)
             }
         }
@@ -108,6 +108,7 @@ struct ElementCell: View {
 class ElementCellViewModel: ObservableObject {
     
     let element: Element
+    
     @Published var address: Address?
     @Published var userLocation: CLLocation? {
         didSet {
@@ -115,8 +116,9 @@ class ElementCellViewModel: ObservableObject {
         }
     }
     
-    private let geocoder = CLGeocoder()
+    static var geocodingCache: [String: Address] = [:]
     
+    private let geocoder = CLGeocoder()
     let viewModel: ContentViewModel
     
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
@@ -126,30 +128,64 @@ class ElementCellViewModel: ObservableObject {
     }
     
     func updateAddress() {
+        // Check if all required properties are not nil
+        if let streetNumber = address?.streetNumber,
+           let streetName = address?.streetName,
+           let cityOrTownName = address?.cityOrTownName,
+           let regionOrStateName = address?.regionOrStateName,
+           let postalCode = address?.postalCode {
+            
+            let existingAddress = Address(
+                streetNumber: streetNumber,
+                streetName: streetName,
+                cityOrTownName: cityOrTownName,
+                postalCode: postalCode,
+                regionOrStateName: regionOrStateName,
+                countryName: address?.countryName ?? ""
+            )
+            
+            self.address = existingAddress
+            return
+        }
+        
+        
         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
             return
         }
+        
+        // Check the cache before making a geocoding request
+        let cacheKey = "\(lat),\(lon)"
+        if let cachedAddress = ElementCellViewModel.geocodingCache[cacheKey] {
+            self.address = cachedAddress
+            return
+        }
+        
         let location = CLLocation(latitude: lat, longitude: lon)
-        geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-            if let placemark = placemarks?.first {
-                let streetNumber = placemark.subThoroughfare ?? ""
-                let streetName = placemark.thoroughfare ?? ""
-                let cityOrTownName = placemark.locality ?? ""
-                let postalCode = placemark.postalCode ?? ""
-                let regionOrStateName = placemark.administrativeArea ?? ""
-                let countryName = placemark.country ?? ""
-                
-                let address = Address(
-                    streetNumber: streetNumber,
-                    streetName: streetName,
-                    cityOrTownName: cityOrTownName,
-                    postalCode: postalCode,
-                    regionOrStateName: regionOrStateName,
-                    countryName: countryName
-                )
-                
-                DispatchQueue.main.async {
-                    self.address = address
+        
+        // Throttle geocoding requests
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now()) {
+            self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+                if let placemark = placemarks?.first {
+                    let streetNumber = placemark.subThoroughfare ?? ""
+                    let streetName = placemark.thoroughfare ?? ""
+                    let cityOrTownName = placemark.locality ?? ""
+                    let postalCode = placemark.postalCode ?? ""
+                    let regionOrStateName = placemark.administrativeArea ?? ""
+                    let countryName = placemark.country ?? ""
+                    
+                    let address = Address(
+                        streetNumber: streetNumber,
+                        streetName: streetName,
+                        cityOrTownName: cityOrTownName,
+                        postalCode: postalCode,
+                        regionOrStateName: regionOrStateName,
+                        countryName: countryName
+                    )
+                    
+                    DispatchQueue.main.async {
+                        self.address = address
+                        ElementCellViewModel.geocodingCache[cacheKey] = address // Update the cache with the new geocoded result
+                    }
                 }
             }
         }
@@ -176,6 +212,32 @@ struct PaymentIcons: View {
                 Image(systemName: "wave.3.right.circle.fill")
                     .foregroundColor(.orange)
             }
+        }
+    }
+}
+
+class Geocoder {
+    private let geocoder = CLGeocoder()
+    private let semaphore: DispatchSemaphore
+    
+    init(maxConcurrentRequests: Int = 1) {
+        semaphore = DispatchSemaphore(value: maxConcurrentRequests)
+    }
+    
+    func reverseGeocode(location: CLLocation, completion: @escaping (CLPlacemark?) -> Void) {
+        semaphore.wait() // Wait for a free slot
+        
+        geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+            defer {
+                self.semaphore.signal() // Release the slot
+            }
+            
+            guard let placemark = placemarks?.first else {
+                completion(nil)
+                return
+            }
+            
+            completion(placemark)
         }
     }
 }

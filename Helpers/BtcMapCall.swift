@@ -152,8 +152,6 @@ enum CategoryPlural: String, Codable {
 
 class APIManager {
     
-    private let geocoder = CLGeocoder()
-    
     func getElements(completion: @escaping ([Element]?) -> Void) {
         guard let url = URL(string: "https://api.btcmap.org/v2/elements/") else {
             completion(nil)
@@ -165,36 +163,7 @@ class APIManager {
                 return
             }
             do {
-                var elements = try JSONDecoder().decode([Element].self, from: data)
-                
-                // Determine the address based on the coordinates and store in the address field of the array
-                for index in 0..<elements.count {
-                    guard let lat = elements[index].osmJSON?.lat, let lon = elements[index].osmJSON?.lon else {
-                        continue
-                    }
-                    let location = CLLocation(latitude: lat, longitude: lon)
-                    self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-                        if let placemark = placemarks?.first {
-                            let streetNumber = placemark.subThoroughfare
-                            let streetName = placemark.thoroughfare
-                            let cityOrTownName = placemark.locality
-                            let postalCode = placemark.postalCode
-                            let regionOrStateName = placemark.administrativeArea
-                            let countryName = placemark.country
-                            
-                            let address = Address(
-                                streetNumber: streetNumber,
-                                streetName: streetName,
-                                cityOrTownName: cityOrTownName,
-                                postalCode: postalCode,
-                                regionOrStateName: regionOrStateName,
-                                countryName: countryName
-                            )
-                            
-                            elements[index].address = address
-                        }
-                    }
-                }
+                let elements = try JSONDecoder().decode([Element].self, from: data)
                 completion(elements)
             } catch let error {
                 print(error)
@@ -203,4 +172,3 @@ class APIManager {
         }.resume()
     }
 }
-

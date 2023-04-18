@@ -61,9 +61,8 @@ struct BusinessDetailsSection: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
-                // TODO: Fix display issues when certain address elements are nil
                 Link(destination: URL(string: "maps://?saddr=&daddr=\(element.osmJSON?.lat ?? 0.0),\(element.osmJSON?.lon ?? 0.0)")!) {
-                    Text("\(elementCellViewModel.address?.streetNumber ?? "") \(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? ""), \(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
+                    Text("\(elementCellViewModel.address?.streetNumber ?? "") \(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
                 }
             }
             

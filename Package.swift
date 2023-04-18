@@ -19,7 +19,7 @@ let package = Package(
             bundleIdentifier: "app.bitlocal.bitlocal",
             teamIdentifier: "5YUMLYCFT8",
             displayVersion: "0.1",
-            bundleVersion: "2",
+            bundleVersion: "3",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
@@ -35,7 +35,7 @@ let package = Package(
             capabilities: [
                 .locationWhenInUse(purposeString: "BitLocal asks for your location to find businesses near you. Location sharing is not required to use BitLocal.")
             ],
-            appCategory: "public.app-category.shopping"
+            appCategory: .lifestyle
         )
     ],
     dependencies: [
