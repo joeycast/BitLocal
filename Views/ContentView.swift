@@ -1,3 +1,5 @@
+// ContentView.swift
+
 import UIKit
 import SwiftUI
 import MapKit
@@ -10,7 +12,6 @@ struct ContentView: View {
     @StateObject private var viewModel = ContentViewModel()
     
     @State public var showingAbout = false
-    // @State public var userSearchText = ""
     @State public var elements: [Element]?
     @State public var visibleElements: [Element] = []
     
@@ -32,15 +33,25 @@ struct ContentView: View {
                 NavigationView {
                     BusinessesListView(elements: visibleElements)
                         .environmentObject(viewModel)
-                    
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .principal) {
+                                CustomiPadNavigationStackTitleView()
+                            }
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                InfoButtonView(showingAbout: $showingAbout)
+                            }
+                        }
                     ZStack {
                         if let elements = elements {
                             mapView(elements: elements)
                                 .ignoresSafeArea()
                         }
-                        
-                        headerAndLocationButton(screenWidth: screenWidth)
+                        locationButtonView()
                     }
+                }
+                .sheet(isPresented: $showingAbout) {
+                    AboutView()
                 }
             } else { // iPhone layout
                 ZStack {
@@ -53,9 +64,11 @@ struct ContentView: View {
                             }
                     }
                     ZStack {
-//                        headerRectangle(screenWidth: screenWidth)
-                        
-                        headerAndLocationButton(screenWidth: screenWidth)   
+                        VStack {
+                            iPhoneHeaderView(screenWidth: screenWidth)
+                            Spacer()
+                            locationButtonView()
+                        }   
                     }
                     
                     // **** Bottom Sheet ****
@@ -99,95 +112,133 @@ struct ContentView: View {
         }
     }
     
-//    func headerRectangle(screenWidth: CGFloat) -> some View {
-//        RoundedRectangle(cornerRadius: 10)
-//            .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-//            .frame(width: screenWidth, height: 110)
-//            .padding(.top, -10)
-//            .ignoresSafeArea()
-//    }
-    
-    func headerAndLocationButton(screenWidth: CGFloat) -> some View {
-        VStack {
-            // **** Header ****
-            HStack {
-                // **** Title ****
-                // Sets the header title.
-                Text(appName)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .font(.title3)
-                    .bold(true)
-                    .padding()
-                    .padding(.leading, 5)
-                // .shadow(radius: 10) // Use if change to logo
-                
-                // **** About Button ****            
-                // Sets about button and toggles showingAbout when tapped. .frame, .contentShape, and .clipShape help increase the tappable area of the button.
-                // TODO: How to make iPad cursor snap to button?
-                Image(systemName: "info.circle")
-                    .padding()
-                    .padding(.top, 5)
-                    .frame(width: 88, height: 50, alignment: .center)
-                    .foregroundColor(.orange)
-                //.background(Color.white) // Reveals tappable area (for testing)
-                    .contentShape(Circle())
-                    .clipShape(Circle())
-                    .onTapGesture {
-                        showingAbout.toggle()
-                    }
-                    .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing) 
-            }
-            
-            // **** Location Button ****
+    // iPhone Header
+    func iPhoneHeaderView(screenWidth: CGFloat) -> some View {
+        ZStack {
             GeometryReader { geometry in
-                // Use the geometry to determine the size of the screen so I can set the location button at a location that is a percentage of the user's screen size.
                 let screenSize = geometry.frame(in: .global)
                 let screenWidth = screenSize.width
-                let screenHeight = screenSize.height
+                let roundedRectangleRadius = 10
                 
-                LocationButton(.currentLocation) {
-                    viewModel.locationManager.requestWhenInUseAuthorization()
-                    viewModel.isUpdatingLocation = true
-                    viewModel.locationManager.startUpdatingLocation()
+                Rectangle()
+                    .cornerRadius(CGFloat(roundedRectangleRadius))
+                    .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
+                    .frame(width: screenWidth, height: CGFloat(110 + roundedRectangleRadius)) 
+                    .padding(.top, -CGFloat(roundedRectangleRadius))
+                    .ignoresSafeArea()
+            }
+            
+            VStack(alignment: .leading) {
+                
+                // BitLocal text
+                HStack {
+                    Spacer()
+                    HStack(spacing: 0) {
+                        Text("bit")
+                            .font(Font.custom("Ubuntu-LightItalic", size: 28))
+                            .foregroundColor(.orange)
+                        
+                        Text("local")
+                            .bold()
+                            .font(Font.custom("Ubuntu-Italic", size: 28))
+                            .foregroundColor(.orange)
+                    }
+                    Spacer()
                     
-                    // Set a timeout for the location update process
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                        // Check if location is still being updated
-                        if viewModel.isUpdatingLocation {
-                            // If location update is still in progress after 10 seconds, show an alert
-                            let alert = UIAlertController(title: "Location could not be determined. Please check if location permissions have been granted.", message: nil, preferredStyle: .alert)
-                            alert.addAction(UIAlertAction(title: "OK", style: .default))
-                            
-                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                               let rootViewController = windowScene.windows.first?.rootViewController {
-                                rootViewController.topMostViewController().present(alert, animated: true, completion: nil)
-                            }
-                            
-                            // Stop location update process
-                            viewModel.locationManager.stopUpdatingLocation()
-                            viewModel.isUpdatingLocation = false
+                    // Info Button
+                    InfoButtonView(showingAbout: $showingAbout)
+                        .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(.trailing, 3)
+                }
+                .padding(.horizontal)
+                .frame(width: screenWidth, height: 50)
+                Spacer()
+            }
+            .padding(.top, 30)
+        }
+    }
+    
+    // Navigation Stack Title View for iPad
+    struct CustomiPadNavigationStackTitleView: View {
+        var body: some View {
+            HStack(spacing: 0) {
+                Text("bit")
+                    .font(Font.custom("Ubuntu-LightItalic", size: 28))
+                    .foregroundColor(.orange)
+                
+                Text("local")
+                    .bold()
+                    .font(Font.custom("Ubuntu-Italic", size: 28))
+                    .foregroundColor(.orange)
+            }
+            .padding(.trailing)
+        }
+    }
+
+    // Info Button View
+    struct InfoButtonView: View {
+        @Binding var showingAbout: Bool
+        
+        var body: some View {
+            Button(action: {
+                showingAbout.toggle()
+            }) {
+                Image(systemName: "info.circle")
+                    .padding()
+                    .foregroundColor(.orange)
+                    .contentShape(Circle())
+                    .clipShape(Circle())
+            }
+        }
+    }
+    
+    // Location Button View
+    func locationButtonView() -> some View {
+        GeometryReader { geometry in
+            let screenSize = geometry.frame(in: .global)
+            let screenWidth = screenSize.width
+            let screenHeight = screenSize.height
+            
+            let buttonXPosition: CGFloat = screenWidth > 768 ? screenWidth - 60 : screenWidth - 45
+            let buttonYPosition: CGFloat = screenWidth > 768 ? screenHeight * 0.95 : screenHeight * 0.30
+            
+            LocationButton(.currentLocation) {
+                viewModel.locationManager.requestWhenInUseAuthorization()
+                viewModel.isUpdatingLocation = true
+                viewModel.locationManager.startUpdatingLocation()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    if viewModel.isUpdatingLocation {
+                        let alert = UIAlertController(title: "Location could not be determined. Please check if location permissions have been granted.", message: nil, preferredStyle: .alert)
+                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let rootViewController = windowScene.windows.first?.rootViewController {
+                            rootViewController.topMostViewController().present(alert, animated: true, completion: nil)
                         }
+                        
+                        viewModel.locationManager.stopUpdatingLocation()
+                        viewModel.isUpdatingLocation = false
                     }
                 }
-                .tint(.orange)
-                .foregroundColor(.white)
-                .cornerRadius(20, antialiased: true)
-                .labelStyle(.iconOnly)
-                .symbolVariant(.fill)
-                .position(x: screenWidth - 45, y: screenHeight * 0.30)
-                .overlay(
-                    // Progress indicator overlay while the app is checking for the user's location
-                    Group {
-                        if viewModel.isUpdatingLocation {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .frame(width: 20, height: 20)
-                        }
-                    }
-                        .animation(.easeInOut, value: viewModel.isUpdatingLocation)
-                        .position(x: screenWidth - 45, y: screenHeight * 0.66)
-                )
             }
+            .tint(.orange)
+            .foregroundColor(.white)
+            .cornerRadius(20, antialiased: true)
+            .labelStyle(.iconOnly)
+            .symbolVariant(.fill)
+            .position(x: buttonXPosition, y: buttonYPosition)
+            .overlay(
+                Group {
+                    if viewModel.isUpdatingLocation {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .frame(width: 20, height: 20)
+                    }
+                }
+                    .animation(.easeInOut, value: viewModel.isUpdatingLocation)
+                    .position(x: buttonXPosition, y: buttonYPosition + 3)
+            )
         }
     }
     

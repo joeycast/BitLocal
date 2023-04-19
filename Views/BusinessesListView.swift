@@ -102,6 +102,7 @@ struct ElementCell: View {
         
         return Text(formattedDistance != nil ? "\(formattedDistance!) mi" : "")
             .opacity(formattedDistance != nil ? 1 : 0)
+            .padding(.trailing, 3)
     }
 }
 
