@@ -24,38 +24,93 @@ struct ContentView: View {
     
     var body: some View {
         
-        // **** Main ZStack ****
-        ZStack() {    
-            // **** Map ****
-            // Sets the map as the background in the ZStack.
-            if let elements = elements {
-                mapView(elements: elements)
-                    .ignoresSafeArea()
-                    .onAppear {
-                        viewModel.locationManager.requestWhenInUseAuthorization()
-                        viewModel.locationManager.startUpdatingLocation()
+        // **** Main View ****
+        GeometryReader { geometry in
+            let screenWidth = geometry.size.width
+            
+            if screenWidth > 768 { // iPad layout
+                NavigationView {
+                    BusinessesListView(elements: visibleElements)
+                        .environmentObject(viewModel)
+                    
+                    ZStack {
+                        if let elements = elements {
+                            mapView(elements: elements)
+                                .ignoresSafeArea()
+                        }
+                        
+                        headerAndLocationButton(screenWidth: screenWidth)
                     }
+                }
+            } else { // iPhone layout
+                ZStack {
+                    if let elements = elements {
+                        mapView(elements: elements)
+                            .ignoresSafeArea()
+                            .onAppear {
+                                viewModel.locationManager.requestWhenInUseAuthorization()
+                                viewModel.locationManager.startUpdatingLocation()
+                            }
+                    }
+                    ZStack {
+//                        headerRectangle(screenWidth: screenWidth)
+                        
+                        headerAndLocationButton(screenWidth: screenWidth)   
+                    }
+                    
+                    // **** Bottom Sheet ****
+                        .bottomSheet(
+                            presentationDetents: [.fraction(0.3), .medium, .large],
+                            isPresented: .constant(true),
+                            sheetCornerRadius: 20
+                        ) {
+                            // **** Bottom Sheet Scroll View ****
+                            BusinessesListView(elements: visibleElements)
+                                .environmentObject(viewModel)
+                            
+                            // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
+                                .sheet(isPresented: $showingAbout) {
+                                    AboutView()
+                                }
+                        } onDismiss: {}
+                }
+                .ignoresSafeArea(.keyboard)
             }
-            
-            // **** Background Header Rectangle ****
-            // TODO: Make rectangle more dynamic
-            GeometryReader { geometry in 
-                let screenSize = geometry.frame(in: .global)
-                let screenWidth = screenSize.width
-                let roundedRectangleRadius = 10
-                
-                Rectangle()
-                    .cornerRadius(CGFloat(roundedRectangleRadius))
-                    .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-                // .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius)) // Use after reintroducing Search
-                    .frame(width: screenWidth, height: CGFloat(110 + roundedRectangleRadius)) 
-                //.padding(.bottom, CGFloat(roundedRectangleRadius))
-                    .padding(.top, -CGFloat(roundedRectangleRadius))
-                    .ignoresSafeArea()
+        }
+        .onAppear {
+            // Get elements
+            apiManager.getElements { elements in
+                DispatchQueue.main.async {
+                    self.elements = elements
+                }
             }
-            
-            // **** Header ****            
-            HStack () {
+            // Determine elements visible in user view
+            cancellable = viewModel.visibleElementsSubject.sink(receiveValue: { updatedVisibleElements in
+                visibleElements = updatedVisibleElements
+            })
+            // Update user location
+            cancellableUserLocation = viewModel.userLocationSubject.sink(receiveValue: { updatedUserLocation in
+                userLocation = updatedUserLocation
+            })
+            // When user stops moving map
+            mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {
+                // Any additional logic that should be executed when the map stops moving can be added here.
+            })
+        }
+    }
+    
+//    func headerRectangle(screenWidth: CGFloat) -> some View {
+//        RoundedRectangle(cornerRadius: 10)
+//            .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
+//            .frame(width: screenWidth, height: 110)
+//            .padding(.top, -10)
+//            .ignoresSafeArea()
+//    }
+    
+    func headerAndLocationButton(screenWidth: CGFloat) -> some View {
+        VStack {
+            // **** Header ****
+            HStack {
                 // **** Title ****
                 // Sets the header title.
                 Text(appName)
@@ -83,9 +138,7 @@ struct ContentView: View {
                     .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing) 
             }
             
-            // **** Location Button ****            
-            // Get current location button. Run requestWhenInUseAuthorization() on tap.
-            // TODO: How to make iPad cursor snap to button?
+            // **** Location Button ****
             GeometryReader { geometry in
                 // Use the geometry to determine the size of the screen so I can set the location button at a location that is a percentage of the user's screen size.
                 let screenSize = geometry.frame(in: .global)
@@ -121,7 +174,7 @@ struct ContentView: View {
                 .cornerRadius(20, antialiased: true)
                 .labelStyle(.iconOnly)
                 .symbolVariant(.fill)
-                .position(x: screenWidth - 45, y: screenHeight * 0.66)
+                .position(x: screenWidth - 45, y: screenHeight * 0.30)
                 .overlay(
                     // Progress indicator overlay while the app is checking for the user's location
                     Group {
@@ -135,52 +188,8 @@ struct ContentView: View {
                         .position(x: screenWidth - 45, y: screenHeight * 0.66)
                 )
             }
-            
-            // **** Bottom Sheet ****            
-            // Set the bottom sheet as an overlayed sheet in the ZStack.
-            .bottomSheet(
-                presentationDetents: [.fraction(0.3),.medium, .large],
-                isPresented: .constant(true), 
-                sheetCornerRadius: 20 
-            ) 
-            {
-                // **** Bottom Sheet Scroll View ****
-                // Set the bottom sheet content in a VStack.                    
-                BusinessesListView(elements: visibleElements)
-                    .environmentObject(viewModel)
-                
-                // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
-                    .sheet(isPresented: $showingAbout) {
-                        AboutView()
-                    }
-            } onDismiss: {
-            }
         }
-        // Prevents location button from moving with keyboard. Need to make sure this doesn't mess anything up when searching is introduced.
-        .ignoresSafeArea(.keyboard)
-        
-        // On View Appear Actions
-        .onAppear {
-            // Get elements
-            apiManager.getElements { elements in
-                DispatchQueue.main.async {
-                    self.elements = elements
-                }
-            }
-            // Determine elements visible in user view
-            cancellable = viewModel.visibleElementsSubject.sink(receiveValue: { updatedVisibleElements in
-                visibleElements = updatedVisibleElements
-            })
-            // Update user location
-            cancellableUserLocation = viewModel.userLocationSubject.sink(receiveValue: { updatedUserLocation in
-                userLocation = updatedUserLocation
-            })
-            // When user stops moving map
-            mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {
-                // Any additional logic that should be executed when the map stops moving can be added here.
-            })
-        }
-    }    
+    }
     
     func mapView(elements: [Element]) -> some View {
         MapView(elements: $elements)
