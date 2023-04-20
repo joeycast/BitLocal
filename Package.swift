@@ -19,7 +19,7 @@ let package = Package(
             bundleIdentifier: "app.bitlocal.bitlocal",
             teamIdentifier: "5YUMLYCFT8",
             displayVersion: "0.1",
-            bundleVersion: "3",
+            bundleVersion: "4",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
@@ -38,18 +38,13 @@ let package = Package(
             appCategory: .lifestyle
         )
     ],
-    dependencies: [
-        .package(url: "https://github.com/stephencelis/SQLite.swift.git", "0.14.1"..<"1.0.0"),
-        .package(url: "https://github.com/marmelroy/PhoneNumberKit.git", "3.5.8"..<"4.0.0")
-    ],
     targets: [
         .executableTarget(
             name: "AppModule",
-            dependencies: [
-                .product(name: "SQLite", package: "SQLite.swift"),
-                .product(name: "PhoneNumberKit", package: "PhoneNumberKit")
-            ],
-            path: "."
+            path: ".",
+            resources: [
+                .process("Resources")
+            ]
         )
     ]
 )

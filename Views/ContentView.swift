@@ -134,13 +134,12 @@ struct ContentView: View {
                 HStack {
                     Spacer()
                     HStack(spacing: 0) {
-                        Text("bit")
-                            .font(Font.custom("Ubuntu-LightItalic", size: 28))
+                        Text(" bit")
+                            .font(.custom("Ubuntu-LightItalic", size: 28))
                             .foregroundColor(.orange)
                         
-                        Text("local")
-                            .bold()
-                            .font(Font.custom("Ubuntu-Italic", size: 28))
+                        Text("local ")
+                            .font(.custom("Ubuntu-MediumItalic", size: 28))
                             .foregroundColor(.orange)
                     }
                     Spacer()
@@ -151,7 +150,7 @@ struct ContentView: View {
                         .padding(.trailing, 3)
                 }
                 .padding(.horizontal)
-                .frame(width: screenWidth, height: 50)
+                .frame(width: screenWidth, height: 1)
                 Spacer()
             }
             .padding(.top, 30)
@@ -162,14 +161,14 @@ struct ContentView: View {
     struct CustomiPadNavigationStackTitleView: View {
         var body: some View {
             HStack(spacing: 0) {
-                Text("bit")
-                    .font(Font.custom("Ubuntu-LightItalic", size: 28))
+                Text(" bit")
+                    .font(.custom("Ubuntu-LightItalic", size: 28))
                     .foregroundColor(.orange)
                 
-                Text("local")
-                    .bold()
-                    .font(Font.custom("Ubuntu-Italic", size: 28))
+                Text("local ")
+                    .font(.custom("Ubuntu-MediumItalic", size: 28))
                     .foregroundColor(.orange)
+
             }
             .padding(.trailing)
         }
@@ -472,3 +471,5 @@ class AnnotationView: MKMarkerAnnotationView {
         canShowCallout = true
     }
 }
+
+
