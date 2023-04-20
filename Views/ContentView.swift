@@ -319,6 +319,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     override init() {
         super.init()
         locationManager.delegate = self
+        mapView?.delegate = self
     }
     
     // Request location
@@ -405,7 +406,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
         debounceTimer?.cancel()
         debounceTimer = Just(())
-            .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
+            .delay(for: .seconds(1), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 self.updateMapRegion(center: mapView.region.center)
