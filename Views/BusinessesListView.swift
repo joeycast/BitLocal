@@ -30,9 +30,6 @@ struct BusinessesListView: View {
                     let cellViewModel = ElementCellViewModel(element: element, userLocation: viewModel.userLocation, viewModel: viewModel)
                     NavigationLink(destination: BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel), label: { 
                         ElementCell(viewModel: cellViewModel)
-                            .onAppear {
-                                cellViewModel.updateAddress()
-                            }
                     })
                 }
                 .listStyle(.plain)
@@ -57,7 +54,7 @@ struct ElementCell: View {
                     .minimumScaleFactor(1)
                     .padding(.vertical, 5)
                     .frame(maxWidth: .infinity, alignment: .leading)
-        
+                
                 // Distance from location
                 distanceText
                     .font(.subheadline)
@@ -126,9 +123,33 @@ class ElementCellViewModel: ObservableObject {
         self.element = element
         self.userLocation = userLocation
         self.viewModel = viewModel
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.updateAddress()
+        }
+    }
+    
+    private func getCachedAddress() -> Address? {
+        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
+            return nil
+        }
+        let cacheKey = "\(lat),\(lon)"
+        return viewModel.geocodingCache.getValue(forKey: cacheKey)
+    }
+    
+    private func setCachedAddress(_ address: Address) {
+        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
+            return
+        }
+        let cacheKey = "\(lat),\(lon)"
+        viewModel.geocodingCache.setValue(address, forKey: cacheKey)
     }
     
     func updateAddress() {
+        // Check if the address is already cached
+        if let cachedAddress = getCachedAddress() {
+            self.address = cachedAddress
+            return
+        }
         // Check if all required properties are not nil
         if let streetNumber = address?.streetNumber,
            let streetName = address?.streetName,

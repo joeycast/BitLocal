@@ -72,20 +72,20 @@ struct ContentView: View {
                     }
                     
                     // **** Bottom Sheet ****
-                        .bottomSheet(
-                            presentationDetents: [.fraction(0.3), .medium, .large],
-                            isPresented: .constant(true),
-                            sheetCornerRadius: 20
-                        ) {
-                            // **** Bottom Sheet Scroll View ****
-                            BusinessesListView(elements: visibleElements)
-                                .environmentObject(viewModel)
-                            
-                            // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
-                                .sheet(isPresented: $showingAbout) {
-                                    AboutView()
-                                }
-                        } onDismiss: {}
+                    .bottomSheet(
+                        presentationDetents: [.fraction(0.3), .medium, .large],
+                        isPresented: .constant(true),
+                        sheetCornerRadius: 20
+                    ) {
+                        // **** Bottom Sheet Scroll View ****
+                        BusinessesListView(elements: visibleElements)
+                            .environmentObject(viewModel)
+                        
+                        // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
+                            .sheet(isPresented: $showingAbout) {
+                                AboutView()
+                            }
+                    } onDismiss: {}
                 }
                 .ignoresSafeArea(.keyboard)
             }
@@ -168,12 +168,12 @@ struct ContentView: View {
                 Text("local ")
                     .font(.custom("Ubuntu-MediumItalic", size: 28))
                     .foregroundColor(.orange)
-
+                
             }
             .padding(.trailing)
         }
     }
-
+    
     // Info Button View
     struct InfoButtonView: View {
         @Binding var showingAbout: Bool
@@ -306,6 +306,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
     @Published var isUpdatingLocation = false
+    @Published var geocodingCache = LRUCache<String, Address>(maxSize: 100)
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -405,7 +406,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
         debounceTimer?.cancel()
         debounceTimer = Just(())
-            .delay(for: .seconds(1), scheduler: DispatchQueue.main)
+            .delay(for: .seconds(0.75), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 self.updateMapRegion(center: mapView.region.center)
@@ -471,5 +472,3 @@ class AnnotationView: MKMarkerAnnotationView {
         canShowCallout = true
     }
 }
-
-
