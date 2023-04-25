@@ -266,7 +266,7 @@ struct ContentView: View {
         func updateUIView(_ mapView: MKMapView, context: Context) {
             if mapView.region != viewModel.region {
                 // Makes sure region is set on map.
-                mapView.setRegion(viewModel.region, animated: true) 
+                mapView.setRegion(viewModel.region, animated: true)
                 
                 // Only show annotations within 25 miles of center of current map view
                 // TODO: Use elementShouldBeShownAsAnnotation function result here.
@@ -275,9 +275,11 @@ struct ContentView: View {
                         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
                         let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                         let distance = viewModel.distanceFromCenter(location: location)
-                        if distance <= (25 * 1609.344) { // miles to meters
-                            let annotation = Annotation(element: element)
-                            return annotation
+                        if distance <= (25 * 1609.344) { // Miles to meters
+                            if element.deletedAt == "" { // Only show element as annotation if it has not been deleted 
+                                let annotation = Annotation(element: element)
+                                return annotation
+                            }
                         }
                         return nil
                     }
@@ -300,6 +302,7 @@ struct ContentView: View {
     }
 }
 
+        
 // ContentViewModel
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
