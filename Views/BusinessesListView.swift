@@ -170,7 +170,6 @@ class ElementCellViewModel: ObservableObject {
             return
         }
         
-        
         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
             return
         }

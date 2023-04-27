@@ -46,6 +46,10 @@ struct ContentView: View {
                         if let elements = elements {
                             mapView(elements: elements)
                                 .ignoresSafeArea()
+                                .onAppear {
+                                    viewModel.locationManager.requestWhenInUseAuthorization()
+                                    viewModel.locationManager.startUpdatingLocation()
+                                }
                         }
                         locationButtonView()
                     }
@@ -269,13 +273,12 @@ struct ContentView: View {
                 mapView.setRegion(viewModel.region, animated: true)
                 
                 // Only show annotations within 25 miles of center of current map view
-                // TODO: Use elementShouldBeShownAsAnnotation function result here.
                 if let elements = elements {
                     let newAnnotations = elements.compactMap { element -> Annotation? in
                         guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
                         let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                         let distance = viewModel.distanceFromCenter(location: location)
-                        if distance <= (25 * 1609.344) { // Miles to meters
+                        if distance <= CLLocationDistance(25 * 1609.344) { // Miles to meters
                             if element.deletedAt == "" { // Only show element as annotation if it has not been deleted 
                                 let annotation = Annotation(element: element)
                                 return annotation
