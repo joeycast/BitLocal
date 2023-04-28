@@ -16,13 +16,13 @@ struct AboutView: View {
     
     // Socials section links
     let twitterURL = URL(string:"https://twitter.com/bitlocal_app")!
-//    let discordURL = URL(string:"https://twitter.com/joeycast")!
-//    let nostrURL = URL(string:"https://twitter.com/joeycast")!
+//    let discordURL = URL(string:"")!
+//    let nostrURL = URL(string:"")!
     
     // Other section links
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
-    let privacyPolicyURL = URL(string: "https://twitter.com/joeycast")!
-//    let termsofServiceURL = URL(string: "https://twitter.com/joeycast")!
+    let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy%20Policy.md")!
+//    let termsofServiceURL = URL(string: "")!
     
     // Support Development links
     // let tipJarURL = URL(string: "")!

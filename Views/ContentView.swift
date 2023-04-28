@@ -127,7 +127,7 @@ struct ContentView: View {
                 Rectangle()
                     .cornerRadius(CGFloat(roundedRectangleRadius))
                     .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-                    .frame(width: screenWidth, height: CGFloat(110 + roundedRectangleRadius)) 
+                    .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius)) 
                     .padding(.top, -CGFloat(roundedRectangleRadius))
                     .ignoresSafeArea()
             }
@@ -305,7 +305,7 @@ struct ContentView: View {
     }
 }
 
-        
+
 // ContentViewModel
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
