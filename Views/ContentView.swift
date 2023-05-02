@@ -29,7 +29,7 @@ struct ContentView: View {
         GeometryReader { geometry in
             let screenWidth = geometry.size.width
             
-            if screenWidth > 768 { // iPad layout
+            if screenWidth > 768 || geometry.size.height > 1024 { // iPad layout
                 NavigationView {
                     BusinessesListView(elements: visibleElements)
                         .environmentObject(viewModel)
