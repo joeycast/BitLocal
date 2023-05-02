@@ -268,32 +268,41 @@ struct ContentView: View {
         
         // Update annotations on map
         func updateUIView(_ mapView: MKMapView, context: Context) {
-            if mapView.region != viewModel.region {
-                // Makes sure region is set on map.
-                mapView.setRegion(viewModel.region, animated: true)
-                
-                // Only show annotations within 25 miles of center of current map view
-                if let elements = elements {
-                    let newAnnotations = elements.compactMap { element -> Annotation? in
-                        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
-                        let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                        let distance = viewModel.distanceFromCenter(location: location)
-                        if distance <= CLLocationDistance(25 * 1609.344) { // Miles to meters
-                            if element.deletedAt == "" { // Only show element as annotation if it has not been deleted 
-                                let annotation = Annotation(element: element)
-                                return annotation
-                            }
+            let currentRegion = mapView.region
+            let targetCenterCoordinate = viewModel.region.center
+            
+            
+            // Check if the center coordinates are not equal
+            if currentRegion.center.latitude != targetCenterCoordinate.latitude || currentRegion.center.longitude != targetCenterCoordinate.longitude {
+                let updatedRegion = MKCoordinateRegion(center: targetCenterCoordinate, span: currentRegion.span)
+                mapView.setRegion(updatedRegion, animated: true)
+            }
+            
+            // Call the updateAnnotations function to refresh annotations when the region is updated
+            updateAnnotations(mapView: mapView, elements: elements)
+        }
+        
+        func updateAnnotations(mapView: MKMapView, elements: [Element]?) {
+            if let elements = elements {
+                let newAnnotations = elements.compactMap { element -> Annotation? in
+                    guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
+                    let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                    let distance = viewModel.distanceFromCenter(location: location)
+                    if distance <= CLLocationDistance(25 * 1609.344) { // Miles to meters
+                        if (element.deletedAt == "" && (element.osmJSON?.tags?["name"] != nil) || element.osmJSON?.tags?["operator"] != nil) { // Only show element as annotation if it has not been deleted and has a name or operator 
+                            let annotation = Annotation(element: element)
+                            return annotation
                         }
-                        return nil
                     }
-                    
-                    // Remove old annotations
-                    let oldAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-                    mapView.removeAnnotations(oldAnnotations)
-                    
-                    // Add new annotations
-                    mapView.addAnnotations(newAnnotations)
+                    return nil
                 }
+                
+                // Remove old annotations
+                let oldAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+                mapView.removeAnnotations(oldAnnotations)
+                
+                // Add new annotations
+                mapView.addAnnotations(newAnnotations)
             }
         }
         
@@ -318,6 +327,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
     let visibleElementsSubject = PassthroughSubject<[Element], Never>()
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
+    let geocoder = Geocoder(maxConcurrentRequests: 5)
     
     private var debounceTimer: Cancellable?
     weak var mapView: MKMapView?
@@ -347,7 +357,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.userLocationSubject.send(latestLocation)
         }
         manager.stopUpdatingLocation() // Stop updating location once we have the user's location
-        userLocation = locations.last // Set the user's location in the view model
         isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
     }
     
@@ -409,10 +418,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     // Detecting when map view visible region changes
-    func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
+    func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+        self.updateMapRegion(center: mapView.region.center)
+        
         debounceTimer?.cancel()
         debounceTimer = Just(())
-            .delay(for: .seconds(0.75), scheduler: DispatchQueue.main)
+            .delay(for: .seconds(1), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 self.updateMapRegion(center: mapView.region.center)
@@ -421,6 +432,18 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self.visibleElementsSubject.send(visibleElements)
                 self.mapStoppedMovingSubject.send(())
             }
+    }
+    
+    func updateAnnotations(for mapView: MKMapView) {
+        let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
+        let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
+        self.visibleElementsSubject.send(visibleElements)
+        self.mapStoppedMovingSubject.send(())
+    }
+    
+    func updateVisibleElements(for annotations: [MKAnnotation]) {
+        let visibleElements = annotations.compactMap { ($0 as? Annotation)?.element }
+        self.visibleElementsSubject.send(visibleElements)
     }
 }
 

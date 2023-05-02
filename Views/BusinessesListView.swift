@@ -5,6 +5,8 @@ struct BusinessesListView: View {
     
     @EnvironmentObject var viewModel: ContentViewModel
     
+    let maxListResults = 25
+    
     var elements: [Element]
     var userLocation: CLLocation?
     
@@ -26,22 +28,42 @@ struct BusinessesListView: View {
                     .font(.title3)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
-                List(sortedElements.prefix(100), id: \.uuid) { element in
-                    let cellViewModel = ElementCellViewModel(element: element, userLocation: viewModel.userLocation, viewModel: viewModel)
-                    NavigationLink(destination: BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel), label: { 
-                        ElementCell(viewModel: cellViewModel)
-                    })
+                List {
+                    Section(footer: footerView) {
+                        ForEach(sortedElements.prefix(maxListResults), id: \.uuid) { element in
+                            let cellViewModel = ElementCellViewModel(element: element, userLocation: viewModel.userLocation, viewModel: viewModel)
+                            NavigationLink(destination: BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel), label: { 
+                                ElementCell(viewModel: cellViewModel)
+                            })
+                        }
+                    }
                 }
                 .listStyle(.plain)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .id(UUID())
             }
         }
+    }
+    
+    private var footerView: some View {
+        Group {
+            if sortedElements.count > maxListResults {
+                VStack {
+                    Text("\(sortedElements.count) locations returned on the map. The top \(min(sortedElements.count, maxListResults)) are displayed in the list.")
+                }
+            } else {
+                Text("Showing \(sortedElements.count) of \(sortedElements.count) locations.")
+            }
+        }
+        .font(.footnote)
+        .foregroundColor(.secondary)
     }
 }
 
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
+    @State private var appeared = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -80,6 +102,12 @@ struct ElementCell: View {
                 
                 PaymentIcons(element: viewModel.element)
             }
+        }
+        .onAppear {
+            viewModel.onCellAppear()
+        }
+        .onChange(of: viewModel.viewModel.userLocation) { _ in
+            viewModel.onCellAppear()
         }
     }
     private var distanceText: some View {
@@ -123,8 +151,12 @@ class ElementCellViewModel: ObservableObject {
         self.element = element
         self.userLocation = userLocation
         self.viewModel = viewModel
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.updateAddress()
+        self.address = viewModel.geocodingCache.getValue(forKey: "\(element.osmJSON?.lat ?? 0),\(element.osmJSON?.lon ?? 0)")
+    }
+    
+    func onCellAppear() {
+        if address == nil {
+            updateAddress()
         }
     }
     
@@ -184,9 +216,9 @@ class ElementCellViewModel: ObservableObject {
         let location = CLLocation(latitude: lat, longitude: lon)
         
         // Throttle geocoding requests
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now()) {
-            self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-                if let placemark = placemarks?.first {
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.viewModel.geocoder.reverseGeocode(location: location) { placemark in
+                if let placemark = placemark {
                     let streetNumber = placemark.subThoroughfare ?? ""
                     let streetName = placemark.thoroughfare ?? ""
                     let cityOrTownName = placemark.locality ?? ""
