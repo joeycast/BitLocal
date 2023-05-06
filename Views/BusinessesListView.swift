@@ -70,7 +70,7 @@ struct ElementCell: View {
             
             HStack {
                 // Business Name
-                Text(viewModel.element.osmJSON?.tags?["name"] ?? viewModel.element.osmJSON?.tags?["operator"] ?? "Name not available")
+                Text(viewModel.element.osmJSON?.tags?.name ?? viewModel.element.osmJSON?.tags?.operator ?? "Name not available")
                     .fontWeight(.semibold)
                     .lineLimit(1)
                     .minimumScaleFactor(1)
@@ -180,25 +180,6 @@ class ElementCellViewModel: ObservableObject {
         // Check if the address is already cached
         if let cachedAddress = getCachedAddress() {
             self.address = cachedAddress
-            return
-        }
-        // Check if all required properties are not nil
-        if let streetNumber = address?.streetNumber,
-           let streetName = address?.streetName,
-           let cityOrTownName = address?.cityOrTownName,
-           let regionOrStateName = address?.regionOrStateName,
-           let postalCode = address?.postalCode {
-            
-            let existingAddress = Address(
-                streetNumber: streetNumber,
-                streetName: streetName,
-                cityOrTownName: cityOrTownName,
-                postalCode: postalCode,
-                regionOrStateName: regionOrStateName,
-                countryName: address?.countryName ?? ""
-            )
-            
-            self.address = existingAddress
             return
         }
         

@@ -19,7 +19,7 @@ let package = Package(
             bundleIdentifier: "app.bitlocal.bitlocal",
             teamIdentifier: "5YUMLYCFT8",
             displayVersion: "0.1",
-            bundleVersion: "11",
+            bundleVersion: "12",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [

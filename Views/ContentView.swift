@@ -289,7 +289,7 @@ struct ContentView: View {
                     let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                     let distance = viewModel.distanceFromCenter(location: location)
                     if distance <= CLLocationDistance(25 * 1609.344) { // Miles to meters
-                        if (element.deletedAt == "" && (element.osmJSON?.tags?["name"] != nil) || element.osmJSON?.tags?["operator"] != nil) { // Only show element as annotation if it has not been deleted and has a name or operator 
+                        if (element.deletedAt == "" && (element.osmJSON?.tags?.name != nil) || element.osmJSON?.tags?.operator != nil) { // Only show element as annotation if it has not been deleted and has a name or operator 
                             let annotation = Annotation(element: element)
                             return annotation
                         }
@@ -461,7 +461,7 @@ class Annotation: NSObject, Identifiable, MKAnnotation {
     }
     
     var title: String? {
-        element?.osmJSON?.tags?["name"]
+        element?.osmJSON?.tags?.name
     }
     
     init(element: Element) {

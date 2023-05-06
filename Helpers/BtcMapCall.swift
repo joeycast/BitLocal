@@ -30,7 +30,19 @@ struct Element: Codable, Identifiable {
         createdAt = try container.decode(String.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+        
+        if let osmTags = osmJSON?.tags {
+            address = Address(streetNumber: osmTags.addrHousenumber,
+                              streetName: osmTags.addrStreet,
+                              cityOrTownName: osmTags.addrCity,
+                              postalCode: osmTags.addrPostcode,
+                              regionOrStateName: osmTags.addrState,
+                              countryName: nil) // Country is not present in the given JSON
+        } else {
+            address = nil
+        }
     }
+
 }
 
 // MARK: - Address
@@ -56,7 +68,7 @@ struct Address {
 struct OsmJSON: Codable {
     let changeset, id: Int?
     let lat, lon: Double?
-    let tags: [String: String]?
+    let tags: OsmTags?
     let timestamp: String?
     let type: TypeEnum?
     let uid: Int?
@@ -66,6 +78,36 @@ struct OsmJSON: Codable {
     let geometry: [Geometry]?
     let nodes: [Int]?
     let members: [Member]?
+}
+
+// MARK: - OsmTags
+struct OsmTags: Codable {
+    let addrCity, addrHousenumber, addrPostcode, addrState, addrStreet: String?
+    let paymentBitcoin, currencyXBT, paymentOnchain, paymentLightning, paymentLightningContactless: String?
+    let name, `operator`: String?
+    let description, descriptionEn, website, contactWebsite, phone, contactPhone, openingHours: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case addrCity = "addr:city"
+        case addrHousenumber = "addr:housenumber"
+        case addrPostcode = "addr:postcode"
+        case addrState = "addr:state"
+        case addrStreet = "addr:street"
+        case paymentBitcoin = "payment:bitcoin"
+        case currencyXBT = "currency:XBT"
+        case paymentOnchain = "payment:onchain"
+        case paymentLightning = "payment:lightning"
+        case paymentLightningContactless = "payment:lightning_contactless"
+        case name
+        case `operator`
+        case description
+        case descriptionEn = "description:en"
+        case website
+        case contactWebsite = "contact:website"
+        case phone
+        case contactPhone = "contact:phone"
+        case openingHours = "opening_hours"
+    }
 }
 
 // MARK: - Bounds
@@ -106,7 +148,6 @@ struct Tags: Codable {
     let paymentProvider: String?
     let paymentURI: String?
     
-    // TODO: Add more here, like bitcoin/lightning/phone/website?
     enum CodingKeys: String, CodingKey {
         case category
         case iconAndroid = "icon:android"

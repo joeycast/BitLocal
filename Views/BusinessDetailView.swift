@@ -4,12 +4,12 @@ import MapKit
 
 struct BusinessDetailView: View {
     
-    var element: Element
-    var userLocation: CLLocation?
-    
     @State private var region = MKCoordinateRegion()
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
+    
+    var element: Element
+    var userLocation: CLLocation?
     
     init(element: Element, userLocation: CLLocation?, contentViewModel: ContentViewModel) {
         self.element = element
@@ -23,12 +23,12 @@ struct BusinessDetailView: View {
             BusinessDetailsSection(element: element, elementCellViewModel: elementCellViewModel)
             PaymentDetailsSection(element: element)
             BusinessMapSection(element: element)         
-            TroubleshootingSection(element: element)
+//            TroubleshootingSection(element: element)
         }
         .onAppear {
             elementCellViewModel.updateAddress()
         }
-        .navigationTitle(element.osmJSON?.tags?["name"] ?? element.osmJSON?.tags?["operator"] ?? "Name not available")
+        .navigationTitle(element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? "Name not available")
         .navigationBarTitleDisplayMode(.large)
     }
 }
@@ -38,7 +38,7 @@ struct BusinessDescriptionSection: View {
     var element: Element
     
     var body: some View {
-        if let description = element.osmJSON?.tags?["description"] ?? element.osmJSON?.tags?["description:en"] {
+        if let description = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn {
             Section(header: Text("Description")) {
                 Text(description)   
             }
@@ -46,7 +46,6 @@ struct BusinessDescriptionSection: View {
         }
     }
 }
-
 
 // Business Details Section
 struct BusinessDetailsSection: View {
@@ -67,53 +66,46 @@ struct BusinessDetailsSection: View {
             }
             
             // Business Website
-            // TODO: Remove leading "https:.//www."?
-            VStack (alignment: .leading, spacing: 3) {
-                Text("Website")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                if let website = element.osmJSON?.tags?["website"] ?? element.osmJSON?.tags?["contact:website"] {
+            if let website = element.osmJSON?.tags?.website ?? element.osmJSON?.tags?.contactWebsite {
+                VStack (alignment: .leading, spacing: 3) {
+                    Text("Website")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
                     Link(destination: URL(string: website)!) {
                         Text(website)
                             .lineLimit(1)
                     }
-                } else {
-                    Text("No website available.")
                 }
             }
             
             // Business Phone
-            VStack (alignment: .leading, spacing: 3) {
-                Text("Phone")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                // TODO: Apply formatting to phone
-                // TODO: Strip the junk out of phone numbers before storing instead of here.
-                if let phone = element.osmJSON?.tags?["phone"] ?? element.osmJSON?.tags?["contact:phone"], let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "+", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
+            if let phone = element.osmJSON?.tags?.phone ?? element.osmJSON?.tags?.contactPhone, let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "+", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
+                VStack (alignment: .leading, spacing: 3) {
+                    Text("Phone")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
                     Link(destination: url) {
                         Text(phone)
                             .lineLimit(1)
                     }
-                } else {
-                    Text("No phone number available.")
                 }
             }
-            VStack (alignment: .leading, spacing: 3) {
-                Text("Opening Hours")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                if let openingHours = element.osmJSON?.tags?["opening_hours"] {
+            
+            if let openingHours = element.osmJSON?.tags?.openingHours {
+                VStack (alignment: .leading, spacing: 3) {
+                    Text("Opening Hours")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
                     Text(openingHours)
-                } else {
-                    Text("No opening hours data available.")
                 }
             }
         }
     }
 }
+
 
 // Payment Details Section
 struct PaymentDetailsSection: View {
@@ -196,7 +188,7 @@ struct MapView: UIViewRepresentable {
            let longitude = element.osmJSON?.lon {
             let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
             annotation.coordinate = coordinate
-            annotation.title = element.osmJSON?.tags?["name"] ?? element.osmJSON?.tags?["operator"] ?? "Name not available"
+            annotation.title = element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? "Name not available"
             
             mapView.addAnnotation(annotation)
             
@@ -235,28 +227,31 @@ struct MapView: UIViewRepresentable {
 }
 
 // Troubleshooting Section
-struct TroubleshootingSection: View {
-    var element: Element
-    
-    var body: some View {
-        Section(header: Text("Troubleshooting")) {
-            Text("ID: \(element.id)")
-            Text("Created at: \(element.createdAt)")
-            Text("Updated at: \(element.updatedAt ?? "")")
-            Text("Deleted at: \(element.deletedAt ?? "")")
-            //Text("Description: \(element.osmJSON?.tags?["description"] ?? "")")                
-            //Text("Phone: \(element.osmJSON?.tags?["phone"] ?? "")")
-            //Text("Contact:Phone: \(element.osmJSON?.tags?["contact:phone"] ?? "")")
-            //Text("Website: \(element.osmJSON?.tags?["website"] ?? "")")
-            //Text("Contact:Website: \(element.osmJSON?.tags?["contact:website"] ?? "")")
-            //Text("Opening Hours: \(element.osmJSON?.tags?["opening_hours"] ?? "")")
-            //Text("Accepts payment:bitcoin: \(element.osmJSON?.tags?["payment:bitcoin"] ?? "no")")
-            //Text("Accepts currency:XBT: \(element.osmJSON?.tags?["currency:XBT"] ?? "no")")
-            Text("Accepts payment:bitcoin: \(element.osmJSON?.tags?["payment:bitcoin"] ?? "no")")
-            Text("Accepts currency:XBT: \(element.osmJSON?.tags?["currency:XBT"] ?? "no")")
-            Text("Accepts Bitcoin on Chain: \(element.osmJSON?.tags?["payment:onchain"] ?? "no")")
-            Text("Accepts Lightning: \(element.osmJSON?.tags?["payment:lightning"] ?? "no")")
-            Text("Accepts Contactless Lightning: \(element.osmJSON?.tags?["payment:lightning_contactless"] ?? "no")")
-        }
-    }
-}
+//struct TroubleshootingSection: View {
+//    var element: Element
+//    
+//    var body: some View {
+//        Section(header: Text("Troubleshooting")) {
+//            Text("ID: \(element.id)")
+//            Text("Created at: \(element.createdAt)")
+//            Text("Updated at: \(element.updatedAt ?? "")")
+//            Text("Deleted at: \(element.deletedAt ?? "")")
+//            Text("Description: \(element.osmJSON?.tags?.description ?? "")")                
+//            Text("Phone: \(element.osmJSON?.tags?.phone ?? "")")
+//            Text("Contact:Phone: \(element.osmJSON?.tags?.contactPhone ?? "")")
+//            Text("Website: \(element.osmJSON?.tags?.website ?? "")")
+//            Text("Contact:Website: \(element.osmJSON?.tags?.contactWebsite ?? "")")
+//            Text("Opening Hours: \(element.osmJSON?.tags?.openingHours ?? "")")
+//            Text("Accepts payment:bitcoin: \(element.osmJSON?.tags?.paymentBitcoin ?? "no")")
+//            Text("Accepts currency:XBT: \(element.osmJSON?.tags?.currencyXBT ?? "no")")
+//            Text("Accepts Bitcoin on Chain: \(element.osmJSON?.tags?.paymentOnchain ?? "no")")
+//            Text("Accepts Lightning: \(element.osmJSON?.tags?.paymentLightning ?? "no")")
+//            Text("Accepts Contactless Lightning: \(element.osmJSON?.tags?.paymentLightningContactless ?? "no")")
+//            Text("House Number: \(element.osmJSON?.tags?.addrHousenumber ?? "")")
+//            Text("Street: \(element.osmJSON?.tags?.addrStreet ?? "")")
+//            Text("City: \(element.osmJSON?.tags?.addrCity ?? "")")
+//            Text("State: \(element.osmJSON?.tags?.addrState ?? "")")
+//            Text("Post Code: \(element.osmJSON?.tags?.addrPostcode ?? "")")            
+//        }
+//    }
+//}

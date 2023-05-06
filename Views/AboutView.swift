@@ -21,7 +21,7 @@ struct AboutView: View {
     
     // Other section links
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
-    let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy%20Policy.md")!
+    let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md")!
 //    let termsofServiceURL = URL(string: "")!
     
     // Support Development links
@@ -34,7 +34,7 @@ struct AboutView: View {
             Form {
                 // Header section
                 Section {
-                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the Bitcoin community. Location data displayed in \(ContentView().appName) is retreived from OpenStreetMap through the BTC Map API. \(ContentView().appName) is built entirely on iPad using Swift Playgrounds.")
+                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in \(ContentView().appName) is retreived from OpenStreetMap through the BTC Map API. \(ContentView().appName) is built entirely on iPad using Swift Playgrounds.")
                 }
                 // Contribute section
                 Section(header: Text("Contribute"), 
