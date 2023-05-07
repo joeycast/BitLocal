@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var cancellable: Cancellable?
     @State private var mapStoppedMovingCancellable: Cancellable?
     @State private var cancellableUserLocation: Cancellable?
+    @State private var firstLocationUpdate: Bool = true
     
     let appName = "BitLocal"   
     let apiManager = APIManager()
@@ -108,6 +109,15 @@ struct ContentView: View {
             // Update user location
             cancellableUserLocation = viewModel.userLocationSubject.sink(receiveValue: { updatedUserLocation in
                 userLocation = updatedUserLocation
+                
+                // Zoom in on user's location on the first launch and subsequent app launches
+                if firstLocationUpdate {
+                    if let coordinate = userLocation?.coordinate {
+                        let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // set the desired zoom level
+                        viewModel.updateMapRegion(center: coordinate, span: newZoomLevel)
+                    }
+                    firstLocationUpdate = false
+                }
             })
             // When user stops moving map
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {
@@ -210,6 +220,12 @@ struct ContentView: View {
                 viewModel.isUpdatingLocation = true
                 viewModel.locationManager.startUpdatingLocation()
                 
+                // Zoom in on user's location after tapping the location button
+                if let coordinate = userLocation?.coordinate {
+                    let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // set the desired zoom level
+                    viewModel.updateMapRegion(center: coordinate, span: newZoomLevel)
+                }
+                
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
                     if viewModel.isUpdatingLocation {
                         let alert = UIAlertController(title: "Location could not be determined. Please check if location permissions have been granted.", message: nil, preferredStyle: .alert)
@@ -266,16 +282,14 @@ struct ContentView: View {
             return mapView
         }
         
-        // Update annotations on map
+        // Update the region change in this method
         func updateUIView(_ mapView: MKMapView, context: Context) {
-            let currentRegion = mapView.region
-            let targetCenterCoordinate = viewModel.region.center
+            let targetRegion = viewModel.region
             
-            
-            // Check if the center coordinates are not equal
-            if currentRegion.center.latitude != targetCenterCoordinate.latitude || currentRegion.center.longitude != targetCenterCoordinate.longitude {
-                let updatedRegion = MKCoordinateRegion(center: targetCenterCoordinate, span: currentRegion.span)
-                mapView.setRegion(updatedRegion, animated: true)
+            // Check if the regional changes are needed
+            if mapView.region != targetRegion {
+                let fittedRegion = mapView.regionThatFits(targetRegion)
+                mapView.setRegion(fittedRegion, animated: false)
             }
             
             // Call the updateAnnotations function to refresh annotations when the region is updated
@@ -413,13 +427,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     // Update map region
-    func updateMapRegion(center: CLLocationCoordinate2D) {
-        self.region = MKCoordinateRegion(center: center, span: region.span)
+    func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil) {
+        let updatedSpan = span ?? region.span
+        self.region = MKCoordinateRegion(center: center, span: updatedSpan)
     }
     
     // Detecting when map view visible region changes
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-        self.updateMapRegion(center: mapView.region.center)
+        self.updateMapRegion(center: mapView.region.center, span: mapView.region.span)
         
         debounceTimer?.cancel()
         debounceTimer = Just(())

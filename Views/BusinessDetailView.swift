@@ -119,6 +119,8 @@ struct PaymentDetailsSection: View {
                     Image(systemName: "bitcoinsign.circle.fill")
                         .foregroundColor(.orange)
                     Text("Accepts Bitcoin")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
             
@@ -128,6 +130,8 @@ struct PaymentDetailsSection: View {
                     Image(systemName: "bitcoinsign.circle.fill")
                         .foregroundColor(.orange)
                     Text("Accepts Bitcoin on Chain")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
             
@@ -137,6 +141,8 @@ struct PaymentDetailsSection: View {
                     Image(systemName: "bolt.circle.fill")
                         .foregroundColor(.orange)
                     Text("Accepts Bitcoin over Lightning")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }  
             if acceptsContactlessLightning(element: element) {
@@ -144,6 +150,8 @@ struct PaymentDetailsSection: View {
                     Image(systemName: "wave.3.right.circle.fill")
                         .foregroundColor(.orange)
                     Text("Accepts Contactless Lightning")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }  
         }
