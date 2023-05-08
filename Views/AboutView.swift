@@ -22,7 +22,7 @@ struct AboutView: View {
     // Other section links
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
     let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md")!
-//    let termsofServiceURL = URL(string: "")!
+    let bitlocalWebsite = URL(string: "https://www.bitlocal.app")!
     
     // Support Development links
     // let tipJarURL = URL(string: "")!
@@ -72,18 +72,18 @@ struct AboutView: View {
                 }
                 // Other section
                 Section(header: Text("Other")) {
-                    Link(destination: bitcoinResourcesURL, 
+                    Link(destination: bitlocalWebsite, 
                          label: {
-                        Label("Bitcoin Resources", systemImage: "bitcoinsign.circle")    
+                        Label("BitLocal Website", systemImage: "globe")
                     })
                     Link(destination: privacyPolicyURL, 
                          label: {
                         Label("Privacy Policy", systemImage: "hand.raised")    
                     })
-//                    Link(destination: termsofServiceURL, 
-//                         label: {
-//                        Label("Terms of Service", systemImage: "link")    
-//                    })
+                    Link(destination: bitcoinResourcesURL, 
+                         label: {
+                        Label("Bitcoin Resources", systemImage: "bitcoinsign.circle")    
+                    })
                 }
                 // Support Development section
 //                Section(header: Text("Support Development"), 
