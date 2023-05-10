@@ -23,6 +23,7 @@ struct AboutView: View {
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
     let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md")!
     let bitlocalWebsite = URL(string: "https://www.bitlocal.app")!
+    let btcMapURL = URL(string: "https://btcmap.org/")!
     
     // Support Development links
     // let tipJarURL = URL(string: "")!
@@ -34,7 +35,7 @@ struct AboutView: View {
             Form {
                 // Header section
                 Section {
-                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in \(ContentView().appName) is retreived from OpenStreetMap through the BTC Map API. \(ContentView().appName) is built entirely on iPad using Swift Playgrounds.")
+                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in \(ContentView().appName) is retrieved from OpenStreetMap through the BTC Map API. \(ContentView().appName) is built entirely on iPad using Swift Playgrounds.")
                 }
                 // Contribute section
                 Section(header: Text("Contribute"), 
@@ -79,6 +80,10 @@ struct AboutView: View {
                     Link(destination: privacyPolicyURL, 
                          label: {
                         Label("Privacy Policy", systemImage: "hand.raised")    
+                    })
+                    Link(destination: btcMapURL,
+                         label: {
+                        Label("BTC Map", systemImage: "mappin.circle")
                     })
                     Link(destination: bitcoinResourcesURL, 
                          label: {
