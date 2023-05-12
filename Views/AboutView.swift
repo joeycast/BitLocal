@@ -86,7 +86,7 @@ struct AboutView: View {
                          label: {
                         Label("BTC Map", systemImage: "mappin.circle")
                     })
-                    Link(destination: btcMapURL,
+                    Link(destination: openStreetMapURL,
                          label: {
                         Label("OpenStreetMap", systemImage: "map.circle")
                     })
