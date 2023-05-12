@@ -24,7 +24,7 @@ struct AboutView: View {
     let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md")!
     let bitlocalWebsite = URL(string: "https://www.bitlocal.app")!
     let btcMapURL = URL(string: "https://btcmap.org/")!
-    let openStreetMapURL = URL(string: "openstreetmap.org/copyright")!
+    let openStreetMapURL = URL(string: "https://openstreetmap.org/copyright")!
     
     // Support Development links
     // let tipJarURL = URL(string: "")!

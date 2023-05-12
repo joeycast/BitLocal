@@ -286,7 +286,7 @@ struct ContentView: View {
                     .foregroundColor(colorScheme == .light ? Color.black : Color.white)
             }
             .padding(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
-            .background(Color(colorScheme == .light ? UIColor.white : UIColor.black).opacity(0.6))
+            .background(Color(colorScheme == .light ? UIColor.white : UIColor.black).opacity(colorScheme == .light ? 0.6 : 0.4))
             .cornerRadius(3)
         }
     }
