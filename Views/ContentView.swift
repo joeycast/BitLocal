@@ -52,7 +52,7 @@ struct ContentView: View {
                                     viewModel.locationManager.startUpdatingLocation()
                                 }
                         }
-                        locationButtonView()
+                        locationButtonView(isIPad: true)
                     }
                 }
                 .sheet(isPresented: $showingAbout) {
@@ -72,7 +72,7 @@ struct ContentView: View {
                         VStack {
                             iPhoneHeaderView(screenWidth: screenWidth)
                             Spacer()
-                            locationButtonView()
+                            locationButtonView(isIPad: false)
                         }   
                     }
                     
@@ -206,7 +206,7 @@ struct ContentView: View {
     }
     
     // Location Button View
-    func locationButtonView() -> some View {
+    func locationButtonView(isIPad: Bool) -> some View {
         GeometryReader { geometry in
             let screenSize = geometry.frame(in: .global)
             let screenWidth = screenSize.width
@@ -258,6 +258,36 @@ struct ContentView: View {
                     .animation(.easeInOut, value: viewModel.isUpdatingLocation)
                     .position(x: buttonXPosition, y: buttonYPosition + 3)
             )
+            GeometryReader { attributionGeometry in
+                let attributionXPosition = isIPad ? 85 : 85
+                let attributionYPosition = isIPad ? screenHeight * 0.95 : screenHeight * 0.37
+                OpenStreetMapAttributionView()
+                    .position(x: attributionGeometry.size.width * CGFloat(attributionXPosition) / screenWidth, y: attributionGeometry.size.height * CGFloat(attributionYPosition) / screenHeight)
+            }
+        }
+    }
+    
+    struct OpenStreetMapAttributionView: View {
+        @Environment(\.colorScheme) var colorScheme
+        
+        var body: some View {
+            Button(action: {
+                if let url = URL(string: "https://www.openstreetmap.org/copyright") {
+                    UIApplication.shared.open(url)
+                }
+            }) {
+                Text("Map data from ")
+                    .font(.system(size: 10))
+                    .foregroundColor(colorScheme == .light ? Color.black : Color.white)
+                +
+                Text("OpenStreetMap")
+                    .font(.system(size: 10))
+                    .underline()
+                    .foregroundColor(colorScheme == .light ? Color.black : Color.white)
+            }
+            .padding(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
+            .background(Color(colorScheme == .light ? UIColor.white : UIColor.black).opacity(0.6))
+            .cornerRadius(3)
         }
     }
     
