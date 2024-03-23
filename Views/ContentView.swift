@@ -268,7 +268,9 @@ struct ContentView: View {
     }
     
     struct OpenStreetMapAttributionView: View {
+        @Environment(\.scenePhase) private var scenePhase
         @Environment(\.colorScheme) var colorScheme
+        @State private var isFaded = false
         
         var body: some View {
             Button(action: {
@@ -288,6 +290,26 @@ struct ContentView: View {
             .padding(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
             .background(Color(colorScheme == .light ? UIColor.white : UIColor.black).opacity(colorScheme == .light ? 0.6 : 0.4))
             .cornerRadius(3)
+            .opacity(isFaded ? 0 : 1)
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+                    withAnimation(.easeInOut(duration: 3)) {
+                        isFaded = true
+                    }
+                }
+            }
+            .onChange(of: scenePhase) { newScenePhase in
+                if newScenePhase == .active {
+                    withAnimation(.easeInOut(duration: 0)) {
+                        isFaded = false
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+                        withAnimation(.easeInOut(duration: 3)) {
+                            isFaded = true
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -319,7 +341,7 @@ struct ContentView: View {
             // Check if the regional changes are needed
             if mapView.region != targetRegion {
                 let fittedRegion = mapView.regionThatFits(targetRegion)
-                mapView.setRegion(fittedRegion, animated: false)
+                mapView.setRegion(fittedRegion, animated: true)
             }
             
             // Call the updateAnnotations function to refresh annotations when the region is updated
@@ -333,7 +355,8 @@ struct ContentView: View {
                     let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                     let distance = viewModel.distanceFromCenter(location: location)
                     if distance <= CLLocationDistance(25 * 1609.344) { // Miles to meters
-                        if (element.deletedAt == "" && (element.osmJSON?.tags?.name != nil) || element.osmJSON?.tags?.operator != nil) { // Only show element as annotation if it has not been deleted and has a name or operator 
+                        if (element.deletedAt == nil || element.deletedAt == "") && (element.osmJSON?.tags?.name != nil || element.osmJSON?.tags?.operator != nil) {
+                            // Only show element as annotation if it has not been deleted and has a name or operator
                             let annotation = Annotation(element: element)
                             return annotation
                         }
@@ -466,22 +489,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
         self.updateMapRegion(center: mapView.region.center, span: mapView.region.span)
         
-        debounceTimer?.cancel()
-        debounceTimer = Just(())
-            .delay(for: .seconds(1), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                self.updateMapRegion(center: mapView.region.center)
-                let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
-                let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-                self.visibleElementsSubject.send(visibleElements)
-                self.mapStoppedMovingSubject.send(())
-            }
+        // Update visible elements with a slight delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.updateAnnotations(for: mapView)
+        }
     }
-    
+
     func updateAnnotations(for mapView: MKMapView) {
         let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
         let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
+        
         self.visibleElementsSubject.send(visibleElements)
         self.mapStoppedMovingSubject.send(())
     }

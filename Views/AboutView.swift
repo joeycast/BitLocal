@@ -61,7 +61,7 @@ struct AboutView: View {
                 Section(header: Text("Socials")) {
                     Link(destination: twitterURL, 
                          label: {
-                        Label("Twitter", systemImage: "bird")    
+                        Label("X / Twitter", systemImage: "bird")    
                     })
 //                    Link(destination: discordURL, 
 //                         label: {
