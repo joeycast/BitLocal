@@ -61,19 +61,27 @@ struct BusinessDetailsSection: View {
                     .foregroundColor(.secondary)
                 
                 Link(destination: URL(string: "maps://?saddr=&daddr=\(element.osmJSON?.lat ?? 0.0),\(element.osmJSON?.lon ?? 0.0)")!) {
-                    Text("\(elementCellViewModel.address?.streetNumber ?? "") \(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
+                    Text("\(elementCellViewModel.address?.streetNumber != nil && !elementCellViewModel.address!.streetNumber!.isEmpty ? elementCellViewModel.address!.streetNumber! + " " : "")\(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
                 }
             }
             
             // Business Website
             if let website = element.osmJSON?.tags?.website ?? element.osmJSON?.tags?.contactWebsite {
+                let displayWebsite = website
+                    .replacingOccurrences(of: "http://", with: "")
+                    .replacingOccurrences(of: "https://", with: "")
+                    .replacingOccurrences(of: "http://www.", with: "")
+                    .replacingOccurrences(of: "https://www.", with: "")
+                    .replacingOccurrences(of: "www.", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                
                 VStack (alignment: .leading, spacing: 3) {
                     Text("Website")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
                     Link(destination: URL(string: website)!) {
-                        Text(website)
+                        Text(displayWebsite)
                             .lineLimit(1)
                     }
                 }
