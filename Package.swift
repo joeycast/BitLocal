@@ -18,7 +18,7 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "app.bitlocal.bitlocal",
             teamIdentifier: "5YUMLYCFT8",
-            displayVersion: "1.3",
+            displayVersion: "1.4",
             bundleVersion: "20",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),

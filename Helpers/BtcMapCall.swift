@@ -193,23 +193,112 @@ enum CategoryPlural: String, Codable {
 
 class APIManager {
     
+    let cacheKey = "cachedElements"
+    let lastUpdateKey = "lastUpdate"
+    
+    init() {
+        UserDefaults.standard.register(defaults: [lastUpdateKey: "2000-01-01T00:00:00.000Z"])
+    }
+    
+    private func updateCacheWithFetchedElements(fetchedElements: [Element]) {
+        // Since cacheKey is not optional, we can use it directly without unwrapping
+        let cacheKey = self.cacheKey
+        
+        // Load the existing cache or initialize it if not present
+        var cachedElements = UserDefaults.standard.getElements(forKey: cacheKey) ?? []
+        
+        // Create a dictionary for efficient lookup and merging
+        var elementsDictionary = Dictionary(uniqueKeysWithValues: cachedElements.map { ($0.id, $0) })
+        
+        // Update existing elements or add new ones
+        fetchedElements.forEach { element in
+            elementsDictionary[element.id] = element
+        }
+        
+        // Convert dictionary back to array
+        cachedElements = Array(elementsDictionary.values)
+        
+        // Save updated cache
+        UserDefaults.standard.setElements(cachedElements, forKey: cacheKey)
+    }
+    
     func getElements(completion: @escaping ([Element]?) -> Void) {
-        guard let url = URL(string: "https://api.btcmap.org/v2/elements/") else {
+        let lastUpdate = UserDefaults.standard.string(forKey: lastUpdateKey) ?? ""
+        let urlString = "https://api.btcmap.org/v2/elements?updated_since=\(lastUpdate)"
+        
+        guard let url = URL(string: urlString) else {
+            print("Invalid URL string: \(urlString)")
+            LogManager.shared.log("Invalid URL string: \(urlString)")
             completion(nil)
             return
         }
-        URLSession.shared.dataTask(with: url) { (data, _, error) in
-            guard let data = data else {
+        
+        // Log the requesting URL
+        print("Requesting URL: \(url.absoluteString)")
+        LogManager.shared.log("Requesting URL: \(url.absoluteString)")
+        
+        URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
+            guard let data = data, error == nil else {
+                print("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
+                LogManager.shared.log("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
                 completion(nil)
                 return
             }
+            
             do {
-                let elements = try JSONDecoder().decode([Element].self, from: data)
-                completion(elements)
-            } catch let error {
-                print(error)
+                let fetchedElements = try JSONDecoder().decode([Element].self, from: data)
+                
+                // Assuming updateCacheWithFetchedElements is already correctly integrated
+                self?.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
+                
+                // Find the most recent 'updatedAt' timestamp from the fetched elements
+                if let mostRecentUpdate = fetchedElements.max(by: { $0.updatedAt ?? "" < $1.updatedAt ?? "" })?.updatedAt {
+                    print("Updating lastUpdateKey to: \(mostRecentUpdate)")
+                    LogManager.shared.log("Updating lastUpdateKey to: \(mostRecentUpdate)")
+                    UserDefaults.standard.setValue(mostRecentUpdate, forKey: self?.lastUpdateKey ?? "")
+                    
+                    // Immediately read it back for verification
+                    let updatedTime = UserDefaults.standard.string(forKey: self?.lastUpdateKey ?? "")
+                    print("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
+                    LogManager.shared.log("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
+                }
+                
+                // Fetch the updated cache to return via completion
+                let updatedCache = UserDefaults.standard.getElements(forKey: self?.cacheKey ?? "")
+                completion(updatedCache)
+            } catch {
+                print("JSON Decoding Error: \(error.localizedDescription)")
+                LogManager.shared.log("JSON Decoding Error: \(error.localizedDescription)")
                 completion(nil)
             }
         }.resume()
+    }
+}
+
+class LogManager {
+    static let shared = LogManager()
+    private init() {} // Private constructor ensures a single instance
+    
+    private(set) var logs: [String] = []
+    
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        // Customize the date format according to your needs
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return formatter
+    }()
+    
+    func log(_ message: String) {
+        let timestamp = dateFormatter.string(from: Date())
+        let logMessage = "[\(timestamp)] \(message)"
+        logs.append(logMessage)
+    }
+    
+    func allLogs() -> String {
+        return logs.joined(separator: "\n")
+    }
+    
+    func clearLogs() {
+        logs.removeAll()
     }
 }

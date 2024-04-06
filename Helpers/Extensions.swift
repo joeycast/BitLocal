@@ -76,3 +76,25 @@ extension UIViewController {
         return self
     }
 }
+
+extension Element: Equatable {
+    static func == (lhs: Element, rhs: Element) -> Bool {
+        return lhs.uuid == rhs.uuid // Assuming 'uuid' is a unique identifier for each Element
+    }
+}
+
+extension UserDefaults {
+    func setElements(_ elements: [Element], forKey key: String) {
+        if let encoded = try? JSONEncoder().encode(elements) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+    
+    func getElements(forKey key: String) -> [Element]? {
+        if let data = UserDefaults.standard.data(forKey: key),
+           let elements = try? JSONDecoder().decode([Element].self, from: data) {
+            return elements
+        }
+        return nil
+    }
+}
