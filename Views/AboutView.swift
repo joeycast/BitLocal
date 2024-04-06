@@ -102,19 +102,19 @@ struct AboutView: View {
 //                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
 //                    Label("Tip Jar", systemImage: "bolt.circle.fill")
 //                }
-                Section(header: Text("Logs")) {
-                    Button("Show Logs") {
-                        self.showingLogs = true
-                    }
-                    .sheet(isPresented: $showingLogs) {
-                        // Display logs in a scrollable text view
-                        ScrollView {
-                            Text(LogManager.shared.allLogs())
-                                .padding()
-                                .font(.system(.body, design: .monospaced))
-                        }
-                    }
-                }
+//                Section(header: Text("Logs")) {
+//                    Button("Show Logs") {
+//                        self.showingLogs = true
+//                    }
+//                    .sheet(isPresented: $showingLogs) {
+//                        // Display logs in a scrollable text view
+//                        ScrollView {
+//                            Text(LogManager.shared.allLogs())
+//                                .padding()
+//                                .font(.system(.body, design: .monospaced))
+//                        }
+//                    }
+//                }
             }
             // About page title
             // TODO: Figure out how to use the appName constant here

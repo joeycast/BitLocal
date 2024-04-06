@@ -1,5 +1,6 @@
 import Foundation
 
+// Address caching to prevent geocoding rate limiting 
 class LRUCache<Key: Hashable, Value> {
     private let maxSize: Int
     private var cache: [Key: CacheItem] = [:]
@@ -7,7 +8,7 @@ class LRUCache<Key: Hashable, Value> {
     
     init(maxSize: Int) {
         self.maxSize = maxSize
-    }
+    } 
     
     func getValue(forKey key: Key) -> Value? {
         guard let item = cache[key] else { return nil }
