@@ -2,6 +2,7 @@ import SwiftUI
 import CoreLocation
 import MapKit
 
+@available(iOS 16.4, *)
 struct BusinessDetailView: View {
     
     @State private var region = MKCoordinateRegion()
@@ -48,6 +49,7 @@ struct BusinessDescriptionSection: View {
 }
 
 // Business Details Section
+@available(iOS 16.4, *)
 struct BusinessDetailsSection: View {
     var element: Element
     @ObservedObject var elementCellViewModel: ElementCellViewModel

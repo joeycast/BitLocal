@@ -1,6 +1,9 @@
 import SwiftUI
 import MapKit
+import CoreLocation
+import Combine
 
+@available(iOS 16.4, *)
 struct BusinessesListView: View {
     
     @EnvironmentObject var viewModel: ContentViewModel
@@ -10,6 +13,8 @@ struct BusinessesListView: View {
     var elements: [Element]
     var userLocation: CLLocation?
     
+    @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
+
     private var sortedElements: [Element] {
         elements.sorted { (element1, element2) -> Bool in
             guard let distance1 = viewModel.distanceInMiles(element: element1),
@@ -21,27 +26,34 @@ struct BusinessesListView: View {
     }
     
     var body: some View {
-        NavigationView {
-            if elements.isEmpty {
-                Text("No locations found.")
-                    .foregroundColor(.gray)
-                    .font(.title3)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            } else {
-                List {
-                    Section(footer: footerView) {
-                        ForEach(sortedElements.prefix(maxListResults), id: \.uuid) { element in
-                            let cellViewModel = ElementCellViewModel(element: element, userLocation: viewModel.userLocation, viewModel: viewModel)
-                            NavigationLink(destination: BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel), label: { 
-                                ElementCell(viewModel: cellViewModel)
-                            })
+        if elements.isEmpty {
+            Text("No locations found.")
+                .foregroundColor(.gray)
+                .font(.title3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        } else {
+            List {
+                Section(footer: footerView) {
+                    ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
+                        let cellViewModel = self.cellViewModel(for: element)
+                        NavigationLink(value: element) {
+                            ElementCell(viewModel: cellViewModel)
                         }
                     }
                 }
-                .listStyle(.plain)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .id(UUID())
             }
+            .listStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+    
+    private func cellViewModel(for element: Element) -> ElementCellViewModel {
+        if let vm = viewModel.cellViewModels[element.id] {
+            return vm
+        } else {
+            let newVM = ElementCellViewModel(element: element, userLocation: viewModel.userLocation, viewModel: viewModel)
+            viewModel.cellViewModels[element.id] = newVM
+            return newVM
         }
     }
     
@@ -60,6 +72,7 @@ struct BusinessesListView: View {
     }
 }
 
+@available(iOS 16.4, *)
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
@@ -103,9 +116,6 @@ struct ElementCell: View {
                 PaymentIcons(element: viewModel.element)
             }
         }
-        .onAppear {
-            viewModel.onCellAppear()
-        }
         .onChange(of: viewModel.viewModel.userLocation) { _ in
             viewModel.onCellAppear()
         }
@@ -131,33 +141,57 @@ struct ElementCell: View {
     }
 }
 
+@available(iOS 16.4, *)
 class ElementCellViewModel: ObservableObject {
     
     let element: Element
-    
+    let viewModel: ContentViewModel
     @Published var address: Address?
     @Published var userLocation: CLLocation? {
         didSet {
             print("User location set: \(userLocation?.coordinate.latitude ?? 0), \(userLocation?.coordinate.longitude ?? 0)")
         }
     }
-    
     static var geocodingCache: [String: Address] = [:]
-    
     private let geocoder = CLGeocoder()
-    let viewModel: ContentViewModel
-    
+    private var userLocationCancellable: AnyCancellable?
+
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
         self.userLocation = userLocation
         self.viewModel = viewModel
-        self.address = viewModel.geocodingCache.getValue(forKey: "\(element.osmJSON?.lat ?? 0),\(element.osmJSON?.lon ?? 0)")
+        
+        // Observe changes to userLocation if needed
+        self.userLocationCancellable = viewModel.$userLocation.sink { [weak self] newLocation in
+            self?.userLocation = newLocation
+            // Perform any updates needed when userLocation changes
+        }
+        
+        // Attempt to retrieve cached address
+        if let cachedAddress = ElementCellViewModel.geocodingCache[addressCacheKey] {
+            self.address = cachedAddress
+        } else {
+            // Start geocoding immediately
+            self.updateAddress()
+        }
+    }
+    
+    deinit {
+        // Cancel the subscription when the view model is deallocated
+        userLocationCancellable?.cancel()
     }
     
     func onCellAppear() {
         if address == nil {
             updateAddress()
         }
+    }
+    
+    private var addressCacheKey: String {
+        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
+            return ""
+        }
+        return "\(lat),\(lon)"
     }
     
     private func getCachedAddress() -> Address? {
@@ -178,49 +212,28 @@ class ElementCellViewModel: ObservableObject {
     
     func updateAddress() {
         // Check if the address is already cached
-        if let cachedAddress = getCachedAddress() {
+        if let cachedAddress = ElementCellViewModel.geocodingCache[addressCacheKey] {
             self.address = cachedAddress
             return
         }
         
-        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
-            return
-        }
-        
-        // Check the cache before making a geocoding request
-        let cacheKey = "\(lat),\(lon)"
-        if let cachedAddress = ElementCellViewModel.geocodingCache[cacheKey] {
-            self.address = cachedAddress
-            return
-        }
-        
+        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return }
         let location = CLLocation(latitude: lat, longitude: lon)
         
-        // Throttle geocoding requests
-        DispatchQueue.global(qos: .userInitiated).async {
-            self.viewModel.geocoder.reverseGeocode(location: location) { placemark in
-                if let placemark = placemark {
-                    let streetNumber = placemark.subThoroughfare ?? ""
-                    let streetName = placemark.thoroughfare ?? ""
-                    let cityOrTownName = placemark.locality ?? ""
-                    let postalCode = placemark.postalCode ?? ""
-                    let regionOrStateName = placemark.administrativeArea ?? ""
-                    let countryName = placemark.country ?? ""
-                    
-                    let address = Address(
-                        streetNumber: streetNumber,
-                        streetName: streetName,
-                        cityOrTownName: cityOrTownName,
-                        postalCode: postalCode,
-                        regionOrStateName: regionOrStateName,
-                        countryName: countryName
-                    )
-                    
-                    DispatchQueue.main.async {
-                        self.address = address
-                        ElementCellViewModel.geocodingCache[cacheKey] = address // Update the cache with the new geocoded result
-                    }
-                }
+        // Perform geocoding
+        geocoder.reverseGeocodeLocation(location) { [weak self] (placemarks, error) in
+            guard let self = self, let placemark = placemarks?.first else { return }
+            let address = Address(
+                streetNumber: placemark.subThoroughfare ?? "",
+                streetName: placemark.thoroughfare ?? "",
+                cityOrTownName: placemark.locality ?? "",
+                postalCode: placemark.postalCode ?? "",
+                regionOrStateName: placemark.administrativeArea ?? "",
+                countryName: placemark.country ?? ""
+            )
+            DispatchQueue.main.async {
+                self.address = address
+                ElementCellViewModel.geocodingCache[self.addressCacheKey] = address
             }
         }
     }

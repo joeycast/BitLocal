@@ -32,27 +32,39 @@ struct ContentView: View {
             
             if screenWidth > 768 || geometry.size.height > 1024 { // iPad layout
                 NavigationView {
-                    BusinessesListView(elements: visibleElements)
-                        .environmentObject(viewModel)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .principal) {
-                                CustomiPadNavigationStackTitleView()
+                    NavigationStack(path: $viewModel.path) {
+                        BusinessesListView(elements: visibleElements)
+                            .environmentObject(viewModel)
+                            .navigationDestination(for: Element.self) { element in
+                                BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel)
                             }
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                InfoButtonView(showingAbout: $showingAbout)
-                            }
-                        }
-                    ZStack {
-                        if let elements = elements {
-                            mapView(elements: elements)
-                                .ignoresSafeArea()
-                                .onAppear {
-                                    viewModel.locationManager.requestWhenInUseAuthorization()
-                                    viewModel.locationManager.startUpdatingLocation()
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .principal) {
+                                    CustomiPadNavigationStackTitleView()
                                 }
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    InfoButtonView(showingAbout: $showingAbout)
+                                }
+                            }
+                        ZStack {
+                            if let elements = elements {
+                                mapView(elements: elements)
+                                    .ignoresSafeArea()
+                                    .onAppear {
+                                        viewModel.locationManager.requestWhenInUseAuthorization()
+                                        viewModel.locationManager.startUpdatingLocation()
+                                    }
+                            }
+                            locationButtonView(isIPad: true)
                         }
-                        locationButtonView(isIPad: true)
+                    }
+                }
+                .onChange(of: viewModel.path) { newPath in
+                    if let lastElement = newPath.last {
+                        viewModel.selectedElement = lastElement
+                    } else {
+                        viewModel.selectedElement = nil
                     }
                 }
                 .sheet(isPresented: $showingAbout) {
@@ -73,7 +85,7 @@ struct ContentView: View {
                             iPhoneHeaderView(screenWidth: screenWidth)
                             Spacer()
                             locationButtonView(isIPad: false)
-                        }   
+                        }
                     }
                     
                     // **** Bottom Sheet ****
@@ -83,13 +95,25 @@ struct ContentView: View {
                         sheetCornerRadius: 20
                     ) {
                         // **** Bottom Sheet Scroll View ****
-                        BusinessesListView(elements: visibleElements)
-                            .environmentObject(viewModel)
+                        NavigationStack(path: $viewModel.path) {
+                            BusinessesListView(elements: visibleElements)
+                                .environmentObject(viewModel)
+                                .navigationDestination(for: Element.self) { element in
+                                    BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel)
+                                }
+                        }
+                        .onChange(of: viewModel.path) { newPath in
+                            if let lastElement = newPath.last {
+                                viewModel.selectedElement = lastElement
+                            } else {
+                                viewModel.selectedElement = nil
+                            }
+                        }
                         
                         // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
-                            .sheet(isPresented: $showingAbout) {
-                                AboutView()
-                            }
+                        .sheet(isPresented: $showingAbout) {
+                            AboutView()
+                        }
                     } onDismiss: {}
                 }
                 .ignoresSafeArea(.keyboard)
@@ -100,6 +124,7 @@ struct ContentView: View {
             apiManager.getElements { elements in
                 DispatchQueue.main.async {
                     self.elements = elements
+                    viewModel.elements = elements 
                 }
             }
             // Determine elements visible in user view
@@ -223,7 +248,11 @@ struct ContentView: View {
                 // Zoom in on user's location after tapping the location button
                 if let coordinate = userLocation?.coordinate {
                     let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // set the desired zoom level
-                    viewModel.updateMapRegion(center: coordinate, span: newZoomLevel)
+                    // Directly set the map's region
+                    viewModel.region = MKCoordinateRegion(center: coordinate, span: newZoomLevel)
+                    if let mapView = viewModel.mapView {
+                        mapView.setRegion(viewModel.region, animated: true)
+                    }
                 }
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
@@ -319,76 +348,205 @@ struct ContentView: View {
     }
     
     struct MapView: UIViewRepresentable {
-        @Binding var elements: [Element]?
-        @EnvironmentObject var viewModel: ContentViewModel
+        @Binding var elements: [Element]? // Binding to the elements (businesses) to be displayed on the map
+        @EnvironmentObject var viewModel: ContentViewModel // Access to the shared view model
         
-        func makeCoordinator() -> ContentViewModel {
-            viewModel
+        // Create the Coordinator, which will act as the MKMapViewDelegate
+        func makeCoordinator() -> Coordinator {
+            return Coordinator(viewModel: viewModel)
         }
         
+        // Create and configure the MKMapView
         func makeUIView(context: Context) -> MKMapView {
             let mapView = MKMapView()
+            
+            // Store reference to mapView in viewModel
+            viewModel.mapView = mapView
+            
+            // Set the delegate to the Coordinator
             mapView.delegate = context.coordinator
+            
+            // Set up clustering
             setupCluster(mapView: mapView)
+            
+            // Show user location on the map
             mapView.showsUserLocation = true
+            
+            // Observe selectedElement changes
+            context.coordinator.setupSelectedElementObservation(mapView: mapView)
+            
             return mapView
         }
         
-        // Update the region change in this method
+        // Update the MKMapView when the SwiftUI view updates
         func updateUIView(_ mapView: MKMapView, context: Context) {
-            let targetRegion = viewModel.region
-            
-            // Check if the regional changes are needed
-            if mapView.region != targetRegion {
-                let fittedRegion = mapView.regionThatFits(targetRegion)
-                mapView.setRegion(fittedRegion, animated: true)
-            }
-            
-            // Call the updateAnnotations function to refresh annotations when the region is updated
-            updateAnnotations(mapView: mapView, elements: elements)
+           
         }
         
-        func updateAnnotations(mapView: MKMapView, elements: [Element]?) {
-            if let elements = elements {
-                let newAnnotations = elements.compactMap { element -> Annotation? in
-                    guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return nil }
-                    let location = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                    let distance = viewModel.distanceFromCenter(location: location)
-                    if distance <= CLLocationDistance(25 * 1609.344) { // Miles to meters
-                        if (element.deletedAt == nil || element.deletedAt == "") && (element.osmJSON?.tags?.name != nil || element.osmJSON?.tags?.operator != nil) {
-                            // Only show element as annotation if it has not been deleted and has a name or operator
-                            let annotation = Annotation(element: element)
-                            return annotation
-                        }
-                    }
-                    return nil
-                }
-                
-                // Remove old annotations
-                let oldAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-                mapView.removeAnnotations(oldAnnotations)
-                
-                // Add new annotations
-                mapView.addAnnotations(newAnnotations)
-            }
-        }
-        
-        // Setup Cluster
+        // Set up clustering for map annotations
         private func setupCluster(mapView: MKMapView) {
             let clusteringIdentifier = "Cluster"
             mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: clusteringIdentifier)
+        }
+        
+        // Coordinator class to handle MKMapViewDelegate methods and annotations management
+        class Coordinator: NSObject, MKMapViewDelegate {
+            var viewModel: ContentViewModel
+            // Keep track of previously displayed elements to manage annotations efficiently
+            var previousElements: Set<Element> = []
+            var currentAnnotations: [String: Annotation] = [:] // Keep track of current annotations
+            private var cancellable: AnyCancellable?
+            private var debounceTimer: AnyCancellable?
+            
+            init(viewModel: ContentViewModel) {
+                self.viewModel = viewModel
+            }
+            
+            func setupSelectedElementObservation(mapView: MKMapView) {
+                // Observe changes to selectedElement
+                cancellable = viewModel.$selectedElement.sink { [weak mapView] selectedElement in
+                    guard let mapView = mapView, let element = selectedElement else { return }
+                    // Find the corresponding annotation
+                    if let annotation = mapView.annotations.first(where: { annotation in
+                        if let annotation = annotation as? Annotation, annotation.element == element {
+                            return true
+                        }
+                        return false
+                    }) {
+                        // Select the annotation on the main thread
+                        DispatchQueue.main.async {
+                            mapView.selectAnnotation(annotation, animated: true)
+                        }
+                    }
+                }
+            }
+            
+            // Ensure to cancel the subscription when the Coordinator is deinitialized
+            deinit {
+                cancellable?.cancel()
+            }
+            
+            // Efficiently update annotations by only adding/removing what's changed
+            func updateAnnotations(mapView: MKMapView) {
+                guard let elements = self.viewModel.elements else { return }
+                
+                let visibleRect = mapView.visibleMapRect
+                let centerCoordinate = mapView.centerCoordinate
+                let centerLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
+                
+                let visibleElements = elements.filter { element in
+                    guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return false }
+                    let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                    let location = CLLocation(latitude: lat, longitude: lon)
+                    let distance = location.distance(from: centerLocation)
+                    
+                    let mapPoint = MKMapPoint(coordinate)
+                    return visibleRect.contains(mapPoint) &&
+                    distance <= 25 * 1609.344 && // 25 miles in meters
+                    (element.deletedAt == nil || element.deletedAt == "") &&
+                    (element.osmJSON?.tags?.name != nil || element.osmJSON?.tags?.operator != nil)
+                }
+                
+                let existingAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+                let existingElements = Set(existingAnnotations.compactMap { $0.element })
+                let newElements = Set(visibleElements)
+                
+                let annotationsToRemove = existingAnnotations.filter { !newElements.contains($0.element!) }
+                let elementsToAdd = newElements.subtracting(existingElements)
+                
+                mapView.removeAnnotations(annotationsToRemove)
+                
+                let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
+                mapView.addAnnotations(newAnnotations)
+                
+                // Update visible elements
+                self.viewModel.visibleElementsSubject.send(Array(newElements))
+            }
+            
+            // MARK: - MKMapViewDelegate Methods
+            
+            // Provide views for map annotations
+            func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+                let reuseIdentifier = "AnnotationView"
+                var view: MKMarkerAnnotationView?
+                
+                if let cluster = annotation as? MKClusterAnnotation {
+                    // Handle cluster annotations
+                    view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
+                    view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+                    view?.markerTintColor = .orange
+                    view?.glyphText = String(cluster.memberAnnotations.count)
+                } else if let annotation = annotation as? Annotation {
+                    // Handle individual annotations
+                    if annotation.element == nil {
+                        fatalError("Failed to get element from annotation.")
+                    }
+                    view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
+                    view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+                    view?.canShowCallout = true
+                    view?.markerTintColor = .orange
+                    view?.glyphText = nil
+                    view?.glyphTintColor = .white
+                    view?.glyphImage = UIImage(systemName: "location.circle.fill")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                    view?.displayPriority = .required
+                }
+                return view
+            }
+            
+            // Handle annotation selection to update navigation path
+            func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+                if let annotation = view.annotation as? Annotation, let element = annotation.element {
+                    DispatchQueue.main.async {
+                        // Set the navigation path to contain only the selected element
+                        self.viewModel.path = [element]
+                        // Update selectedElement if it's different
+                        if self.viewModel.selectedElement != element {
+                            self.viewModel.selectedElement = element
+                        }
+                    }
+                }
+            }
+            
+            // Detect when the map region changes
+            func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+                // Update the view model's region to match the map's region
+                self.viewModel.updateMapRegion(center: mapView.region.center, span: mapView.region.span)
+                
+                // Debounce the call to update annotations
+                debounceTimer?.cancel()
+                debounceTimer = Just(())
+                    .delay(for: .seconds(0.5), scheduler: RunLoop.main)
+                    .sink { [weak self] _ in
+                        guard let self = self else { return }
+                        self.updateAnnotations(mapView: mapView) // Remove `elements` parameter
+                    }
+            }
+            
+            // Update visible elements based on annotations in the visible map rect
+            func updateVisibleElements(for mapView: MKMapView) {
+                let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
+                let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
+                
+                self.viewModel.visibleElementsSubject.send(visibleElements)
+                self.viewModel.mapStoppedMovingSubject.send(())
+            }
         }
     }
 }
 
 
 // ContentViewModel
+@available(iOS 16.4, *)
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
     @Published var isUpdatingLocation = false
     @Published var geocodingCache = LRUCache<String, Address>(maxSize: 100)
+    @Published var path: [Element] = []
+    @Published var selectedElement: Element? 
+    @Published var cellViewModels: [String: ElementCellViewModel] = [:]
+    @Published var elements: [Element]? = [] 
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -396,7 +554,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
     let geocoder = Geocoder(maxConcurrentRequests: 5)
     
-    private var debounceTimer: Cancellable?
+    private var debounceTimer: AnyCancellable?
     weak var mapView: MKMapView?
     
     override init() {
@@ -446,32 +604,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return distanceInMiles
     }
     
-    // mapView Function
-    func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-        let reuseIdentifier = "AnnotationView"
-        var view: MKMarkerAnnotationView?
-        
-        if let cluster = annotation as? MKClusterAnnotation {
-            view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
-            view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
-            view?.markerTintColor = .orange
-            view?.glyphText = String(cluster.memberAnnotations.count)
-        } else if let annotation = annotation as? Annotation {
-            if annotation.element == nil {
-                fatalError("Failed to get element from annotation.")
-            }
-            view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
-            view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
-            view?.canShowCallout = true
-            view?.markerTintColor = .orange
-            view?.glyphText = nil
-            view?.glyphTintColor = .white
-            view?.glyphImage = UIImage(systemName: "location.circle.fill")?.withTintColor(.white, renderingMode: .alwaysOriginal)
-            view?.displayPriority = .required
-        }
-        return view
-    }
-    
     // Determining distance from center
     func distanceFromCenter(location: CLLocationCoordinate2D) -> CLLocationDistance {
         let centerLocation = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
@@ -480,32 +612,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     // Update map region
-    func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil) {
+    func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil, animated: Bool = true) {
         let updatedSpan = span ?? region.span
         self.region = MKCoordinateRegion(center: center, span: updatedSpan)
-    }
-    
-    // Detecting when map view visible region changes
-    func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-        self.updateMapRegion(center: mapView.region.center, span: mapView.region.span)
-        
-        // Update visible elements with a slight delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.updateAnnotations(for: mapView)
-        }
-    }
-    
-    func updateAnnotations(for mapView: MKMapView) {
-        let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
-        let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-        
-        self.visibleElementsSubject.send(visibleElements)
-        self.mapStoppedMovingSubject.send(())
-    }
-    
-    func updateVisibleElements(for annotations: [MKAnnotation]) {
-        let visibleElements = annotations.compactMap { ($0 as? Annotation)?.element }
-        self.visibleElementsSubject.send(visibleElements)
+        mapView?.setRegion(self.region, animated: animated)
     }
 }
 

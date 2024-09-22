@@ -1,8 +1,9 @@
 import SwiftUI
 import CoreLocation
+import MapKit
 
 // MARK: - Element
-struct Element: Codable, Identifiable {
+struct Element: Codable, Identifiable, Hashable {
     let id: String
     let uuid: UUID
     let osmJSON: OsmJSON?
@@ -32,17 +33,23 @@ struct Element: Codable, Identifiable {
         deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
         
         if let osmTags = osmJSON?.tags {
-            address = Address(streetNumber: osmTags.addrHousenumber,
-                              streetName: osmTags.addrStreet,
-                              cityOrTownName: osmTags.addrCity,
-                              postalCode: osmTags.addrPostcode,
-                              regionOrStateName: osmTags.addrState,
-                              countryName: nil) // Country is not present in the given JSON
+            address = Address(
+                streetNumber: osmTags.addrHousenumber,
+                streetName: osmTags.addrStreet,
+                cityOrTownName: osmTags.addrCity,
+                postalCode: osmTags.addrPostcode,
+                regionOrStateName: osmTags.addrState,
+                countryName: nil // Country is not present in the given JSON
+            )
         } else {
             address = nil
         }
     }
     
+    // Implement `hash(into:)` if needed
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
 // MARK: - Address
@@ -320,12 +327,60 @@ enum CategoryPlural: Codable {
 }
 
 class APIManager {
+    static let shared = APIManager()
     
     let cacheKey = "cachedElements"
     let lastUpdateKey = "lastUpdate"
     
     init() {
         UserDefaults.standard.register(defaults: [lastUpdateKey: "2000-01-01T00:00:00.000Z"])
+    }
+    
+    func fetchElements(in region: MKCoordinateRegion, completion: @escaping ([Element]?) -> Void) {
+        let minLatitude = region.center.latitude - (region.span.latitudeDelta / 2)
+        let maxLatitude = region.center.latitude + (region.span.latitudeDelta / 2)
+        let minLongitude = region.center.longitude - (region.span.longitudeDelta / 2)
+        let maxLongitude = region.center.longitude + (region.span.longitudeDelta / 2)
+        
+        let urlString = "https://api.btcmap.org/v2/elements?bbox=\(minLongitude),\(minLatitude),\(maxLongitude),\(maxLatitude)"
+        
+        guard let url = URL(string: urlString) else {
+            print("Invalid URL string: \(urlString)")
+            completion(nil)
+            return
+        }
+        
+        // Log the requesting URL
+        print("Requesting URL: \(url.absoluteString)")
+        LogManager.shared.log("Requesting URL: \(url.absoluteString)")
+        
+        URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
+            guard let self = self else {
+                completion(nil)
+                return
+            }
+            
+            guard let data = data, error == nil else {
+                print("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
+                LogManager.shared.log("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
+                completion(nil)
+                return
+            }
+            
+            do {
+                let decoder = JSONDecoder()
+                let fetchedElements = try decoder.decode([Element].self, from: data)
+                
+                // Update cache if needed
+                self.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
+                
+                completion(fetchedElements)
+            } catch {
+                print("JSON Decoding Error: \(error)")
+                LogManager.shared.log("JSON Decoding Error: \(error)")
+                completion(nil)
+            }
+        }.resume()
     }
     
     private func updateCacheWithFetchedElements(fetchedElements: [Element]) {
