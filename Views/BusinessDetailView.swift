@@ -1,10 +1,12 @@
+// BusinessDetailView.swift
+
 import SwiftUI
 import CoreLocation
 import MapKit
 
 @available(iOS 16.4, *)
 struct BusinessDetailView: View {
-    
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State private var region = MKCoordinateRegion()
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
@@ -23,14 +25,14 @@ struct BusinessDetailView: View {
             BusinessDescriptionSection(element: element)
             BusinessDetailsSection(element: element, elementCellViewModel: elementCellViewModel)
             PaymentDetailsSection(element: element)
-            BusinessMapSection(element: element)         
-            //            TroubleshootingSection(element: element)
+            BusinessMapSection(element: element)
         }
         .onAppear {
             elementCellViewModel.updateAddress()
         }
+        .listStyle(InsetGroupedListStyle()) // Consistent list style
         .navigationTitle(element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? "Name not available")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)
     }
 }
 
@@ -171,10 +173,11 @@ struct PaymentDetailsSection: View {
 // BusinessMapSection
 struct BusinessMapSection: View {
     var element: Element
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     var body: some View {
         MapView(element: element)
-            .frame(height: 200)
+            .frame(height: horizontalSizeClass == .compact ? 200 : 300) // Adjust height based on device
             .cornerRadius(10)
     }
 }
@@ -201,18 +204,12 @@ struct MapView: UIViewRepresentable {
     private func updateAnnotations(from mapView: MKMapView) {
         mapView.removeAnnotations(mapView.annotations)
         
-        let annotation = MKPointAnnotation()
-        if let latitude = element.osmJSON?.lat,
-           let longitude = element.osmJSON?.lon {
-            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-            annotation.coordinate = coordinate
-            annotation.title = element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? "Name not available"
-            
-            mapView.addAnnotation(annotation)
-            
-            let region = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005))
-            mapView.setRegion(region, animated: true)
-        }
+        let annotation = Annotation(element: element)
+        mapView.addAnnotation(annotation)
+        
+        let coordinate = annotation.coordinate
+        let region = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005))
+        mapView.setRegion(region, animated: true)
     }
     
     class Coordinator: NSObject, MKMapViewDelegate {
@@ -223,23 +220,19 @@ struct MapView: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            guard annotation is MKPointAnnotation else { return nil }
+            let reuseIdentifier = "AnnotationView"
+            var view: MKMarkerAnnotationView?
             
-            let identifier = "customPin"
-            var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
-            
-            if annotationView == nil {
-                annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-                
-                // Set the glyph image to "location.circle.fill"
-                annotationView?.glyphImage = UIImage(systemName: "location.circle.fill")
-                // Set the marker tint color to orange
-                annotationView?.markerTintColor = .orange
-            } else {
-                annotationView?.annotation = annotation
+            if let annotation = annotation as? Annotation {
+                view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
+                view?.canShowCallout = true
+                view?.markerTintColor = .orange
+                view?.glyphText = nil
+                view?.glyphTintColor = .white
+                view?.glyphImage = UIImage(systemName: "location.circle.fill")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                view?.displayPriority = .required
             }
-            
-            return annotationView
+            return view
         }
     }
 }

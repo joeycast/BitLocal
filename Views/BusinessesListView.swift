@@ -1,3 +1,5 @@
+// BusinessesListView.swift
+
 import SwiftUI
 import MapKit
 import CoreLocation
@@ -14,7 +16,7 @@ struct BusinessesListView: View {
     var userLocation: CLLocation?
     
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
-
+    
     private var sortedElements: [Element] {
         elements.sorted { (element1, element2) -> Bool in
             guard let distance1 = viewModel.distanceInMiles(element: element1),
@@ -26,6 +28,7 @@ struct BusinessesListView: View {
     }
     
     var body: some View {
+        // In BusinessesListView
         if elements.isEmpty {
             Text("No locations found.")
                 .foregroundColor(.gray)
@@ -43,7 +46,19 @@ struct BusinessesListView: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 0)
+            .navigationBarTitleDisplayMode(.inline)
+            .padding(.top)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: viewModel.path) { newPath in
+                if let element = newPath.last {
+                    // Delay zoom until after navigation completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        viewModel.zoomToElement(element)
+                    }
+                }
+            }
         }
     }
     
@@ -155,7 +170,7 @@ class ElementCellViewModel: ObservableObject {
     static var geocodingCache: [String: Address] = [:]
     private let geocoder = CLGeocoder()
     private var userLocationCancellable: AnyCancellable?
-
+    
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
         self.userLocation = userLocation

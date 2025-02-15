@@ -20,8 +20,9 @@ struct ContentView: View {
     @State private var mapStoppedMovingCancellable: Cancellable?
     @State private var cancellableUserLocation: Cancellable?
     @State private var firstLocationUpdate: Bool = true
+    @State private var headerHeight: CGFloat = 0
     
-    let appName = "BitLocal"   
+    let appName = "BitLocal"
     let apiManager = APIManager()
     
     var body: some View {
@@ -29,43 +30,60 @@ struct ContentView: View {
         // **** Main View ****
         GeometryReader { geometry in
             let screenWidth = geometry.size.width
+            let screenHeight = geometry.size.height
             
-            if screenWidth > 768 || geometry.size.height > 1024 { // iPad layout
-                NavigationView {
+            if screenWidth > 768 || screenHeight > 1024 { // iPad layout
+                HStack(spacing: 0) {
                     NavigationStack(path: $viewModel.path) {
                         BusinessesListView(elements: visibleElements)
                             .environmentObject(viewModel)
                             .navigationDestination(for: Element.self) { element in
-                                BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel)
+                                BusinessDetailView(
+                                    element: element,
+                                    userLocation: viewModel.userLocation,
+                                    contentViewModel: viewModel)
+                                .environmentObject(viewModel)
                             }
-                            .navigationBarTitleDisplayMode(.inline)
                             .toolbar {
+                                ToolbarItem(placement: .navigationBarLeading) {
+                                    // Invisible placeholder that mirrors the info button
+                                    InfoButtonView(showingAbout: $showingAbout)
+                                        .opacity(0)
+                                        .allowsHitTesting(false)
+                                }
                                 ToolbarItem(placement: .principal) {
                                     CustomiPadNavigationStackTitleView()
+                                        .frame(maxWidth: .infinity)
                                 }
                                 ToolbarItem(placement: .navigationBarTrailing) {
                                     InfoButtonView(showingAbout: $showingAbout)
                                 }
                             }
-                        ZStack {
-                            if let elements = elements {
-                                mapView(elements: elements)
-                                    .ignoresSafeArea()
-                                    .onAppear {
-                                        viewModel.locationManager.requestWhenInUseAuthorization()
-                                        viewModel.locationManager.startUpdatingLocation()
-                                    }
-                            }
-                            locationButtonView(isIPad: true)
+                    }
+                    .frame(width: calculateSidePanelWidth(screenWidth: screenWidth))
+                    .navigationBarTitleDisplayMode(.automatic)
+                    
+                    ZStack {
+                        if let elements = elements {
+                            mapView(elements: elements, topPadding: headerHeight, bottomPadding: viewModel.bottomPadding)
+                                .ignoresSafeArea()
+                                .onAppear {
+                                    viewModel.locationManager.requestWhenInUseAuthorization()
+                                    viewModel.locationManager.startUpdatingLocation()
+                                }
                         }
+                        locationButtonView(isIPad: true)
                     }
                 }
                 .onChange(of: viewModel.path) { newPath in
-                    if let lastElement = newPath.last {
-                        viewModel.selectedElement = lastElement
+                    print("iPad onChange handler called")
+                    if let selectedElement = newPath.last {
+                        viewModel.zoomToElement(selectedElement)
                     } else {
-                        viewModel.selectedElement = nil
+                        // Deselect annotation when the path is empty (i.e., detail view is dismissed)
+                        viewModel.deselectAnnotation()
                     }
+                    viewModel.selectedElement = newPath.last
                 }
                 .sheet(isPresented: $showingAbout) {
                     AboutView()
@@ -73,7 +91,7 @@ struct ContentView: View {
             } else { // iPhone layout
                 ZStack {
                     if let elements = elements {
-                        mapView(elements: elements)
+                        mapView(elements: elements, topPadding: headerHeight, bottomPadding: viewModel.bottomPadding)
                             .ignoresSafeArea()
                             .onAppear {
                                 viewModel.locationManager.requestWhenInUseAuthorization()
@@ -94,37 +112,29 @@ struct ContentView: View {
                         isPresented: .constant(true),
                         sheetCornerRadius: 20
                     ) {
-                        // **** Bottom Sheet Scroll View ****
-                        NavigationStack(path: $viewModel.path) {
-                            BusinessesListView(elements: visibleElements)
-                                .environmentObject(viewModel)
-                                .navigationDestination(for: Element.self) { element in
-                                    BusinessDetailView(element: element, userLocation: viewModel.userLocation, contentViewModel: viewModel)
-                                }
-                        }
-                        .onChange(of: viewModel.path) { newPath in
-                            if let lastElement = newPath.last {
-                                viewModel.selectedElement = lastElement
-                            } else {
-                                viewModel.selectedElement = nil
+                        BottomSheetContentView(visibleElements: $visibleElements)
+                            .environmentObject(viewModel)
+                            .sheet(isPresented: $showingAbout) {
+                                AboutView()
                             }
-                        }
-                        
-                        // Show the About sheet even when the bottom sheet is showing (Swift doesn't normally allow more than one sheet showing at the same time).
-                        .sheet(isPresented: $showingAbout) {
-                            AboutView()
-                        }
-                    } onDismiss: {}
+                    } onDismiss: {
+                        print("Bottom sheet dismissed") // Optional debug output
+                    }
+                    .ignoresSafeArea(.keyboard)
                 }
-                .ignoresSafeArea(.keyboard)
             }
+        }
+        .onPreferenceChange(HeaderHeightKey.self) { value in
+            self.headerHeight = value
+            viewModel.topPadding = value
+            print("Header Height reported: \(value)")
         }
         .onAppear {
             // Get elements
             apiManager.getElements { elements in
                 DispatchQueue.main.async {
                     self.elements = elements
-                    viewModel.elements = elements 
+                    viewModel.elements = elements
                 }
             }
             // Determine elements visible in user view
@@ -132,18 +142,16 @@ struct ContentView: View {
                 visibleElements = updatedVisibleElements
             })
             // Update user location
-            cancellableUserLocation = viewModel.userLocationSubject.sink(receiveValue: { updatedUserLocation in
+            cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation
                 
-                // Zoom in on user's location on the first launch and subsequent app launches
-                if firstLocationUpdate {
+                // Zoom in on user's location on the first launch
+                if viewModel.initialRegionSet == false {
                     if let coordinate = userLocation?.coordinate {
-                        let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // set the desired zoom level
-                        viewModel.updateMapRegion(center: coordinate, span: newZoomLevel)
+                        viewModel.centerMap(to: coordinate)
                     }
-                    firstLocationUpdate = false
                 }
-            })
+            }
             // When user stops moving map
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {
                 // Any additional logic that should be executed when the map stops moving can be added here.
@@ -151,27 +159,50 @@ struct ContentView: View {
         }
     }
     
+    private func calculateSidePanelWidth(screenWidth: CGFloat) -> CGFloat {
+        // iPad Mini in portrait mode has a width of 744 points
+        if screenWidth <= 744 {
+            return screenWidth * 0.4 // 40% of screen width for iPad Mini
+        } else {
+            return screenWidth * 0.35 // 30% for other iPads
+        }
+    }
+    
     // iPhone Header
     func iPhoneHeaderView(screenWidth: CGFloat) -> some View {
         ZStack {
+            
             GeometryReader { geometry in
-                let screenSize = geometry.frame(in: .global)
-                let screenWidth = screenSize.width
-                let roundedRectangleRadius = 10
+                let height = geometry.size.height * 0.35 // Proportional header height
                 
                 Rectangle()
-                    .cornerRadius(CGFloat(roundedRectangleRadius))
-                    .foregroundColor(Color(UIColor.systemBackground)) // Sets the color based on light/dark mode.
-                    .frame(width: screenWidth, height: CGFloat(115 + roundedRectangleRadius)) 
-                    .padding(.top, -CGFloat(roundedRectangleRadius))
-                    .ignoresSafeArea()
+                    .cornerRadius(10)
+                    .foregroundColor(Color(UIColor.systemBackground)) // Adaptive to light/dark mode
+                    .frame(width: screenWidth, height: height)
+                    .padding(.top, -10)
+                    .ignoresSafeArea() // Extend into safe area
+                    .onAppear {
+                        // Accurately capture and update header height
+                        DispatchQueue.main.async {
+                            viewModel.topPadding = height
+                            print("Header Height Updated: \(height)")
+                        }
+                    }
             }
             
             VStack(alignment: .leading) {
-                
-                // BitLocal text
+                // BitLocal text and Info Button
                 HStack {
+                    
+                    // Hidden Info Button to balance the trailing Info Button
+                    InfoButtonView(showingAbout: $showingAbout)
+                        .opacity(0) // Make it invisible
+                        .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(.leading, 6.5)
+                        .allowsHitTesting(false) // Disable interaction
+                    
                     Spacer()
+                    
                     HStack(spacing: 0) {
                         Text(" bit")
                             .font(.custom("Ubuntu-LightItalic", size: 28))
@@ -186,10 +217,10 @@ struct ContentView: View {
                     // Info Button
                     InfoButtonView(showingAbout: $showingAbout)
                         .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(.trailing, 3)
+                        .padding(.trailing, 6.5)
                 }
                 .padding(.horizontal)
-                .frame(width: screenWidth, height: 1)
+                .frame(height: 1) // Adjust based on content
                 Spacer()
             }
             .padding(.top, 30)
@@ -200,20 +231,19 @@ struct ContentView: View {
     struct CustomiPadNavigationStackTitleView: View {
         var body: some View {
             HStack(spacing: 0) {
-                Text(" bit")
-                    .font(.custom("Ubuntu-LightItalic", size: 28))
+                Text("bit")
+                    .font(.custom("Ubuntu-LightItalic", size: 32))
                     .foregroundColor(.orange)
                 
-                Text("local ")
-                    .font(.custom("Ubuntu-MediumItalic", size: 28))
+                Text("local")
+                    .font(.custom("Ubuntu-MediumItalic", size: 32))
                     .foregroundColor(.orange)
-                
             }
-            .padding(.trailing)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .offset(x: -8) // Fine-tune the centering to account for the info button width
         }
     }
     
-    // Info Button View
     struct InfoButtonView: View {
         @Binding var showingAbout: Bool
         
@@ -222,37 +252,39 @@ struct ContentView: View {
                 showingAbout.toggle()
             }) {
                 Image(systemName: "info.circle")
-                    .padding()
+                    .font(.system(size: 18)) // Consistent size
                     .foregroundColor(.orange)
-                    .contentShape(Circle())
-                    .clipShape(Circle())
             }
+            .frame(width: 44) // Fixed width to ensure consistent spacing
+            .offset(x: -7, y: +2) // Fine-tune the centering to account for the info button width
         }
     }
     
     // Location Button View
     func locationButtonView(isIPad: Bool) -> some View {
         GeometryReader { geometry in
-            let screenSize = geometry.frame(in: .global)
-            let screenWidth = screenSize.width
-            let screenHeight = screenSize.height
+            let screenWidth = geometry.size.width
+            let screenHeight = geometry.size.height
             
-            let buttonXPosition: CGFloat = screenWidth > 768 ? screenWidth - 60 : screenWidth - 45
-            let buttonYPosition: CGFloat = screenWidth > 768 ? screenHeight * 0.95 : screenHeight * 0.30
+            // Define padding from the edges
+            let horizontalPadding: CGFloat = isIPad ? -5 : 4
+            let verticalPadding: CGFloat = isIPad ? -20 : 30
+            
+            // Calculate button positions based on device type
+            let buttonXPosition: CGFloat = screenWidth - horizontalPadding - (isIPad ? 60 : 45)
+            let buttonYPosition: CGFloat = isIPad ? screenHeight - verticalPadding - 60 : screenHeight * 0.30
+            
+            // Alternatively, use safeAreaInsets for more accurate positioning
+            let safeAreaInsets = geometry.safeAreaInsets
             
             LocationButton(.currentLocation) {
                 viewModel.locationManager.requestWhenInUseAuthorization()
                 viewModel.isUpdatingLocation = true
                 viewModel.locationManager.startUpdatingLocation()
                 
-                // Zoom in on user's location after tapping the location button
+                // Center the map to user's location with dynamic padding
                 if let coordinate = userLocation?.coordinate {
-                    let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // set the desired zoom level
-                    // Directly set the map's region
-                    viewModel.region = MKCoordinateRegion(center: coordinate, span: newZoomLevel)
-                    if let mapView = viewModel.mapView {
-                        mapView.setRegion(viewModel.region, animated: true)
-                    }
+                    viewModel.centerMap(to: coordinate)
                 }
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
@@ -287,9 +319,13 @@ struct ContentView: View {
                     .animation(.easeInOut, value: viewModel.isUpdatingLocation)
                     .position(x: buttonXPosition, y: buttonYPosition + 3)
             )
+            .padding(.trailing, isIPad ? safeAreaInsets.trailing : 0)
+            .padding(.bottom, isIPad ? 0 : 0)
+            
+            // Attribution View
             GeometryReader { attributionGeometry in
                 let attributionXPosition = isIPad ? 85 : 85
-                let attributionYPosition = isIPad ? screenHeight * 0.95 : screenHeight * 0.37
+                let attributionYPosition = isIPad ? screenHeight - verticalPadding - 20 : screenHeight * 0.37
                 OpenStreetMapAttributionView()
                     .position(x: attributionGeometry.size.width * CGFloat(attributionXPosition) / screenWidth, y: attributionGeometry.size.height * CGFloat(attributionYPosition) / screenHeight)
             }
@@ -342,18 +378,76 @@ struct ContentView: View {
         }
     }
     
-    func mapView(elements: [Element]) -> some View {
-        MapView(elements: $elements)
+    struct BottomSheetContentView: View {
+        @EnvironmentObject var viewModel: ContentViewModel
+        @Binding var visibleElements: [Element]
+        
+        var body: some View {
+            GeometryReader { geometry in
+                VStack {
+                    NavigationStack(path: $viewModel.path) {
+                        BusinessesListView(elements: visibleElements)
+                            .environmentObject(viewModel)
+                            .navigationDestination(for: Element.self) { element in
+                                BusinessDetailView(
+                                    element: element,
+                                    userLocation: viewModel.userLocation,
+                                    contentViewModel: viewModel
+                                )
+                            }
+                    }
+                }
+                .background(Color.white)
+                .onAppear {
+                    DispatchQueue.main.async {
+                        let bottomSheetHeight = geometry.size.height
+                        if viewModel.bottomPadding != bottomSheetHeight {
+                            viewModel.bottomPadding = bottomSheetHeight
+                            print("Accurate Bottom Sheet Height: \(bottomSheetHeight)")
+                        }
+                    }
+                }
+                .onChange(of: geometry.size.height) { newHeight in
+                    viewModel.bottomPadding = newHeight
+                    print("BottomSheetContentView height updated: \(newHeight)")
+                }
+                .onChange(of: viewModel.path) { newPath in
+                    print("BottomSheet path changed (iPhone scenario)")
+                    if let selectedElement = newPath.last {
+                        // If detail view is pushed, zoom to element
+                        viewModel.zoomToElement(selectedElement)
+                    } else {
+                        // If no element is selected (path is empty), deselect annotation
+                        viewModel.deselectAnnotation()
+                    }
+                }
+            }
+        }
+    }
+    
+    func mapView(elements: [Element], topPadding: CGFloat, bottomPadding: CGFloat) -> some View {
+        MapView(elements: $elements, topPadding: topPadding, bottomPadding: bottomPadding)
             .environmentObject(viewModel)
     }
     
     struct MapView: UIViewRepresentable {
-        @Binding var elements: [Element]? // Binding to the elements (businesses) to be displayed on the map
-        @EnvironmentObject var viewModel: ContentViewModel // Access to the shared view model
+        @Binding var elements: [Element]?
+        @EnvironmentObject var viewModel: ContentViewModel
+        
+        // New Properties for Dynamic Padding
+        var topPadding: CGFloat
+        var bottomPadding: CGFloat
+        
+        // Updated Initializer
+        init(elements: Binding<[Element]?>, topPadding: CGFloat, bottomPadding: CGFloat) {
+            self._elements = elements
+            self.topPadding = topPadding
+            self.bottomPadding = bottomPadding
+        }
         
         // Create the Coordinator, which will act as the MKMapViewDelegate
         func makeCoordinator() -> Coordinator {
-            return Coordinator(viewModel: viewModel)
+            return Coordinator(viewModel: viewModel, topPadding: topPadding, bottomPadding: bottomPadding)
         }
         
         // Create and configure the MKMapView
@@ -372,15 +466,16 @@ struct ContentView: View {
             // Show user location on the map
             mapView.showsUserLocation = true
             
-            // Observe selectedElement changes
-            context.coordinator.setupSelectedElementObservation(mapView: mapView)
-            
             return mapView
         }
         
         // Update the MKMapView when the SwiftUI view updates
         func updateUIView(_ mapView: MKMapView, context: Context) {
-           
+            // Update padding in Coordinator
+            context.coordinator.updatePadding(top: topPadding, bottom: bottomPadding)
+            
+            // Handle updating annotations if `elements` change
+            context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
         }
         
         // Set up clustering for map annotations
@@ -392,33 +487,79 @@ struct ContentView: View {
         // Coordinator class to handle MKMapViewDelegate methods and annotations management
         class Coordinator: NSObject, MKMapViewDelegate {
             var viewModel: ContentViewModel
+            var topPadding: CGFloat
+            var bottomPadding: CGFloat
+            var mapRegionChangeCompletion: (() -> Void)?
+            
             // Keep track of previously displayed elements to manage annotations efficiently
             var previousElements: Set<Element> = []
             var currentAnnotations: [String: Annotation] = [:] // Keep track of current annotations
             private var cancellable: AnyCancellable?
             private var debounceTimer: AnyCancellable?
             
-            init(viewModel: ContentViewModel) {
+            init(viewModel: ContentViewModel, topPadding: CGFloat, bottomPadding: CGFloat) {
                 self.viewModel = viewModel
+                self.topPadding = topPadding
+                self.bottomPadding = bottomPadding
             }
             
-            func setupSelectedElementObservation(mapView: MKMapView) {
-                // Observe changes to selectedElement
-                cancellable = viewModel.$selectedElement.sink { [weak mapView] selectedElement in
-                    guard let mapView = mapView, let element = selectedElement else { return }
-                    // Find the corresponding annotation
-                    if let annotation = mapView.annotations.first(where: { annotation in
-                        if let annotation = annotation as? Annotation, annotation.element == element {
-                            return true
-                        }
-                        return false
-                    }) {
-                        // Select the annotation on the main thread
-                        DispatchQueue.main.async {
-                            mapView.selectAnnotation(annotation, animated: true)
-                        }
-                    }
+            // Update padding method
+            func updatePadding(top: CGFloat, bottom: CGFloat) {
+                self.topPadding = top
+                self.bottomPadding = bottom
+            }
+            
+            // Smoothly expand the cluster and zoom to a specific annotation
+            private func expandClusterAndZoomToAnnotation(_ cluster: MKClusterAnnotation, targetAnnotation: MKAnnotation, mapView: MKMapView) {
+                // Calculate the bounding rect for the cluster's member annotations
+                var rect = MKMapRect.null
+                for annotation in cluster.memberAnnotations {
+                    let point = MKMapPoint(annotation.coordinate)
+                    rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
                 }
+                
+                // Apply a slight zoom-out scale for better visual feedback
+                let zoomOutScale: Double = 1.3
+                rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1), dy: -rect.size.height * (zoomOutScale - 1))
+                
+                // Edge padding for header and bottom sheet
+                let edgePadding = UIEdgeInsets(
+                    top: viewModel.topPadding + 10,
+                    left: 20,
+                    bottom: viewModel.bottomPadding + 100,
+                    right: 20
+                )
+                
+                // Smoothly animate to the expanded cluster region
+                DispatchQueue.main.async {
+                    UIView.animate(withDuration: 0.7, delay: 0, options: [.curveEaseInOut], animations: {
+                        mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: false)
+                    }, completion: { _ in
+                        // After cluster expansion, smoothly center and zoom into the target annotation
+                        self.centerAnnotationSmoothly(mapView: mapView, annotation: targetAnnotation)
+                    })
+                }
+            }
+            
+            // Smoothly center and zoom into an annotation
+            private func centerAnnotationSmoothly(mapView: MKMapView, annotation: MKAnnotation) {
+                let targetCoordinate = annotation.coordinate
+                
+                // Desired camera altitude for zoom (adjust this value for more/less zoom)
+                let altitude: CLLocationDistance = 500 // A lower value zooms in more
+                
+                // Create an MKMapCamera with the target coordinate and altitude
+                let camera = MKMapCamera(lookingAtCenter: targetCoordinate, fromDistance: altitude, pitch: 0, heading: 0)
+                
+                // Perform a smooth camera animation
+                UIView.animate(withDuration: 1.0, delay: 0, options: [.curveEaseInOut], animations: {
+                    mapView.setCamera(camera, animated: true)
+                }, completion: { _ in
+                    // Select the annotation after the animation completes
+                    DispatchQueue.main.async {
+                        mapView.selectAnnotation(annotation, animated: true)
+                    }
+                })
             }
             
             // Ensure to cancel the subscription when the Coordinator is deinitialized
@@ -427,8 +568,8 @@ struct ContentView: View {
             }
             
             // Efficiently update annotations by only adding/removing what's changed
-            func updateAnnotations(mapView: MKMapView) {
-                guard let elements = self.viewModel.elements else { return }
+            func updateAnnotations(mapView: MKMapView, elements: [Element]?) {
+                guard let elements = elements else { return }
                 
                 let visibleRect = mapView.visibleMapRect
                 let centerCoordinate = mapView.centerCoordinate
@@ -465,7 +606,6 @@ struct ContentView: View {
             
             // MARK: - MKMapViewDelegate Methods
             
-            // Provide views for map annotations
             func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
                 let reuseIdentifier = "AnnotationView"
                 var view: MKMarkerAnnotationView?
@@ -475,7 +615,7 @@ struct ContentView: View {
                     view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
                     view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                     view?.markerTintColor = .orange
-                    view?.glyphText = String(cluster.memberAnnotations.count)
+                    view?.glyphText = "\(cluster.memberAnnotations.count)"
                 } else if let annotation = annotation as? Annotation {
                     // Handle individual annotations
                     if annotation.element == nil {
@@ -495,17 +635,50 @@ struct ContentView: View {
             
             // Handle annotation selection to update navigation path
             func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
-                if let annotation = view.annotation as? Annotation, let element = annotation.element {
+                if let cluster = view.annotation as? MKClusterAnnotation {
+                    let annotations = cluster.memberAnnotations
+                    
+                    // Calculate the bounding map rect for the cluster annotations
+                    var rect = MKMapRect.null
+                    for annotation in annotations {
+                        let point = MKMapPoint(annotation.coordinate)
+                        rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
+                    }
+                    
+                    // Apply a scale factor to control zoom level
+                    let zoomOutScale: Double = 1.3 // Adjust this value for better zoom
+                    rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1),
+                                        dy: -rect.size.height * (zoomOutScale - 1))
+                    
+                    // Edge padding to respect header and bottom sheet
+                    let topInset: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 10 : viewModel.topPadding + 10
+                    let edgePadding = UIEdgeInsets(
+                        top: topInset,
+                        left: 20,
+                        bottom: viewModel.bottomPadding + 100,
+                        right: 20
+                    )
+                    
+                    // Set the visible map rect with padding and zoom adjustments
+                    mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: true)
+                    
+                    print("""
+                    Cluster Selected -> 
+                    Edge Padding (Top: \(edgePadding.top), Bottom: \(edgePadding.bottom)),
+                    Zoom Scale: \(zoomOutScale)
+                    """)
+                }
+                else if let annotation = view.annotation as? Annotation, let element = annotation.element {
+                    // Restore the logic to display BusinessDetailView
                     DispatchQueue.main.async {
-                        // Set the navigation path to contain only the selected element
-                        self.viewModel.path = [element]
-                        // Update selectedElement if it's different
-                        if self.viewModel.selectedElement != element {
-                            self.viewModel.selectedElement = element
-                        }
+                        self.viewModel.path = [element] // Update path for NavigationStack
+                        self.viewModel.selectedElement = element // Update the selected element
+                        
+                        print("Annotation tapped: \(element)")
                     }
                 }
             }
+            
             
             // Detect when the map region changes
             func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
@@ -518,8 +691,14 @@ struct ContentView: View {
                     .delay(for: .seconds(0.5), scheduler: RunLoop.main)
                     .sink { [weak self] _ in
                         guard let self = self else { return }
-                        self.updateAnnotations(mapView: mapView) // Remove `elements` parameter
+                        self.updateAnnotations(mapView: mapView, elements: self.viewModel.elements)
                     }
+                
+                if animated, let completion = mapRegionChangeCompletion {
+                    // Trigger completion handler
+                    mapRegionChangeCompletion = nil // Reset to avoid repeated calls
+                    completion()
+                }
             }
             
             // Update visible elements based on annotations in the visible map rect
@@ -544,16 +723,21 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var isUpdatingLocation = false
     @Published var geocodingCache = LRUCache<String, Address>(maxSize: 100)
     @Published var path: [Element] = []
-    @Published var selectedElement: Element? 
+    @Published var selectedElement: Element?
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
-    @Published var elements: [Element]? = [] 
+    @Published var elements: [Element]? = []
+    @Published var topPadding: CGFloat = 0
+    @Published var bottomPadding: CGFloat = 0
+    @Published var initialRegionSet = false // Track if initial region has been set
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
     let visibleElementsSubject = PassthroughSubject<[Element], Never>()
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
     let geocoder = Geocoder(maxConcurrentRequests: 5)
+    let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
     
+    private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: AnyCancellable?
     weak var mapView: MKMapView?
     
@@ -561,6 +745,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         super.init()
         locationManager.delegate = self
         mapView?.delegate = self
+        setupCenterMapSubscription()
     }
     
     // Request location
@@ -611,11 +796,100 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return centerLocation.distance(from: annotationLocation)
     }
     
+    // Zoom to element
+    func zoomToElement(_ element: Element) {
+        guard let mapView = mapView,
+              let lat = element.osmJSON?.lat,
+              let lon = element.osmJSON?.lon else { return }
+        
+        let targetCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        let targetCamera = MKMapCamera(
+            lookingAtCenter: targetCoordinate,
+            fromDistance: 500,
+            pitch: 0,
+            heading: 0
+        )
+        
+        let inCluster = mapView.annotations
+            .compactMap { $0 as? MKClusterAnnotation }
+            .contains { cluster in
+                cluster.memberAnnotations.contains { member in
+                    (member as? Annotation)?.element?.id == element.id
+                }
+            }
+        
+        let duration: TimeInterval = 0.5
+        let selectionDelay: TimeInterval = inCluster ? 0.8 : 0.1
+        
+        UIView.animate(
+            withDuration: duration,
+            animations: {
+                mapView.setCamera(targetCamera, animated: false)
+            },
+            completion: { _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                    if let annotation = mapView.annotations.first(where: {
+                        ($0 as? Annotation)?.element?.id == element.id
+                    }) {
+                        mapView.selectAnnotation(annotation, animated: true)
+                    }
+                }
+            }
+        )
+    }
+    
+    private func setupCenterMapSubscription() {
+        centerMapToCoordinateSubject
+            .sink { [weak self] coordinate in
+                guard let self = self, let mapView = self.mapView else { return }
+                let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                let region = MKCoordinateRegion(center: coordinate, span: newZoomLevel)
+                let edgePadding = UIEdgeInsets(
+                    top: topPadding + 10,
+                    left: 20,
+                    bottom: bottomPadding + 100,
+                    right: 20
+                )
+                mapView.setCameraBoundary(MKMapView.CameraBoundary(coordinateRegion: region), animated: true)
+                mapView.setVisibleMapRect(region.mapRect, edgePadding: edgePadding, animated: true)
+            }
+            .store(in: &cancellables)
+    }
+    
+    func centerMap(to coordinate: CLLocationCoordinate2D, animated: Bool = true) {
+        guard let mapView = mapView else { return }
+        
+        if !initialRegionSet {
+            // Set an initial zoom level only once
+            print("Setting initial region -> Coordinate: \(coordinate.latitude), \(coordinate.longitude)")
+            let initialRegion = MKCoordinateRegion(
+                center: coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3) // Default zoom level
+            )
+            mapView.setRegion(initialRegion, animated: animated)
+            initialRegionSet = true
+        } else {
+            // Preserve zoom level and only center the map
+            print("Centering Map -> Coordinate: \(coordinate.latitude), \(coordinate.longitude)")
+            mapView.setCenter(coordinate, animated: animated)
+        }
+    }
+    
     // Update map region
     func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil, animated: Bool = true) {
         let updatedSpan = span ?? region.span
         self.region = MKCoordinateRegion(center: center, span: updatedSpan)
         mapView?.setRegion(self.region, animated: animated)
+    }
+    
+    // Deselect the currently selected annotation
+    func deselectAnnotation() {
+        selectedElement = nil
+        DispatchQueue.main.async {
+            self.mapView?.selectedAnnotations.forEach { annotation in
+                self.mapView?.deselectAnnotation(annotation, animated: true)
+            }
+        }
     }
 }
 

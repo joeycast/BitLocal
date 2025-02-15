@@ -18,8 +18,8 @@ struct AboutView: View {
     
     // Socials section links
     let twitterURL = URL(string:"https://twitter.com/bitlocal_app")!
-//    let discordURL = URL(string:"")!
-//    let nostrURL = URL(string:"")!
+    //    let discordURL = URL(string:"")!
+    //    let nostrURL = URL(string:"")!
     
     // Other section links
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
@@ -65,14 +65,14 @@ struct AboutView: View {
                          label: {
                         Label("X / Twitter", systemImage: "bird")    
                     })
-//                    Link(destination: discordURL, 
-//                         label: {
-//                        Label("Discord", systemImage: "link")    
-//                    })
-//                    Link(destination: nostrURL, 
-//                         label: {
-//                        Label("Nostr", systemImage: "link")    
-//                    })
+                    //                    Link(destination: discordURL, 
+                    //                         label: {
+                    //                        Label("Discord", systemImage: "link")    
+                    //                    })
+                    //                    Link(destination: nostrURL, 
+                    //                         label: {
+                    //                        Label("Nostr", systemImage: "link")    
+                    //                    })
                 }
                 // Other section
                 Section(header: Text("Other")) {
@@ -98,23 +98,23 @@ struct AboutView: View {
                     })
                 }
                 // Support Development section
-//                Section(header: Text("Support Development"), 
-//                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
-//                    Label("Tip Jar", systemImage: "bolt.circle.fill")
-//                }
-//                Section(header: Text("Logs")) {
-//                    Button("Show Logs") {
-//                        self.showingLogs = true
-//                    }
-//                    .sheet(isPresented: $showingLogs) {
-//                        // Display logs in a scrollable text view
-//                        ScrollView {
-//                            Text(LogManager.shared.allLogs())
-//                                .padding()
-//                                .font(.system(.body, design: .monospaced))
-//                        }
-//                    }
-//                }
+                //                Section(header: Text("Support Development"), 
+                //                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
+                //                    Label("Tip Jar", systemImage: "bolt.circle.fill")
+                //                }
+                //                Section(header: Text("Logs")) {
+                //                    Button("Show Logs") {
+                //                        self.showingLogs = true
+                //                    }
+                //                    .sheet(isPresented: $showingLogs) {
+                //                        // Display logs in a scrollable text view
+                //                        ScrollView {
+                //                            Text(LogManager.shared.allLogs())
+                //                                .padding()
+                //                                .font(.system(.body, design: .monospaced))
+                //                        }
+                //                    }
+                //                }
             }
             // About page title
             // TODO: Figure out how to use the appName constant here

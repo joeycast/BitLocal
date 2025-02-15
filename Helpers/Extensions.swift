@@ -98,3 +98,27 @@ extension UserDefaults {
         return nil
     }
 }
+
+@available(iOS 16.4, *)
+extension MKCoordinateRegion {
+    var mapRect: MKMapRect {
+        let topLeft = CLLocationCoordinate2D(
+            latitude: center.latitude + (span.latitudeDelta / 2),
+            longitude: center.longitude - (span.longitudeDelta / 2)
+        )
+        let bottomRight = CLLocationCoordinate2D(
+            latitude: center.latitude - (span.latitudeDelta / 2),
+            longitude: center.longitude + (span.longitudeDelta / 2)
+        )
+        
+        let topLeftPoint = MKMapPoint(topLeft)
+        let bottomRightPoint = MKMapPoint(bottomRight)
+        
+        return MKMapRect(
+            x: min(topLeftPoint.x, bottomRightPoint.x),
+            y: min(topLeftPoint.y, bottomRightPoint.y),
+            width: abs(topLeftPoint.x - bottomRightPoint.x),
+            height: abs(topLeftPoint.y - bottomRightPoint.y)
+        )
+    }
+}
