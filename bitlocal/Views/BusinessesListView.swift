@@ -203,38 +203,38 @@ class ElementCellViewModel: ObservableObject {
     }
     
     private var addressCacheKey: String {
-        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
+        guard let coord = element.mapCoordinate else {
             return ""
         }
-        return "\(lat),\(lon)"
+        return "\(coord.latitude),\(coord.longitude)"
     }
-    
+
     private func getCachedAddress() -> Address? {
-        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
+        guard let coord = element.mapCoordinate else {
             return nil
         }
-        let cacheKey = "\(lat),\(lon)"
+        let cacheKey = "\(coord.latitude),\(coord.longitude)"
         return viewModel.geocodingCache.getValue(forKey: cacheKey)
     }
-    
+
     private func setCachedAddress(_ address: Address) {
-        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else {
+        guard let coord = element.mapCoordinate else {
             return
         }
-        let cacheKey = "\(lat),\(lon)"
+        let cacheKey = "\(coord.latitude),\(coord.longitude)"
         viewModel.geocodingCache.setValue(address, forKey: cacheKey)
     }
-    
+
     func updateAddress() {
         // Check if the address is already cached
         if let cachedAddress = ElementCellViewModel.geocodingCache[addressCacheKey] {
             self.address = cachedAddress
             return
         }
-        
-        guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return }
-        let location = CLLocation(latitude: lat, longitude: lon)
-        
+
+        guard let coord = element.mapCoordinate else { return }
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+
         // Perform geocoding
         geocoder.reverseGeocodeLocation(location) { [weak self] (placemarks, error) in
             guard let self = self, let placemark = placemarks?.first else { return }

@@ -6,7 +6,7 @@ import MapKit
 import CoreLocationUI
 import Combine
 
-@available(iOS 16.4, *) 
+@available(iOS 16.4, *)
 struct ContentView: View {
     
     @StateObject private var viewModel = ContentViewModel()
@@ -658,9 +658,8 @@ struct ContentView: View {
                 let centerLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
                 
                 let visibleElements = elements.filter { element in
-                    guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return false }
-                    let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                    let location = CLLocation(latitude: lat, longitude: lon)
+                    guard let coordinate = element.mapCoordinate else { return false }
+                    let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
                     let distance = location.distance(from: centerLocation)
                     
                     let mapPoint = MKMapPoint(coordinate)
@@ -861,11 +860,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Calculate distance between element and user location
     func distanceInMiles(element: Element) -> Double? {
         guard let userLocation = userLocation,
-              let lat = element.osmJSON?.lat,
-              let lon = element.osmJSON?.lon else {
+              let coord = element.mapCoordinate else {
             return nil
         }
-        let location = CLLocation(latitude: lat, longitude: lon)
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         let distanceInMeters = userLocation.distance(from: location)
         let distanceInMiles = distanceInMeters / 1609.34
         return distanceInMiles
@@ -881,17 +879,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Zoom to element
     func zoomToElement(_ element: Element) {
         guard let mapView = mapView,
-              let lat = element.osmJSON?.lat,
-              let lon = element.osmJSON?.lon else { return }
-        
-        let targetCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+              let targetCoordinate = element.mapCoordinate else { return }
+
         let targetCamera = MKMapCamera(
             lookingAtCenter: targetCoordinate,
             fromDistance: 500,
             pitch: 0,
             heading: 0
         )
-        
+
         let inCluster = mapView.annotations
             .compactMap { $0 as? MKClusterAnnotation }
             .contains { cluster in
@@ -899,10 +895,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     (member as? Annotation)?.element?.id == element.id
                 }
             }
-        
+
         let duration: TimeInterval = 0.5
         let selectionDelay: TimeInterval = inCluster ? 0.8 : 0.1
-        
+
         UIView.animate(
             withDuration: duration,
             animations: {
@@ -985,7 +981,7 @@ class Annotation: NSObject, Identifiable, MKAnnotation {
     let element: Element?
     
     var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: element?.osmJSON?.lat ?? 0, longitude: element?.osmJSON?.lon ?? 0)
+        element?.mapCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
     }
     
     var title: String? {

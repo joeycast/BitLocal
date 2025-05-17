@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 @available(iOS 16.4, *)
 // Bottom Sheet
@@ -132,5 +133,21 @@ extension MKMapType {
     
     static func from(int: Int) -> MKMapType {
         return MKMapType(rawValue: UInt(int)) ?? .standard
+    }
+}
+
+extension Element {
+    /// Returns a coordinate for node or way (first geometry point), or nil if unavailable
+    var mapCoordinate: CLLocationCoordinate2D? {
+        // For node
+        if let lat = osmJSON?.lat, let lon = osmJSON?.lon {
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+        // For way: use first geometry point, but make sure lat/lon are not nil
+        if let geometry = osmJSON?.geometry, let first = geometry.first,
+           let lat = first.lat, let lon = first.lon {
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+        return nil
     }
 }

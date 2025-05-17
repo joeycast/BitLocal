@@ -32,8 +32,7 @@ struct BusinessDetailView: View {
         }
         .listStyle(InsetGroupedListStyle()) // Consistent list style
         .navigationTitle(element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? "Name not available")
-        .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)
-    }
+        .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)    }
 }
 
 // BusinessDescriptionSection
@@ -43,7 +42,7 @@ struct BusinessDescriptionSection: View {
     var body: some View {
         if let description = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn {
             Section(header: Text("Description")) {
-                Text(description)   
+                Text(description)
             }
         } else {
         }
@@ -64,8 +63,10 @@ struct BusinessDetailsSection: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
-                Link(destination: URL(string: "maps://?saddr=&daddr=\(element.osmJSON?.lat ?? 0.0),\(element.osmJSON?.lon ?? 0.0)")!) {
-                    Text("\(elementCellViewModel.address?.streetNumber != nil && !elementCellViewModel.address!.streetNumber!.isEmpty ? elementCellViewModel.address!.streetNumber! + " " : "")\(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
+                if let coord = element.mapCoordinate {
+                    Link(destination: URL(string: "maps://?saddr=&daddr=\(coord.latitude),\(coord.longitude)")!) {
+                        Text("\(elementCellViewModel.address?.streetNumber != nil && !elementCellViewModel.address!.streetNumber!.isEmpty ? elementCellViewModel.address!.streetNumber! + " " : "")\(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
+                    }
                 }
             }
             
@@ -156,7 +157,7 @@ struct PaymentDetailsSection: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
-            }  
+            }
             if acceptsContactlessLightning(element: element) {
                 HStack {
                     Image(systemName: "wave.3.right.circle.fill")
@@ -165,7 +166,7 @@ struct PaymentDetailsSection: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
-            }  
+            }
         }
     }
 }
@@ -257,14 +258,14 @@ struct MapView: UIViewRepresentable {
 // Troubleshooting Section
 //struct TroubleshootingSection: View {
 //    var element: Element
-//    
+//
 //    var body: some View {
 //        Section(header: Text("Troubleshooting")) {
 //            Text("ID: \(element.id)")
 //            Text("Created at: \(element.createdAt)")
 //            Text("Updated at: \(element.updatedAt ?? "")")
 //            Text("Deleted at: \(element.deletedAt ?? "")")
-//            Text("Description: \(element.osmJSON?.tags?.description ?? "")")                
+//            Text("Description: \(element.osmJSON?.tags?.description ?? "")")
 //            Text("Phone: \(element.osmJSON?.tags?.phone ?? "")")
 //            Text("Contact:Phone: \(element.osmJSON?.tags?.contactPhone ?? "")")
 //            Text("Website: \(element.osmJSON?.tags?.website ?? "")")
@@ -279,7 +280,7 @@ struct MapView: UIViewRepresentable {
 //            Text("Street: \(element.osmJSON?.tags?.addrStreet ?? "")")
 //            Text("City: \(element.osmJSON?.tags?.addrCity ?? "")")
 //            Text("State: \(element.osmJSON?.tags?.addrState ?? "")")
-//            Text("Post Code: \(element.osmJSON?.tags?.addrPostcode ?? "")")            
+//            Text("Post Code: \(element.osmJSON?.tags?.addrPostcode ?? "")")
 //        }
 //    }
 //}
