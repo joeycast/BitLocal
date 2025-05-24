@@ -1,12 +1,15 @@
 import SwiftUI
 
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 struct AboutView: View {
     
     // For dismissing the SettingsView sheet
     @Environment(\.dismiss) var dismiss
     
     @State private var showingLogs = false
+    
+    // App name
+    let appName = "BitLocal"
     
     // Contribute section links
     let suggestABusinessEmail = URL(string:"mailto:support@bitlocal.app")!
@@ -38,7 +41,7 @@ struct AboutView: View {
             Form {
                 // Header section
                 Section {
-                    Text("\(ContentView().appName) is an app developed by Joe Castagnaro in Nashville, TN. \(ContentView().appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in \(ContentView().appName) is retrieved from OpenStreetMap through the BTC Map API.")
+                    Text("\(appName) is an app developed by Joe Castagnaro in Nashville, TN. \(appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in \(appName) is retrieved from OpenStreetMap through the BTC Map API.")
                 }
                 // Contribute section
                 Section(header: Text("Contribute"), 
@@ -130,7 +133,7 @@ struct AboutView: View {
 }
 
 // View preview
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 struct AboutView_Previews: PreviewProvider {
     static var previews: some View {
         AboutView()

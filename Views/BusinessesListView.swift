@@ -6,7 +6,7 @@ import CoreLocation
 import Combine
 import Foundation
 
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 struct BusinessesListView: View {
     
     @EnvironmentObject var viewModel: ContentViewModel
@@ -119,7 +119,7 @@ struct BusinessesListView: View {
     }
 }
 
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
@@ -220,7 +220,7 @@ struct ElementCell: View {
     }
 }
 
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 class ElementCellViewModel: ObservableObject {
     
     let element: Element

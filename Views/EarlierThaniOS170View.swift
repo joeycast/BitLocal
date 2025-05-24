@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct EarlierThaniOS164View: View {
+struct EarlierThaniOS170View: View {
     var body: some View {
         ZStack{
             // Support system light/dark mode
@@ -15,7 +15,7 @@ struct EarlierThaniOS164View: View {
                     .frame(width: 150, height: 150) // Set desired size
                     .padding() // Add padding around the image
                 
-                Text("BitLocal Requires iOS 16.4 or Later")   
+                Text("BitLocal Requires iOS 17.0 or Later")
                     .font(.headline)
                 
                 Text("")
@@ -52,8 +52,8 @@ struct EarlierThaniOS164View: View {
     }
 }
 
-struct EarlierThaniOS164View_Previews: PreviewProvider {
+struct EarlierThaniOS170View_Previews: PreviewProvider {
     static var previews: some View {
-        EarlierThaniOS164View()
+        EarlierThaniOS170View()
     }
 }

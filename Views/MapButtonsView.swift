@@ -1,3 +1,11 @@
+//
+//  MapButtonsView.swift
+//  bitlocal
+//
+//  Created by Joe Castagnaro on 5/24/25.
+//
+
+
 import SwiftUI
 import MapKit
 
@@ -26,7 +34,7 @@ struct MapButtonsView: View {
                         .foregroundColor(.white)
                 }
             }
-            LocationButton(.currentLocation) {
+            Button(action: {
                 viewModel.locationManager.requestWhenInUseAuthorization()
                 viewModel.isUpdatingLocation = true
                 viewModel.locationManager.startUpdatingLocation()
@@ -49,12 +57,13 @@ struct MapButtonsView: View {
                         viewModel.isUpdatingLocation = false
                     }
                 }
+            }) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color.white)
+                    .padding()
+                    .background(Circle().fill(Color.orange))
             }
-            .tint(.orange)
-            .foregroundColor(.white)
-            .cornerRadius(20, antialiased: true)
-            .labelStyle(.iconOnly)
-            .symbolVariant(.fill)
             .shadow(radius: 3)
         }
     }

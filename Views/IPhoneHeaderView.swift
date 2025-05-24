@@ -1,4 +1,13 @@
+//
+//  IPhoneHeaderView.swift
+//  bitlocal
+//
+//  Created by Joe Castagnaro on 5/24/25.
+//
+
+
 import SwiftUI
+import MapKit
 
 @available(iOS 17.0, *)
 struct IPhoneHeaderView: View {

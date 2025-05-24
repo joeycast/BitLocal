@@ -3,12 +3,14 @@ import MapKit
 
 struct SettingsView: View {
     @Binding var selectedMapType: MKMapType
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.colorScheme) var systemColorScheme
+
     // Store the enum directly
     @AppStorage("appearance") private var appearance: Appearance = .system
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    
+
+    var onDone: (() -> Void)? = nil
+
     var body: some View {
         NavigationStack {
             List {
@@ -25,7 +27,7 @@ struct SettingsView: View {
                         .frame(maxWidth: 200)
                     }
                 }
-                
+
                 Section {
                     HStack {
                         Text("Appearance")
@@ -39,7 +41,7 @@ struct SettingsView: View {
                         .frame(maxWidth: 200)
                     }
                 }
-                
+
                 Section {
                     HStack {
                         Text("Distance Unit")
@@ -57,10 +59,11 @@ struct SettingsView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
             .navigationBarItems(trailing:
-                                    Button("Done") {
-                dismiss()
-            }
+                Button("Done") {
+                    onDone?()
+                }
             )
         }
+        .id("\(appearance)-\(systemColorScheme)")
     }
 }

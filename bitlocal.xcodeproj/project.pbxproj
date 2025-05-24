@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		F615ACB32DE2350F00B86607 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F615ACB22DE2350F00B86607 /* DistanceUnit.swift */; };
+		F66E0B5E2DE277F700D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B5D2DE277F700D68897 /* MapView.swift */; };
+		F66E0B602DE279AE00D68897 /* BottomSheetContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B5F2DE279AE00D68897 /* BottomSheetContentView.swift */; };
 		F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F67937602DE205E400A49AC3 /* Assets.xcassets */; };
 		F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937652DE2065E00A49AC3 /* bitlocalApp.swift */; };
 		F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937672DE206D200A49AC3 /* CustomFonts.swift */; };
@@ -20,7 +22,7 @@
 		F679377C2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */; };
 		F679377D2DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */; };
 		F67937882DE2071C00A49AC3 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679377E2DE2071C00A49AC3 /* AboutView.swift */; };
-		F67937892DE2071C00A49AC3 /* EarlierThaniOS164View.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937832DE2071C00A49AC3 /* EarlierThaniOS164View.swift */; };
+		F67937892DE2071C00A49AC3 /* EarlierThaniOS170View.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */; };
 		F679378A2DE2071C00A49AC3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937822DE2071C00A49AC3 /* ContentView.swift */; };
 		F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679377F2DE2071C00A49AC3 /* Appearance.swift */; };
 		F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937812DE2071C00A49AC3 /* BusinessesListView.swift */; };
@@ -28,11 +30,23 @@
 		F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */; };
 		F679378F2DE2071C00A49AC3 /* SettingsButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */; };
 		F67937902DE2071C00A49AC3 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937842DE2071C00A49AC3 /* MainView.swift */; };
+		F6A26A8C2DE272FE00873795 /* IPadLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A8B2DE272FE00873795 /* IPadLayoutView.swift */; };
+		F6A26A8E2DE2730700873795 /* IPhoneLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A8D2DE2730700873795 /* IPhoneLayoutView.swift */; };
+		F6A26A902DE2730E00873795 /* IPhoneHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A8F2DE2730E00873795 /* IPhoneHeaderView.swift */; };
+		F6A26A922DE2731400873795 /* MapButtonsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A912DE2731400873795 /* MapButtonsView.swift */; };
+		F6A26A942DE2731900873795 /* CustomiPadNavigationStackTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A932DE2731900873795 /* CustomiPadNavigationStackTitleView.swift */; };
+		F6A26A962DE2731D00873795 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A952DE2731D00873795 /* OpenStreetMapAttributionView.swift */; };
+		F6A26A982DE2732200873795 /* InfoButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A972DE2732200873795 /* InfoButtonView.swift */; };
+		F6A26A9A2DE2748700873795 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A992DE2748700873795 /* ContentViewModel.swift */; };
+		F6A26A9C2DE274C700873795 /* Annotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A9B2DE274C700873795 /* Annotation.swift */; };
+		F6A26A9E2DE274D000873795 /* AnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A9D2DE274D000873795 /* AnnotationView.swift */; };
 		F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6B565F62DA327BE00EE992E /* CoreLocation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		F615ACB22DE2350F00B86607 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
+		F66E0B5D2DE277F700D68897 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
+		F66E0B5F2DE279AE00D68897 /* BottomSheetContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheetContentView.swift; sourceTree = "<group>"; };
 		F67937602DE205E400A49AC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F67937622DE205F700A49AC3 /* bitlocal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = bitlocal.entitlements; sourceTree = "<group>"; };
 		F67937652DE2065E00A49AC3 /* bitlocalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = bitlocalApp.swift; sourceTree = "<group>"; };
@@ -51,10 +65,20 @@
 		F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessDetailView.swift; sourceTree = "<group>"; };
 		F67937812DE2071C00A49AC3 /* BusinessesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessesListView.swift; sourceTree = "<group>"; };
 		F67937822DE2071C00A49AC3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		F67937832DE2071C00A49AC3 /* EarlierThaniOS164View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlierThaniOS164View.swift; sourceTree = "<group>"; };
+		F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlierThaniOS170View.swift; sourceTree = "<group>"; };
 		F67937842DE2071C00A49AC3 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsButtonView.swift; sourceTree = "<group>"; };
 		F67937862DE2071C00A49AC3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F6A26A8B2DE272FE00873795 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
+		F6A26A8D2DE2730700873795 /* IPhoneLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLayoutView.swift; sourceTree = "<group>"; };
+		F6A26A8F2DE2730E00873795 /* IPhoneHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneHeaderView.swift; sourceTree = "<group>"; };
+		F6A26A912DE2731400873795 /* MapButtonsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapButtonsView.swift; sourceTree = "<group>"; };
+		F6A26A932DE2731900873795 /* CustomiPadNavigationStackTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomiPadNavigationStackTitleView.swift; sourceTree = "<group>"; };
+		F6A26A952DE2731D00873795 /* OpenStreetMapAttributionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenStreetMapAttributionView.swift; sourceTree = "<group>"; };
+		F6A26A972DE2732200873795 /* InfoButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoButtonView.swift; sourceTree = "<group>"; };
+		F6A26A992DE2748700873795 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
+		F6A26A9B2DE274C700873795 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
+		F6A26A9D2DE274D000873795 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
 		F6B565BF2DA322FD00EE992E /* bitlocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bitlocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B565F62DA327BE00EE992E /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.4.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
@@ -104,12 +128,24 @@
 		F67937872DE2071C00A49AC3 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				F66E0B5F2DE279AE00D68897 /* BottomSheetContentView.swift */,
+				F66E0B5D2DE277F700D68897 /* MapView.swift */,
+				F6A26A9D2DE274D000873795 /* AnnotationView.swift */,
+				F6A26A9B2DE274C700873795 /* Annotation.swift */,
+				F6A26A992DE2748700873795 /* ContentViewModel.swift */,
+				F6A26A972DE2732200873795 /* InfoButtonView.swift */,
+				F6A26A952DE2731D00873795 /* OpenStreetMapAttributionView.swift */,
+				F6A26A932DE2731900873795 /* CustomiPadNavigationStackTitleView.swift */,
+				F6A26A912DE2731400873795 /* MapButtonsView.swift */,
+				F6A26A8F2DE2730E00873795 /* IPhoneHeaderView.swift */,
+				F6A26A8D2DE2730700873795 /* IPhoneLayoutView.swift */,
+				F6A26A8B2DE272FE00873795 /* IPadLayoutView.swift */,
 				F679377E2DE2071C00A49AC3 /* AboutView.swift */,
 				F679377F2DE2071C00A49AC3 /* Appearance.swift */,
 				F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */,
 				F67937812DE2071C00A49AC3 /* BusinessesListView.swift */,
 				F67937822DE2071C00A49AC3 /* ContentView.swift */,
-				F67937832DE2071C00A49AC3 /* EarlierThaniOS164View.swift */,
+				F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */,
 				F67937842DE2071C00A49AC3 /* MainView.swift */,
 				F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */,
 				F67937862DE2071C00A49AC3 /* SettingsView.swift */,
@@ -121,14 +157,14 @@
 			isa = PBXGroup;
 			children = (
 				F67937872DE2071C00A49AC3 /* Views */,
-				F679377B2DE2070D00A49AC3 /* Resources */,
-				F67937772DE206F000A49AC3 /* LICENSE */,
-				F67937752DE206E800A49AC3 /* Info.plist */,
 				F679376F2DE206DD00A49AC3 /* Helpers */,
 				F67937682DE206D200A49AC3 /* Fonts */,
 				F67937652DE2065E00A49AC3 /* bitlocalApp.swift */,
 				F67937622DE205F700A49AC3 /* bitlocal.entitlements */,
 				F67937602DE205E400A49AC3 /* Assets.xcassets */,
+				F679377B2DE2070D00A49AC3 /* Resources */,
+				F67937772DE206F000A49AC3 /* LICENSE */,
+				F67937752DE206E800A49AC3 /* Info.plist */,
 				F6B565F52DA327BD00EE992E /* Frameworks */,
 				F6B565C02DA322FD00EE992E /* Products */,
 			);
@@ -226,17 +262,29 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F6A26A902DE2730E00873795 /* IPhoneHeaderView.swift in Sources */,
+				F6A26A9E2DE274D000873795 /* AnnotationView.swift in Sources */,
 				F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */,
 				F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */,
 				F67937702DE206DD00A49AC3 /* BtcMapCall.swift in Sources */,
+				F6A26A9C2DE274C700873795 /* Annotation.swift in Sources */,
 				F67937882DE2071C00A49AC3 /* AboutView.swift in Sources */,
-				F67937892DE2071C00A49AC3 /* EarlierThaniOS164View.swift in Sources */,
+				F6A26A942DE2731900873795 /* CustomiPadNavigationStackTitleView.swift in Sources */,
+				F67937892DE2071C00A49AC3 /* EarlierThaniOS170View.swift in Sources */,
+				F6A26A922DE2731400873795 /* MapButtonsView.swift in Sources */,
+				F6A26A8E2DE2730700873795 /* IPhoneLayoutView.swift in Sources */,
+				F6A26A9A2DE2748700873795 /* ContentViewModel.swift in Sources */,
 				F679378A2DE2071C00A49AC3 /* ContentView.swift in Sources */,
+				F6A26A982DE2732200873795 /* InfoButtonView.swift in Sources */,
 				F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */,
 				F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */,
 				F679378D2DE2071C00A49AC3 /* SettingsView.swift in Sources */,
 				F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */,
+				F6A26A962DE2731D00873795 /* OpenStreetMapAttributionView.swift in Sources */,
+				F66E0B602DE279AE00D68897 /* BottomSheetContentView.swift in Sources */,
+				F6A26A8C2DE272FE00873795 /* IPadLayoutView.swift in Sources */,
 				F679378F2DE2071C00A49AC3 /* SettingsButtonView.swift in Sources */,
+				F66E0B5E2DE277F700D68897 /* MapView.swift in Sources */,
 				F67937902DE2071C00A49AC3 /* MainView.swift in Sources */,
 				F67937712DE206DD00A49AC3 /* Extensions.swift in Sources */,
 				F67937722DE206DD00A49AC3 /* LRUCache.swift in Sources */,
@@ -391,7 +439,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
@@ -436,7 +484,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;

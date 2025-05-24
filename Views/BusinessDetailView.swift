@@ -4,7 +4,7 @@ import SwiftUI
 import CoreLocation
 import MapKit
 
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 struct BusinessDetailView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State private var region = MKCoordinateRegion()
@@ -74,7 +74,7 @@ struct BusinessDescriptionSection: View {
 }
 
 // Business Details Section
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 struct BusinessDetailsSection: View {
     var element: Element
     @ObservedObject var elementCellViewModel: ElementCellViewModel
@@ -209,7 +209,7 @@ struct BusinessMapSection: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     var body: some View {
-        MapView(element: element)
+        BusinessMiniMapView(element: element)
             .frame(height: horizontalSizeClass == .compact ? 200 : 300) // Adjust height based on device
             .cornerRadius(10)
     }
@@ -217,7 +217,7 @@ struct BusinessMapSection: View {
 
 // Map View
 // TODO: Refactor to reuse annotation customization code from ContentViewModel
-struct MapView: UIViewRepresentable {
+struct BusinessMiniMapView: UIViewRepresentable {
     var element: Element
     
     // Read the persisted map type using AppStorage.
@@ -263,9 +263,9 @@ struct MapView: UIViewRepresentable {
     }
     
     class Coordinator: NSObject, MKMapViewDelegate {
-        var parent: MapView
+        var parent: BusinessMiniMapView
         
-        init(_ parent: MapView) {
+        init(_ parent: BusinessMiniMapView) {
             self.parent = parent
         }
         

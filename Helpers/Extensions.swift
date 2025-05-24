@@ -2,7 +2,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 // Bottom Sheet
 extension View {
     @ViewBuilder
@@ -24,7 +24,7 @@ extension View {
             } content: {
                 content()
                 // 2) Apply the color scheme if provided
-                    .preferredColorScheme(forcedColorScheme)   
+                    .preferredColorScheme(forcedColorScheme)
                     .presentationDetents(presentationDetents)
                     .presentationDragIndicator(dragIndicator)
                     .interactiveDismissDisabled(interactiveDisabled)
@@ -102,7 +102,7 @@ extension UserDefaults {
     }
 }
 
-@available(iOS 16.4, *)
+@available(iOS 17.0, *)
 extension MKCoordinateRegion {
     var mapRect: MKMapRect {
         let topLeft = CLLocationCoordinate2D(
