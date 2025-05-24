@@ -2,6 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>systemBackgroundColor</string>
+	</dict>
+	<key>CFBundleVersion</key>
+	<string>26</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.5.1</string>
 	<key>CFBundleDisplayName</key>
 	<string>BitLocal</string>
 	<key>CFBundleExecutable</key>
@@ -16,13 +25,6 @@
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>BitLocal asks for your location to find businesses near you. Location sharing is not required to use BitLocal.</string>
-	<key>UIDeviceFamily</key>
-	<array>
-		<integer>1</integer>
-		<integer>2</integer>
-	</array>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
@@ -34,7 +36,5 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-    <key>UILaunchStoryboardName</key>
-    <string>LaunchScreen</string>
 </dict>
 </plist>

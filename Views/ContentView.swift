@@ -21,14 +21,31 @@ struct ContentView: View {
     @State private var cancellableUserLocation: Cancellable?
     @State private var firstLocationUpdate: Bool = true
     @State private var headerHeight: CGFloat = 0
+    @State private var showingSettings = false
+    
+    // Appearance from @AppStorage
+    @AppStorage("appearance") private var appearance: Appearance = .system
+    @AppStorage("selectedMapType") private var storedMapType: Int = 0
     
     let appName = "BitLocal"
     let apiManager = APIManager()
     
+    var selectedMapTypeBinding: Binding<MKMapType> {
+        Binding<MKMapType>(
+            get: { MKMapType.from(int: storedMapType) },
+            set: { storedMapType = $0.intValue }
+        )
+    }
+    
+    // This computed property lets you use "selectedMapType" in read-only contexts:
+    var selectedMapType: MKMapType {
+        selectedMapTypeBinding.wrappedValue
+    }
+    
     var body: some View {
         
         // **** Main View ****
-        GeometryReader { geometry in
+        return GeometryReader { geometry in
             let screenWidth = geometry.size.width
             let screenHeight = geometry.size.height
             
@@ -46,10 +63,8 @@ struct ContentView: View {
                             }
                             .toolbar {
                                 ToolbarItem(placement: .navigationBarLeading) {
-                                    // Invisible placeholder that mirrors the info button
-                                    InfoButtonView(showingAbout: $showingAbout)
+                                    SettingsButtonView(showingSettings: $showingSettings)
                                         .opacity(0)
-                                        .allowsHitTesting(false)
                                 }
                                 ToolbarItem(placement: .principal) {
                                     CustomiPadNavigationStackTitleView()
@@ -65,15 +80,31 @@ struct ContentView: View {
                     
                     ZStack {
                         if let elements = elements {
-                            mapView(elements: elements, topPadding: headerHeight, bottomPadding: viewModel.bottomPadding)
-                                .ignoresSafeArea()
-                                .onAppear {
-                                    viewModel.locationManager.requestWhenInUseAuthorization()
-                                    viewModel.locationManager.startUpdatingLocation()
-                                }
+                            mapView(
+                                elements: elements,
+                                topPadding: headerHeight,
+                                bottomPadding: viewModel.bottomPadding,
+                                mapType: selectedMapType
+                            )
+                            .ignoresSafeArea()
+                            .onAppear {
+                                viewModel.locationManager.requestWhenInUseAuthorization()
+                                viewModel.locationManager.startUpdatingLocation()
+                            }
+                            .overlay(
+                                OpenStreetMapAttributionView()
+                                    .padding(.bottom, 7)
+                                    .padding(.leading, 100),
+                                alignment: .bottomLeading
+                            )
                         }
-                        locationButtonView(isIPad: true)
                     }
+                    .overlay(
+                        mapButtonsView(isIPad: true)
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 0),
+                        alignment: .bottomTrailing
+                    )
                 }
                 .onChange(of: viewModel.path) { newPath in
                     print("iPad onChange handler called")
@@ -88,40 +119,72 @@ struct ContentView: View {
                 .sheet(isPresented: $showingAbout) {
                     AboutView()
                 }
+                .sheet(isPresented: $showingSettings) {
+                    SettingsView(selectedMapType: selectedMapTypeBinding)
+                        .preferredColorScheme(colorSchemeFor(appearance))
+                        .id(appearance)
+                }
             } else { // iPhone layout
                 ZStack {
                     if let elements = elements {
-                        mapView(elements: elements, topPadding: headerHeight, bottomPadding: viewModel.bottomPadding)
-                            .ignoresSafeArea()
-                            .onAppear {
-                                viewModel.locationManager.requestWhenInUseAuthorization()
-                                viewModel.locationManager.startUpdatingLocation()
-                            }
-                    }
-                    ZStack {
-                        VStack {
-                            iPhoneHeaderView(screenWidth: screenWidth)
-                            Spacer()
-                            locationButtonView(isIPad: false)
+                        mapView(
+                            elements: elements,
+                            topPadding: headerHeight,
+                            bottomPadding: viewModel.bottomPadding,
+                            mapType: selectedMapType
+                        )
+                        .ignoresSafeArea()
+                        .onAppear {
+                            viewModel.locationManager.requestWhenInUseAuthorization()
+                            viewModel.locationManager.startUpdatingLocation()
                         }
+                        .overlay(
+                            OpenStreetMapAttributionView()
+                                .padding(.bottom, geometry.size.height * 0.3 + 1)
+                                .padding(.leading, 16),
+                            alignment: .bottomLeading
+                        )
                     }
                     
-                    // **** Bottom Sheet ****
-                    .bottomSheet(
-                        presentationDetents: [.fraction(0.3), .medium, .large],
-                        isPresented: .constant(true),
-                        sheetCornerRadius: 20
-                    ) {
+                    // Header view
+                    VStack {
+                        iPhoneHeaderView(screenWidth: geometry.size.width)
+                        Spacer()
+                    }
+                }
+                .overlay(
+                    mapButtonsView(isIPad: false)
+                        .padding(.trailing, 27)
+                        .padding(.bottom, geometry.size.height * 0.3 + 10), // 30% of screen height plus an extra 10 points
+                    alignment: .bottomTrailing
+                )
+                .bottomSheet(
+                    presentationDetents: [.fraction(0.3), .medium, .large],
+                    isPresented: .constant(true),
+                    dragIndicator: .visible,
+                    sheetCornerRadius: 20,
+                    largestUndimmedIdentifier: .medium,
+                    interactiveDisabled: true,
+                    forcedColorScheme: colorSchemeFor(appearance),
+                    content: {
                         BottomSheetContentView(visibleElements: $visibleElements)
+                            .id(appearance)
                             .environmentObject(viewModel)
                             .sheet(isPresented: $showingAbout) {
                                 AboutView()
                             }
-                    } onDismiss: {
-                        print("Bottom sheet dismissed") // Optional debug output
+                            .sheet(isPresented: $showingSettings) {
+                                SettingsView(selectedMapType: selectedMapTypeBinding)
+                                    .preferredColorScheme(colorSchemeFor(appearance))
+                                    .id(appearance)
+                            }
+                            .preferredColorScheme(colorSchemeFor(appearance))
+                    },
+                    onDismiss: {
+                        print("Bottom sheet dismissed")
                     }
-                    .ignoresSafeArea(.keyboard)
-                }
+                )
+                .ignoresSafeArea(.keyboard)
             }
         }
         .onPreferenceChange(HeaderHeightKey.self) { value in
@@ -157,6 +220,85 @@ struct ContentView: View {
                 // Any additional logic that should be executed when the map stops moving can be added here.
             })
         }
+        // Apply the user-chosen color scheme to the entire view hierarchy
+        .preferredColorScheme(colorSchemeFor(appearance))
+    }
+    
+    // MARK: - Shared Map Buttons View
+    @ViewBuilder
+    func mapButtonsView(isIPad: Bool) -> some View {
+        VStack(spacing: 10) {
+            // Map Type Toggle Button
+            Button(action: {
+                // Toggle between standard and hybrid
+                let newType: MKMapType = (selectedMapTypeBinding.wrappedValue == .standard) ? .hybrid : .standard
+                selectedMapTypeBinding.wrappedValue = newType
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 44, height: 44) // Fixed circle size
+                        .shadow(radius: 3)
+                    Image(systemName: selectedMapType == .standard ? "globe.americas.fill" : "map.fill")
+                        .font(.system(size: 20)) // Increase icon size without enlarging the circle
+                        .foregroundColor(.white)
+                }
+            }
+            
+            // Location Button
+            LocationButton(.currentLocation) {
+                viewModel.locationManager.requestWhenInUseAuthorization()
+                viewModel.isUpdatingLocation = true
+                viewModel.locationManager.startUpdatingLocation()
+                
+                if let coordinate = userLocation?.coordinate {
+                    viewModel.centerMap(to: coordinate)
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    if viewModel.isUpdatingLocation {
+                        let alert = UIAlertController(
+                            title: "Location could not be determined. Please check if location permissions have been granted.",
+                            message: nil,
+                            preferredStyle: .alert
+                        )
+                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let rootViewController = windowScene.windows.first?.rootViewController {
+                            rootViewController.topMostViewController().present(alert, animated: true, completion: nil)
+                        }
+                        
+                        viewModel.locationManager.stopUpdatingLocation()
+                        viewModel.isUpdatingLocation = false
+                    }
+                }
+            }
+            .tint(.orange)
+            .foregroundColor(.white)
+            .cornerRadius(20, antialiased: true)
+            .labelStyle(.iconOnly)
+            .symbolVariant(.fill)
+            .shadow(radius: 3)
+            //            .overlay(
+            //                Group {
+            //                    if viewModel.isUpdatingLocation {
+            //                        ProgressView()
+            //                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            //                            .frame(width: 20, height: 20)
+            //                    }
+            //                }
+            //            )
+        }
+    }
+    
+    // Helper to map Appearance -> SwiftUI ColorScheme?
+    private func colorSchemeFor(_ appearance: Appearance) -> ColorScheme? {
+        switch appearance {
+        case .system: return nil    // Follows device setting
+        case .light:  return .light
+        case .dark:   return .dark
+        }
     }
     
     private func calculateSidePanelWidth(screenWidth: CGFloat) -> CGFloat {
@@ -173,11 +315,12 @@ struct ContentView: View {
         ZStack {
             
             GeometryReader { geometry in
-                let height = geometry.size.height * 0.35 // Proportional header height
+                let height = geometry.size.height * 0.15 // Proportional header height
                 
                 Rectangle()
                     .cornerRadius(10)
                     .foregroundColor(Color(UIColor.systemBackground)) // Adaptive to light/dark mode
+                    .opacity(1)
                     .frame(width: screenWidth, height: height)
                     .padding(.top, -10)
                     .ignoresSafeArea() // Extend into safe area
@@ -194,12 +337,11 @@ struct ContentView: View {
                 // BitLocal text and Info Button
                 HStack {
                     
-                    // Hidden Info Button to balance the trailing Info Button
-                    InfoButtonView(showingAbout: $showingAbout)
-                        .opacity(0) // Make it invisible
-                        .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(.leading, 6.5)
+                    SettingsButtonView(showingSettings: $showingSettings)
+                        .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(.leading, 5)
                         .allowsHitTesting(false) // Disable interaction
+                        .opacity(0) // Make it invisible
                     
                     Spacer()
                     
@@ -217,13 +359,14 @@ struct ContentView: View {
                     // Info Button
                     InfoButtonView(showingAbout: $showingAbout)
                         .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(.trailing, 6.5)
+                        .padding(.trailing, 2)
+                        .padding(.leading, 7)
                 }
                 .padding(.horizontal)
                 .frame(height: 1) // Adjust based on content
                 Spacer()
             }
-            .padding(.top, 30)
+            .padding(.top, 20)
         }
     }
     
@@ -257,78 +400,6 @@ struct ContentView: View {
             }
             .frame(width: 44) // Fixed width to ensure consistent spacing
             .offset(x: -7, y: +2) // Fine-tune the centering to account for the info button width
-        }
-    }
-    
-    // Location Button View
-    func locationButtonView(isIPad: Bool) -> some View {
-        GeometryReader { geometry in
-            let screenWidth = geometry.size.width
-            let screenHeight = geometry.size.height
-            
-            // Define padding from the edges
-            let horizontalPadding: CGFloat = isIPad ? -5 : 4
-            let verticalPadding: CGFloat = isIPad ? -20 : 30
-            
-            // Calculate button positions based on device type
-            let buttonXPosition: CGFloat = screenWidth - horizontalPadding - (isIPad ? 60 : 45)
-            let buttonYPosition: CGFloat = isIPad ? screenHeight - verticalPadding - 60 : screenHeight * 0.30
-            
-            // Alternatively, use safeAreaInsets for more accurate positioning
-            let safeAreaInsets = geometry.safeAreaInsets
-            
-            LocationButton(.currentLocation) {
-                viewModel.locationManager.requestWhenInUseAuthorization()
-                viewModel.isUpdatingLocation = true
-                viewModel.locationManager.startUpdatingLocation()
-                
-                // Center the map to user's location with dynamic padding
-                if let coordinate = userLocation?.coordinate {
-                    viewModel.centerMap(to: coordinate)
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                    if viewModel.isUpdatingLocation {
-                        let alert = UIAlertController(title: "Location could not be determined. Please check if location permissions have been granted.", message: nil, preferredStyle: .alert)
-                        alert.addAction(UIAlertAction(title: "OK", style: .default))
-                        
-                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                           let rootViewController = windowScene.windows.first?.rootViewController {
-                            rootViewController.topMostViewController().present(alert, animated: true, completion: nil)
-                        }
-                        
-                        viewModel.locationManager.stopUpdatingLocation()
-                        viewModel.isUpdatingLocation = false
-                    }
-                }
-            }
-            .tint(.orange)
-            .foregroundColor(.white)
-            .cornerRadius(20, antialiased: true)
-            .labelStyle(.iconOnly)
-            .symbolVariant(.fill)
-            .position(x: buttonXPosition, y: buttonYPosition)
-            .overlay(
-                Group {
-                    if viewModel.isUpdatingLocation {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .frame(width: 20, height: 20)
-                    }
-                }
-                    .animation(.easeInOut, value: viewModel.isUpdatingLocation)
-                    .position(x: buttonXPosition, y: buttonYPosition + 3)
-            )
-            .padding(.trailing, isIPad ? safeAreaInsets.trailing : 0)
-            .padding(.bottom, isIPad ? 0 : 0)
-            
-            // Attribution View
-            GeometryReader { attributionGeometry in
-                let attributionXPosition = isIPad ? 85 : 85
-                let attributionYPosition = isIPad ? screenHeight - verticalPadding - 20 : screenHeight * 0.37
-                OpenStreetMapAttributionView()
-                    .position(x: attributionGeometry.size.width * CGFloat(attributionXPosition) / screenWidth, y: attributionGeometry.size.height * CGFloat(attributionYPosition) / screenHeight)
-            }
         }
     }
     
@@ -397,7 +468,7 @@ struct ContentView: View {
                             }
                     }
                 }
-                .background(Color.white)
+                .background(Color(uiColor: .systemBackground))
                 .onAppear {
                     DispatchQueue.main.async {
                         let bottomSheetHeight = geometry.size.height
@@ -425,8 +496,8 @@ struct ContentView: View {
         }
     }
     
-    func mapView(elements: [Element], topPadding: CGFloat, bottomPadding: CGFloat) -> some View {
-        MapView(elements: $elements, topPadding: topPadding, bottomPadding: bottomPadding)
+    func mapView(elements: [Element], topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType) -> some View {
+        MapView(elements: $elements, topPadding: topPadding, bottomPadding: bottomPadding, mapType: mapType)
             .environmentObject(viewModel)
     }
     
@@ -434,20 +505,24 @@ struct ContentView: View {
         @Binding var elements: [Element]?
         @EnvironmentObject var viewModel: ContentViewModel
         
-        // New Properties for Dynamic Padding
+        // Properties for Dynamic Padding
         var topPadding: CGFloat
         var bottomPadding: CGFloat
         
-        // Updated Initializer
-        init(elements: Binding<[Element]?>, topPadding: CGFloat, bottomPadding: CGFloat) {
+        // Propery for map type selection
+        var mapType: MKMapType
+        
+        // Initializer
+        init(elements: Binding<[Element]?>, topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType) {
             self._elements = elements
             self.topPadding = topPadding
             self.bottomPadding = bottomPadding
+            self.mapType = mapType
         }
         
         // Create the Coordinator, which will act as the MKMapViewDelegate
         func makeCoordinator() -> Coordinator {
-            return Coordinator(viewModel: viewModel, topPadding: topPadding, bottomPadding: bottomPadding)
+            Coordinator(viewModel: viewModel, topPadding: topPadding, bottomPadding: bottomPadding)
         }
         
         // Create and configure the MKMapView
@@ -466,6 +541,9 @@ struct ContentView: View {
             // Show user location on the map
             mapView.showsUserLocation = true
             
+            // Set initial map type
+            mapView.mapType = mapType
+            
             return mapView
         }
         
@@ -473,6 +551,10 @@ struct ContentView: View {
         func updateUIView(_ mapView: MKMapView, context: Context) {
             // Update padding in Coordinator
             context.coordinator.updatePadding(top: topPadding, bottom: bottomPadding)
+            
+            if mapView.mapType != mapType {
+                mapView.mapType = mapType
+            }
             
             // Handle updating annotations if `elements` change
             context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
@@ -576,9 +658,8 @@ struct ContentView: View {
                 let centerLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
                 
                 let visibleElements = elements.filter { element in
-                    guard let lat = element.osmJSON?.lat, let lon = element.osmJSON?.lon else { return false }
-                    let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                    let location = CLLocation(latitude: lat, longitude: lon)
+                    guard let coordinate = element.mapCoordinate else { return false }
+                    let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
                     let distance = location.distance(from: centerLocation)
                     
                     let mapPoint = MKMapPoint(coordinate)
@@ -779,11 +860,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Calculate distance between element and user location
     func distanceInMiles(element: Element) -> Double? {
         guard let userLocation = userLocation,
-              let lat = element.osmJSON?.lat,
-              let lon = element.osmJSON?.lon else {
+              let coord = element.mapCoordinate else {
             return nil
         }
-        let location = CLLocation(latitude: lat, longitude: lon)
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         let distanceInMeters = userLocation.distance(from: location)
         let distanceInMiles = distanceInMeters / 1609.34
         return distanceInMiles
@@ -799,17 +879,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Zoom to element
     func zoomToElement(_ element: Element) {
         guard let mapView = mapView,
-              let lat = element.osmJSON?.lat,
-              let lon = element.osmJSON?.lon else { return }
-        
-        let targetCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+              let targetCoordinate = element.mapCoordinate else { return }
+
         let targetCamera = MKMapCamera(
             lookingAtCenter: targetCoordinate,
             fromDistance: 500,
             pitch: 0,
             heading: 0
         )
-        
+
         let inCluster = mapView.annotations
             .compactMap { $0 as? MKClusterAnnotation }
             .contains { cluster in
@@ -817,10 +895,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     (member as? Annotation)?.element?.id == element.id
                 }
             }
-        
+
         let duration: TimeInterval = 0.5
         let selectionDelay: TimeInterval = inCluster ? 0.8 : 0.1
-        
+
         UIView.animate(
             withDuration: duration,
             animations: {
@@ -903,7 +981,7 @@ class Annotation: NSObject, Identifiable, MKAnnotation {
     let element: Element?
     
     var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: element?.osmJSON?.lat ?? 0, longitude: element?.osmJSON?.lon ?? 0)
+        element?.mapCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
     }
     
     var title: String? {

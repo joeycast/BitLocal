@@ -7,34 +7,55 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F67937602DE205E400A49AC3 /* Assets.xcassets */; };
+		F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937652DE2065E00A49AC3 /* bitlocalApp.swift */; };
+		F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937672DE206D200A49AC3 /* CustomFonts.swift */; };
+		F67937702DE206DD00A49AC3 /* BtcMapCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376B2DE206DD00A49AC3 /* BtcMapCall.swift */; };
+		F67937712DE206DD00A49AC3 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376C2DE206DD00A49AC3 /* Extensions.swift */; };
+		F67937722DE206DD00A49AC3 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376D2DE206DD00A49AC3 /* LRUCache.swift */; };
+		F67937732DE206DD00A49AC3 /* PreferenceKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376E2DE206DD00A49AC3 /* PreferenceKeys.swift */; };
+		F67937742DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376A2DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift */; };
+		F67937782DE206F000A49AC3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F67937772DE206F000A49AC3 /* LICENSE */; };
+		F679377C2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */; };
+		F679377D2DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */; };
+		F67937882DE2071C00A49AC3 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679377E2DE2071C00A49AC3 /* AboutView.swift */; };
+		F67937892DE2071C00A49AC3 /* EarlierThaniOS164View.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937832DE2071C00A49AC3 /* EarlierThaniOS164View.swift */; };
+		F679378A2DE2071C00A49AC3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937822DE2071C00A49AC3 /* ContentView.swift */; };
+		F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679377F2DE2071C00A49AC3 /* Appearance.swift */; };
+		F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937812DE2071C00A49AC3 /* BusinessesListView.swift */; };
+		F679378D2DE2071C00A49AC3 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937862DE2071C00A49AC3 /* SettingsView.swift */; };
+		F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */; };
+		F679378F2DE2071C00A49AC3 /* SettingsButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */; };
+		F67937902DE2071C00A49AC3 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937842DE2071C00A49AC3 /* MainView.swift */; };
 		F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6B565F62DA327BE00EE992E /* CoreLocation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F67937602DE205E400A49AC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F67937622DE205F700A49AC3 /* bitlocal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = bitlocal.entitlements; sourceTree = "<group>"; };
+		F67937652DE2065E00A49AC3 /* bitlocalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = bitlocalApp.swift; sourceTree = "<group>"; };
+		F67937672DE206D200A49AC3 /* CustomFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomFonts.swift; sourceTree = "<group>"; };
+		F679376A2DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailablePaymentMethodsChecks.swift; sourceTree = "<group>"; };
+		F679376B2DE206DD00A49AC3 /* BtcMapCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BtcMapCall.swift; sourceTree = "<group>"; };
+		F679376C2DE206DD00A49AC3 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+		F679376D2DE206DD00A49AC3 /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
+		F679376E2DE206DD00A49AC3 /* PreferenceKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceKeys.swift; sourceTree = "<group>"; };
+		F67937752DE206E800A49AC3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F67937772DE206F000A49AC3 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Ubuntu-LightItalic.ttf"; sourceTree = "<group>"; };
+		F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Ubuntu-MediumItalic.ttf"; sourceTree = "<group>"; };
+		F679377E2DE2071C00A49AC3 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		F679377F2DE2071C00A49AC3 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
+		F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessDetailView.swift; sourceTree = "<group>"; };
+		F67937812DE2071C00A49AC3 /* BusinessesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessesListView.swift; sourceTree = "<group>"; };
+		F67937822DE2071C00A49AC3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F67937832DE2071C00A49AC3 /* EarlierThaniOS164View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlierThaniOS164View.swift; sourceTree = "<group>"; };
+		F67937842DE2071C00A49AC3 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsButtonView.swift; sourceTree = "<group>"; };
+		F67937862DE2071C00A49AC3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F6B565BF2DA322FD00EE992E /* bitlocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bitlocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B565F62DA327BE00EE992E /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.4.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		F6B565FC2DA32AA600EE992E /* Exceptions for "bitlocal" folder in "bitlocal" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = F6B565BE2DA322FD00EE992E /* bitlocal */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		F6B565C12DA322FD00EE992E /* bitlocal */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				F6B565FC2DA32AA600EE992E /* Exceptions for "bitlocal" folder in "bitlocal" target */,
-			);
-			path = bitlocal;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		F6B565BC2DA322FD00EE992E /* Frameworks */ = {
@@ -48,10 +69,63 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F67937682DE206D200A49AC3 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				F67937672DE206D200A49AC3 /* CustomFonts.swift */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		F679376F2DE206DD00A49AC3 /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				F679376A2DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift */,
+				F679376B2DE206DD00A49AC3 /* BtcMapCall.swift */,
+				F679376C2DE206DD00A49AC3 /* Extensions.swift */,
+				F679376D2DE206DD00A49AC3 /* LRUCache.swift */,
+				F679376E2DE206DD00A49AC3 /* PreferenceKeys.swift */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		F679377B2DE2070D00A49AC3 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */,
+				F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		F67937872DE2071C00A49AC3 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F679377E2DE2071C00A49AC3 /* AboutView.swift */,
+				F679377F2DE2071C00A49AC3 /* Appearance.swift */,
+				F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */,
+				F67937812DE2071C00A49AC3 /* BusinessesListView.swift */,
+				F67937822DE2071C00A49AC3 /* ContentView.swift */,
+				F67937832DE2071C00A49AC3 /* EarlierThaniOS164View.swift */,
+				F67937842DE2071C00A49AC3 /* MainView.swift */,
+				F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */,
+				F67937862DE2071C00A49AC3 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		F6B565B62DA322FD00EE992E = {
 			isa = PBXGroup;
 			children = (
-				F6B565C12DA322FD00EE992E /* bitlocal */,
+				F67937872DE2071C00A49AC3 /* Views */,
+				F679377B2DE2070D00A49AC3 /* Resources */,
+				F67937772DE206F000A49AC3 /* LICENSE */,
+				F67937752DE206E800A49AC3 /* Info.plist */,
+				F679376F2DE206DD00A49AC3 /* Helpers */,
+				F67937682DE206D200A49AC3 /* Fonts */,
+				F67937652DE2065E00A49AC3 /* bitlocalApp.swift */,
+				F67937622DE205F700A49AC3 /* bitlocal.entitlements */,
+				F67937602DE205E400A49AC3 /* Assets.xcassets */,
 				F6B565F52DA327BD00EE992E /* Frameworks */,
 				F6B565C02DA322FD00EE992E /* Products */,
 			);
@@ -88,9 +162,6 @@
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				F6B565C12DA322FD00EE992E /* bitlocal */,
-			);
 			name = bitlocal;
 			packageProductDependencies = (
 			);
@@ -110,6 +181,7 @@
 				TargetAttributes = {
 					F6B565BE2DA322FD00EE992E = {
 						CreatedOnToolsVersion = 16.3;
+						LastSwiftMigration = 1630;
 					};
 				};
 			};
@@ -137,6 +209,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F67937782DE206F000A49AC3 /* LICENSE in Resources */,
+				F679377C2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf in Resources */,
+				F679377D2DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf in Resources */,
+				F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -147,6 +223,22 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */,
+				F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */,
+				F67937702DE206DD00A49AC3 /* BtcMapCall.swift in Sources */,
+				F67937882DE2071C00A49AC3 /* AboutView.swift in Sources */,
+				F67937892DE2071C00A49AC3 /* EarlierThaniOS164View.swift in Sources */,
+				F679378A2DE2071C00A49AC3 /* ContentView.swift in Sources */,
+				F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */,
+				F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */,
+				F679378D2DE2071C00A49AC3 /* SettingsView.swift in Sources */,
+				F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */,
+				F679378F2DE2071C00A49AC3 /* SettingsButtonView.swift in Sources */,
+				F67937902DE2071C00A49AC3 /* MainView.swift in Sources */,
+				F67937712DE206DD00A49AC3 /* Extensions.swift in Sources */,
+				F67937722DE206DD00A49AC3 /* LRUCache.swift in Sources */,
+				F67937732DE206DD00A49AC3 /* PreferenceKeys.swift in Sources */,
+				F67937742DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,14 +366,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = bitlocal/bitlocal.entitlements;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "$(SRCROOT)/bitlocal/Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BitLocal;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -306,6 +399,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 2.0;
@@ -317,14 +411,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = bitlocal/bitlocal.entitlements;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "$(SRCROOT)/bitlocal/Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BitLocal;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;

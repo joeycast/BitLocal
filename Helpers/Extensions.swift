@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 @available(iOS 16.4, *)
 // Bottom Sheet
@@ -12,14 +13,18 @@ extension View {
         sheetCornerRadius: CGFloat?,
         largestUndimmedIdentifier: UISheetPresentationController.Detent.Identifier = .medium,
         interactiveDisabled: Bool = true,
+        // 1) Pass in a color scheme
+        forcedColorScheme: ColorScheme? = nil,
         @ViewBuilder content: @escaping ()->Content,
         onDismiss: @escaping()->()
-    )-> some View {
+    ) -> some View {
         self
-            .sheet(isPresented: isPresented) {                
+            .sheet(isPresented: isPresented) {
                 onDismiss()
             } content: {
                 content()
+                // 2) Apply the color scheme if provided
+                    .preferredColorScheme(forcedColorScheme)   
                     .presentationDetents(presentationDetents)
                     .presentationDragIndicator(dragIndicator)
                     .interactiveDismissDisabled(interactiveDisabled)
@@ -28,12 +33,10 @@ extension View {
                         guard let windows = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
                             return
                         }
-                        if let controller = windows.windows.first?.rootViewController?.presentedViewController, 
-                            let sheet = controller.presentationController as? UISheetPresentationController {
+                        if let controller = windows.windows.first?.rootViewController?.presentedViewController,
+                           let sheet = controller.presentationController as? UISheetPresentationController {
                             
-                            // Ensures About sheet button does not inadvertently change to dimmed 
                             controller.presentedViewController?.view.tintAdjustmentMode = .normal
-                            
                             sheet.largestUndimmedDetentIdentifier = largestUndimmedIdentifier
                             sheet.preferredCornerRadius = sheetCornerRadius
                         } else {
@@ -120,5 +123,31 @@ extension MKCoordinateRegion {
             width: abs(topLeftPoint.x - bottomRightPoint.x),
             height: abs(topLeftPoint.y - bottomRightPoint.y)
         )
+    }
+}
+
+extension MKMapType {
+    var intValue: Int {
+        return Int(self.rawValue)
+    }
+    
+    static func from(int: Int) -> MKMapType {
+        return MKMapType(rawValue: UInt(int)) ?? .standard
+    }
+}
+
+extension Element {
+    /// Returns a coordinate for node or way (first geometry point), or nil if unavailable
+    var mapCoordinate: CLLocationCoordinate2D? {
+        // For node
+        if let lat = osmJSON?.lat, let lon = osmJSON?.lon {
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+        // For way: use first geometry point, but make sure lat/lon are not nil
+        if let geometry = osmJSON?.geometry, let first = geometry.first,
+           let lat = first.lat, let lon = first.lon {
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
+        return nil
     }
 }
