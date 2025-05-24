@@ -11,6 +11,8 @@ struct BusinessDetailView: View {
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
     
+    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
+    
     var element: Element
     var userLocation: CLLocation?
     
@@ -18,6 +20,28 @@ struct BusinessDetailView: View {
         self.element = element
         self.userLocation = userLocation
         self._elementCellViewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation, viewModel: contentViewModel))
+    }
+    
+    fileprivate func localizedDistanceString() -> String? {
+        guard let userLocation = userLocation, let coord = element.mapCoordinate else { return nil }
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let distanceInMeters = userLocation.distance(from: location)
+        let useMetric: Bool
+        switch distanceUnit {
+        case .auto:
+            useMetric = Locale.current.measurementSystem == .metric
+        case .miles:
+            useMetric = false
+        case .kilometers:
+            useMetric = true
+        }
+        if useMetric {
+            let km = distanceInMeters / 1000
+            return String(format: "%.1f km", km)
+        } else {
+            let miles = distanceInMeters / 1609.34
+            return String(format: "%.1f mi", miles)
+        }
     }
     
     var body: some View {
@@ -57,6 +81,14 @@ struct BusinessDetailsSection: View {
     
     var body: some View {
         Section(header: Text("Business Details")) {
+            if let distance = BusinessDetailView(element: element, userLocation: nil, contentViewModel: ContentViewModel()).localizedDistanceString() {
+                HStack {
+                    Image(systemName: "location")
+                        .foregroundColor(.blue)
+                    Text(distance)
+                        .font(.subheadline)
+                }
+            }
             // Business Address
             VStack (alignment: .leading, spacing: 3) {
                 Text("Address")

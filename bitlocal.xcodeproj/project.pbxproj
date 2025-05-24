@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F615ACB32DE2350F00B86607 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F615ACB22DE2350F00B86607 /* DistanceUnit.swift */; };
 		F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F67937602DE205E400A49AC3 /* Assets.xcassets */; };
 		F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937652DE2065E00A49AC3 /* bitlocalApp.swift */; };
 		F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937672DE206D200A49AC3 /* CustomFonts.swift */; };
@@ -31,6 +32,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F615ACB22DE2350F00B86607 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
 		F67937602DE205E400A49AC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F67937622DE205F700A49AC3 /* bitlocal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = bitlocal.entitlements; sourceTree = "<group>"; };
 		F67937652DE2065E00A49AC3 /* bitlocalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = bitlocalApp.swift; sourceTree = "<group>"; };
@@ -80,6 +82,7 @@
 		F679376F2DE206DD00A49AC3 /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
+				F615ACB22DE2350F00B86607 /* DistanceUnit.swift */,
 				F679376A2DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift */,
 				F679376B2DE206DD00A49AC3 /* BtcMapCall.swift */,
 				F679376C2DE206DD00A49AC3 /* Extensions.swift */,
@@ -237,6 +240,7 @@
 				F67937902DE2071C00A49AC3 /* MainView.swift in Sources */,
 				F67937712DE206DD00A49AC3 /* Extensions.swift in Sources */,
 				F67937722DE206DD00A49AC3 /* LRUCache.swift in Sources */,
+				F615ACB32DE2350F00B86607 /* DistanceUnit.swift in Sources */,
 				F67937732DE206DD00A49AC3 /* PreferenceKeys.swift in Sources */,
 				F67937742DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift in Sources */,
 			);

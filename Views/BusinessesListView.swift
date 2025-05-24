@@ -4,11 +4,13 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import Combine
+import Foundation
 
 @available(iOS 16.4, *)
 struct BusinessesListView: View {
     
     @EnvironmentObject var viewModel: ContentViewModel
+    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     
     let maxListResults = 25
     
@@ -72,6 +74,36 @@ struct BusinessesListView: View {
         }
     }
     
+    private func localizedDistanceString(for element: Element) -> String? {
+        guard let userLocation = viewModel.userLocation, let coord = element.mapCoordinate else { return nil }
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let distanceInMeters = userLocation.distance(from: location)
+        let useMetric: Bool
+        switch distanceUnit {
+        case .auto:
+            useMetric = Locale.current.measurementSystem == .metric
+        case .miles:
+            useMetric = false
+        case .kilometers:
+            useMetric = true
+        }
+        if useMetric {
+            let km = distanceInMeters / 1000
+            if km < 1 {
+                return String(format: "%.2f km", km)
+            } else {
+                return String(format: "%.1f km", km)
+            }
+        } else {
+            let miles = distanceInMeters / 1609.344
+            if miles < 1 {
+                return String(format: "%.2f mi", miles)
+            } else {
+                return String(format: "%.1f mi", miles)
+            }
+        }
+    }
+    
     private var footerView: some View {
         Group {
             if sortedElements.count > maxListResults {
@@ -92,6 +124,7 @@ struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
     @State private var appeared = false
+    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -136,23 +169,54 @@ struct ElementCell: View {
         }
     }
     private var distanceText: some View {
-        let distanceInMiles = viewModel.viewModel.distanceInMiles(element: viewModel.element)
-        
         let formattedDistance: String? = {
-            guard let distance = distanceInMiles else { return nil }
-            
-            if distance < 1 {
-                return String(format: "%.2f", distance)
-            } else if distance >= 1 && distance <= 50 {
-                return String(format: "%.1f", distance)
+            if let distance = localizedDistanceString(for: viewModel.element) {
+                return distance
             } else {
-                return String(format: "%.0f", distance)
+                // fallback to miles for now
+                if let distance = viewModel.viewModel.distanceInMiles(element: viewModel.element) {
+                    if distance < 1 {
+                        return String(format: "%.2f mi", distance)
+                    } else {
+                        return String(format: "%.1f mi", distance)
+                    }
+                }
+                return nil
             }
         }()
-        
-        return Text(formattedDistance != nil ? "\(formattedDistance!) mi" : "")
+        return Text(formattedDistance ?? "")
             .opacity(formattedDistance != nil ? 1 : 0)
             .padding(.trailing, 3)
+    }
+    
+    private func localizedDistanceString(for element: Element) -> String? {
+        guard let userLocation = viewModel.viewModel.userLocation, let coord = element.mapCoordinate else { return nil }
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let distanceInMeters = userLocation.distance(from: location)
+        let useMetric: Bool
+        switch distanceUnit {
+        case .auto:
+            useMetric = Locale.current.measurementSystem == .metric
+        case .miles:
+            useMetric = false
+        case .kilometers:
+            useMetric = true
+        }
+        if useMetric {
+            let km = distanceInMeters / 1000
+            if km < 1 {
+                return String(format: "%.2f km", km)
+            } else {
+                return String(format: "%.1f km", km)
+            }
+        } else {
+            let miles = distanceInMeters / 1609.344
+            if miles < 1 {
+                return String(format: "%.2f mi", miles)
+            } else {
+                return String(format: "%.1f mi", miles)
+            }
+        }
     }
 }
 

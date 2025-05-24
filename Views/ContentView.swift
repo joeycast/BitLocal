@@ -5,6 +5,7 @@ import SwiftUI
 import MapKit
 import CoreLocationUI
 import Combine
+import Foundation
 
 @available(iOS 16.4, *)
 struct ContentView: View {
@@ -26,6 +27,8 @@ struct ContentView: View {
     // Appearance from @AppStorage
     @AppStorage("appearance") private var appearance: Appearance = .system
     @AppStorage("selectedMapType") private var storedMapType: Int = 0
+    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
+
     
     let appName = "BitLocal"
     let apiManager = APIManager()
@@ -340,8 +343,8 @@ struct ContentView: View {
                     SettingsButtonView(showingSettings: $showingSettings)
                         .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.leading, 5)
-                        .allowsHitTesting(false) // Disable interaction
-                        .opacity(0) // Make it invisible
+                        .allowsHitTesting(true) // Set to false to disable interaction
+                        .opacity(1) // Set to 0 to make it invisible
                     
                     Spacer()
                     
@@ -867,6 +870,29 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let distanceInMeters = userLocation.distance(from: location)
         let distanceInMiles = distanceInMeters / 1609.34
         return distanceInMiles
+    }
+
+    // Returns a localized distance string based on user settings
+    func localizedDistanceString(element: Element, distanceUnit: DistanceUnit) -> String? {
+        guard let userLocation = userLocation, let coord = element.mapCoordinate else { return nil }
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let distanceInMeters = userLocation.distance(from: location)
+        let useMetric: Bool
+        switch distanceUnit {
+        case .auto:
+            useMetric = Locale.current.measurementSystem == .metric
+        case .miles:
+            useMetric = false
+        case .kilometers:
+            useMetric = true
+        }
+        if useMetric {
+            let km = distanceInMeters / 1000
+            return String(format: "%.1f km", km)
+        } else {
+            let miles = distanceInMeters / 1609.34
+            return String(format: "%.1f mi", miles)
+        }
     }
     
     // Determining distance from center

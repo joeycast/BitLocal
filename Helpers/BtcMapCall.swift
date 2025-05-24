@@ -14,7 +14,7 @@ struct Element: Codable, Identifiable, Hashable {
     
     enum CodingKeys: String, CodingKey {
         case id
-        case uuid 
+        case uuid
         case osmJSON = "osm_json"
         case tags
         case createdAt = "created_at"
@@ -434,6 +434,15 @@ class APIManager {
                 LogManager.shared.log("Content-Type: \(contentType ?? "Unknown")")
             }
             
+            if let httpResponse = response as? HTTPURLResponse {
+                print("HTTP Status Code: \(httpResponse.statusCode)")
+                LogManager.shared.log("HTTP Status Code: \(httpResponse.statusCode)")
+            }
+            
+            // Print the raw response as a string (preview up to 1000 chars)
+            let responsePreview = String(data: data, encoding: .utf8) ?? ""
+            print("API response preview: \(responsePreview.prefix(1000))")
+            
             do {
                 let decoder = JSONDecoder()
                 decoder.dataDecodingStrategy = .base64 // Set the data decoding strategy to discard invalid characters
@@ -460,6 +469,9 @@ class APIManager {
                 let updatedCache = UserDefaults.standard.getElements(forKey: self?.cacheKey ?? "")
                 completion(updatedCache)
             } catch {
+                // Print the raw data as a string, even on error
+                let responsePreview = String(data: data, encoding: .utf8) ?? "<Could not decode as UTF-8>"
+                print("RAW API response preview on decoding error: \(responsePreview.prefix(2000))")
                 print("JSON Decoding Error: \(error)")
                 LogManager.shared.log("JSON Decoding Error: \(error)")
                 completion(nil)
