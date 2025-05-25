@@ -26,7 +26,7 @@
 		F679378A2DE2071C00A49AC3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937822DE2071C00A49AC3 /* ContentView.swift */; };
 		F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679377F2DE2071C00A49AC3 /* Appearance.swift */; };
 		F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937812DE2071C00A49AC3 /* BusinessesListView.swift */; };
-		F679378D2DE2071C00A49AC3 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937862DE2071C00A49AC3 /* SettingsView.swift */; };
+		F679378D2DE2071C00A49AC3 /* CompactSettingsPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937862DE2071C00A49AC3 /* CompactSettingsPopoverView.swift */; };
 		F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */; };
 		F679378F2DE2071C00A49AC3 /* SettingsButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */; };
 		F67937902DE2071C00A49AC3 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937842DE2071C00A49AC3 /* MainView.swift */; };
@@ -68,7 +68,7 @@
 		F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlierThaniOS170View.swift; sourceTree = "<group>"; };
 		F67937842DE2071C00A49AC3 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsButtonView.swift; sourceTree = "<group>"; };
-		F67937862DE2071C00A49AC3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F67937862DE2071C00A49AC3 /* CompactSettingsPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactSettingsPopoverView.swift; sourceTree = "<group>"; };
 		F6A26A8B2DE272FE00873795 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
 		F6A26A8D2DE2730700873795 /* IPhoneLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLayoutView.swift; sourceTree = "<group>"; };
 		F6A26A8F2DE2730E00873795 /* IPhoneHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneHeaderView.swift; sourceTree = "<group>"; };
@@ -148,7 +148,7 @@
 				F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */,
 				F67937842DE2071C00A49AC3 /* MainView.swift */,
 				F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */,
-				F67937862DE2071C00A49AC3 /* SettingsView.swift */,
+				F67937862DE2071C00A49AC3 /* CompactSettingsPopoverView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -278,7 +278,7 @@
 				F6A26A982DE2732200873795 /* InfoButtonView.swift in Sources */,
 				F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */,
 				F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */,
-				F679378D2DE2071C00A49AC3 /* SettingsView.swift in Sources */,
+				F679378D2DE2071C00A49AC3 /* CompactSettingsPopoverView.swift in Sources */,
 				F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */,
 				F6A26A962DE2731D00873795 /* OpenStreetMapAttributionView.swift in Sources */,
 				F66E0B602DE279AE00D68897 /* BottomSheetContentView.swift in Sources */,

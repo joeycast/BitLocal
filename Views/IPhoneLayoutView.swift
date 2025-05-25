@@ -18,9 +18,10 @@ struct IPhoneLayoutView: View {
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
-    var appearance: Appearance
+
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+    @AppStorage("appearance") private var appearance: Appearance = .system
 
     var body: some View {
         GeometryReader { geometry in
@@ -87,25 +88,6 @@ struct IPhoneLayoutView: View {
                 }
             )
             .ignoresSafeArea(.keyboard)
-            .overlay(
-                Group {
-                    if showingSettings {
-                        ZStack {
-                            Color.black.opacity(0.3)
-                                .ignoresSafeArea()
-                                .onTapGesture { showingSettings = false }
-                            SettingsView(selectedMapType: selectedMapTypeBinding)
-                                .preferredColorScheme(colorSchemeFor(appearance))
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color(.systemBackground))
-                                        .shadow(radius: 10)
-                                )
-                                .padding(40)
-                        }
-                    }
-                }
-            )
         }
     }
 

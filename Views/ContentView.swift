@@ -50,8 +50,7 @@ struct ContentView: View {
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
-                    selectedMapTypeBinding: selectedMapTypeBinding,
-                    appearance: appearance
+                    selectedMapTypeBinding: selectedMapTypeBinding
                 )
             } else {
                 IPhoneLayoutView(
@@ -61,8 +60,7 @@ struct ContentView: View {
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
-                    selectedMapTypeBinding: selectedMapTypeBinding,
-                    appearance: appearance
+                    selectedMapTypeBinding: selectedMapTypeBinding
                 )
             }
         }

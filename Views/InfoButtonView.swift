@@ -16,9 +16,8 @@ struct InfoButtonView: View {
             showingAbout = true
         }) {
             Image(systemName: "info.circle")
-                .font(.system(size: 24))
+                .font(.system(size: 18))
                 .foregroundColor(.orange)
-                .padding(8)
                 .background(
                     Circle()
                         .fill(Color(.systemBackground).opacity(0.8))

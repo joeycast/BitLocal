@@ -19,3 +19,11 @@ struct BottomSheetHeightKey: PreferenceKey {
         value = max(value, nextValue())
     }
 }
+
+struct SettingsButtonFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        // Always take the latest
+        value = nextValue()
+    }
+}
