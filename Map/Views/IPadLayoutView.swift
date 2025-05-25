@@ -5,7 +5,6 @@
 //  Created by Joe Castagnaro on 5/24/25.
 //
 
-
 import SwiftUI
 import MapKit
 
@@ -19,13 +18,13 @@ struct IPadLayoutView: View {
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
     @AppStorage("appearance") private var appearance: Appearance = .system
-
+    
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-
+    
     @State private var settingsButtonFrame: CGRect = .zero
-
+    
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
-
+    
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
             BusinessesListView(elements: visibleElements)
@@ -59,26 +58,14 @@ struct IPadLayoutView: View {
                         .opacity(1)
                     }
                 }
-                .overlay(alignment: .topLeading) {
-                    if showingSettings {
-                        Color.black.opacity(0.01)
-                            .ignoresSafeArea()
-                            .onTapGesture { withAnimation { showingSettings = false } }
-                        CompactSettingsPopoverView(
-                            selectedMapType: selectedMapTypeBinding,
-                            onDone: { withAnimation { showingSettings = false } }
-                        )
-                        .position(x: settingsButtonFrame.maxX + 275, y: settingsButtonFrame.maxY + 175)
-                        .transition(.scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity))
-                        .zIndex(2)
-                    }
-                }
-                .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
+        }
+        .sheet(isPresented: $showingAbout) {
+            AboutView()
         }
         .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
         .navigationBarTitleDisplayMode(.automatic)
     }
-
+    
     private var mapPanel: some View {
         ZStack {
             if let elements = elements {
@@ -112,33 +99,42 @@ struct IPadLayoutView: View {
             alignment: .bottomTrailing
         )
     }
-
-    private var overlayGroup: some View {
-        Group {
-            if showingAbout {
-                ZStack {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture { showingAbout = false }
-                    AboutView()
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(.systemBackground))
-                                .shadow(radius: 10)
-                        )
-                        .padding(40)
-                }
-            }
-        }
-    }
-
+    
     var body: some View {
-        let screenWidth = UIScreen.main.bounds.width
-
         HStack(spacing: 0) {
             sidePanel
             mapPanel
         }
+        .overlay {
+            if showingSettings {
+                GeometryReader { geometry in
+                    // Invisible overlay to capture taps and dismiss
+                    Color.black.opacity(0.01)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation { showingSettings = false }
+                        }
+                    
+                    // Settings popover positioned relative to the settings button frame
+                    CompactSettingsPopoverView(
+                        selectedMapType: selectedMapTypeBinding,
+                        onDone: { withAnimation { showingSettings = false } }
+                    )
+                    .position(
+                        x: calculateSidePanelWidth(screenWidth: geometry.size.width) + 125, // Position within side panel
+                        y: settingsButtonFrame.maxY + 225 // Below the button
+                    )
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity),
+                            removal: .scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity)
+                        )
+                    )
+                }
+                .zIndex(1000)
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
         .onChange(of: viewModel.path) { newPath in
             if let selectedElement = newPath.last {
                 viewModel.zoomToElement(selectedElement)
@@ -147,9 +143,8 @@ struct IPadLayoutView: View {
             }
             viewModel.selectedElement = newPath.last
         }
-        .overlay(overlayGroup)
     }
-
+    
     private func colorSchemeFor(_ appearance: Appearance) -> ColorScheme? {
         switch appearance {
         case .system: return nil
@@ -157,7 +152,7 @@ struct IPadLayoutView: View {
         case .dark:   return .dark
         }
     }
-
+    
     private func calculateSidePanelWidth(screenWidth: CGFloat) -> CGFloat {
         if screenWidth <= 744 {
             return screenWidth * 0.4
@@ -178,7 +173,7 @@ struct IPadLayoutView_Previews: PreviewProvider {
     @State static var headerHeight: CGFloat = 80
     @StateObject static var viewModel = ContentViewModel()
     @State static var mapType: MKMapType = .standard
-
+    
     static var previews: some View {
         IPadLayoutView(
             viewModel: viewModel,

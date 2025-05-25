@@ -2,15 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
 		<string>systemBackgroundColor</string>
 	</dict>
 	<key>CFBundleVersion</key>
-	<string>26</string>
+	<string>28</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.5.1</string>
+	<string>1.6</string>
 	<key>CFBundleDisplayName</key>
 	<string>BitLocal</string>
 	<key>CFBundleExecutable</key>

@@ -86,6 +86,9 @@ struct IPhoneLayoutView: View {
                         .background(Color(UIColor.systemBackground))
                         .preferredColorScheme(effectiveColorScheme)
                         .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
+                        .sheet(isPresented: $showingAbout) {
+                            AboutView()
+                        }
                 },
                 onDismiss: {
                     print("Bottom sheet dismissed")
