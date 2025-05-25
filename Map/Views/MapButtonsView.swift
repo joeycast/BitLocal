@@ -58,13 +58,16 @@ struct MapButtonsView: View {
                     }
                 }
             }) {
-                Image(systemName: "location.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(Color.white)
-                    .padding()
-                    .background(Circle().fill(Color.orange))
+                ZStack {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 44, height: 44)
+                        .shadow(radius: 3)
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white)
+                }
             }
-            .shadow(radius: 3)
         }
     }
 }
