@@ -7,78 +7,80 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F615ACB32DE2350F00B86607 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F615ACB22DE2350F00B86607 /* DistanceUnit.swift */; };
-		F66E0B5E2DE277F700D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B5D2DE277F700D68897 /* MapView.swift */; };
-		F66E0B602DE279AE00D68897 /* BottomSheetContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B5F2DE279AE00D68897 /* BottomSheetContentView.swift */; };
+		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
+		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
+		F66E0B752DE33ED800D68897 /* IPadLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */; };
+		F66E0B762DE33ED800D68897 /* MapButtonsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6E2DE33ED800D68897 /* MapButtonsView.swift */; };
+		F66E0B772DE33ED800D68897 /* AnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */; };
+		F66E0B782DE33ED800D68897 /* Annotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B682DE33ED800D68897 /* Annotation.swift */; };
+		F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */; };
+		F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */; };
+		F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */; };
+		F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */; };
+		F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */; };
+		F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B872DE33EF800D68897 /* DistanceUnit.swift */; };
+		F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */; };
+		F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B862DE33EF800D68897 /* Appearance.swift */; };
+		F66E0B902DE33EF800D68897 /* CompactSettingsPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B892DE33EF800D68897 /* CompactSettingsPopoverView.swift */; };
+		F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B952DE33F1200D68897 /* LRUCache.swift */; };
+		F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */; };
+		F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */; };
+		F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B942DE33F1200D68897 /* Extensions.swift */; };
+		F66E0BA62DE33F1200D68897 /* BtcMapCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B932DE33F1200D68897 /* BtcMapCall.swift */; };
+		F66E0BA72DE33F1200D68897 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9B2DE33F1200D68897 /* ContentView.swift */; };
+		F66E0BA82DE33F1200D68897 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9F2DE33F1200D68897 /* MainView.swift */; };
+		F66E0BA92DE33F1200D68897 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9A2DE33F1200D68897 /* AboutView.swift */; };
+		F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */; };
+		F66E0BAB2DE33F1200D68897 /* EarlierThaniOS170View.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */; };
+		F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B982DE33F1200D68897 /* ContentViewModel.swift */; };
+		F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */; };
+		F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0BAE2DE340CB00D68897 /* Element.swift */; };
 		F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F67937602DE205E400A49AC3 /* Assets.xcassets */; };
 		F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937652DE2065E00A49AC3 /* bitlocalApp.swift */; };
 		F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937672DE206D200A49AC3 /* CustomFonts.swift */; };
-		F67937702DE206DD00A49AC3 /* BtcMapCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376B2DE206DD00A49AC3 /* BtcMapCall.swift */; };
-		F67937712DE206DD00A49AC3 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376C2DE206DD00A49AC3 /* Extensions.swift */; };
-		F67937722DE206DD00A49AC3 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376D2DE206DD00A49AC3 /* LRUCache.swift */; };
-		F67937732DE206DD00A49AC3 /* PreferenceKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376E2DE206DD00A49AC3 /* PreferenceKeys.swift */; };
-		F67937742DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679376A2DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift */; };
 		F67937782DE206F000A49AC3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F67937772DE206F000A49AC3 /* LICENSE */; };
 		F679377C2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */; };
 		F679377D2DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */; };
-		F67937882DE2071C00A49AC3 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679377E2DE2071C00A49AC3 /* AboutView.swift */; };
-		F67937892DE2071C00A49AC3 /* EarlierThaniOS170View.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */; };
-		F679378A2DE2071C00A49AC3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937822DE2071C00A49AC3 /* ContentView.swift */; };
-		F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F679377F2DE2071C00A49AC3 /* Appearance.swift */; };
-		F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937812DE2071C00A49AC3 /* BusinessesListView.swift */; };
-		F679378D2DE2071C00A49AC3 /* CompactSettingsPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937862DE2071C00A49AC3 /* CompactSettingsPopoverView.swift */; };
-		F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */; };
-		F679378F2DE2071C00A49AC3 /* SettingsButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */; };
-		F67937902DE2071C00A49AC3 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937842DE2071C00A49AC3 /* MainView.swift */; };
-		F6A26A8C2DE272FE00873795 /* IPadLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A8B2DE272FE00873795 /* IPadLayoutView.swift */; };
-		F6A26A8E2DE2730700873795 /* IPhoneLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A8D2DE2730700873795 /* IPhoneLayoutView.swift */; };
-		F6A26A902DE2730E00873795 /* IPhoneHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A8F2DE2730E00873795 /* IPhoneHeaderView.swift */; };
-		F6A26A922DE2731400873795 /* MapButtonsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A912DE2731400873795 /* MapButtonsView.swift */; };
-		F6A26A942DE2731900873795 /* CustomiPadNavigationStackTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A932DE2731900873795 /* CustomiPadNavigationStackTitleView.swift */; };
-		F6A26A962DE2731D00873795 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A952DE2731D00873795 /* OpenStreetMapAttributionView.swift */; };
-		F6A26A982DE2732200873795 /* InfoButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A972DE2732200873795 /* InfoButtonView.swift */; };
-		F6A26A9A2DE2748700873795 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A992DE2748700873795 /* ContentViewModel.swift */; };
-		F6A26A9C2DE274C700873795 /* Annotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A9B2DE274C700873795 /* Annotation.swift */; };
-		F6A26A9E2DE274D000873795 /* AnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A26A9D2DE274D000873795 /* AnnotationView.swift */; };
 		F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6B565F62DA327BE00EE992E /* CoreLocation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		F615ACB22DE2350F00B86607 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
-		F66E0B5D2DE277F700D68897 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
-		F66E0B5F2DE279AE00D68897 /* BottomSheetContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheetContentView.swift; sourceTree = "<group>"; };
+		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
+		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
+		F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
+		F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLayoutView.swift; sourceTree = "<group>"; };
+		F66E0B6E2DE33ED800D68897 /* MapButtonsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapButtonsView.swift; sourceTree = "<group>"; };
+		F66E0B6F2DE33ED800D68897 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
+		F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenStreetMapAttributionView.swift; sourceTree = "<group>"; };
+		F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheetContentView.swift; sourceTree = "<group>"; };
+		F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessDetailView.swift; sourceTree = "<group>"; };
+		F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessesListView.swift; sourceTree = "<group>"; };
+		F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomiPadNavigationStackTitleView.swift; sourceTree = "<group>"; };
+		F66E0B862DE33EF800D68897 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
+		F66E0B872DE33EF800D68897 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
+		F66E0B892DE33EF800D68897 /* CompactSettingsPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactSettingsPopoverView.swift; sourceTree = "<group>"; };
+		F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsButtonView.swift; sourceTree = "<group>"; };
+		F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailablePaymentMethodsChecks.swift; sourceTree = "<group>"; };
+		F66E0B932DE33F1200D68897 /* BtcMapCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BtcMapCall.swift; sourceTree = "<group>"; };
+		F66E0B942DE33F1200D68897 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+		F66E0B952DE33F1200D68897 /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
+		F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceKeys.swift; sourceTree = "<group>"; };
+		F66E0B982DE33F1200D68897 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
+		F66E0B9A2DE33F1200D68897 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		F66E0B9B2DE33F1200D68897 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlierThaniOS170View.swift; sourceTree = "<group>"; };
+		F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoButtonView.swift; sourceTree = "<group>"; };
+		F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneHeaderView.swift; sourceTree = "<group>"; };
+		F66E0B9F2DE33F1200D68897 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		F66E0BAE2DE340CB00D68897 /* Element.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Element.swift; sourceTree = "<group>"; };
 		F67937602DE205E400A49AC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F67937622DE205F700A49AC3 /* bitlocal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = bitlocal.entitlements; sourceTree = "<group>"; };
 		F67937652DE2065E00A49AC3 /* bitlocalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = bitlocalApp.swift; sourceTree = "<group>"; };
 		F67937672DE206D200A49AC3 /* CustomFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomFonts.swift; sourceTree = "<group>"; };
-		F679376A2DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailablePaymentMethodsChecks.swift; sourceTree = "<group>"; };
-		F679376B2DE206DD00A49AC3 /* BtcMapCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BtcMapCall.swift; sourceTree = "<group>"; };
-		F679376C2DE206DD00A49AC3 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
-		F679376D2DE206DD00A49AC3 /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
-		F679376E2DE206DD00A49AC3 /* PreferenceKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceKeys.swift; sourceTree = "<group>"; };
 		F67937752DE206E800A49AC3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F67937772DE206F000A49AC3 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Ubuntu-LightItalic.ttf"; sourceTree = "<group>"; };
 		F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Ubuntu-MediumItalic.ttf"; sourceTree = "<group>"; };
-		F679377E2DE2071C00A49AC3 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
-		F679377F2DE2071C00A49AC3 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
-		F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessDetailView.swift; sourceTree = "<group>"; };
-		F67937812DE2071C00A49AC3 /* BusinessesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessesListView.swift; sourceTree = "<group>"; };
-		F67937822DE2071C00A49AC3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlierThaniOS170View.swift; sourceTree = "<group>"; };
-		F67937842DE2071C00A49AC3 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
-		F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsButtonView.swift; sourceTree = "<group>"; };
-		F67937862DE2071C00A49AC3 /* CompactSettingsPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactSettingsPopoverView.swift; sourceTree = "<group>"; };
-		F6A26A8B2DE272FE00873795 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
-		F6A26A8D2DE2730700873795 /* IPhoneLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLayoutView.swift; sourceTree = "<group>"; };
-		F6A26A8F2DE2730E00873795 /* IPhoneHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneHeaderView.swift; sourceTree = "<group>"; };
-		F6A26A912DE2731400873795 /* MapButtonsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapButtonsView.swift; sourceTree = "<group>"; };
-		F6A26A932DE2731900873795 /* CustomiPadNavigationStackTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomiPadNavigationStackTitleView.swift; sourceTree = "<group>"; };
-		F6A26A952DE2731D00873795 /* OpenStreetMapAttributionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenStreetMapAttributionView.swift; sourceTree = "<group>"; };
-		F6A26A972DE2732200873795 /* InfoButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoButtonView.swift; sourceTree = "<group>"; };
-		F6A26A992DE2748700873795 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
-		F6A26A9B2DE274C700873795 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
-		F6A26A9D2DE274D000873795 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
 		F6B565BF2DA322FD00EE992E /* bitlocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bitlocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B565F62DA327BE00EE992E /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.4.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
@@ -95,25 +97,156 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F66E0B692DE33ED800D68897 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B682DE33ED800D68897 /* Annotation.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		F66E0B6A2DE33ED800D68897 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		F66E0B712DE33ED800D68897 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */,
+				F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */,
+				F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */,
+				F66E0B6E2DE33ED800D68897 /* MapButtonsView.swift */,
+				F66E0B6F2DE33ED800D68897 /* MapView.swift */,
+				F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F66E0B722DE33ED800D68897 /* Map */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B692DE33ED800D68897 /* Models */,
+				F66E0B6A2DE33ED800D68897 /* ViewModels */,
+				F66E0B712DE33ED800D68897 /* Views */,
+			);
+			path = Map;
+			sourceTree = "<group>";
+		};
+		F66E0B7A2DE33EE600D68897 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0BAE2DE340CB00D68897 /* Element.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		F66E0B7B2DE33EE600D68897 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		F66E0B802DE33EE600D68897 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */,
+				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
+				F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */,
+				F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F66E0B812DE33EE600D68897 /* Businesses */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B7A2DE33EE600D68897 /* Models */,
+				F66E0B7B2DE33EE600D68897 /* ViewModels */,
+				F66E0B802DE33EE600D68897 /* Views */,
+			);
+			path = Businesses;
+			sourceTree = "<group>";
+		};
+		F66E0B882DE33EF800D68897 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B862DE33EF800D68897 /* Appearance.swift */,
+				F66E0B872DE33EF800D68897 /* DistanceUnit.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		F66E0B8B2DE33EF800D68897 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B892DE33EF800D68897 /* CompactSettingsPopoverView.swift */,
+				F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F66E0B8C2DE33EF800D68897 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B882DE33EF800D68897 /* Models */,
+				F66E0B8B2DE33EF800D68897 /* Views */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		F66E0B972DE33F1200D68897 /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */,
+				F66E0B932DE33F1200D68897 /* BtcMapCall.swift */,
+				F66E0B942DE33F1200D68897 /* Extensions.swift */,
+				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
+				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		F66E0B992DE33F1200D68897 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B982DE33F1200D68897 /* ContentViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		F66E0BA02DE33F1200D68897 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B9A2DE33F1200D68897 /* AboutView.swift */,
+				F66E0B9B2DE33F1200D68897 /* ContentView.swift */,
+				F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */,
+				F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */,
+				F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */,
+				F66E0B9F2DE33F1200D68897 /* MainView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F66E0BA12DE33F1200D68897 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				F66E0B972DE33F1200D68897 /* Helpers */,
+				F66E0B992DE33F1200D68897 /* ViewModels */,
+				F66E0BA02DE33F1200D68897 /* Views */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		F67937682DE206D200A49AC3 /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
 				F67937672DE206D200A49AC3 /* CustomFonts.swift */,
 			);
 			path = Fonts;
-			sourceTree = "<group>";
-		};
-		F679376F2DE206DD00A49AC3 /* Helpers */ = {
-			isa = PBXGroup;
-			children = (
-				F615ACB22DE2350F00B86607 /* DistanceUnit.swift */,
-				F679376A2DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift */,
-				F679376B2DE206DD00A49AC3 /* BtcMapCall.swift */,
-				F679376C2DE206DD00A49AC3 /* Extensions.swift */,
-				F679376D2DE206DD00A49AC3 /* LRUCache.swift */,
-				F679376E2DE206DD00A49AC3 /* PreferenceKeys.swift */,
-			);
-			path = Helpers;
 			sourceTree = "<group>";
 		};
 		F679377B2DE2070D00A49AC3 /* Resources */ = {
@@ -125,39 +258,13 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		F67937872DE2071C00A49AC3 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				F66E0B5F2DE279AE00D68897 /* BottomSheetContentView.swift */,
-				F66E0B5D2DE277F700D68897 /* MapView.swift */,
-				F6A26A9D2DE274D000873795 /* AnnotationView.swift */,
-				F6A26A9B2DE274C700873795 /* Annotation.swift */,
-				F6A26A992DE2748700873795 /* ContentViewModel.swift */,
-				F6A26A972DE2732200873795 /* InfoButtonView.swift */,
-				F6A26A952DE2731D00873795 /* OpenStreetMapAttributionView.swift */,
-				F6A26A932DE2731900873795 /* CustomiPadNavigationStackTitleView.swift */,
-				F6A26A912DE2731400873795 /* MapButtonsView.swift */,
-				F6A26A8F2DE2730E00873795 /* IPhoneHeaderView.swift */,
-				F6A26A8D2DE2730700873795 /* IPhoneLayoutView.swift */,
-				F6A26A8B2DE272FE00873795 /* IPadLayoutView.swift */,
-				F679377E2DE2071C00A49AC3 /* AboutView.swift */,
-				F679377F2DE2071C00A49AC3 /* Appearance.swift */,
-				F67937802DE2071C00A49AC3 /* BusinessDetailView.swift */,
-				F67937812DE2071C00A49AC3 /* BusinessesListView.swift */,
-				F67937822DE2071C00A49AC3 /* ContentView.swift */,
-				F67937832DE2071C00A49AC3 /* EarlierThaniOS170View.swift */,
-				F67937842DE2071C00A49AC3 /* MainView.swift */,
-				F67937852DE2071C00A49AC3 /* SettingsButtonView.swift */,
-				F67937862DE2071C00A49AC3 /* CompactSettingsPopoverView.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
 		F6B565B62DA322FD00EE992E = {
 			isa = PBXGroup;
 			children = (
-				F67937872DE2071C00A49AC3 /* Views */,
-				F679376F2DE206DD00A49AC3 /* Helpers */,
+				F66E0BA12DE33F1200D68897 /* Shared */,
+				F66E0B722DE33ED800D68897 /* Map */,
+				F66E0B812DE33EE600D68897 /* Businesses */,
+				F66E0B8C2DE33EF800D68897 /* Settings */,
 				F67937682DE206D200A49AC3 /* Fonts */,
 				F67937652DE2065E00A49AC3 /* bitlocalApp.swift */,
 				F67937622DE205F700A49AC3 /* bitlocal.entitlements */,
@@ -262,35 +369,36 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F6A26A902DE2730E00873795 /* IPhoneHeaderView.swift in Sources */,
-				F6A26A9E2DE274D000873795 /* AnnotationView.swift in Sources */,
 				F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */,
 				F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */,
-				F67937702DE206DD00A49AC3 /* BtcMapCall.swift in Sources */,
-				F6A26A9C2DE274C700873795 /* Annotation.swift in Sources */,
-				F67937882DE2071C00A49AC3 /* AboutView.swift in Sources */,
-				F6A26A942DE2731900873795 /* CustomiPadNavigationStackTitleView.swift in Sources */,
-				F67937892DE2071C00A49AC3 /* EarlierThaniOS170View.swift in Sources */,
-				F6A26A922DE2731400873795 /* MapButtonsView.swift in Sources */,
-				F6A26A8E2DE2730700873795 /* IPhoneLayoutView.swift in Sources */,
-				F6A26A9A2DE2748700873795 /* ContentViewModel.swift in Sources */,
-				F679378A2DE2071C00A49AC3 /* ContentView.swift in Sources */,
-				F6A26A982DE2732200873795 /* InfoButtonView.swift in Sources */,
-				F679378B2DE2071C00A49AC3 /* Appearance.swift in Sources */,
-				F679378C2DE2071C00A49AC3 /* BusinessesListView.swift in Sources */,
-				F679378D2DE2071C00A49AC3 /* CompactSettingsPopoverView.swift in Sources */,
-				F679378E2DE2071C00A49AC3 /* BusinessDetailView.swift in Sources */,
-				F6A26A962DE2731D00873795 /* OpenStreetMapAttributionView.swift in Sources */,
-				F66E0B602DE279AE00D68897 /* BottomSheetContentView.swift in Sources */,
-				F6A26A8C2DE272FE00873795 /* IPadLayoutView.swift in Sources */,
-				F679378F2DE2071C00A49AC3 /* SettingsButtonView.swift in Sources */,
-				F66E0B5E2DE277F700D68897 /* MapView.swift in Sources */,
-				F67937902DE2071C00A49AC3 /* MainView.swift in Sources */,
-				F67937712DE206DD00A49AC3 /* Extensions.swift in Sources */,
-				F67937722DE206DD00A49AC3 /* LRUCache.swift in Sources */,
-				F615ACB32DE2350F00B86607 /* DistanceUnit.swift in Sources */,
-				F67937732DE206DD00A49AC3 /* PreferenceKeys.swift in Sources */,
-				F67937742DE206DD00A49AC3 /* AvailablePaymentMethodsChecks.swift in Sources */,
+				F66E0B732DE33ED800D68897 /* MapView.swift in Sources */,
+				F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */,
+				F66E0B752DE33ED800D68897 /* IPadLayoutView.swift in Sources */,
+				F66E0B762DE33ED800D68897 /* MapButtonsView.swift in Sources */,
+				F66E0B772DE33ED800D68897 /* AnnotationView.swift in Sources */,
+				F66E0B782DE33ED800D68897 /* Annotation.swift in Sources */,
+				F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */,
+				F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */,
+				F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */,
+				F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */,
+				F66E0B902DE33EF800D68897 /* CompactSettingsPopoverView.swift in Sources */,
+				F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */,
+				F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */,
+				F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */,
+				F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */,
+				F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */,
+				F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */,
+				F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */,
+				F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */,
+				F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */,
+				F66E0BA62DE33F1200D68897 /* BtcMapCall.swift in Sources */,
+				F66E0BA72DE33F1200D68897 /* ContentView.swift in Sources */,
+				F66E0BA82DE33F1200D68897 /* MainView.swift in Sources */,
+				F66E0BA92DE33F1200D68897 /* AboutView.swift in Sources */,
+				F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */,
+				F66E0BAB2DE33F1200D68897 /* EarlierThaniOS170View.swift in Sources */,
+				F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */,
+				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
