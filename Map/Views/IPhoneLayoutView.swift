@@ -5,7 +5,6 @@
 //  Created by Joe Castagnaro on 5/24/25.
 //
 
-
 import SwiftUI
 import MapKit
 
@@ -19,9 +18,11 @@ struct IPhoneLayoutView: View {
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
 
-
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
-    @AppStorage("appearance") private var appearance: Appearance = .system
+    @EnvironmentObject var appearanceManager: AppearanceManager
+    @Environment(\.colorScheme) private var systemColorScheme
+    
+    private var appearance: Appearance { appearanceManager.appearance }
 
     var body: some View {
         GeometryReader { geometry in
@@ -54,6 +55,7 @@ struct IPhoneLayoutView: View {
                         showingAbout: $showingAbout,
                         showingSettings: $showingSettings,
                         selectedMapTypeBinding: selectedMapTypeBinding
+                        // Removed appearance and systemColorScheme parameters
                     )
                     Spacer()
                 }
@@ -76,26 +78,33 @@ struct IPhoneLayoutView: View {
                 sheetCornerRadius: 20,
                 largestUndimmedIdentifier: .medium,
                 interactiveDisabled: true,
-                forcedColorScheme: colorSchemeFor(appearance),
+                forcedColorScheme: nil, // Let the content handle its own color scheme
                 content: {
                     BottomSheetContentView(visibleElements: $visibleElements)
-                        .id(appearance)
+                        .id("\(appearance.rawValue)-\(systemColorScheme)")
                         .environmentObject(viewModel)
-                        .preferredColorScheme(colorSchemeFor(appearance))
+                        .background(Color(UIColor.systemBackground))
+                        .preferredColorScheme(effectiveColorScheme)
+                        .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
                 },
                 onDismiss: {
                     print("Bottom sheet dismissed")
                 }
             )
             .ignoresSafeArea(.keyboard)
+            .animation(.easeInOut(duration: 0.25), value: appearance)
+            .animation(.easeInOut(duration: 0.25), value: systemColorScheme)
         }
     }
 
-    private func colorSchemeFor(_ appearance: Appearance) -> ColorScheme? {
+    private var effectiveColorScheme: ColorScheme? {
         switch appearance {
-        case .system: return nil
-        case .light:  return .light
-        case .dark:   return .dark
+        case .system:
+            return nil // Let system decide
+        case .light:
+            return .light
+        case .dark:
+            return .dark
         }
     }
 }

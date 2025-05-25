@@ -3,7 +3,7 @@ import MapKit
 
 struct CompactSettingsPopoverView: View {
     @Binding var selectedMapType: MKMapType
-    @AppStorage("appearance") private var appearance: Appearance = .system
+    @EnvironmentObject var appearanceManager: AppearanceManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     var onDone: (() -> Void)? = nil
 
@@ -15,10 +15,9 @@ struct CompactSettingsPopoverView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Map Type")
                         .font(.caption)
-                        .foregroundColor(.secondary)
                     Picker(selection: $selectedMapType, label: EmptyView()) {
-                        Label("Standard", systemImage: "map").tag(MKMapType.standard)
-                        Label("Hybrid", systemImage: "globe.europe.africa.fill").tag(MKMapType.hybrid)
+                        Text("Standard").tag(MKMapType.standard)
+                        Text("Hybrid").tag(MKMapType.hybrid)
                     }
                     .pickerStyle(.segmented)
                 }
@@ -27,24 +26,24 @@ struct CompactSettingsPopoverView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Theme")
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                    Picker(selection: $appearance, label: EmptyView()) {
-                        Label("System", systemImage: "circle.lefthalf.fill").tag(Appearance.system)
-                        Label("Light", systemImage: "sun.max").tag(Appearance.light)
-                        Label("Dark", systemImage: "moon").tag(Appearance.dark)
+                        .foregroundColor(.primary)
+                    Picker(selection: $appearanceManager.appearance, label: EmptyView()) {
+                        Text("System").tag(Appearance.system)
+                        Text("Light").tag(Appearance.light)
+                        Text("Dark").tag(Appearance.dark)
                     }
                     .pickerStyle(.segmented)
                 }
 
                 // Distance Unit Picker
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Units")
+                    Text("Distance Units")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.primary)
                     Picker(selection: $distanceUnit, label: EmptyView()) {
                         Text("Auto").tag(DistanceUnit.auto)
-                        Text("km").tag(DistanceUnit.kilometers)
                         Text("mi").tag(DistanceUnit.miles)
+                        Text("km").tag(DistanceUnit.kilometers)
                     }
                     .pickerStyle(.segmented)
                 }
@@ -53,10 +52,11 @@ struct CompactSettingsPopoverView: View {
                 Button(action: { onDone?() }) {
                     Text("Done")
                         .font(.callout)
+                        .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(Color.orange.opacity(0.18))
-                        .foregroundColor(.orange)
+                        .background(Color.orange.opacity(0.90))
+                        .foregroundColor(.white)
                         .cornerRadius(10)
                 }
                 .padding(.top, 6)

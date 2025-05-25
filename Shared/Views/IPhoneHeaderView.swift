@@ -15,9 +15,13 @@ struct IPhoneHeaderView: View {
     @Binding var showingAbout: Bool
     @Binding var showingSettings: Bool
     var selectedMapTypeBinding: Binding<MKMapType>
-
-    @AppStorage("appearance") private var appearance: Appearance = .system
+    
+    // Use environment object for instant updates
+    @EnvironmentObject var appearanceManager: AppearanceManager
+    @Environment(\.colorScheme) private var systemColorScheme
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
+    
+    private var appearance: Appearance { appearanceManager.appearance }
 
     @State private var settingsButtonFrame: CGRect = .zero
 
@@ -27,7 +31,7 @@ struct IPhoneHeaderView: View {
                 let height = geometry.size.height * 0.15
                 Rectangle()
                     .cornerRadius(10)
-                    .foregroundColor(Color(UIColor.systemBackground))
+                    .foregroundColor(backgroundColorForCurrentScheme)
                     .opacity(1)
                     .frame(width: screenWidth, height: height)
                     .padding(.top, -10)
@@ -56,7 +60,7 @@ struct IPhoneHeaderView: View {
                     Spacer()
                     SettingsButtonView(
                         selectedMapType: selectedMapTypeBinding,
-                        appearance: $appearance,
+                        appearance: $appearanceManager.appearance, // Bind to the environment object
                         distanceUnit: $distanceUnit,
                         onSettingsSelected: { showingSettings = true },
                         onButtonFrameChange: { frame in
@@ -88,5 +92,19 @@ struct IPhoneHeaderView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
+    }
+    
+    private var backgroundColorForCurrentScheme: Color {
+        let isDark: Bool
+        switch appearance {
+        case .system:
+            isDark = systemColorScheme == .dark
+        case .light:
+            isDark = false
+        case .dark:
+            isDark = true
+        }
+        
+        return isDark ? Color(red: 0.11, green: 0.11, blue: 0.12) : Color.white
     }
 }

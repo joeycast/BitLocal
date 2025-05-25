@@ -10,6 +10,9 @@ import Foundation
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @Environment(\.colorScheme) private var systemColorScheme
+    
+    // Create the appearance manager as a StateObject
+    @StateObject private var appearanceManager = AppearanceManager()
 
     @State public var showingAbout = false
     @State public var elements: [Element]?
@@ -22,8 +25,6 @@ struct ContentView: View {
     @State private var headerHeight: CGFloat = 0
     @State private var showingSettings = false
 
-    // Appearance from @AppStorage
-    @AppStorage("appearance") private var appearance: Appearance = .system
     @AppStorage("selectedMapType") private var storedMapType: Int = 0
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
@@ -52,6 +53,7 @@ struct ContentView: View {
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding
                 )
+                .environmentObject(appearanceManager)
             } else {
                 IPhoneLayoutView(
                     viewModel: viewModel,
@@ -62,6 +64,7 @@ struct ContentView: View {
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding
                 )
+                .environmentObject(appearanceManager)
             }
         }
         .onPreferenceChange(HeaderHeightKey.self) { value in
@@ -89,7 +92,7 @@ struct ContentView: View {
             }
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
         }
-        .preferredColorScheme(colorSchemeFor(appearance))
+        .preferredColorScheme(colorSchemeFor(appearanceManager.appearance))
     }
 
     // Helper function to map Appearance -> ColorScheme?
