@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "AppIcon.png",
+      "filename" : "BitLocal Logo v2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -74,7 +74,7 @@
       "size" : "512x512"
     },
     {
-      "filename" : "AppIcon 1.png",
+      "filename" : "BitLocal Logo v2 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"
