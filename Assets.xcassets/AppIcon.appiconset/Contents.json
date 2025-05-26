@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "BitLocal Logo v2.png",
+      "filename" : "BitLocal_App_Icon_v2_Light.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,6 +13,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "BitLocal_App_Icon_v2_Dark.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -24,6 +25,7 @@
           "value" : "tinted"
         }
       ],
+      "filename" : "BitLocal_App_Icon_v2_Tinted.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -74,7 +76,7 @@
       "size" : "512x512"
     },
     {
-      "filename" : "BitLocal Logo v2 1.png",
+      "filename" : "BitLocal_App_Icon_v2_Light 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"
