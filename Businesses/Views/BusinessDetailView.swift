@@ -162,7 +162,7 @@ struct PaymentDetailsSection: View {
             if acceptsBitcoin(element: element) {
                 HStack {
                     Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(.accentColor)
                     Text("Accepts Bitcoin")
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -173,7 +173,7 @@ struct PaymentDetailsSection: View {
             if acceptsBitcoinOnChain(element: element) {
                 HStack {
                     Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(.accentColor)
                     Text("Accepts Bitcoin on Chain")
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -184,7 +184,7 @@ struct PaymentDetailsSection: View {
             if acceptsLightning(element: element) {
                 HStack {
                     Image(systemName: "bolt.circle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(.accentColor)
                     Text("Accepts Bitcoin over Lightning")
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -193,7 +193,7 @@ struct PaymentDetailsSection: View {
             if acceptsContactlessLightning(element: element) {
                 HStack {
                     Image(systemName: "wave.3.right.circle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(.accentColor)
                     Text("Accepts Contactless Lightning")
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -276,10 +276,10 @@ struct BusinessMiniMapView: UIViewRepresentable {
             if let annotation = annotation as? Annotation {
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.canShowCallout = true
-                view?.markerTintColor = .orange
+                view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
-                view?.glyphImage = UIImage(systemName: "location.circle.fill")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                view?.glyphImage = UIImage(systemName: "bitcoinsign")?.withTintColor(.white, renderingMode: .alwaysOriginal)
                 view?.displayPriority = .required
             }
             return view

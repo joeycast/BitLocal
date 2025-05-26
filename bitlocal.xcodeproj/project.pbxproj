@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
 		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
 		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
 		F66E0B752DE33ED800D68897 /* IPadLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */; };
@@ -40,12 +41,11 @@
 		F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937652DE2065E00A49AC3 /* bitlocalApp.swift */; };
 		F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937672DE206D200A49AC3 /* CustomFonts.swift */; };
 		F67937782DE206F000A49AC3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F67937772DE206F000A49AC3 /* LICENSE */; };
-		F679377C2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */; };
-		F679377D2DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */; };
 		F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6B565F62DA327BE00EE992E /* CoreLocation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
 		F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
@@ -81,8 +81,6 @@
 		F67937672DE206D200A49AC3 /* CustomFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomFonts.swift; sourceTree = "<group>"; };
 		F67937752DE206E800A49AC3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F67937772DE206F000A49AC3 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
-		F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Ubuntu-LightItalic.ttf"; sourceTree = "<group>"; };
-		F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Ubuntu-MediumItalic.ttf"; sourceTree = "<group>"; };
 		F6B565BF2DA322FD00EE992E /* bitlocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bitlocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B565F62DA327BE00EE992E /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.4.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
@@ -255,8 +253,7 @@
 		F679377B2DE2070D00A49AC3 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				F67937792DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf */,
-				F679377A2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf */,
+				F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -343,6 +340,8 @@
 			);
 			mainGroup = F6B565B62DA322FD00EE992E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F6B565C02DA322FD00EE992E /* Products */;
 			projectDirPath = "";
@@ -359,9 +358,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				F67937782DE206F000A49AC3 /* LICENSE in Resources */,
-				F679377C2DE2070D00A49AC3 /* Ubuntu-MediumItalic.ttf in Resources */,
-				F679377D2DE2070D00A49AC3 /* Ubuntu-LightItalic.ttf in Resources */,
 				F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */,
+				F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

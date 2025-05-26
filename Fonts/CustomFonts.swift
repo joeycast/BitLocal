@@ -4,8 +4,7 @@ import SwiftUI
 
 public struct MyFont {
     public static func registerFonts() {
-        registerFont(bundle: Bundle.main, fontName: "Ubuntu-LightItalic", fontExtension: "ttf")
-        registerFont(bundle: Bundle.main, fontName: "Ubuntu-MediumItalic", fontExtension: "ttf")
+        registerFont(bundle: Bundle.main, fontName: "Fredoka-Medium", fontExtension: "ttf")
     }
     
     fileprivate static func registerFont(bundle: Bundle, fontName: String, fontExtension: String) {

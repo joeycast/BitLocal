@@ -55,7 +55,7 @@ struct CompactSettingsPopoverView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(Color.orange.opacity(0.90))
+                        .background(Color.accentColor.opacity(0.90))
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }

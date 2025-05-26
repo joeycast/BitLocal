@@ -49,14 +49,9 @@ struct IPhoneHeaderView: View {
                         .padding(.trailing)
                         .padding(.leading, 25)
                     Spacer()
-                    HStack(spacing: 0) {
-                        Text(" bit")
-                            .font(.custom("Ubuntu-LightItalic", size: 28))
-                            .foregroundColor(.orange)
-                        Text("local ")
-                            .font(.custom("Ubuntu-MediumItalic", size: 28))
-                            .foregroundColor(.orange)
-                    }
+                    Text("bitlocal")
+                        .font(.custom("Fredoka-Medium", size: 28))
+                        .foregroundColor(.accentColor)
                     Spacer()
                     SettingsButtonView(
                         selectedMapType: selectedMapTypeBinding,

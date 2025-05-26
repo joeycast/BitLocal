@@ -34,7 +34,7 @@ class AnnotationView: MKMarkerAnnotationView {
             clusteringIdentifier = nil
             displayPriority = .defaultHigh
             let totalCount = cluster.memberAnnotations.count
-            markerTintColor = totalCount < 5 ? .orange : totalCount < 10 ? .yellow : .red
+            markerTintColor = totalCount < 5 ? UIColor(named: "MarkerColor") : totalCount < 10 ? UIColor(named: "MarkerColor") : UIColor(named: "MarkerColor")
             glyphText = "\(totalCount)"
         }
         canShowCallout = true

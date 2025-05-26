@@ -326,17 +326,17 @@ struct PaymentIcons: View {
         HStack {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(.accentColor)
             }
             
             if acceptsLightning(element: element) {
                 Image(systemName: "bolt.circle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(.accentColor)
             }
             
             if acceptsContactlessLightning(element: element) {
                 Image(systemName: "wave.3.right.circle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(.accentColor)
             }
         }
     }

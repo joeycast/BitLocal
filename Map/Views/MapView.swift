@@ -205,7 +205,7 @@ struct MapView: UIViewRepresentable {
                 // Handle cluster annotations
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
-                view?.markerTintColor = .orange
+                view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = "\(cluster.memberAnnotations.count)"
             } else if let annotation = annotation as? Annotation {
                 // Handle individual annotations
@@ -215,10 +215,10 @@ struct MapView: UIViewRepresentable {
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                 view?.canShowCallout = true
-                view?.markerTintColor = .orange
+                view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
-                view?.glyphImage = UIImage(systemName: "location.circle.fill")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                view?.glyphImage = UIImage(systemName: "bitcoinsign")?.withTintColor(.white, renderingMode: .alwaysOriginal)
                 view?.displayPriority = .required
             }
             return view

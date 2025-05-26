@@ -21,7 +21,7 @@ struct SettingsButtonView: View {
         }) {
             Image(systemName: "gearshape")
                 .font(.system(size: 18, weight: .regular))
-                .foregroundColor(.orange)
+                .foregroundColor(.accentColor)
                 .frame(width: 44, height: 44)
         }
         .background(

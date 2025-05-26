@@ -32,7 +32,7 @@ struct EarlierThaniOS170View: View {
                         .font(.headline)
                         .padding()
                         .foregroundColor(.white)
-                        .background(Color.orange) // Set background color to orange
+                        .background(Color.accentColor) // Set background color to orange
                         .cornerRadius(10)
                 }
             }   

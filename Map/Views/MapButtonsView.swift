@@ -26,7 +26,7 @@ struct MapButtonsView: View {
             }) {
                 ZStack {
                     Circle()
-                        .fill(Color.orange)
+                        .fill(Color.accentColor)
                         .frame(width: 44, height: 44)
                         .shadow(radius: 3)
                     Image(systemName: selectedMapType == .standard ? "globe.americas.fill" : "map.fill")
@@ -60,7 +60,7 @@ struct MapButtonsView: View {
             }) {
                 ZStack {
                     Circle()
-                        .fill(Color.orange)
+                        .fill(Color.accentColor)
                         .frame(width: 44, height: 44)
                         .shadow(radius: 3)
                     Image(systemName: "location.fill")
