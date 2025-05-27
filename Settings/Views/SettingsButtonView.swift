@@ -22,7 +22,7 @@ struct SettingsButtonView: View {
             Image("gear-six-fill")
                 .aboutIconStyle(size: 18)
         }
-        .accessibilityLabel("Settings")
+        .accessibilityLabel(Text("settings_label_accessibility"))
 //        .frame(width: 44, height: 44)
         .background(
             GeometryReader { proxy in

@@ -32,7 +32,7 @@ struct BusinessesListView: View {
     var body: some View {
         // In BusinessesListView
         if elements.isEmpty {
-            Text("No locations found.")
+            Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
                 .foregroundColor(.gray)
                 .font(.title3)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -108,10 +108,18 @@ struct BusinessesListView: View {
         Group {
             if sortedElements.count > maxListResults {
                 VStack {
-                    Text("\(sortedElements.count) locations returned on the map. The top \(min(sortedElements.count, maxListResults)) are displayed in the list.")
+                    Text(String(
+                        format: NSLocalizedString("locations_returned_footer", comment: "Footer: N locations returned, top M displayed"),
+                        sortedElements.count,
+                        min(sortedElements.count, maxListResults)
+                    ))
                 }
             } else {
-                Text("Showing \(sortedElements.count) of \(sortedElements.count) locations.")
+                Text(String(
+                    format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
+                    sortedElements.count,
+                    sortedElements.count
+                ))
             }
         }
         .font(.footnote)
@@ -131,7 +139,11 @@ struct ElementCell: View {
             
             HStack {
                 // Business Name
-                Text(viewModel.element.osmJSON?.tags?.name ?? viewModel.element.osmJSON?.tags?.operator ?? "Name not available")
+                Text(
+                    viewModel.element.osmJSON?.tags?.name ??
+                    viewModel.element.osmJSON?.tags?.operator ??
+                    NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
+                )
                     .fontWeight(.semibold)
                     .lineLimit(1)
                     .minimumScaleFactor(1)

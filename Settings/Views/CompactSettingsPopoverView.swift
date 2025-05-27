@@ -13,44 +13,44 @@ struct CompactSettingsPopoverView: View {
 
                 // Map Type Picker
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Map Type")
+                    Text("map_type_label")
                         .font(.caption)
                     Picker(selection: $selectedMapType, label: EmptyView()) {
-                        Text("Standard").tag(MKMapType.standard)
-                        Text("Hybrid").tag(MKMapType.hybrid)
+                        Text("map_type_standard").tag(MKMapType.standard)
+                        Text("map_type_hybrid").tag(MKMapType.hybrid)
                     }
                     .pickerStyle(.segmented)
                 }
 
                 // Appearance Picker
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Theme")
+                    Text("theme_label")
                         .font(.caption)
                         .foregroundColor(.primary)
                     Picker(selection: $appearanceManager.appearance, label: EmptyView()) {
-                        Text("System").tag(Appearance.system)
-                        Text("Light").tag(Appearance.light)
-                        Text("Dark").tag(Appearance.dark)
+                        Text("theme_system").tag(Appearance.system)
+                        Text("theme_light").tag(Appearance.light)
+                        Text("theme_dark").tag(Appearance.dark)
                     }
                     .pickerStyle(.segmented)
                 }
 
                 // Distance Unit Picker
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Distance Units")
+                    Text("distance_units_label")
                         .font(.caption)
                         .foregroundColor(.primary)
                     Picker(selection: $distanceUnit, label: EmptyView()) {
-                        Text("Auto").tag(DistanceUnit.auto)
-                        Text("mi").tag(DistanceUnit.miles)
-                        Text("km").tag(DistanceUnit.kilometers)
+                        Text("distance_units_auto").tag(DistanceUnit.auto)
+                        Text("distance_units_miles").tag(DistanceUnit.miles)
+                        Text("distance_units_kilometers").tag(DistanceUnit.kilometers)
                     }
                     .pickerStyle(.segmented)
                 }
 
                 // Done Button
                 Button(action: { onDone?() }) {
-                    Text("Done")
+                    Text("done_button")
                         .font(.callout)
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)

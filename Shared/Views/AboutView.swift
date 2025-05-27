@@ -43,27 +43,27 @@ struct AboutView: View {
             Form {
                 // Header section
                 Section {
-                    Text("\(appName) is an app developed by Joe Castagnaro in Nashville, TN. \(appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in \(appName) is retrieved from OpenStreetMap through the BTC Map API.")
+                    Text("about_description")
                 }
                 // Contribute section
-                Section(header: Text("Contribute"),
-                        footer: Text("At this time, adding businesses is not supported in-app but is being considered as a feature for a future release. Until then, email us by tapping \"Suggest a Business\" above.")) {
+                Section(header: Text("contribute_section"),
+                        footer: Text("contribute_footer")) {
                     Link(destination: suggestABusinessEmail) {
                         HStack(spacing: 10) {
                             Image("storefront-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("Suggest a Business")
+                            Text("suggest_a_business")
                             Spacer()
                         }
                     }
                 }
                 // Contact section
-                Section(header: Text("Contact")) {
+                Section(header: Text("contact_section")) {
                     Link(destination: generalSupportInquiriesEmail) {
                         HStack(spacing: 10) {
                             Image("paper-plane-tilt-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("General Support Inquiries")
+                            Text("general_support_inquiries")
                             Spacer()
                         }
                     }
@@ -71,7 +71,7 @@ struct AboutView: View {
                         HStack(spacing: 10) {
                             Image("bug-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("Report a Bug")
+                            Text("report_a_bug")
                             Spacer()
                         }
                     }
@@ -79,18 +79,18 @@ struct AboutView: View {
                         HStack(spacing: 10) {
                             Image("lightbulb-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("Suggest a Feature")
+                            Text("suggest_a_feature")
                             Spacer()
                         }
                     }
                 }
                 // Socials section
-                Section(header: Text("Socials")) {
+                Section(header: Text("socials_section")) {
                     Link(destination: twitterURL) {
                         HStack(spacing: 10) {
                             Image("x-logo-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("X / Twitter")
+                            Text("x_twitter_label")
                             Spacer()
                         }
                     }
@@ -104,12 +104,12 @@ struct AboutView: View {
                     //                    })
                 }
                 // Other section
-                Section(header: Text("Other")) {
+                Section(header: Text("other_section")) {
                     Link(destination: bitlocalWebsite) {
                         HStack(spacing: 10) {
                             Image("compass-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("BitLocal Website")
+                            Text("bitlocal_website")
                             Spacer()
                         }
                     }
@@ -117,7 +117,7 @@ struct AboutView: View {
                         HStack(spacing: 10) {
                             Image("hand-palm-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("Privacy Policy")
+                            Text("privacy_policy")
                             Spacer()
                         }
                     }
@@ -125,7 +125,7 @@ struct AboutView: View {
                         HStack(spacing: 10) {
                             Image("map-pin-line-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("BTC Map")
+                            Text("btc_map")
                             Spacer()
                         }
                     }
@@ -133,7 +133,7 @@ struct AboutView: View {
                         HStack(spacing: 10) {
                             Image("globe-simple-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("OpenStreetMap")
+                            Text("open_street_map")
                             Spacer()
                         }
                     }
@@ -141,7 +141,7 @@ struct AboutView: View {
                         HStack(spacing: 10) {
                             Image("currency-btc-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("Bitcoin Resources")
+                            Text("bitcoin_resources")
                             Spacer()
                         }
                     }
@@ -167,12 +167,12 @@ struct AboutView: View {
             }
             // About page title
             // TODO: Figure out how to use the appName constant here
-            .navigationTitle("About BitLocal")
+            .navigationTitle(Text("about_title"))
             
             // Dismiss sheet when tapping Done.
             .navigationBarItems(trailing:
                 Button(action: { dismiss() }) {
-                    Text("Done")
+                    Text("done_button")
                         .bold() // or .fontWeight(.bold)
                 }
             )

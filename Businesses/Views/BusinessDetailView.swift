@@ -55,7 +55,7 @@ struct BusinessDetailView: View {
             elementCellViewModel.updateAddress()
         }
         .listStyle(InsetGroupedListStyle()) // Consistent list style
-        .navigationTitle(element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? "Name not available")
+        .navigationTitle(element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)    }
 }
 
@@ -65,7 +65,7 @@ struct BusinessDescriptionSection: View {
     
     var body: some View {
         if let description = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn {
-            Section(header: Text("Description")) {
+            Section(header: Text(NSLocalizedString("business_description_section", comment: "Section header for business description"))) {
                 Text(description)
             }
         } else {
@@ -80,7 +80,7 @@ struct BusinessDetailsSection: View {
     @ObservedObject var elementCellViewModel: ElementCellViewModel
     
     var body: some View {
-        Section(header: Text("Business Details")) {
+        Section(header: Text(NSLocalizedString("business_details_section", comment: "Section header for business details"))) {
             if let distance = BusinessDetailView(element: element, userLocation: nil, contentViewModel: ContentViewModel()).localizedDistanceString() {
                 HStack {
                     Image(systemName: "location")
@@ -91,7 +91,7 @@ struct BusinessDetailsSection: View {
             }
             // Business Address
             VStack (alignment: .leading, spacing: 3) {
-                Text("Address")
+                Text(NSLocalizedString("address_label", comment: "Label for address"))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
@@ -113,7 +113,7 @@ struct BusinessDetailsSection: View {
                     .trimmingCharacters(in: .whitespaces)
                 
                 VStack (alignment: .leading, spacing: 3) {
-                    Text("Website")
+                    Text(NSLocalizedString("website_label", comment: "Label for website"))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
@@ -127,7 +127,7 @@ struct BusinessDetailsSection: View {
             // Business Phone
             if let phone = element.osmJSON?.tags?.phone ?? element.osmJSON?.tags?.contactPhone, let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "+", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
                 VStack (alignment: .leading, spacing: 3) {
-                    Text("Phone")
+                    Text(NSLocalizedString("phone_label", comment: "Label for phone"))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
@@ -140,7 +140,7 @@ struct BusinessDetailsSection: View {
             
             if let openingHours = element.osmJSON?.tags?.openingHours {
                 VStack (alignment: .leading, spacing: 3) {
-                    Text("Opening Hours")
+                    Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
@@ -157,13 +157,13 @@ struct PaymentDetailsSection: View {
     var element: Element
     
     var body: some View {
-        Section(header: Text("Payment Details")) {
+        Section(header: Text(NSLocalizedString("payment_details_section", comment: "Section header for payment details"))) {
             // Accepts Bitcoin (details regarding on chain/lightning/contactless lightning not available)
             if acceptsBitcoin(element: element) {
                 HStack {
                     Image(systemName: "bitcoinsign.circle.fill")
                         .foregroundColor(.accentColor)
-                    Text("Accepts Bitcoin")
+                    Text(NSLocalizedString("accepts_bitcoin", comment: "Label for accepting Bitcoin"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
@@ -174,7 +174,7 @@ struct PaymentDetailsSection: View {
                 HStack {
                     Image(systemName: "bitcoinsign.circle.fill")
                         .foregroundColor(.accentColor)
-                    Text("Accepts Bitcoin on Chain")
+                    Text(NSLocalizedString("accepts_bitcoin_onchain", comment: "Label for accepting Bitcoin on Chain"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
@@ -185,7 +185,7 @@ struct PaymentDetailsSection: View {
                 HStack {
                     Image(systemName: "bolt.circle.fill")
                         .foregroundColor(.accentColor)
-                    Text("Accepts Bitcoin over Lightning")
+                    Text(NSLocalizedString("accepts_bitcoin_lightning", comment: "Label for accepting Bitcoin over Lightning"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
@@ -194,7 +194,7 @@ struct PaymentDetailsSection: View {
                 HStack {
                     Image(systemName: "wave.3.right.circle.fill")
                         .foregroundColor(.accentColor)
-                    Text("Accepts Contactless Lightning")
+                    Text(NSLocalizedString("accepts_contactless_lightning", comment: "Label for accepting Contactless Lightning"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }

@@ -18,6 +18,6 @@ struct InfoButtonView: View {
             Image("info-fill")
                 .aboutIconStyle(size: 18)
         }
-        .accessibilityLabel("About")
+        .accessibilityLabel(Text("about_accessibility_label"))
     }
 }

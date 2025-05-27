@@ -42,11 +42,11 @@ struct MapButtonsView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
                     if viewModel.isUpdatingLocation {
                         let alert = UIAlertController(
-                            title: "Location could not be determined. Please check if location permissions have been granted.",
+                            title: NSLocalizedString("location_alert_title", comment: "Alert title for failed location determination"),
                             message: nil,
                             preferredStyle: .alert
                         )
-                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        alert.addAction(UIAlertAction(title: NSLocalizedString("ok_button", comment: "OK button"), style: .default))
                         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                            let rootViewController = windowScene.windows.first?.rootViewController {
                             rootViewController.topMostViewController().present(alert, animated: true, completion: nil)

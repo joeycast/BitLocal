@@ -42,6 +42,7 @@
 		F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937672DE206D200A49AC3 /* CustomFonts.swift */; };
 		F67937782DE206F000A49AC3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F67937772DE206F000A49AC3 /* LICENSE */; };
 		F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6B565F62DA327BE00EE992E /* CoreLocation.framework */; };
+		F6C883BF2DE5D6B2003FAA4C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F6C883BE2DE5D6B2003FAA4C /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,6 +84,7 @@
 		F67937772DE206F000A49AC3 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		F6B565BF2DA322FD00EE992E /* bitlocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bitlocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B565F62DA327BE00EE992E /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.4.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
+		F6C883BE2DE5D6B2003FAA4C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -207,6 +209,7 @@
 				F66E0B942DE33F1200D68897 /* Extensions.swift */,
 				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
+				F6C883BE2DE5D6B2003FAA4C /* Localizable.xcstrings */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -337,6 +340,26 @@
 			knownRegions = (
 				en,
 				Base,
+				es,
+				"es-419",
+				"es-US",
+				nl,
+				fr,
+				de,
+				it,
+				th,
+				"pt-BR",
+				ru,
+				"pt-PT",
+				cs,
+				ko,
+				ja,
+				"zh-HK",
+				"zh-Hans",
+				pl,
+				sk,
+				uk,
+				hi,
 			);
 			mainGroup = F6B565B62DA322FD00EE992E;
 			minimizedProjectReferenceProxies = 1;
@@ -359,6 +382,7 @@
 			files = (
 				F67937782DE206F000A49AC3 /* LICENSE in Resources */,
 				F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */,
+				F6C883BF2DE5D6B2003FAA4C /* Localizable.xcstrings in Resources */,
 				F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -465,6 +489,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -520,6 +545,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Release;
 		};

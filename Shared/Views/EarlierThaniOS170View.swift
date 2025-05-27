@@ -15,12 +15,11 @@ struct EarlierThaniOS170View: View {
                     .frame(width: 150, height: 150) // Set desired size
                     .padding() // Add padding around the image
                 
-                Text("BitLocal Requires iOS 17.0 or Later")
+                Text(LocalizedStringKey("version_requirement_title"))
                     .font(.headline)
-                
-                Text("")
-                
-                Text("Open Settings > General > Software Update to update.")
+                    .padding(.bottom, 16)
+
+                Text(LocalizedStringKey("version_requirement_update_instruction"))
                 
                 Spacer()
                 Spacer()
@@ -28,14 +27,14 @@ struct EarlierThaniOS170View: View {
                 Button(action: {
                     openSettings()
                 }) {
-                    Text("Open Settings")
+                    Text(LocalizedStringKey("open_settings_button"))
                         .font(.headline)
                         .padding()
                         .foregroundColor(.white)
                         .background(Color.accentColor) // Set background color to orange
                         .cornerRadius(10)
                 }
-            }   
+            }
             .padding()
         }
         .padding()

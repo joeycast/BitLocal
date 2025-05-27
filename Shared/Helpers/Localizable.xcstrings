@@ -1,0 +1,656 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@" : {
+      "comment" : "Street Name (not localized)",
+      "shouldTranslate" : false
+    },
+    "%@%@\n%@%@%@ %@" : {
+      "comment" : "Address - Street (not localized)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@\n%3$@%4$@%5$@ %6$@"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@%@%@ %@" : {
+      "comment" : "Address - City/State/Country (not localized)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@%3$@ %4$@"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "about_accessibility_label" : {
+      "comment" : "About (info button) accessibility label",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About"
+          }
+        }
+      }
+    },
+    "about_description" : {
+      "comment" : "Descriptive paragraph about the app and its mission\n",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal is an app developed by Joe Castagnaro in Nashville, TN. BitLocal’s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in BitLocal is retrieved from OpenStreetMap through the BTC Map API."
+          }
+        }
+      }
+    },
+    "about_title" : {
+      "comment" : "Title of the About screen",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About BitLocal"
+          }
+        }
+      }
+    },
+    "accepts_bitcoin" : {
+      "comment" : "Label for accepting Bitcoin",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepts Bitcoin"
+          }
+        }
+      }
+    },
+    "accepts_bitcoin_lightning" : {
+      "comment" : "Label for accepting Bitcoin over Lightning",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepts Bitcoin over Lightning"
+          }
+        }
+      }
+    },
+    "accepts_bitcoin_onchain" : {
+      "comment" : "Label for accepting Bitcoin on Chain",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepts Bitcoin on Chain"
+          }
+        }
+      }
+    },
+    "accepts_contactless_lightning" : {
+      "comment" : "Label for accepting Contactless Lightning",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepts Contactless Lightning"
+          }
+        }
+      }
+    },
+    "address_label" : {
+      "comment" : "Label for address",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Address"
+          }
+        }
+      }
+    },
+    "bitcoin_resources" : {
+      "comment" : "Link or section for external Bitcoin resources",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Resources"
+          }
+        }
+      }
+    },
+    "bitlocal" : {
+      "comment" : "bitlocal app header name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bitlocal"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "bitlocal_website" : {
+      "comment" : "Link to the website",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal Website"
+          }
+        }
+      }
+    },
+    "btc_map" : {
+      "comment" : "Label for BTC Map reference/link",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BTC Map"
+          }
+        }
+      }
+    },
+    "business_description_section" : {
+      "comment" : "Section header for business description",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Description"
+          }
+        }
+      }
+    },
+    "business_details_section" : {
+      "comment" : "Section header for business details",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Business Details"
+          }
+        }
+      }
+    },
+    "contact_section" : {
+      "comment" : "Section title for contact options",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        }
+      }
+    },
+    "contribute_footer" : {
+      "comment" : "Footer text under contribute section",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At this time, adding businesses is not supported in-app but is being considered as a feature for a future release. Until then, email us by tapping “Suggest a Business” above."
+          }
+        }
+      }
+    },
+    "contribute_section" : {
+      "comment" : "Section title for contribution options",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contribute"
+          }
+        }
+      }
+    },
+    "distance_units_auto" : {
+      "comment" : "Distance Units Auto label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
+          }
+        }
+      }
+    },
+    "distance_units_kilometers" : {
+      "comment" : "Distance Units km label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "km"
+          }
+        }
+      }
+    },
+    "distance_units_label" : {
+      "comment" : "Distance Units label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance Units"
+          }
+        }
+      }
+    },
+    "distance_units_miles" : {
+      "comment" : "Distance Units miles label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mi"
+          }
+        }
+      }
+    },
+    "done_button" : {
+      "comment" : "Button to dismiss sheet",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "general_support_inquiries" : {
+      "comment" : "Label for support email link",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General Support Inquiries"
+          }
+        }
+      }
+    },
+    "Key" : {
+      "extractionState" : "manual"
+    },
+    "Key 1" : {
+      "extractionState" : "manual"
+    },
+    "location_alert_title" : {
+      "comment" : "Alert title for failed location determination",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location could not be determined. Please check if location permissions have been granted."
+          }
+        }
+      }
+    },
+    "locations_returned_footer" : {
+      "comment" : "Footer: N locations returned, top M displayed",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d locations returned on the map. The top %d are displayed in the list."
+          }
+        }
+      }
+    },
+    "map_type_hybrid" : {
+      "comment" : "Map type: Hybrid",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hybrid"
+          }
+        }
+      }
+    },
+    "map_type_label" : {
+      "comment" : "Map type label title",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Map Type"
+          }
+        }
+      }
+    },
+    "map_type_standard" : {
+      "comment" : "Map type: Standard",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        }
+      }
+    },
+    "name_not_available" : {
+      "comment" : "Fallback name for unavailable business name\nFallback name when no name is available",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name not available"
+          }
+        }
+      }
+    },
+    "no_locations_found" : {
+      "comment" : "Empty state for no locations found",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No locations found."
+          }
+        }
+      }
+    },
+    "ok_button" : {
+      "comment" : "OK button",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "open_settings_button" : {
+      "comment" : "Open Settings button in EarlierThaniOS170View",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        }
+      }
+    },
+    "open_street_map" : {
+      "comment" : "Label for OSM reference/link",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenStreetMap"
+          }
+        }
+      }
+    },
+    "opening_hours_label" : {
+      "comment" : "Label for opening hours",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opening Hours"
+          }
+        }
+      }
+    },
+    "osm_attribution_prefix" : {
+      "comment" : "OSM attribution prefix",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Map data from "
+          }
+        }
+      }
+    },
+    "osm_openstreetmap" : {
+      "comment" : "OSM attribution",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenStreetMap"
+          }
+        }
+      }
+    },
+    "other_section" : {
+      "comment" : "Section title for miscellaneous links",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other"
+          }
+        }
+      }
+    },
+    "payment_details_section" : {
+      "comment" : "Section header for payment details",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Payment Details"
+          }
+        }
+      }
+    },
+    "phone_label" : {
+      "comment" : "Label for phone",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phone"
+          }
+        }
+      }
+    },
+    "privacy_policy" : {
+      "comment" : "Link to privacy policy",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Policy"
+          }
+        }
+      }
+    },
+    "report_a_bug" : {
+      "comment" : "Label for bug report email link",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report a Bug"
+          }
+        }
+      }
+    },
+    "settings_label_accessibility" : {
+      "comment" : "Settings accessibility label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "showing_locations_footer" : {
+      "comment" : "Footer: Showing N of N locations",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Showing %d of %d locations."
+          }
+        }
+      }
+    },
+    "socials_section" : {
+      "comment" : "Section title for social media links",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Socials"
+          }
+        }
+      }
+    },
+    "suggest_a_business" : {
+      "comment" : "Link/button to email for business suggestions",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggest a Business"
+          }
+        }
+      }
+    },
+    "suggest_a_feature" : {
+      "comment" : "Label for feature request email link",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggest a Feature"
+          }
+        }
+      }
+    },
+    "theme_dark" : {
+      "comment" : "Dark theme appearance label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        }
+      }
+    },
+    "theme_label" : {
+      "comment" : "Theme appearance label title",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme"
+          }
+        }
+      }
+    },
+    "theme_light" : {
+      "comment" : "Light theme appearance label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        }
+      }
+    },
+    "theme_system" : {
+      "comment" : "System appearance label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        }
+      }
+    },
+    "version_requirement_title" : {
+      "comment" : "Version requirement title in EarlierThaniOS170View",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal Requires iOS 17.0 or Later"
+          }
+        }
+      }
+    },
+    "version_requirement_update_instruction" : {
+      "comment" : "Version requirement update instruction in EarlierThaniOS170View",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings > General > Software Update to update."
+          }
+        }
+      }
+    },
+    "website_label" : {
+      "comment" : "Label for website",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Website"
+          }
+        }
+      }
+    },
+    "x_twitter_label" : {
+      "comment" : "Label for X / Twitter link",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X / Twitter"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

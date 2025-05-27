@@ -19,14 +19,15 @@ struct OpenStreetMapAttributionView: View {
                 UIApplication.shared.open(url)
             }
         }) {
-            Text("Map data from ")
-                .font(.system(size: 10))
-                .foregroundColor(colorScheme == .light ? Color.black : Color.white)
-            +
-            Text("OpenStreetMap")
-                .font(.system(size: 10))
-                .underline()
-                .foregroundColor(colorScheme == .light ? Color.black : Color.white)
+            HStack(spacing: 0) {
+                Text("osm_attribution_prefix")
+                    .font(.system(size: 10))
+                    .foregroundColor(colorScheme == .light ? .black : .white)
+                Text("osm_openstreetmap")
+                    .font(.system(size: 10))
+                    .underline()
+                    .foregroundColor(colorScheme == .light ? .black : .white)
+            }
         }
         .padding(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
         .background(Color(colorScheme == .light ? UIColor.white : UIColor.black).opacity(colorScheme == .light ? 0.6 : 0.4))
