@@ -171,9 +171,11 @@ struct AboutView: View {
             
             // Dismiss sheet when tapping Done.
             .navigationBarItems(trailing:
-                                    Button("Done") {
-                dismiss()
-            })
+                Button(action: { dismiss() }) {
+                    Text("Done")
+                        .bold() // or .fontWeight(.bold)
+                }
+            )
         }
     }
 }
