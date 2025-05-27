@@ -34,6 +34,8 @@ struct AboutView: View {
     // Support Development links
     // let tipJarURL = URL(string: "")!
     
+    let iconSize: CGFloat = 20
+    
     // Settings Page
     var body: some View {
         
@@ -44,64 +46,108 @@ struct AboutView: View {
                     Text("\(appName) is an app developed by Joe Castagnaro in Nashville, TN. \(appName)'s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in \(appName) is retrieved from OpenStreetMap through the BTC Map API.")
                 }
                 // Contribute section
-                Section(header: Text("Contribute"), 
+                Section(header: Text("Contribute"),
                         footer: Text("At this time, adding businesses is not supported in-app but is being considered as a feature for a future release. Until then, email us by tapping \"Suggest a Business\" above.")) {
-                    Link(destination: suggestABusinessEmail, label: {
-                        Label("Suggest a Business", systemImage: "bag")
-                    })                    
+                    Link(destination: suggestABusinessEmail) {
+                        HStack(spacing: 10) {
+                            Image("storefront-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("Suggest a Business")
+                            Spacer()
+                        }
+                    }
                 }
                 // Contact section
                 Section(header: Text("Contact")) {
-                    Link(destination: generalSupportInquiriesEmail, label: {
-                        Label("General Support Inquiries", systemImage: "paperplane")
-                    })
-                    Link(destination: reportABugEmail, label: {
-                        Label("Report a Bug", systemImage: "ladybug")
-                    })
-                    Link(destination: suggestAFeatureEmail, label: {
-                        Label("Suggest a Feature", systemImage: "plus.app")
-                    })                    
+                    Link(destination: generalSupportInquiriesEmail) {
+                        HStack(spacing: 10) {
+                            Image("paper-plane-tilt-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("General Support Inquiries")
+                            Spacer()
+                        }
+                    }
+                    Link(destination: reportABugEmail) {
+                        HStack(spacing: 10) {
+                            Image("bug-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("Report a Bug")
+                            Spacer()
+                        }
+                    }
+                    Link(destination: suggestAFeatureEmail) {
+                        HStack(spacing: 10) {
+                            Image("lightbulb-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("Suggest a Feature")
+                            Spacer()
+                        }
+                    }
                 }
                 // Socials section
                 Section(header: Text("Socials")) {
-                    Link(destination: twitterURL, 
-                         label: {
-                        Label("X / Twitter", systemImage: "bird")    
-                    })
-                    //                    Link(destination: discordURL, 
+                    Link(destination: twitterURL) {
+                        HStack(spacing: 10) {
+                            Image("x-logo-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("X / Twitter")
+                            Spacer()
+                        }
+                    }
+                    //                    Link(destination: discordURL,
                     //                         label: {
-                    //                        Label("Discord", systemImage: "link")    
+                    //                        Label("Discord", systemImage: "link")
                     //                    })
-                    //                    Link(destination: nostrURL, 
+                    //                    Link(destination: nostrURL,
                     //                         label: {
-                    //                        Label("Nostr", systemImage: "link")    
+                    //                        Label("Nostr", systemImage: "link")
                     //                    })
                 }
                 // Other section
                 Section(header: Text("Other")) {
-                    Link(destination: bitlocalWebsite, 
-                         label: {
-                        Label("BitLocal Website", systemImage: "globe")
-                    })
-                    Link(destination: privacyPolicyURL, 
-                         label: {
-                        Label("Privacy Policy", systemImage: "hand.raised")    
-                    })
-                    Link(destination: btcMapURL,
-                         label: {
-                        Label("BTC Map", systemImage: "mappin.circle")
-                    })
-                    Link(destination: openStreetMapURL,
-                         label: {
-                        Label("OpenStreetMap", systemImage: "map.circle")
-                    })
-                    Link(destination: bitcoinResourcesURL, 
-                         label: {
-                        Label("Bitcoin Resources", systemImage: "bitcoinsign.circle")    
-                    })
+                    Link(destination: bitlocalWebsite) {
+                        HStack(spacing: 10) {
+                            Image("compass-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("BitLocal Website")
+                            Spacer()
+                        }
+                    }
+                    Link(destination: privacyPolicyURL) {
+                        HStack(spacing: 10) {
+                            Image("hand-palm-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("Privacy Policy")
+                            Spacer()
+                        }
+                    }
+                    Link(destination: btcMapURL) {
+                        HStack(spacing: 10) {
+                            Image("map-pin-line-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("BTC Map")
+                            Spacer()
+                        }
+                    }
+                    Link(destination: openStreetMapURL) {
+                        HStack(spacing: 10) {
+                            Image("globe-simple-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("OpenStreetMap")
+                            Spacer()
+                        }
+                    }
+                    Link(destination: bitcoinResourcesURL) {
+                        HStack(spacing: 10) {
+                            Image("currency-btc-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("Bitcoin Resources")
+                            Spacer()
+                        }
+                    }
                 }
                 // Support Development section
-                //                Section(header: Text("Support Development"), 
+                //                Section(header: Text("Support Development"),
                 //                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
                 //                    Label("Tip Jar", systemImage: "bolt.circle.fill")
                 //                }
@@ -124,7 +170,7 @@ struct AboutView: View {
             .navigationTitle("About BitLocal")
             
             // Dismiss sheet when tapping Done.
-            .navigationBarItems(trailing: 
+            .navigationBarItems(trailing:
                                     Button("Done") {
                 dismiss()
             })

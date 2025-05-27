@@ -45,9 +45,7 @@ struct IPhoneHeaderView: View {
             VStack(alignment: .leading) {
                 HStack {
                     InfoButtonView(showingAbout: $showingAbout)
-                        .frame(maxWidth: 1, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(.trailing)
-                        .padding(.leading, 25)
+                        .padding(.leading)
                     Spacer()
                     Text("bitlocal")
                         .font(.custom("Fredoka-Medium", size: 28))
@@ -62,11 +60,10 @@ struct IPhoneHeaderView: View {
                             settingsButtonFrame = frame
                         }
                     )
-                    .padding(.leading, 5)
+                    .padding(.trailing)
                     .allowsHitTesting(true)
                     .opacity(1)
                 }
-                .padding(.horizontal)
                 .frame(height: 1)
                 Spacer()
             }
@@ -81,7 +78,7 @@ struct IPhoneHeaderView: View {
                     selectedMapType: selectedMapTypeBinding,
                     onDone: { withAnimation { showingSettings = false } }
                 )
-                .position(x: settingsButtonFrame.maxX - 130, y: settingsButtonFrame.maxY + 115)
+                .position(x: settingsButtonFrame.maxX - 120, y: settingsButtonFrame.maxY + 125)
                 .transition(.scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity))
                 .zIndex(2)
             }

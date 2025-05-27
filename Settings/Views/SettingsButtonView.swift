@@ -19,11 +19,11 @@ struct SettingsButtonView: View {
         Button(action: {
             onSettingsSelected?()
         }) {
-            Image(systemName: "gearshape")
-                .font(.system(size: 18, weight: .regular))
-                .foregroundColor(.accentColor)
-                .frame(width: 44, height: 44)
+            Image("gear-six-fill")
+                .aboutIconStyle(size: 18)
         }
+        .accessibilityLabel("Settings")
+//        .frame(width: 44, height: 44)
         .background(
             GeometryReader { proxy in
                 Color.clear

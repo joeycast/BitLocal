@@ -15,13 +15,8 @@ struct InfoButtonView: View {
         Button(action: {
             showingAbout = true
         }) {
-            Image(systemName: "info.circle")
-                .font(.system(size: 18))
-                .foregroundColor(.accentColor)
-                .background(
-                    Circle()
-                        .fill(Color(.systemBackground).opacity(0.8))
-                )
+            Image("info-fill")
+                .aboutIconStyle(size: 18)
         }
         .accessibilityLabel("About")
     }

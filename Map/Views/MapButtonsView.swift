@@ -5,7 +5,6 @@
 //  Created by Joe Castagnaro on 5/24/25.
 //
 
-
 import SwiftUI
 import MapKit
 
@@ -29,9 +28,8 @@ struct MapButtonsView: View {
                         .fill(Color.accentColor)
                         .frame(width: 44, height: 44)
                         .shadow(radius: 3)
-                    Image(systemName: selectedMapType == .standard ? "globe.americas.fill" : "map.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white)
+                    Image(selectedMapType == .standard ? "globe-hemisphere-west-fill" : "map-trifold-fill")
+                        .aboutIconStyle(size: 20, color: .white)
                 }
             }
             Button(action: {
@@ -63,9 +61,8 @@ struct MapButtonsView: View {
                         .fill(Color.accentColor)
                         .frame(width: 44, height: 44)
                         .shadow(radius: 3)
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white)
+                    Image("navigation-arrow-fill")
+                        .aboutIconStyle(size: 20, color: .white)
                 }
             }
         }

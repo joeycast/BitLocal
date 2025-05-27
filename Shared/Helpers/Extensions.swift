@@ -151,3 +151,13 @@ extension Element {
         return nil
     }
 }
+
+extension Image {
+    func aboutIconStyle(size: CGFloat, color: Color = .accentColor) -> some View {
+        self
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: size, height: size)
+            .foregroundColor(color)
+    }
+}
