@@ -164,6 +164,11 @@ struct AboutView: View {
                 //                        }
                 //                    }
                 //                }
+                Section {
+                    Button("Show Onboarding") {
+                        UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")
+                    }
+                }
             }
             // About page title
             // TODO: Figure out how to use the appName constant here

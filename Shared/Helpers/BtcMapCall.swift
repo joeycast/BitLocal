@@ -18,8 +18,34 @@ import MapKit
 class APIManager {
     static let shared = APIManager()
     
-    let cacheKey = "cachedElements"
     let lastUpdateKey = "lastUpdate"
+
+    // MARK: - File-based Caching Helpers
+    private var elementsFileURL: URL {
+        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        return directory.appendingPathComponent("elements.json")
+    }
+
+    private func saveElementsToFile(_ elements: [Element]) {
+        DispatchQueue.global(qos: .utility).async {
+            do {
+                let data = try JSONEncoder().encode(elements)
+                try data.write(to: self.elementsFileURL, options: .atomic)
+            } catch {
+                print("Failed to save elements to file: \(error)")
+            }
+        }
+    }
+
+    private func loadElementsFromFile() -> [Element]? {
+        do {
+            let data = try Data(contentsOf: elementsFileURL)
+            return try JSONDecoder().decode([Element].self, from: data)
+        } catch {
+            print("Failed to load elements from file: \(error)")
+            return nil
+        }
+    }
     
     init() {
         UserDefaults.standard.register(defaults: [lastUpdateKey: "2000-01-01T00:00:00.000Z"])
@@ -60,7 +86,7 @@ class APIManager {
                 let decoder = JSONDecoder()
                 let fetchedElements = try decoder.decode([Element].self, from: data)
                 
-                // Update cache if needed
+                // Update cache if needed (now file-based)
                 self.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
                 
                 completion(fetchedElements)
@@ -73,14 +99,15 @@ class APIManager {
     }
     
     private func updateCacheWithFetchedElements(fetchedElements: [Element]) {
-        let cacheKey = self.cacheKey
-        var cachedElements = UserDefaults.standard.getElements(forKey: cacheKey) ?? []
-        var elementsDictionary = Dictionary(uniqueKeysWithValues: cachedElements.map { ($0.id, $0) })
-        fetchedElements.forEach { element in
-            elementsDictionary[element.id] = element
+        DispatchQueue.global(qos: .utility).async {
+            var cachedElements = self.loadElementsFromFile() ?? []
+            var elementsDictionary = Dictionary(uniqueKeysWithValues: cachedElements.map { ($0.id, $0) })
+            fetchedElements.forEach { element in
+                elementsDictionary[element.id] = element
+            }
+            let updatedElements = Array(elementsDictionary.values)
+            self.saveElementsToFile(updatedElements)
         }
-        cachedElements = Array(elementsDictionary.values)
-        UserDefaults.standard.setElements(cachedElements, forKey: cacheKey)
     }
     
     func getElements(completion: @escaping ([Element]?) -> Void) {
@@ -90,62 +117,73 @@ class APIManager {
         guard let url = URL(string: urlString) else {
             print("Invalid URL string: \(urlString)")
             LogManager.shared.log("Invalid URL string: \(urlString)")
-            completion(nil)
+            DispatchQueue.main.async { completion(nil) }
             return
         }
         
-        // Log the requesting URL
+        // Log the requesting URL (safe)
         print("Requesting URL: \(url.absoluteString)")
         LogManager.shared.log("Requesting URL: \(url.absoluteString)")
         
         URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
-            guard let data = data, error == nil else {
-                print("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
-                LogManager.shared.log("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
-                completion(nil)
-                return
-            }
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                let contentType = httpResponse.allHeaderFields["Content-Type"] as? String
-                print("Content-Type: \(contentType ?? "Unknown")")
-                LogManager.shared.log("Content-Type: \(contentType ?? "Unknown")")
-            }
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                print("HTTP Status Code: \(httpResponse.statusCode)")
-                LogManager.shared.log("HTTP Status Code: \(httpResponse.statusCode)")
-            }
-            
-            let responsePreview = String(data: data, encoding: .utf8) ?? ""
-            print("API response preview: \(responsePreview.prefix(1000))")
-            
-            do {
-                let decoder = JSONDecoder()
-                decoder.dataDecodingStrategy = .base64
-                
-                let fetchedElements = try decoder.decode([Element].self, from: data)
-                print("Decoded JSON: \(String(data: data, encoding: .utf8) ?? "")")
-                print("Decoded Elements: \(fetchedElements)")
-                self?.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
-                
-                if let mostRecentUpdate = fetchedElements.max(by: { $0.updatedAt ?? "" < $1.updatedAt ?? "" })?.updatedAt {
-                    print("Updating lastUpdateKey to: \(mostRecentUpdate)")
-                    LogManager.shared.log("Updating lastUpdateKey to: \(mostRecentUpdate)")
-                    UserDefaults.standard.setValue(mostRecentUpdate, forKey: self?.lastUpdateKey ?? "")
-                    let updatedTime = UserDefaults.standard.string(forKey: self?.lastUpdateKey ?? "")
-                    print("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
-                    LogManager.shared.log("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
+            // Always background any heavy lifting!
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let self = self else {
+                    DispatchQueue.main.async { completion(nil) }
+                    return
+                }
+                guard let data = data, error == nil else {
+                    print("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
+                    LogManager.shared.log("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
+                    DispatchQueue.main.async { completion(nil) }
+                    return
                 }
                 
-                let updatedCache = UserDefaults.standard.getElements(forKey: self?.cacheKey ?? "")
-                completion(updatedCache)
-            } catch {
-                let responsePreview = String(data: data, encoding: .utf8) ?? "<Could not decode as UTF-8>"
-                print("RAW API response preview on decoding error: \(responsePreview.prefix(2000))")
-                print("JSON Decoding Error: \(error)")
-                LogManager.shared.log("JSON Decoding Error: \(error)")
-                completion(nil)
+                if let httpResponse = response as? HTTPURLResponse {
+                    let contentType = httpResponse.allHeaderFields["Content-Type"] as? String
+                    print("Content-Type: \(contentType ?? "Unknown")")
+                    LogManager.shared.log("Content-Type: \(contentType ?? "Unknown")")
+                    print("HTTP Status Code: \(httpResponse.statusCode)")
+                    LogManager.shared.log("HTTP Status Code: \(httpResponse.statusCode)")
+                }
+                
+                // Only print a preview, not the whole JSON!
+//                let preview = String(data: data.prefix(1000), encoding: .utf8) ?? ""
+//                print("API response preview (first 1000 chars): \(preview)")
+                
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.dataDecodingStrategy = .base64
+                    
+                    let fetchedElements = try decoder.decode([Element].self, from: data)
+                    
+                    // Do NOT print the entire JSON or array!
+                    print("Decoded \(fetchedElements.count) elements.")
+                    
+                    self.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
+                    
+                    if let mostRecentUpdate = fetchedElements.max(by: { $0.updatedAt ?? "" < $1.updatedAt ?? "" })?.updatedAt {
+                        print("Updating lastUpdateKey to: \(mostRecentUpdate)")
+                        LogManager.shared.log("Updating lastUpdateKey to: \(mostRecentUpdate)")
+                        UserDefaults.standard.setValue(mostRecentUpdate, forKey: self.lastUpdateKey)
+                        let updatedTime = UserDefaults.standard.string(forKey: self.lastUpdateKey)
+                        print("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
+                        LogManager.shared.log("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
+                    }
+                    // Now use file-based cache for return value:
+                    let updatedCache = self.loadElementsFromFile()
+                    
+                    // MAIN THREAD for UI update only
+                    DispatchQueue.main.async {
+                        completion(updatedCache)
+                    }
+                } catch {
+                    let responsePreview = String(data: data.prefix(2000), encoding: .utf8) ?? "<Could not decode as UTF-8>"
+                    print("RAW API response preview on decoding error: \(responsePreview)")
+                    print("JSON Decoding Error: \(error)")
+                    LogManager.shared.log("JSON Decoding Error: \(error)")
+                    DispatchQueue.main.async { completion(nil) }
+                }
             }
         }.resume()
     }

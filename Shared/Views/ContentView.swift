@@ -1,3 +1,4 @@
+// NOTE: elements and visibleElements are intentionally passed as plain values (not bindings) to IPadLayoutView and IPhoneLayoutView.
 // ContentView.swift
 
 import SwiftUI
@@ -10,13 +11,9 @@ import Foundation
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @Environment(\.colorScheme) private var systemColorScheme
-    
-    // Create the appearance manager as a StateObject
     @StateObject private var appearanceManager = AppearanceManager()
 
     @State public var showingAbout = false
-    @State public var elements: [Element]?
-    @State public var visibleElements: [Element] = []
     @State private var userLocation: CLLocation?
     @State private var cancellable: Cancellable?
     @State private var mapStoppedMovingCancellable: Cancellable?
@@ -46,8 +43,8 @@ struct ContentView: View {
             if screenWidth > 768 || screenHeight > 1024 {
                 IPadLayoutView(
                     viewModel: viewModel,
-                    elements: $elements,
-                    visibleElements: $visibleElements,
+                    elements: viewModel.allElements,
+                    visibleElements: viewModel.visibleElements,
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
@@ -57,8 +54,8 @@ struct ContentView: View {
             } else {
                 IPhoneLayoutView(
                     viewModel: viewModel,
-                    elements: $elements,
-                    visibleElements: $visibleElements,
+                    elements: viewModel.allElements,
+                    visibleElements: viewModel.visibleElements,
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
@@ -73,22 +70,8 @@ struct ContentView: View {
             print("Header Height reported: \(value)")
         }
         .onAppear {
-            apiManager.getElements { elements in
-                DispatchQueue.main.async {
-                    self.elements = elements
-                    viewModel.elements = elements
-                }
-            }
-            cancellable = viewModel.visibleElementsSubject.sink(receiveValue: { updatedVisibleElements in
-                visibleElements = updatedVisibleElements
-            })
             cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation
-                if viewModel.initialRegionSet == false {
-                    if let coordinate = userLocation?.coordinate {
-                        viewModel.centerMap(to: coordinate)
-                    }
-                }
             }
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
         }

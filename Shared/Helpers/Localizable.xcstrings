@@ -1337,6 +1337,9 @@
         }
       }
     },
+    "Enable Location" : {
+
+    },
     "general_support_inquiries" : {
       "comment" : "Label for support email link",
       "localizations" : {
@@ -1396,6 +1399,12 @@
         }
       }
     },
+    "Get Started" : {
+
+    },
+    "Hang tight! We’re fetching all the best Bitcoin spots near you." : {
+
+    },
     "Key" : {
       "extractionState" : "manual",
       "shouldTranslate" : false
@@ -1403,6 +1412,9 @@
     "Key 1" : {
       "extractionState" : "manual",
       "shouldTranslate" : false
+    },
+    "Loading businesses…" : {
+
     },
     "location_alert_title" : {
       "comment" : "Alert title for failed location determination",
@@ -1757,6 +1769,9 @@
           }
         }
       }
+    },
+    "Next" : {
+
     },
     "no_locations_found" : {
       "comment" : "Empty state for no locations found",
@@ -2530,6 +2545,9 @@
         }
       }
     },
+    "Show Onboarding" : {
+
+    },
     "showing_locations_footer" : {
       "comment" : "Footer: Showing N of N locations",
       "localizations" : {
@@ -2588,6 +2606,9 @@
           }
         }
       }
+    },
+    "Skip for Now" : {
+
     },
     "socials_section" : {
       "comment" : "Section title for social media links",

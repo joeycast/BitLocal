@@ -16,7 +16,7 @@ struct Element: Codable, Identifiable, Hashable {
     let tags: Tags?
     let createdAt: String
     let updatedAt, deletedAt: String?
-    var address: Address?
+    var address: Address? 
     
     enum CodingKeys: String, CodingKey {
         case id

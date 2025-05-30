@@ -11,7 +11,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
-    @Binding var visibleElements: [Element]
+    var visibleElements: [Element]
 
     var body: some View {
         GeometryReader { geometry in

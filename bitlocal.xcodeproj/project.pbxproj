@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
+		F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */; };
 		F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F64093F42DE66D1700906C3E /* Localizable.xcstrings */; };
 		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
 		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
@@ -43,6 +44,8 @@
 		F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67937672DE206D200A49AC3 /* CustomFonts.swift */; };
 		F67937782DE206F000A49AC3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F67937772DE206F000A49AC3 /* LICENSE */; };
 		F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6B565F62DA327BE00EE992E /* CoreLocation.framework */; };
+		F6EFC28E2DE69FAF00D573E1 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC28D2DE69FAF00D573E1 /* RootView.swift */; };
+		F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -85,6 +88,9 @@
 		F67937772DE206F000A49AC3 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		F6B565BF2DA322FD00EE992E /* bitlocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bitlocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B565F62DA327BE00EE992E /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.4.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
+		F6EFC28D2DE69FAF00D573E1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingScreenView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -225,6 +231,8 @@
 		F66E0BA02DE33F1200D68897 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */,
+				F6EFC28D2DE69FAF00D573E1 /* RootView.swift */,
 				F66E0B9A2DE33F1200D68897 /* AboutView.swift */,
 				F66E0B9B2DE33F1200D68897 /* ContentView.swift */,
 				F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */,
@@ -264,6 +272,7 @@
 		F6B565B62DA322FD00EE992E = {
 			isa = PBXGroup;
 			children = (
+				F6EFC28F2DE6A06F00D573E1 /* Onboarding */,
 				F66E0BA12DE33F1200D68897 /* Shared */,
 				F66E0B722DE33ED800D68897 /* Map */,
 				F66E0B812DE33EE600D68897 /* Businesses */,
@@ -294,6 +303,22 @@
 				F6B565F62DA327BE00EE992E /* CoreLocation.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		F6EFC28F2DE6A06F00D573E1 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				F6EFC2902DE6A07600D573E1 /* Views */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		F6EFC2902DE6A07600D573E1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -390,12 +415,14 @@
 				F66E0B752DE33ED800D68897 /* IPadLayoutView.swift in Sources */,
 				F66E0B762DE33ED800D68897 /* MapButtonsView.swift in Sources */,
 				F66E0B772DE33ED800D68897 /* AnnotationView.swift in Sources */,
+				F6EFC28E2DE69FAF00D573E1 /* RootView.swift in Sources */,
 				F66E0B782DE33ED800D68897 /* Annotation.swift in Sources */,
 				F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */,
 				F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */,
 				F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */,
 				F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */,
 				F66E0B902DE33EF800D68897 /* CompactSettingsPopoverView.swift in Sources */,
+				F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */,
 				F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */,
 				F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */,
 				F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */,
@@ -410,6 +437,7 @@
 				F66E0BA82DE33F1200D68897 /* MainView.swift in Sources */,
 				F66E0BA92DE33F1200D68897 /* AboutView.swift in Sources */,
 				F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */,
+				F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */,
 				F66E0BAB2DE33F1200D68897 /* EarlierThaniOS170View.swift in Sources */,
 				F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */,
 				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,

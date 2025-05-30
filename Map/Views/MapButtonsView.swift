@@ -14,11 +14,14 @@ struct MapButtonsView: View {
     var selectedMapTypeBinding: Binding<MKMapType>
     var userLocation: CLLocation?
     var isIPad: Bool
-
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+
+    // 🔑 State to know when the button was tapped and we should center on next location update:
+    @State private var shouldCenterOnLocation = false
 
     var body: some View {
         VStack(spacing: 10) {
+            
             Button(action: {
                 let newType: MKMapType = (selectedMapType == .standard) ? .hybrid : .standard
                 selectedMapTypeBinding.wrappedValue = newType
@@ -32,30 +35,39 @@ struct MapButtonsView: View {
                         .aboutIconStyle(size: 20, color: .white)
                 }
             }
-            Button(action: {
+
+            // 🧭 Locate-me button
+            Button {
+                // 1️⃣ Ask for permission & start updating
                 viewModel.locationManager.requestWhenInUseAuthorization()
                 viewModel.isUpdatingLocation = true
                 viewModel.locationManager.startUpdatingLocation()
-                if let coordinate = userLocation?.coordinate {
-                    viewModel.centerMap(to: coordinate)
-                }
+
+                // 2️⃣ Flag so that when userLocation publishes, we center once
+                shouldCenterOnLocation = true
+
+                // 3️⃣ Keep your timeout alert logic
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                    if viewModel.isUpdatingLocation {
-                        let alert = UIAlertController(
-                            title: NSLocalizedString("location_alert_title", comment: "Alert title for failed location determination"),
-                            message: nil,
-                            preferredStyle: .alert
-                        )
-                        alert.addAction(UIAlertAction(title: NSLocalizedString("ok_button", comment: "OK button"), style: .default))
-                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                           let rootViewController = windowScene.windows.first?.rootViewController {
-                            rootViewController.topMostViewController().present(alert, animated: true, completion: nil)
-                        }
-                        viewModel.locationManager.stopUpdatingLocation()
-                        viewModel.isUpdatingLocation = false
+                    guard viewModel.isUpdatingLocation else { return }
+                    let alert = UIAlertController(
+                        title: NSLocalizedString("location_alert_title", comment: ""),
+                        message: nil,
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
+                                           style: .default))
+                    if let windowScene = UIApplication.shared.connectedScenes
+                        .first as? UIWindowScene,
+                       let rootVC = windowScene.windows.first?.rootViewController
+                    {
+                        rootVC.topMostViewController()
+                              .present(alert, animated: true)
                     }
+                    viewModel.locationManager.stopUpdatingLocation()
+                    viewModel.isUpdatingLocation = false
+                    shouldCenterOnLocation = false
                 }
-            }) {
+            } label: {
                 ZStack {
                     Circle()
                         .fill(Color.accentColor)
@@ -65,6 +77,17 @@ struct MapButtonsView: View {
                         .aboutIconStyle(size: 20, color: .white)
                 }
             }
+        }
+        // 🔄 Watch for the first non-nil userLocation after tapping:
+        .onReceive(viewModel.$userLocation.compactMap { $0 }) { newLocation in
+            guard shouldCenterOnLocation else { return }
+            // This is your existing centering logic in ContentViewModel:
+            viewModel.centerMap(to: newLocation.coordinate)
+
+            // Clean up
+            shouldCenterOnLocation = false
+            viewModel.locationManager.stopUpdatingLocation()
+            viewModel.isUpdatingLocation = false
         }
     }
 }

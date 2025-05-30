@@ -12,7 +12,7 @@ import Combine
 
 @available(iOS 17.0, *)
 struct MapView: UIViewRepresentable {
-    @Binding var elements: [Element]?
+    var elements: [Element]?
     @EnvironmentObject var viewModel: ContentViewModel
     
     // Properties for Dynamic Padding
@@ -23,8 +23,8 @@ struct MapView: UIViewRepresentable {
     var mapType: MKMapType
     
     // Initializer
-    init(elements: Binding<[Element]?>, topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType) {
-        self._elements = elements
+    init(elements: [Element]?, topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType) {
+        self.elements = elements
         self.topPadding = topPadding
         self.bottomPadding = bottomPadding
         self.mapType = mapType
@@ -50,10 +50,22 @@ struct MapView: UIViewRepresentable {
         
         // Show user location on the map
         mapView.showsUserLocation = true
+//        mapView.userTrackingMode = .follow
         
         // Set initial map type
         mapView.mapType = mapType
         
+        // Auto-center on user location when map loads
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let userLocation = viewModel.locationManager.location {
+                viewModel.centerMap(to: userLocation.coordinate)
+            } else {
+                // Request location and center when available
+//                viewModel.locationManager.requestWhenInUseAuthorization()
+                viewModel.locationManager.startUpdatingLocation()
+            }
+        }
+
         return mapView
     }
     
@@ -65,9 +77,15 @@ struct MapView: UIViewRepresentable {
         if mapView.mapType != mapType {
             mapView.mapType = mapType
         }
-        
-        // Handle updating annotations if `elements` change
-        context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
+        // Initial annotation load if data exists
+        if let elements = elements, !elements.isEmpty {
+            let elementsHash = elements.hashValue
+            if context.coordinator.lastElementsHash != elementsHash {
+                context.coordinator.lastElementsHash = elementsHash
+                context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
+            }
+        }
+        // Removed immediate annotation update here; handled via debounced regionDidChangeAnimated
     }
     
     // Set up clustering for map annotations
@@ -88,6 +106,7 @@ struct MapView: UIViewRepresentable {
         var currentAnnotations: [String: Annotation] = [:] // Keep track of current annotations
         private var cancellable: AnyCancellable?
         private var debounceTimer: AnyCancellable?
+        var lastElementsHash: Int?
         
         init(viewModel: ContentViewModel, topPadding: CGFloat, bottomPadding: CGFloat) {
             self.viewModel = viewModel
@@ -191,7 +210,6 @@ struct MapView: UIViewRepresentable {
             let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
             mapView.addAnnotations(newAnnotations)
             
-            // Update visible elements
             self.viewModel.visibleElementsSubject.send(Array(newElements))
         }
         
@@ -282,7 +300,7 @@ struct MapView: UIViewRepresentable {
                 .delay(for: .seconds(0.5), scheduler: RunLoop.main)
                 .sink { [weak self] _ in
                     guard let self = self else { return }
-                    self.updateAnnotations(mapView: mapView, elements: self.viewModel.elements)
+                    self.updateAnnotations(mapView: mapView, elements: self.viewModel.allElements)
                 }
             
             if animated, let completion = mapRegionChangeCompletion {

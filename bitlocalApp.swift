@@ -15,25 +15,17 @@ struct bitlocalApp: App {
     @Environment(\.scenePhase) var scenePhase
     @StateObject private var contentViewModel = ContentViewModel()
     
-    // Initialize your API manager
-    let apiManager = APIManager()
-    
     init() {
         MyFont.registerFonts()
     }
     
     var body: some Scene {
         WindowGroup {
-            MainView()
+            RootView()
                 .environmentObject(contentViewModel)
-                // Use .onChange(of:) to react to changes in the scenePhase
                 .onChange(of: scenePhase) { newPhase in
                     if newPhase == .active {
-                        // The app has become active; trigger API call
-                        apiManager.getElements { _ in
-                            // Handle the fetched data
-                            // Note: Ensure any UI updates are dispatched on the main thread
-                        }
+                        contentViewModel.fetchElements()
                     }
                 }
         }

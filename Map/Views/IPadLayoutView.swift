@@ -11,8 +11,8 @@ import MapKit
 @available(iOS 17.0, *)
 struct IPadLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
-    @Binding var elements: [Element]?
-    @Binding var visibleElements: [Element]
+    var elements: [Element]?
+    var visibleElements: [Element]
     @Binding var showingAbout: Bool
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
@@ -70,14 +70,13 @@ struct IPadLayoutView: View {
         ZStack {
             if let elements = elements {
                 MapView(
-                    elements: .constant(elements),
+                    elements: elements,
                     topPadding: headerHeight,
                     bottomPadding: viewModel.bottomPadding,
                     mapType: selectedMapType
                 )
                 .ignoresSafeArea()
                 .onAppear {
-                    viewModel.locationManager.requestWhenInUseAuthorization()
                     viewModel.locationManager.startUpdatingLocation()
                 }
                 .overlay(
@@ -177,8 +176,8 @@ struct IPadLayoutView_Previews: PreviewProvider {
     static var previews: some View {
         IPadLayoutView(
             viewModel: viewModel,
-            elements: $elements,
-            visibleElements: $visibleElements,
+            elements: elements,
+            visibleElements: visibleElements,
             showingAbout: $showingAbout,
             showingSettings: $showingSettings,
             headerHeight: $headerHeight,

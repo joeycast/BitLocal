@@ -23,7 +23,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var path: [Element] = []
     @Published var selectedElement: Element?
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
-    @Published var elements: [Element]? = []
+    // @Published var elements: [Element]? = nil
+    @Published private(set) var allElements: [Element] = []
+    @Published var visibleElements: [Element] = []
+    @Published var isLoading: Bool = false
     @Published var topPadding: CGFloat = 0
     @Published var bottomPadding: CGFloat = 0
     @Published var initialRegionSet = false // Track if initial region has been set
@@ -44,6 +47,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         locationManager.delegate = self
         mapView?.delegate = self
         setupCenterMapSubscription()
+        visibleElementsSubject
+            .receive(on: RunLoop.main)
+            .sink { [weak self] elements in
+                self?.visibleElements = elements
+            }
+            .store(in: &cancellables)
     }
     
     // Request location
@@ -173,23 +182,37 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             }
             .store(in: &cancellables)
     }
-    
-    func centerMap(to coordinate: CLLocationCoordinate2D, animated: Bool = true) {
+
+    func centerMap(to coordinate: CLLocationCoordinate2D) {
         guard let mapView = mapView else { return }
         
-        if !initialRegionSet {
-            // Set an initial zoom level only once
-            print("Setting initial region -> Coordinate: \(coordinate.latitude), \(coordinate.longitude)")
-            let initialRegion = MKCoordinateRegion(
-                center: coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3) // Default zoom level
-            )
-            mapView.setRegion(initialRegion, animated: animated)
-            initialRegionSet = true
+        // Get screen dimensions
+        let screenBounds = UIScreen.main.bounds
+        let screenWidth = screenBounds.width
+        let screenHeight = screenBounds.height
+        
+        // Determine if we're on iPad based on screen size
+        let isIPad = screenWidth > 768 || screenHeight > 1024
+        
+        // Create region centered on user location
+        let region = MKCoordinateRegion(center: coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
+        
+        // Convert region to map rect
+        let mapPoint = MKMapPoint(coordinate)
+        let metersPerMapPoint = MKMapPointsPerMeterAtLatitude(coordinate.latitude)
+        let mapSize = MKMapSize(width: 10000 * metersPerMapPoint, height: 10000 * metersPerMapPoint)
+        let mapRect = MKMapRect(origin: MKMapPoint(x: mapPoint.x - mapSize.width/2, y: mapPoint.y - mapSize.height/2), size: mapSize)
+        
+        if isIPad {
+            // iPad: Add left padding to account for side panel
+            let sidePanelWidth: CGFloat = screenWidth <= 744 ? screenWidth * 0.4 : screenWidth * 0.35
+            let edgePadding = UIEdgeInsets(top: 0, left: sidePanelWidth, bottom: 0, right: 0)
+            mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
         } else {
-            // Preserve zoom level and only center the map
-            print("Centering Map -> Coordinate: \(coordinate.latitude), \(coordinate.longitude)")
-            mapView.setCenter(coordinate, animated: animated)
+            // iPhone: Add bottom padding to account for bottom sheet (~1/3 of screen)
+            let bottomSheetHeight = screenHeight * (0.8/3.0)
+            let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: bottomSheetHeight, right: 0)
+            mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
         }
     }
     
@@ -206,6 +229,24 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         DispatchQueue.main.async {
             self.mapView?.selectedAnnotations.forEach { annotation in
                 self.mapView?.deselectAnnotation(annotation, animated: true)
+            }
+        }
+    }
+
+    // Fetch elements using the APIManager and update the published elements property
+    func fetchElements() {
+        isLoading = true
+        APIManager.shared.getElements { [weak self] elements in
+            // Offload heavy work
+            DispatchQueue.global(qos: .userInitiated).async {
+                // Example: (if you want to preprocess/filter/map elements)
+                let processedElements = elements ?? []
+                
+                // Now publish ONLY the assignment on the main thread
+                DispatchQueue.main.async {
+                    self?.allElements = processedElements
+                    self?.isLoading = false
+                }
             }
         }
     }

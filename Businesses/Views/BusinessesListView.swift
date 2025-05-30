@@ -13,7 +13,6 @@ struct BusinessesListView: View {
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     
     let maxListResults = 25
-    
     var elements: [Element]
     var userLocation: CLLocation?
     
@@ -30,96 +29,83 @@ struct BusinessesListView: View {
     }
     
     var body: some View {
-        // In BusinessesListView
-        if elements.isEmpty {
-            Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
-                .foregroundColor(.gray)
-                .font(.title3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        } else {
-            List {
-                Section(footer: footerView) {
-                    ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
-                        let cellViewModel = self.cellViewModel(for: element)
-                        NavigationLink(value: element) {
-                            ElementCell(viewModel: cellViewModel)
+        Group {
+            // 1️⃣ Loading state
+            if viewModel.isLoading {
+                VStack {
+                    Spacer()
+                    LoadingScreenView()
+                    Spacer()
+                }
+            }
+            // 2️⃣ No locations after loading finishes
+            else if elements.isEmpty {
+                Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
+                    .foregroundColor(.gray)
+                    .font(.title3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+            // 3️⃣ Show the list when we have elements
+            else {
+                List {
+                    Section(footer: footerView) {
+                        ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
+                            let cellVM = cellViewModel(for: element)
+                            NavigationLink(value: element) {
+                                ElementCell(viewModel: cellVM)
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.defaultMinListRowHeight, 0)
+                .navigationBarTitleDisplayMode(.inline)
+                .padding(.top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onChange(of: viewModel.path) { newPath in
+                    if let element = newPath.last {
+                        // Delay zoom until after navigation completes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            viewModel.zoomToElement(element)
                         }
                     }
                 }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 0)
-            .navigationBarTitleDisplayMode(.inline)
-            .padding(.top)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .onChange(of: viewModel.path) { newPath in
-                if let element = newPath.last {
-                    // Delay zoom until after navigation completes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        viewModel.zoomToElement(element)
-                    }
-                }
-            }
         }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
     }
     
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
         if let vm = viewModel.cellViewModels[element.id] {
             return vm
         } else {
-            let newVM = ElementCellViewModel(element: element, userLocation: viewModel.userLocation, viewModel: viewModel)
+            let newVM = ElementCellViewModel(element: element,
+                                             userLocation: viewModel.userLocation,
+                                             viewModel: viewModel)
             viewModel.cellViewModels[element.id] = newVM
             return newVM
-        }
-    }
-    
-    private func localizedDistanceString(for element: Element) -> String? {
-        guard let userLocation = viewModel.userLocation, let coord = element.mapCoordinate else { return nil }
-        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
-        let distanceInMeters = userLocation.distance(from: location)
-        let useMetric: Bool
-        switch distanceUnit {
-        case .auto:
-            useMetric = Locale.current.measurementSystem == .metric
-        case .miles:
-            useMetric = false
-        case .kilometers:
-            useMetric = true
-        }
-        if useMetric {
-            let km = distanceInMeters / 1000
-            if km < 1 {
-                return String(format: "%.2f km", km)
-            } else {
-                return String(format: "%.1f km", km)
-            }
-        } else {
-            let miles = distanceInMeters / 1609.344
-            if miles < 1 {
-                return String(format: "%.2f mi", miles)
-            } else {
-                return String(format: "%.1f mi", miles)
-            }
         }
     }
     
     private var footerView: some View {
         Group {
             if sortedElements.count > maxListResults {
-                VStack {
-                    Text(String(
+                Text(
+                    String(
                         format: NSLocalizedString("locations_returned_footer", comment: "Footer: N locations returned, top M displayed"),
                         sortedElements.count,
                         min(sortedElements.count, maxListResults)
-                    ))
-                }
+                    )
+                )
             } else {
-                Text(String(
-                    format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
-                    sortedElements.count,
-                    sortedElements.count
-                ))
+                Text(
+                    String(
+                        format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
+                        sortedElements.count,
+                        sortedElements.count
+                    )
+                )
             }
         }
         .font(.footnote)

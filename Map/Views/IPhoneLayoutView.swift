@@ -11,12 +11,15 @@ import MapKit
 @available(iOS 17.0, *)
 struct IPhoneLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
-    @Binding var elements: [Element]?
-    @Binding var visibleElements: [Element]
+    var elements: [Element]?
+    var visibleElements: [Element]
     @Binding var showingAbout: Bool
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
+
+    // Add this to track onboarding state
+    @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     @EnvironmentObject var appearanceManager: AppearanceManager
@@ -31,14 +34,13 @@ struct IPhoneLayoutView: View {
             ZStack {
                 if let elements = elements {
                     MapView(
-                        elements: .constant(elements),
+                        elements: elements,
                         topPadding: headerHeight,
                         bottomPadding: viewModel.bottomPadding,
                         mapType: selectedMapType
                     )
                     .ignoresSafeArea()
                     .onAppear {
-                        viewModel.locationManager.requestWhenInUseAuthorization()
                         viewModel.locationManager.startUpdatingLocation()
                     }
                     .overlay(
@@ -71,16 +73,17 @@ struct IPhoneLayoutView: View {
                 .padding(.bottom, geometry.size.height * 0.3 + 10),
                 alignment: .bottomTrailing
             )
+            // Only show bottom sheet after onboarding is complete
             .bottomSheet(
                 presentationDetents: [.fraction(0.3), .medium, .large],
-                isPresented: .constant(true),
+                isPresented: .constant(didCompleteOnboarding), // Changed this line
                 dragIndicator: .visible,
                 sheetCornerRadius: 20,
                 largestUndimmedIdentifier: .medium,
                 interactiveDisabled: true,
                 forcedColorScheme: nil, // Let the content handle its own color scheme
                 content: {
-                    BottomSheetContentView(visibleElements: $visibleElements)
+                    BottomSheetContentView(visibleElements: visibleElements)
                         .id("\(appearance.rawValue)-\(systemColorScheme)")
                         .environmentObject(viewModel)
                         .background(Color(UIColor.systemBackground))
