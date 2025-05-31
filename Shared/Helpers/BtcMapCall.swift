@@ -154,14 +154,19 @@ class APIManager {
                 do {
                     let decoder = JSONDecoder()
                     decoder.dataDecodingStrategy = .base64
-                    
+
                     let fetchedElements = try decoder.decode([Element].self, from: data)
-                    
+
+                    // Log OSM tags for each element
+                    for el in fetchedElements {
+                        print("OSM tags for element \(el.id): \(String(describing: el.osmJSON?.tags))")
+                    }
+
                     // Do NOT print the entire JSON or array!
                     print("Decoded \(fetchedElements.count) elements.")
-                    
+
                     self.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
-                    
+
                     if let mostRecentUpdate = fetchedElements.max(by: { $0.updatedAt ?? "" < $1.updatedAt ?? "" })?.updatedAt {
                         print("Updating lastUpdateKey to: \(mostRecentUpdate)")
                         LogManager.shared.log("Updating lastUpdateKey to: \(mostRecentUpdate)")
@@ -172,7 +177,7 @@ class APIManager {
                     }
                     // Now use file-based cache for return value:
                     let updatedCache = self.loadElementsFromFile()
-                    
+
                     // MAIN THREAD for UI update only
                     DispatchQueue.main.async {
                         completion(updatedCache)

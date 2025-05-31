@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */; };
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
 		F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */; };
 		F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F64093F42DE66D1700906C3E /* Localizable.xcstrings */; };
@@ -49,6 +50,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCategorySymbols.swift; sourceTree = "<group>"; };
 		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
 		F64093F42DE66D1700906C3E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
@@ -146,6 +148,7 @@
 		F66E0B7A2DE33EE600D68897 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */,
 				F66E0BAE2DE340CB00D68897 /* Element.swift */,
 			);
 			path = Models;
@@ -426,6 +429,7 @@
 				F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */,
 				F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */,
 				F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */,
+				F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */,
 				F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */,
 				F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */,
 				F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */,

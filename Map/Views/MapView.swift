@@ -236,7 +236,11 @@ struct MapView: UIViewRepresentable {
                 view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
-                view?.glyphImage = UIImage(systemName: "bitcoinsign")?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                if let element = annotation.element {
+                    let symbolName = ElementCategorySymbols.symbolName(for: element)
+                    print("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
+                    view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                }
                 view?.displayPriority = .required
             }
             return view

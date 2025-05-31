@@ -16,7 +16,50 @@ struct Element: Codable, Identifiable, Hashable {
     let tags: Tags?
     let createdAt: String
     let updatedAt, deletedAt: String?
-    var address: Address? 
+    var address: Address?
+
+    /// A convenience dictionary of OSM tags (e.g. "cuisine", "shop", "amenity"), suitable for lookup in ElementCategorySymbols.
+    var osmTagsDict: [String: String]? {
+        guard let osmTags = osmJSON?.tags else { return nil }
+        var dict: [String: String] = [:]
+        if let cuisine = osmTags.cuisine {
+            dict["cuisine"] = cuisine
+        }
+        if let shop = osmTags.shop {
+            dict["shop"] = shop
+        }
+        if let sport = osmTags.sport {
+            dict["sport"] = sport
+        }
+        if let tourism = osmTags.tourism {
+            dict["tourism"] = tourism
+        }
+        if let healthcare = osmTags.healthcare {
+            dict["healthcare"] = healthcare
+        }
+        if let craft = osmTags.craft {
+            dict["craft"] = craft
+        }
+        if let amenity = osmTags.amenity {
+            dict["amenity"] = amenity
+        }
+        if let place = osmTags.place {
+            dict["place"] = place
+        }
+        if let leisure = osmTags.leisure {
+            dict["leisure"] = leisure
+        }
+        if let office = osmTags.office {
+            dict["office"] = office
+        }
+        if let building = osmTags.building {
+            dict["building"] = building
+        }
+        if let company = osmTags.company {
+            dict["company"] = company
+        }
+        return dict.isEmpty ? nil : dict
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -98,6 +141,18 @@ struct OsmTags: Codable {
     let paymentBitcoin, currencyXBT, paymentOnchain, paymentLightning, paymentLightningContactless: String?
     let name, `operator`: String?
     let description, descriptionEn, website, contactWebsite, phone, contactPhone, openingHours: String?
+    let cuisine: String?
+    let shop: String?
+    let sport: String?
+    let tourism: String?
+    let healthcare: String?
+    let craft: String?
+    let amenity: String?
+    let place: String?
+    let leisure: String?
+    let office: String?
+    let building: String?
+    let company: String?
     
     enum CodingKeys: String, CodingKey {
         case addrCity = "addr:city"
@@ -119,6 +174,18 @@ struct OsmTags: Codable {
         case phone
         case contactPhone = "contact:phone"
         case openingHours = "opening_hours"
+        case cuisine
+        case shop
+        case sport
+        case tourism
+        case healthcare
+        case craft
+        case amenity
+        case place
+        case leisure
+        case office
+        case building
+        case company
     }
 }
 
