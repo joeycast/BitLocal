@@ -9,9 +9,9 @@ import SwiftUI
 import CoreLocation
 
 struct OnboardingPage {
-    let title: String
-    let subtitle: String
-    let image: String // SF Symbol or asset name
+    let titleKey: String
+    let subtitleKey: String
+    let image: String
     let bgColor: Color
     let isLocationPage: Bool
 }
@@ -22,110 +22,120 @@ struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var locationManager = CLLocationManager()
     @State private var locationDelegate = LocationPermissionDelegate()
+    @State private var iconScale: CGFloat = 1.0
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
-            title: "Discover BitLocal",
-            subtitle: "Unlock a world of local shops and experiences that accept Bitcoin.",
-            image: "bitcoinsign.circle.fill",
-            bgColor: Color.orange,
+            titleKey: "onboarding_discover_title",
+            subtitleKey: "onboarding_discover_subtitle",
+            image: "currency-btc-bold",
+            bgColor: .accentColor,
             isLocationPage: false
         ),
         OnboardingPage(
-            title: "Explore Seamlessly",
-            subtitle: "Find businesses on the map, browse details, and plan your next adventure.",
-            image: "map.fill",
-            bgColor: Color.blue,
+            titleKey: "onboarding_map_title",
+            subtitleKey: "onboarding_map_subtitle",
+            image: "map-trifold-fill",
+            bgColor: .green,
             isLocationPage: false
         ),
         OnboardingPage(
-            title: "Enable Location Services",
-            subtitle: "Allow location access to enhance your experience with personalized recommendations and nearby businesses. This is optional and can be enabled later.",
-            image: "location.fill",
-            bgColor: Color.purple,
+            titleKey: "onboarding_location_title",
+            subtitleKey: "onboarding_location_subtitle",
+            image: "navigation-arrow-fill",
+            bgColor: .blue,
             isLocationPage: true
         ),
         OnboardingPage(
-            title: "Share & Connect",
-            subtitle: "Suggest new places, leave feedback, and help grow the Bitcoin community.",
-            image: "bubble.left.and.bubble.right.fill",
-            bgColor: Color.green,
-            isLocationPage: false
-        ),
-        OnboardingPage(
-            title: "Your Bitcoin Journey Starts Here",
-            subtitle: "Ready to explore? Tap below and dive in!",
-            image: "sparkles",
-            bgColor: Color.yellow,
+            titleKey: "onboarding_ready_title",
+            subtitleKey: "onboarding_ready_subtitle",
+            image: "binoculars-fill",
+            bgColor: .purple,
             isLocationPage: false
         )
     ]
 
     var body: some View {
         ZStack {
-            // Full opacity background that completely covers everything underneath
-            pages[currentPage].bgColor.opacity(0.08)
-                .ignoresSafeArea(.all)
-            
-            // Add a solid background layer to prevent any bleed-through
+            // Background layers
+            pages[currentPage].bgColor.ignoresSafeArea()
             Color(UIColor.systemBackground)
                 .opacity(0.95)
-                .ignoresSafeArea(.all)
-            
+                .ignoresSafeArea()
+
             VStack(spacing: 28) {
-                Spacer(minLength: 30)
-
-                // Animated image/icon with bounce effect
-                ZStack {
-                    Circle()
-                        .fill(pages[currentPage].bgColor.opacity(0.15))
-                        .frame(width: 120, height: 120)
-                        .shadow(color: pages[currentPage].bgColor.opacity(0.3), radius: 16, x: 0, y: 8)
-                    Image(systemName: pages[currentPage].image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 68, height: 68)
-                        .foregroundColor(pages[currentPage].bgColor)
-                        .scaleEffect(1.0 + 0.08 * sin(Double(currentPage) * 1.5))
-                        .animation(.easeInOut(duration: 0.6), value: currentPage)
-                        .shadow(radius: 4)
+                // Bouncing icon with smooth transition (prevents distortion)
+                GeometryReader { geo in
+                    ZStack {
+                        // Keyed on currentPage to ensure a new view for each icon, enabling smooth transition
+                        ZStack {
+                            Circle()
+                                .fill(pages[currentPage].bgColor)
+                                .frame(width: 120, height: 120)
+                                .shadow(color: pages[currentPage].bgColor.opacity(0.3), radius: 16, x: 0, y: 8)
+                            Image(pages[currentPage].image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 68, height: 68)
+                                .foregroundColor(.white)
+                                .scaleEffect(iconScale)
+                                .offset(y: pages[currentPage].image == "navigation-arrow-fill" ? 2 : 0)
+                                .offset(x: pages[currentPage].image == "navigation-arrow-fill" ? -4 : 0)
+                                .offset(x: pages[currentPage].image == "currency-btc-bold" ? 1 : 0)
+                        }
+                        .id(currentPage)
+                        .animation(.easeInOut(duration: 0.5), value: currentPage)
+                    }
+                    .position(x: geo.size.width / 2, y: geo.size.height * 1.0)
                 }
-                .padding(.top, 16)
-                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity))
-                .animation(.easeInOut, value: currentPage)
+                .frame(height: 200)
 
-                // Animated text transitions
+                // Title & subtitle
                 VStack(spacing: 12) {
-                    Text(pages[currentPage].title)
-                        .font(.largeTitle)
-                        .bold()
+                    Text(LocalizedStringKey(pages[currentPage].titleKey))
+                        .font(.largeTitle).bold()
+                        .multilineTextAlignment(.center)
                         .foregroundColor(.primary)
                         .transition(.move(edge: .leading).combined(with: .opacity))
                         .id("title\(currentPage)")
                         .animation(.spring(), value: currentPage)
 
-                    Text(pages[currentPage].subtitle)
+                    Text(LocalizedStringKey(pages[currentPage].subtitleKey))
                         .font(.title3)
-                        .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
                         .padding(.horizontal, 14)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                         .id("subtitle\(currentPage)")
                         .animation(.spring(response: 0.6), value: currentPage)
                 }
-                .padding(.top, 10)
+                .padding(.top, 50)
 
                 Spacer()
 
-                // Special content for location page
+                // 🔹 Indicator always visible
+                HStack(spacing: 8) {
+                    ForEach(pages.indices, id: \.self) { i in
+                        Capsule()
+                            .fill(i == currentPage
+                                  ? pages[currentPage].bgColor
+                                  : Color.gray.opacity(0.3))
+                            .frame(width: i == currentPage ? 32 : 12, height: 8)
+                            .animation(.easeInOut(duration: 0.25), value: currentPage)
+                    }
+                }
+                .padding(.bottom, 12)
+
+                // 🔹 Page-specific controls
                 if pages[currentPage].isLocationPage {
+                    // Location permission UI
                     VStack(spacing: 16) {
-                        Button(action: {
+                        Button {
                             requestLocationPermission()
-                        }) {
+                        } label: {
                             HStack {
                                 Image(systemName: "location.fill")
-                                Text("Enable Location")
+                                Text("onboarding_button_enable_location")
                             }
                             .font(.headline)
                             .frame(maxWidth: .infinity)
@@ -135,34 +145,24 @@ struct OnboardingView: View {
                             .cornerRadius(14)
                             .shadow(color: pages[currentPage].bgColor.opacity(0.3), radius: 4, x: 0, y: 2)
                         }
-                        
-                        Button(action: {
+
+                        Button {
                             proceedToNextPage()
-                        }) {
-                            Text("Skip for Now")
+                        } label: {
+                            Text("onboarding_button_location_skip")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                     }
                     .padding(.horizontal, 6)
                     .padding(.bottom, 20)
-                } else {
-                    // Slick page indicator
-                    HStack(spacing: 8) {
-                        ForEach(pages.indices, id: \.self) { i in
-                            Capsule()
-                                .fill(i == currentPage ? pages[currentPage].bgColor : Color.gray.opacity(0.3))
-                                .frame(width: i == currentPage ? 32 : 12, height: 8)
-                                .animation(.easeInOut(duration: 0.25), value: currentPage)
-                        }
-                    }
-                    .padding(.bottom, 12)
 
-                    // Next/Get Started button with animation
-                    Button(action: {
+                } else {
+                    // Next / Get Started button
+                    Button {
                         proceedToNextPage()
-                    }) {
-                        Text(currentPage == pages.count - 1 ? "Get Started" : "Next")
+                    } label: {
+                        Text(currentPage == pages.count - 1 ? "onboarding_button_get_started" : "onboarding_button_next")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -179,23 +179,37 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: 460)
             .padding(.horizontal)
-        }
-        .animation(.easeInOut(duration: 0.4), value: currentPage)
-        .onAppear {
-            locationManager.delegate = locationDelegate
+            .onAppear {
+                // Start bouncing
+                withAnimation(
+                    Animation.easeInOut(duration: 0.9)
+                        .repeatForever(autoreverses: true)
+                ) {
+                    iconScale = 1.08
+                }
+                locationManager.delegate = locationDelegate
+            }
+            .onChange(of: currentPage) {
+                iconScale = 1.0
+                withAnimation(
+                    Animation.easeInOut(duration: 0.9)
+                        .repeatForever(autoreverses: true)
+                ) {
+                    iconScale = 1.08
+                }
+            }
+            .animation(.easeInOut(duration: 0.4), value: currentPage)
         }
     }
-    
+
     private func requestLocationPermission() {
         locationManager.requestWhenInUseAuthorization()
         viewModel.locationManager.startUpdatingLocation()
-        
-        // Add a small delay to allow the permission dialog to appear and be handled
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             proceedToNextPage()
         }
     }
-    
+
     private func proceedToNextPage() {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             if currentPage < pages.count - 1 {
@@ -207,19 +221,10 @@ struct OnboardingView: View {
     }
 }
 
-// Simple delegate to handle location permission
+// Delegate for location permission changes
 class LocationPermissionDelegate: NSObject, CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        // Handle authorization changes if needed
+    func locationManager(_ manager: CLLocationManager,
+                         didChangeAuthorization status: CLAuthorizationStatus) {
         print("Location authorization status changed: \(status)")
-    }
-}
-
-struct OnboardingPageView: View {
-    let page: OnboardingPage
-
-    var body: some View {
-        // This view is no longer used, but kept for reference if you want per-page customization
-        EmptyView()
     }
 }

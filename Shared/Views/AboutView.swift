@@ -165,7 +165,7 @@ struct AboutView: View {
                 //                    }
                 //                }
                 Section {
-                    Button("Show Onboarding") {
+                    Button("show_onboarding_button") {
                         UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")
                     }
                 }

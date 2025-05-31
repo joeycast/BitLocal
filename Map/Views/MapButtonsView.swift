@@ -75,6 +75,7 @@ struct MapButtonsView: View {
                         .shadow(radius: 3)
                     Image("navigation-arrow-fill")
                         .aboutIconStyle(size: 20, color: .white)
+                        .offset(x: -2, y: 1)
                 }
             }
         }

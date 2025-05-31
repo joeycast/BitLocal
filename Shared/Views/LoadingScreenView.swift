@@ -12,11 +12,11 @@ struct LoadingScreenView: View {
     var body: some View {
         VStack(spacing: 32) {
             Spacer()
-            ProgressView("Loading businesses…")
+            ProgressView("loading_title") // Localized
                 .progressViewStyle(.circular)
                 .font(.title2)
                 .padding(.bottom, 16)
-            Text("Hang tight! We’re fetching all the best Bitcoin spots near you.")
+            Text("loading_subtitle") // Localized
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
