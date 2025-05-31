@@ -165,14 +165,21 @@ struct AboutView: View {
                 //                    }
                 //                }
                 Section {
-                    Button("show_onboarding_button") {
+                    Button {
                         UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")
-                        // Only dismiss the sheet if we’re on an iPad
+                        // Only dismiss the sheet if we're on an iPad
                         #if os(iOS)
                         if UIDevice.current.userInterfaceIdiom == .pad {
                             dismiss()
                         }
                         #endif
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image("cards-three-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("show_onboarding_button")
+                            Spacer()
+                        }
                     }
                 }
             }
