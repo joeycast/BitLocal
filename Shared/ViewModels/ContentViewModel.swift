@@ -185,32 +185,25 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func centerMap(to coordinate: CLLocationCoordinate2D) {
         guard let mapView = mapView else { return }
-        
-        // Get screen dimensions
-        let screenBounds = UIScreen.main.bounds
-        let screenWidth = screenBounds.width
-        let screenHeight = screenBounds.height
-        
-        // Determine if we're on iPad based on screen size
-        let isIPad = screenWidth > 768 || screenHeight > 1024
-        
-        // Create region centered on user location
-        let region = MKCoordinateRegion(center: coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
-        
-        // Convert region to map rect
+
+        // Build a small MKMapRect around the user location:
         let mapPoint = MKMapPoint(coordinate)
-        let metersPerMapPoint = MKMapPointsPerMeterAtLatitude(coordinate.latitude)
-        let mapSize = MKMapSize(width: 10000 * metersPerMapPoint, height: 10000 * metersPerMapPoint)
-        let mapRect = MKMapRect(origin: MKMapPoint(x: mapPoint.x - mapSize.width/2, y: mapPoint.y - mapSize.height/2), size: mapSize)
-        
-        if isIPad {
-            // iPad: Add left padding to account for side panel
-            let sidePanelWidth: CGFloat = screenWidth <= 744 ? screenWidth * 0.4 : screenWidth * 0.35
-            let edgePadding = UIEdgeInsets(top: 0, left: sidePanelWidth, bottom: 0, right: 0)
+        let metersPerPoint = MKMapPointsPerMeterAtLatitude(coordinate.latitude)
+        let mapSize = MKMapSize(width: 10000 * metersPerPoint, height: 10000 * metersPerPoint)
+        let mapRect = MKMapRect(
+            origin: MKMapPoint(x: mapPoint.x - mapSize.width / 2,
+                               y: mapPoint.y - mapSize.height / 2),
+            size: mapSize
+        )
+
+        // If on iPad, center with NO horizontal inset—so the map pane centers user dot visually.
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
             mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
         } else {
-            // iPhone: Add bottom padding to account for bottom sheet (~1/3 of screen)
-            let bottomSheetHeight = screenHeight * (0.8/3.0)
+            // iPhone: preserve your bottom‐sheet inset (unchanged)
+            let screenHeight = UIScreen.main.bounds.height
+            let bottomSheetHeight = screenHeight * (0.8 / 3.0)
             let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: bottomSheetHeight, right: 0)
             mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
         }

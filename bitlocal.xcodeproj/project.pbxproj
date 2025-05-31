@@ -123,11 +123,11 @@
 		F66E0B712DE33ED800D68897 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */,
+				F66E0B6F2DE33ED800D68897 /* MapView.swift */,
 				F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */,
 				F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */,
+				F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */,
 				F66E0B6E2DE33ED800D68897 /* MapButtonsView.swift */,
-				F66E0B6F2DE33ED800D68897 /* MapView.swift */,
 				F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */,
 			);
 			path = Views;
@@ -162,8 +162,8 @@
 			isa = PBXGroup;
 			children = (
 				F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */,
-				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
 				F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */,
+				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
 				F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */,
 			);
 			path = Views;
@@ -231,14 +231,14 @@
 		F66E0BA02DE33F1200D68897 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */,
-				F6EFC28D2DE69FAF00D573E1 /* RootView.swift */,
-				F66E0B9A2DE33F1200D68897 /* AboutView.swift */,
-				F66E0B9B2DE33F1200D68897 /* ContentView.swift */,
-				F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */,
-				F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */,
-				F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */,
 				F66E0B9F2DE33F1200D68897 /* MainView.swift */,
+				F6EFC28D2DE69FAF00D573E1 /* RootView.swift */,
+				F66E0B9B2DE33F1200D68897 /* ContentView.swift */,
+				F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */,
+				F66E0B9A2DE33F1200D68897 /* AboutView.swift */,
+				F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */,
+				F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */,
+				F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
