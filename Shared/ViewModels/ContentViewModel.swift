@@ -5,7 +5,6 @@
 //  Created by Joe Castagnaro on 5/24/25.
 //
 
-
 // ContentViewModel.swift
 
 import SwiftUI
@@ -30,6 +29,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var topPadding: CGFloat = 0
     @Published var bottomPadding: CGFloat = 0
     @Published var initialRegionSet = false // Track if initial region has been set
+    @Published var forceMapRefresh = false // Flag to force map annotation refresh
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -228,17 +228,36 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // Fetch elements using the APIManager and update the published elements property
     func fetchElements() {
+        print("🚀 DEBUG: fetchElements() called!")
+        print("🔄 fetchElements() called - isLoading: \(isLoading)")
         isLoading = true
+        
+        // Check if this is a fresh start after cache clear
+        let wasCacheEmpty = !APIManager.shared.hasCachedData()
+        print("📁 Cache empty before fetch: \(wasCacheEmpty)")
+        
         APIManager.shared.getElements { [weak self] elements in
             // Offload heavy work
             DispatchQueue.global(qos: .userInitiated).async {
                 // Example: (if you want to preprocess/filter/map elements)
                 let processedElements = elements ?? []
+                print("📊 Processed \(processedElements.count) elements")
                 
                 // Now publish ONLY the assignment on the main thread
                 DispatchQueue.main.async {
+                    print("🔄 Updating allElements with \(processedElements.count) elements")
                     self?.allElements = processedElements
                     self?.isLoading = false
+                    
+                    // Force map refresh if cache was empty (indicating fresh data load)
+                    if wasCacheEmpty && !processedElements.isEmpty {
+                        print("🗺️ Setting forceMapRefresh = true (cache was empty, got \(processedElements.count) elements)")
+                        self?.forceMapRefresh = true
+                    } else {
+                        print("🗺️ NOT setting forceMapRefresh - wasCacheEmpty: \(wasCacheEmpty), elements.count: \(processedElements.count)")
+                    }
+                    
+                    print("📍 Current forceMapRefresh state: \(self?.forceMapRefresh ?? false)")
                 }
             }
         }

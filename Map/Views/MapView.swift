@@ -71,21 +71,47 @@ struct MapView: UIViewRepresentable {
     
     // Update the MKMapView when the SwiftUI view updates
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        print("🗺️ DEBUG: MapView.updateUIView() called!")
+
         // Update padding in Coordinator
         context.coordinator.updatePadding(top: topPadding, bottom: bottomPadding)
         
         if mapView.mapType != mapType {
             mapView.mapType = mapType
         }
+        
         // Initial annotation load if data exists
         if let elements = elements, !elements.isEmpty {
             let elementsHash = elements.hashValue
-            if context.coordinator.lastElementsHash != elementsHash {
+            let shouldForceUpdate = viewModel.forceMapRefresh
+            let hashChanged = context.coordinator.lastElementsHash != elementsHash
+            
+            print("🗺️ MapView.updateUIView called:")
+            print("   - Elements count: \(elements.count)")
+            print("   - Elements hash: \(elementsHash)")
+            print("   - Last hash: \(context.coordinator.lastElementsHash ?? -1)")
+            print("   - Hash changed: \(hashChanged)")
+            print("   - Force refresh: \(shouldForceUpdate)")
+            print("   - Will update: \(hashChanged || shouldForceUpdate)")
+            
+            if hashChanged || shouldForceUpdate {
                 context.coordinator.lastElementsHash = elementsHash
                 context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
+                print("🎯 Annotations updated!")
+                
+                // Reset the force refresh flag after using it
+                if shouldForceUpdate {
+                    DispatchQueue.main.async {
+                        self.viewModel.forceMapRefresh = false
+                        print("🔄 Reset forceMapRefresh to false")
+                    }
+                }
+            } else {
+                print("⏭️ Skipping annotation update (no changes)")
             }
+        } else {
+            print("🗺️ MapView.updateUIView: No elements to display (count: \(elements?.count ?? 0))")
         }
-        // Removed immediate annotation update here; handled via debounced regionDidChangeAnimated
     }
     
     // Set up clustering for map annotations

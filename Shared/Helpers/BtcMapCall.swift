@@ -19,6 +19,7 @@ class APIManager {
     static let shared = APIManager()
     
     let lastUpdateKey = "lastUpdate"
+    let lastAppVersionKey = "lastAppVersion"
 
     // MARK: - File-based Caching Helpers
     private var elementsFileURL: URL {
@@ -47,8 +48,41 @@ class APIManager {
         }
     }
     
+    private func clearCache() {
+        // Remove cached file
+        try? FileManager.default.removeItem(at: elementsFileURL)
+        
+        // Reset last update timestamp
+        UserDefaults.standard.removeObject(forKey: lastUpdateKey)
+        UserDefaults.standard.set("2000-01-01T00:00:00.000Z", forKey: lastUpdateKey)
+        
+        print("Cache cleared due to app version change")
+        LogManager.shared.log("Cache cleared due to app version change")
+    }
+    
+    private func getCurrentAppVersion() -> String {
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+    
+    func checkAndHandleVersionChange() { // ⚠️⚠️⚠️⚠️⚠️⚠️ ADD 'PRIVATE' BACK AFTER TESTING ⚠️⚠️⚠️⚠️⚠️⚠️
+        let currentVersion = getCurrentAppVersion()
+        let storedVersion = UserDefaults.standard.string(forKey: lastAppVersionKey)
+        
+        if storedVersion != currentVersion {
+            print("App version changed from \(storedVersion ?? "unknown") to \(currentVersion)")
+            LogManager.shared.log("App version changed from \(storedVersion ?? "unknown") to \(currentVersion)")
+            
+            clearCache()
+            UserDefaults.standard.set(currentVersion, forKey: lastAppVersionKey)
+        }
+    }
+    
     init() {
+        
         UserDefaults.standard.register(defaults: [lastUpdateKey: "2000-01-01T00:00:00.000Z"])
+        
+        // Check for version changes on initialization
+        checkAndHandleVersionChange()
     }
     
     func fetchElements(in region: MKCoordinateRegion, completion: @escaping ([Element]?) -> Void) {
@@ -147,10 +181,6 @@ class APIManager {
                     LogManager.shared.log("HTTP Status Code: \(httpResponse.statusCode)")
                 }
                 
-                // Only print a preview, not the whole JSON!
-//                let preview = String(data: data.prefix(1000), encoding: .utf8) ?? ""
-//                print("API response preview (first 1000 chars): \(preview)")
-                
                 do {
                     let decoder = JSONDecoder()
                     decoder.dataDecodingStrategy = .base64
@@ -162,7 +192,6 @@ class APIManager {
                         print("OSM tags for element \(el.id): \(String(describing: el.osmJSON?.tags))")
                     }
 
-                    // Do NOT print the entire JSON or array!
                     print("Decoded \(fetchedElements.count) elements.")
 
                     self.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
@@ -175,6 +204,7 @@ class APIManager {
                         print("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
                         LogManager.shared.log("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
                     }
+                    
                     // Now use file-based cache for return value:
                     let updatedCache = self.loadElementsFromFile()
 
@@ -191,6 +221,19 @@ class APIManager {
                 }
             }
         }.resume()
+    }
+    
+    // MARK: - Manual Cache Management (Optional)
+    
+    /// Force refresh all cached data - useful for debugging or manual refresh
+    func forceRefreshCache(completion: @escaping ([Element]?) -> Void) {
+        clearCache()
+        getElements(completion: completion)
+    }
+    
+    /// Check if cache exists
+    func hasCachedData() -> Bool {
+        return FileManager.default.fileExists(atPath: elementsFileURL.path)
     }
 }
 

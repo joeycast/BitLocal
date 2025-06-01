@@ -70,6 +70,8 @@ struct ContentView: View {
             print("Header Height reported: \(value)")
         }
         .onAppear {
+            print("📺 DEBUG: ContentView.onAppear called")
+
             cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation
             }

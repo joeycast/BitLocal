@@ -24,7 +24,9 @@ struct bitlocalApp: App {
             RootView()
                 .environmentObject(contentViewModel)
                 .onChange(of: scenePhase) { newPhase in
+                    print("🏃 DEBUG: scenePhase changed to: \(newPhase)")
                     if newPhase == .active {
+                        print("🏃 DEBUG: Scene became active, calling fetchElements()")
                         contentViewModel.fetchElements()
                     }
                 }

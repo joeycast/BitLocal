@@ -25,14 +25,22 @@ struct RootView: View {
             }
         }
         .onAppear {
+            print("📱 DEBUG: RootView.onAppear called")
+            print("📱 DEBUG: didCompleteOnboarding = \(didCompleteOnboarding)")
+            print("📱 DEBUG: allElements.isEmpty = \(contentViewModel.allElements.isEmpty)")
+            print("📱 DEBUG: isLoading = \(contentViewModel.isLoading)")
+            
             // If user already completed onboarding previously, kick off fetch
             if didCompleteOnboarding,
                contentViewModel.allElements.isEmpty,
                !contentViewModel.isLoading {
+                print("📱 DEBUG: Calling fetchElements() from RootView.onAppear")
                 contentViewModel.fetchElements()
             }
         }
         .onChange(of: didCompleteOnboarding) { completed in
+            print("📱 DEBUG: onboarding completion changed to: \(completed)")
+
             guard completed else { return }
             
             // 1️⃣ Center map if we already have location
@@ -43,6 +51,7 @@ struct RootView: View {
             // 2️⃣ Then start loading your data
             if contentViewModel.allElements.isEmpty,
                !contentViewModel.isLoading {
+                print("📱 DEBUG: Calling fetchElements() from onChange")
                 contentViewModel.fetchElements()
             }
         }
