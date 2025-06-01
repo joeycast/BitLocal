@@ -181,10 +181,6 @@ struct AboutView: View {
                             Spacer()
                         }
                     }
-                    Button("🧪 Test Cache Clear") {
-                        UserDefaults.standard.set("1.9", forKey: "lastAppVersion")
-                        APIManager.shared.checkAndHandleVersionChange()
-                    }
                 }
             }
             // About page title

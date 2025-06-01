@@ -29,9 +29,6 @@
       },
       "shouldTranslate" : false
     },
-    "🧪 Test Cache Clear" : {
-
-    },
     "about_accessibility_label" : {
       "comment" : "About (info button) accessibility label",
       "extractionState" : "manual",

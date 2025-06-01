@@ -30,20 +30,28 @@ class APIManager {
     private func saveElementsToFile(_ elements: [Element]) {
         DispatchQueue.global(qos: .utility).async {
             do {
+                print("💾 Attempting to save \(elements.count) elements to file")
                 let data = try JSONEncoder().encode(elements)
+                print("💾 Encoded \(data.count) bytes of data")
                 try data.write(to: self.elementsFileURL, options: .atomic)
+                print("✅ Successfully saved elements to: \(self.elementsFileURL.path)")
             } catch {
-                print("Failed to save elements to file: \(error)")
+                print("❌ Failed to save elements to file: \(error)")
+                print("❌ File path: \(self.elementsFileURL.path)")
             }
         }
     }
 
-    private func loadElementsFromFile() -> [Element]? {
+    func loadElementsFromFile() -> [Element]? {
         do {
+            print("📖 Attempting to load elements from: \(elementsFileURL.path)")
             let data = try Data(contentsOf: elementsFileURL)
-            return try JSONDecoder().decode([Element].self, from: data)
+            print("📖 Loaded \(data.count) bytes from file")
+            let elements = try JSONDecoder().decode([Element].self, from: data)
+            print("✅ Successfully loaded \(elements.count) elements from file")
+            return elements
         } catch {
-            print("Failed to load elements from file: \(error)")
+            print("❌ Failed to load elements from file: \(error)")
             return nil
         }
     }
@@ -64,7 +72,7 @@ class APIManager {
         return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
     
-    func checkAndHandleVersionChange() { // ⚠️⚠️⚠️⚠️⚠️⚠️ ADD 'PRIVATE' BACK AFTER TESTING ⚠️⚠️⚠️⚠️⚠️⚠️
+    private func checkAndHandleVersionChange() {
         let currentVersion = getCurrentAppVersion()
         let storedVersion = UserDefaults.standard.string(forKey: lastAppVersionKey)
         
@@ -229,9 +237,20 @@ class APIManager {
         getElements(completion: completion)
     }
     
-    /// Check if cache exists
+    /// Check if cache exists AND contains valid data
     func hasCachedData() -> Bool {
-        return FileManager.default.fileExists(atPath: elementsFileURL.path)
+        guard FileManager.default.fileExists(atPath: elementsFileURL.path) else {
+            return false
+        }
+        
+        // Check if the file actually contains valid data
+        if let cachedElements = loadElementsFromFile(), !cachedElements.isEmpty {
+            return true
+        } else {
+            // File exists but is empty or corrupted - treat as no cache
+            print("Cache file exists but contains no valid data")
+            return false
+        }
     }
 }
 

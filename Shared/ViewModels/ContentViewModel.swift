@@ -72,6 +72,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.updateMapRegion(center: latestLocation.coordinate)
             self.userLocation = latestLocation
             self.userLocationSubject.send(latestLocation)
+            
+            // 🔧 ADD THIS: Center map for returning users when location finally comes in
+            if !self.allElements.isEmpty {
+                print("🗺️ Centering map for returning user (location received after cache load)")
+                self.centerMap(to: latestLocation.coordinate)
+            }
         }
         manager.stopUpdatingLocation() // Stop updating location once we have the user's location
         isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
@@ -230,34 +236,94 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func fetchElements() {
         print("🚀 DEBUG: fetchElements() called!")
         print("🔄 fetchElements() called - isLoading: \(isLoading)")
+        
+        // Prevent concurrent calls
+        guard !isLoading else {
+            print("⏭️ Already loading, skipping duplicate call")
+            return
+        }
+        
         isLoading = true
+        
+        // IMPORTANT: Load from cache into memory first if allElements is empty
+        if allElements.isEmpty {
+            if let cachedElements = APIManager.shared.loadElementsFromFile(), !cachedElements.isEmpty {
+                print("💾 Loading \(cachedElements.count) elements from cache into memory")
+                allElements = cachedElements
+                // Set loading to false since we have data now
+                isLoading = false
+                
+                // 🔧 Center map for returning users who have cached data
+                if let userLoc = userLocation {
+                    print("🗺️ Centering map to user location for returning user")
+                    centerMap(to: userLoc.coordinate)
+                } else {
+                    print("📍 No user location yet - requesting location for returning user")
+                    // Start location updates if we don't have location yet
+                    locationManager.requestWhenInUseAuthorization()
+                    locationManager.startUpdatingLocation()
+                }
+                
+                // Still check for updates, but don't block UI
+                checkForUpdatesInBackground()
+                return
+            }
+        }
         
         // Check if this is a fresh start after cache clear
         let wasCacheEmpty = !APIManager.shared.hasCachedData()
+        let currentElementsEmpty = allElements.isEmpty
         print("📁 Cache empty before fetch: \(wasCacheEmpty)")
+        print("📁 Current allElements empty: \(currentElementsEmpty)")
         
         APIManager.shared.getElements { [weak self] elements in
-            // Offload heavy work
-            DispatchQueue.global(qos: .userInitiated).async {
-                // Example: (if you want to preprocess/filter/map elements)
+            DispatchQueue.main.async {
                 let processedElements = elements ?? []
                 print("📊 Processed \(processedElements.count) elements")
                 
-                // Now publish ONLY the assignment on the main thread
-                DispatchQueue.main.async {
+                // Update allElements if:
+                // 1. We got new data, OR
+                // 2. Cache was empty (fresh start), OR
+                // 3. Current data is empty (recovery scenario)
+                let shouldUpdate = !processedElements.isEmpty || wasCacheEmpty || currentElementsEmpty
+                
+                if shouldUpdate {
                     print("🔄 Updating allElements with \(processedElements.count) elements")
                     self?.allElements = processedElements
-                    self?.isLoading = false
                     
                     // Force map refresh if cache was empty (indicating fresh data load)
                     if wasCacheEmpty && !processedElements.isEmpty {
                         print("🗺️ Setting forceMapRefresh = true (cache was empty, got \(processedElements.count) elements)")
                         self?.forceMapRefresh = true
+                    } else if currentElementsEmpty && !processedElements.isEmpty {
+                        print("🗺️ Setting forceMapRefresh = true (recovery from empty state)")
+                        self?.forceMapRefresh = true
                     } else {
-                        print("🗺️ NOT setting forceMapRefresh - wasCacheEmpty: \(wasCacheEmpty), elements.count: \(processedElements.count)")
+                        print("🗺️ NOT setting forceMapRefresh - wasCacheEmpty: \(wasCacheEmpty), currentEmpty: \(currentElementsEmpty), elements.count: \(processedElements.count)")
                     }
-                    
-                    print("📍 Current forceMapRefresh state: \(self?.forceMapRefresh ?? false)")
+                } else {
+                    print("⏭️ Skipping allElements update - got 0 elements, cache wasn't empty, and current data exists")
+                }
+                
+                self?.isLoading = false
+                print("📍 Current forceMapRefresh state: \(self?.forceMapRefresh ?? false)")
+            }
+        }
+    }
+
+    // Background update check that doesn't block UI
+    private func checkForUpdatesInBackground() {
+        APIManager.shared.getElements { [weak self] elements in
+            DispatchQueue.main.async {
+                let processedElements = elements ?? []
+                
+                // Only update if we got new data
+                if !processedElements.isEmpty {
+                    print("🔄 Background update: Got \(processedElements.count) new elements")
+                    self?.allElements = processedElements
+                    self?.forceMapRefresh = true
+                } else {
+                    print("✅ Background update: No new data available")
                 }
             }
         }
