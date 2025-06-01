@@ -189,7 +189,7 @@ class APIManager {
 
                     // Log OSM tags for each element
                     for el in fetchedElements {
-                        print("OSM tags for element \(el.id): \(String(describing: el.osmJSON?.tags))")
+//                        print("OSM tags for element \(el.id): \(String(describing: el.osmJSON?.tags))")
                     }
 
                     print("Decoded \(fetchedElements.count) elements.")
