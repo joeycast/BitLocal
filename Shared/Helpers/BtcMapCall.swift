@@ -205,13 +205,11 @@ class APIManager {
                         LogManager.shared.log("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
                     }
                     
-                    // Now use file-based cache for return value:
-                    let updatedCache = self.loadElementsFromFile()
-
-                    // MAIN THREAD for UI update only
+                    // Return the fetched elements directly, don't try to reload from file
                     DispatchQueue.main.async {
-                        completion(updatedCache)
+                        completion(fetchedElements)
                     }
+                    
                 } catch {
                     let responsePreview = String(data: data.prefix(2000), encoding: .utf8) ?? "<Could not decode as UTF-8>"
                     print("RAW API response preview on decoding error: \(responsePreview)")
