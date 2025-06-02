@@ -9,6 +9,7 @@
 import SwiftUI
 import MapKit
 import Combine
+import Foundation // for Debug logging
 
 @available(iOS 17.0, *)
 struct MapView: UIViewRepresentable {
@@ -71,7 +72,7 @@ struct MapView: UIViewRepresentable {
     
     // Update the MKMapView when the SwiftUI view updates
     func updateUIView(_ mapView: MKMapView, context: Context) {
-        print("🗺️ DEBUG: MapView.updateUIView() called!")
+        Debug.logMap("MapView.updateUIView() called!")
 
         // Update padding in Coordinator
         context.coordinator.updatePadding(top: topPadding, bottom: bottomPadding)
@@ -86,31 +87,31 @@ struct MapView: UIViewRepresentable {
             let shouldForceUpdate = viewModel.forceMapRefresh
             let hashChanged = context.coordinator.lastElementsHash != elementsHash
             
-            print("🗺️ MapView.updateUIView called:")
-            print("   - Elements count: \(elements.count)")
-            print("   - Elements hash: \(elementsHash)")
-            print("   - Last hash: \(context.coordinator.lastElementsHash ?? -1)")
-            print("   - Hash changed: \(hashChanged)")
-            print("   - Force refresh: \(shouldForceUpdate)")
-            print("   - Will update: \(hashChanged || shouldForceUpdate)")
+            Debug.logMap("MapView.updateUIView called:")
+            Debug.logMap("   - Elements count: \(elements.count)")
+            Debug.logMap("   - Elements hash: \(elementsHash)")
+            Debug.logMap("   - Last hash: \(context.coordinator.lastElementsHash ?? -1)")
+            Debug.logMap("   - Hash changed: \(hashChanged)")
+            Debug.logMap("   - Force refresh: \(shouldForceUpdate)")
+            Debug.logMap("   - Will update: \(hashChanged || shouldForceUpdate)")
             
             if hashChanged || shouldForceUpdate {
                 context.coordinator.lastElementsHash = elementsHash
                 context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
-                print("🎯 Annotations updated!")
+                Debug.logMap("Annotations updated!")
                 
                 // Reset the force refresh flag after using it
                 if shouldForceUpdate {
                     DispatchQueue.main.async {
                         self.viewModel.forceMapRefresh = false
-                        print("🔄 Reset forceMapRefresh to false")
+                        Debug.logMap("Reset forceMapRefresh to false")
                     }
                 }
             } else {
-                print("⏭️ Skipping annotation update (no changes)")
+                Debug.logMap("Skipping annotation update (no changes)")
             }
         } else {
-            print("🗺️ MapView.updateUIView: No elements to display (count: \(elements?.count ?? 0))")
+            Debug.logMap("MapView.updateUIView: No elements to display (count: \(elements?.count ?? 0))")
         }
     }
     
@@ -264,7 +265,7 @@ struct MapView: UIViewRepresentable {
                 view?.glyphTintColor = .white
                 if let element = annotation.element {
                     let symbolName = ElementCategorySymbols.symbolName(for: element)
-                    print("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
+                    Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
                     view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
                 }
                 view?.displayPriority = .required
@@ -301,7 +302,7 @@ struct MapView: UIViewRepresentable {
                 // Set the visible map rect with padding and zoom adjustments
                 mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: true)
                 
-                print("""
+                Debug.logMap("""
                 Cluster Selected -> 
                 Edge Padding (Top: \(edgePadding.top), Bottom: \(edgePadding.bottom)),
                 Zoom Scale: \(zoomOutScale)
@@ -313,7 +314,7 @@ struct MapView: UIViewRepresentable {
                     self.viewModel.path = [element] // Update path for NavigationStack
                     self.viewModel.selectedElement = element // Update the selected element
                     
-                    print("Annotation tapped: \(element)")
+                    Debug.logMap("Annotation tapped: \(element)")
                 }
             }
         }

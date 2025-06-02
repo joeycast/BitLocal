@@ -11,6 +11,7 @@ import SwiftUI
 import Combine
 import CoreLocation
 import MapKit
+import Foundation // for Debug logging
 
 @available(iOS 17.0, *)
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
@@ -75,7 +76,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             
             // 🔧 ADD THIS: Center map for returning users when location finally comes in
             if !self.allElements.isEmpty {
-                print("🗺️ Centering map for returning user (location received after cache load)")
+                Debug.logMap("Centering map for returning user (location received after cache load)")
                 self.centerMap(to: latestLocation.coordinate)
             }
         }
@@ -86,7 +87,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // locationManager failure scenario (could not get user location)
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // TODO: Need better error handling
-        print(error.localizedDescription)
+        Debug.log("LocationManager error: \(error.localizedDescription)")
     }
     
     // Calculate distance between element and user location
@@ -234,12 +235,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // Fetch elements using the APIManager and update the published elements property
     func fetchElements() {
-        print("🚀 DEBUG: fetchElements() called!")
-        print("🔄 fetchElements() called - isLoading: \(isLoading)")
+        Debug.log("fetchElements() called!")
+        Debug.log("fetchElements() called - isLoading: \(isLoading)")
         
         // Prevent concurrent calls
         guard !isLoading else {
-            print("⏭️ Already loading, skipping duplicate call")
+            Debug.log("Already loading, skipping duplicate call")
             return
         }
         
@@ -248,17 +249,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         // IMPORTANT: Load from cache into memory first if allElements is empty
         if allElements.isEmpty {
             if let cachedElements = APIManager.shared.loadElementsFromFile(), !cachedElements.isEmpty {
-                print("💾 Loading \(cachedElements.count) elements from cache into memory")
+                Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
                 allElements = cachedElements
                 // Set loading to false since we have data now
                 isLoading = false
                 
                 // 🔧 Center map for returning users who have cached data
                 if let userLoc = userLocation {
-                    print("🗺️ Centering map to user location for returning user")
+                    Debug.logMap("Centering map to user location for returning user")
                     centerMap(to: userLoc.coordinate)
                 } else {
-                    print("📍 No user location yet - requesting location for returning user")
+                    Debug.logMap("No user location yet - requesting location for returning user")
                     // Start location updates if we don't have location yet
                     locationManager.requestWhenInUseAuthorization()
                     locationManager.startUpdatingLocation()
@@ -273,13 +274,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         // Check if this is a fresh start after cache clear
         let wasCacheEmpty = !APIManager.shared.hasCachedData()
         let currentElementsEmpty = allElements.isEmpty
-        print("📁 Cache empty before fetch: \(wasCacheEmpty)")
-        print("📁 Current allElements empty: \(currentElementsEmpty)")
+        Debug.logCache("Cache empty before fetch: \(wasCacheEmpty)")
+        Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
         
         APIManager.shared.getElements { [weak self] elements in
             DispatchQueue.main.async {
                 let processedElements = elements ?? []
-                print("📊 Processed \(processedElements.count) elements")
+                Debug.logAPI("Processed \(processedElements.count) elements")
                 
                 // Update allElements if:
                 // 1. We got new data, OR
@@ -288,25 +289,25 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 let shouldUpdate = !processedElements.isEmpty || wasCacheEmpty || currentElementsEmpty
                 
                 if shouldUpdate {
-                    print("🔄 Updating allElements with \(processedElements.count) elements")
+                    Debug.logMap("Updating allElements with \(processedElements.count) elements")
                     self?.allElements = processedElements
                     
                     // Force map refresh if cache was empty (indicating fresh data load)
                     if wasCacheEmpty && !processedElements.isEmpty {
-                        print("🗺️ Setting forceMapRefresh = true (cache was empty, got \(processedElements.count) elements)")
+                        Debug.logMap("Setting forceMapRefresh = true (cache was empty, got \(processedElements.count) elements)")
                         self?.forceMapRefresh = true
                     } else if currentElementsEmpty && !processedElements.isEmpty {
-                        print("🗺️ Setting forceMapRefresh = true (recovery from empty state)")
+                        Debug.logMap("Setting forceMapRefresh = true (recovery from empty state)")
                         self?.forceMapRefresh = true
                     } else {
-                        print("🗺️ NOT setting forceMapRefresh - wasCacheEmpty: \(wasCacheEmpty), currentEmpty: \(currentElementsEmpty), elements.count: \(processedElements.count)")
+                        Debug.logMap("NOT setting forceMapRefresh - wasCacheEmpty: \(wasCacheEmpty), currentEmpty: \(currentElementsEmpty), elements.count: \(processedElements.count)")
                     }
                 } else {
-                    print("⏭️ Skipping allElements update - got 0 elements, cache wasn't empty, and current data exists")
+                    Debug.log("Skipping allElements update - got 0 elements, cache wasn't empty, and current data exists")
                 }
                 
                 self?.isLoading = false
-                print("📍 Current forceMapRefresh state: \(self?.forceMapRefresh ?? false)")
+                Debug.logMap("Current forceMapRefresh state: \(self?.forceMapRefresh ?? false)")
             }
         }
     }
@@ -319,11 +320,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 
                 // Only update if we got new data
                 if !processedElements.isEmpty {
-                    print("🔄 Background update: Got \(processedElements.count) new elements")
+                    Debug.logMap("Background update: Got \(processedElements.count) new elements")
                     self?.allElements = processedElements
                     self?.forceMapRefresh = true
                 } else {
-                    print("✅ Background update: No new data available")
+                    Debug.log("Background update: No new data available")
                 }
             }
         }

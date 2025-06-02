@@ -7,6 +7,7 @@
 
 
 import SwiftUI
+import Foundation // for Debug logging
 
 @available(iOS 17.0, *)
 struct BottomSheetContentView: View {
@@ -34,16 +35,16 @@ struct BottomSheetContentView: View {
                     let bottomSheetHeight = geometry.size.height
                     if viewModel.bottomPadding != bottomSheetHeight {
                         viewModel.bottomPadding = bottomSheetHeight
-                        print("Accurate Bottom Sheet Height: \(bottomSheetHeight)")
+                        Debug.log("Accurate Bottom Sheet Height: \(bottomSheetHeight)")
                     }
                 }
             }
             .onChange(of: geometry.size.height) { newHeight in
                 viewModel.bottomPadding = newHeight
-                print("BottomSheetContentView height updated: \(newHeight)")
+                Debug.log("BottomSheetContentView height updated: \(newHeight)")
             }
             .onChange(of: viewModel.path) { newPath in
-                print("BottomSheet path changed (iPhone scenario)")
+                Debug.log("BottomSheet path changed (iPhone scenario)")
                 if let selectedElement = newPath.last {
                     // If detail view is pushed, zoom to element
                     viewModel.zoomToElement(selectedElement)

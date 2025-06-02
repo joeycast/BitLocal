@@ -5,6 +5,7 @@ import MapKit
 import CoreLocation
 import Combine
 import Foundation
+import Foundation // for Debug logging
 
 @available(iOS 17.0, *)
 struct BusinessesListView: View {
@@ -226,7 +227,7 @@ class ElementCellViewModel: ObservableObject {
     @Published var address: Address?
     @Published var userLocation: CLLocation? {
         didSet {
-            print("User location set: \(userLocation?.coordinate.latitude ?? 0), \(userLocation?.coordinate.longitude ?? 0)")
+            Debug.log("User location set: \(userLocation?.coordinate.latitude ?? 0), \(userLocation?.coordinate.longitude ?? 0)")
         }
     }
     static var geocodingCache: [String: Address] = [:]

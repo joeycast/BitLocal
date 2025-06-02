@@ -6,6 +6,7 @@ import MapKit
 import CoreLocationUI
 import Combine
 import Foundation
+import Foundation // for Debug logging
 
 @available(iOS 17.0, *)
 struct ContentView: View {
@@ -67,10 +68,10 @@ struct ContentView: View {
         .onPreferenceChange(HeaderHeightKey.self) { value in
             self.headerHeight = value
             viewModel.topPadding = value
-            print("Header Height reported: \(value)")
+            Debug.log("Header Height reported: \(value)")
         }
         .onAppear {
-            print("📺 DEBUG: ContentView.onAppear called")
+            Debug.log("ContentView.onAppear called")
 
             cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation

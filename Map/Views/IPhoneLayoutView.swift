@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import Foundation // for Debug logging
 
 @available(iOS 17.0, *)
 struct IPhoneLayoutView: View {
@@ -94,7 +95,7 @@ struct IPhoneLayoutView: View {
                         }
                 },
                 onDismiss: {
-                    print("Bottom sheet dismissed")
+                    Debug.log("Bottom sheet dismissed")
                 }
             )
             .ignoresSafeArea(.keyboard)

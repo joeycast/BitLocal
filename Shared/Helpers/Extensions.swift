@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation // for Debug logging
 import MapKit
 import CoreLocation
 
@@ -40,7 +41,7 @@ extension View {
                             sheet.largestUndimmedDetentIdentifier = largestUndimmedIdentifier
                             sheet.preferredCornerRadius = sheetCornerRadius
                         } else {
-                            print("NO CONTROLLER FOUND")
+                            Debug.log("NO CONTROLLER FOUND")
                         }
                     }
             }

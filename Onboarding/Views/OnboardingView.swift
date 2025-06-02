@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreLocation
+import Foundation // for DebugUtils
 
 struct OnboardingPage {
     let titleKey: String
@@ -225,6 +226,6 @@ struct OnboardingView: View {
 class LocationPermissionDelegate: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager,
                          didChangeAuthorization status: CLAuthorizationStatus) {
-        print("Location authorization status changed: \(status)")
+        Debug.log("Location authorization status changed: \(status)")
     }
 }

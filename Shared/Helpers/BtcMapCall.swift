@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import MapKit
+import Foundation // Required for DebugUtils
 
 // MARK: - NilOnFail property wrapper
 @propertyWrapper public struct NilOnFail<T: Codable>: Codable {
@@ -30,28 +31,28 @@ class APIManager {
     private func saveElementsToFile(_ elements: [Element]) {
         DispatchQueue.global(qos: .utility).async {
             do {
-                print("💾 Attempting to save \(elements.count) elements to file")
+                Debug.logCache("Attempting to save \(elements.count) elements to file")
                 let data = try JSONEncoder().encode(elements)
-                print("💾 Encoded \(data.count) bytes of data")
+                Debug.logCache("Encoded \(data.count) bytes of data")
                 try data.write(to: self.elementsFileURL, options: .atomic)
-                print("✅ Successfully saved elements to: \(self.elementsFileURL.path)")
+                Debug.logCache("Successfully saved elements to: \(self.elementsFileURL.path)")
             } catch {
-                print("❌ Failed to save elements to file: \(error)")
-                print("❌ File path: \(self.elementsFileURL.path)")
+                Debug.logCache("Failed to save elements to file: \(error)")
+                Debug.logCache("File path: \(self.elementsFileURL.path)")
             }
         }
     }
 
     func loadElementsFromFile() -> [Element]? {
         do {
-            print("📖 Attempting to load elements from: \(elementsFileURL.path)")
+            Debug.logCache("Attempting to load elements from: \(elementsFileURL.path)")
             let data = try Data(contentsOf: elementsFileURL)
-            print("📖 Loaded \(data.count) bytes from file")
+            Debug.logCache("Loaded \(data.count) bytes from file")
             let elements = try JSONDecoder().decode([Element].self, from: data)
-            print("✅ Successfully loaded \(elements.count) elements from file")
+            Debug.logCache("Successfully loaded \(elements.count) elements from file")
             return elements
         } catch {
-            print("❌ Failed to load elements from file: \(error)")
+            Debug.logCache("Failed to load elements from file: \(error)")
             return nil
         }
     }
@@ -64,7 +65,7 @@ class APIManager {
         UserDefaults.standard.removeObject(forKey: lastUpdateKey)
         UserDefaults.standard.set("2000-01-01T00:00:00.000Z", forKey: lastUpdateKey)
         
-        print("Cache cleared due to app version change")
+        Debug.logCache("Cache cleared due to app version change")
         LogManager.shared.log("Cache cleared due to app version change")
     }
     
@@ -77,7 +78,7 @@ class APIManager {
         let storedVersion = UserDefaults.standard.string(forKey: lastAppVersionKey)
         
         if storedVersion != currentVersion {
-            print("App version changed from \(storedVersion ?? "unknown") to \(currentVersion)")
+            Debug.logCache("App version changed from \(storedVersion ?? "unknown") to \(currentVersion)")
             LogManager.shared.log("App version changed from \(storedVersion ?? "unknown") to \(currentVersion)")
             
             clearCache()
@@ -102,13 +103,13 @@ class APIManager {
         let urlString = "https://api.btcmap.org/v2/elements?bbox=\(minLongitude),\(minLatitude),\(maxLongitude),\(maxLatitude)"
         
         guard let url = URL(string: urlString) else {
-            print("Invalid URL string: \(urlString)")
+            Debug.logAPI("Invalid URL string: \(urlString)")
             completion(nil)
             return
         }
         
         // Log the requesting URL
-        print("Requesting URL: \(url.absoluteString)")
+        Debug.logAPI("Requesting URL: \(url.absoluteString)")
         LogManager.shared.log("Requesting URL: \(url.absoluteString)")
         
         URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
@@ -118,7 +119,7 @@ class APIManager {
             }
             
             guard let data = data, error == nil else {
-                print("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
+                Debug.logAPI("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
                 LogManager.shared.log("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
                 completion(nil)
                 return
@@ -133,7 +134,7 @@ class APIManager {
                 
                 completion(fetchedElements)
             } catch {
-                print("JSON Decoding Error: \(error)")
+                Debug.logAPI("JSON Decoding Error: \(error)")
                 LogManager.shared.log("JSON Decoding Error: \(error)")
                 completion(nil)
             }
@@ -157,14 +158,14 @@ class APIManager {
         let urlString = "https://api.btcmap.org/v2/elements?updated_since=\(lastUpdate)"
         
         guard let url = URL(string: urlString) else {
-            print("Invalid URL string: \(urlString)")
+            Debug.logAPI("Invalid URL string: \(urlString)")
             LogManager.shared.log("Invalid URL string: \(urlString)")
             DispatchQueue.main.async { completion(nil) }
             return
         }
         
         // Log the requesting URL (safe)
-        print("Requesting URL: \(url.absoluteString)")
+        Debug.logAPI("Requesting URL: \(url.absoluteString)")
         LogManager.shared.log("Requesting URL: \(url.absoluteString)")
         
         URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
@@ -175,7 +176,7 @@ class APIManager {
                     return
                 }
                 guard let data = data, error == nil else {
-                    print("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
+                    Debug.logAPI("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
                     LogManager.shared.log("Error fetching data: \(error?.localizedDescription ?? "Unknown error")")
                     DispatchQueue.main.async { completion(nil) }
                     return
@@ -183,9 +184,9 @@ class APIManager {
                 
                 if let httpResponse = response as? HTTPURLResponse {
                     let contentType = httpResponse.allHeaderFields["Content-Type"] as? String
-                    print("Content-Type: \(contentType ?? "Unknown")")
+                    Debug.logAPI("Content-Type: \(contentType ?? "Unknown")")
+                    Debug.logAPI("HTTP Status Code: \(httpResponse.statusCode)")
                     LogManager.shared.log("Content-Type: \(contentType ?? "Unknown")")
-                    print("HTTP Status Code: \(httpResponse.statusCode)")
                     LogManager.shared.log("HTTP Status Code: \(httpResponse.statusCode)")
                 }
                 
@@ -197,19 +198,19 @@ class APIManager {
 
                     // Log OSM tags for each element
                     for el in fetchedElements {
-//                        print("OSM tags for element \(el.id): \(String(describing: el.osmJSON?.tags))")
+//                        Debug.logMap("OSM tags for element \(el.id): \(String(describing: el.osmJSON?.tags))")
                     }
 
-                    print("Decoded \(fetchedElements.count) elements.")
+                    Debug.logAPI("Decoded \(fetchedElements.count) elements.")
 
                     self.updateCacheWithFetchedElements(fetchedElements: fetchedElements)
 
                     if let mostRecentUpdate = fetchedElements.max(by: { $0.updatedAt ?? "" < $1.updatedAt ?? "" })?.updatedAt {
-                        print("Updating lastUpdateKey to: \(mostRecentUpdate)")
+                        Debug.logCache("Updating lastUpdateKey to: \(mostRecentUpdate)")
                         LogManager.shared.log("Updating lastUpdateKey to: \(mostRecentUpdate)")
                         UserDefaults.standard.setValue(mostRecentUpdate, forKey: self.lastUpdateKey)
                         let updatedTime = UserDefaults.standard.string(forKey: self.lastUpdateKey)
-                        print("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
+                        Debug.logCache("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
                         LogManager.shared.log("Verified lastUpdateKey is now: \(String(describing: updatedTime))")
                     }
                     
@@ -220,8 +221,8 @@ class APIManager {
                     
                 } catch {
                     let responsePreview = String(data: data.prefix(2000), encoding: .utf8) ?? "<Could not decode as UTF-8>"
-                    print("RAW API response preview on decoding error: \(responsePreview)")
-                    print("JSON Decoding Error: \(error)")
+                    Debug.logAPI("RAW API response preview on decoding error: \(responsePreview)")
+                    Debug.logAPI("JSON Decoding Error: \(error)")
                     LogManager.shared.log("JSON Decoding Error: \(error)")
                     DispatchQueue.main.async { completion(nil) }
                 }
@@ -248,7 +249,7 @@ class APIManager {
             return true
         } else {
             // File exists but is empty or corrupted - treat as no cache
-            print("Cache file exists but contains no valid data")
+            Debug.logCache("Cache file exists but contains no valid data")
             return false
         }
     }

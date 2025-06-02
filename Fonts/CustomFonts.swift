@@ -1,6 +1,7 @@
 // CustomFonts.swift
 
 import SwiftUI
+import Foundation // for Debug logging
 
 public struct MyFont {
     public static func registerFonts() {
@@ -17,7 +18,7 @@ public struct MyFont {
         var error: Unmanaged<CFError>?
         CTFontManagerRegisterGraphicsFont(font, &error)
         if let error = error {
-            print("Failed to register font: \(error.takeRetainedValue().localizedDescription)")
+            Debug.log("Failed to register font: \(error.takeRetainedValue().localizedDescription)")
         }
     }
 }

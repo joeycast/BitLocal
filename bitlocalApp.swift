@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Foundation // for Debug logging
 
 @main
 @available(iOS 17.0, *)
@@ -24,9 +25,9 @@ struct bitlocalApp: App {
             RootView()
                 .environmentObject(contentViewModel)
                 .onChange(of: scenePhase) { newPhase in
-                    print("🏃 DEBUG: scenePhase changed to: \(newPhase)")
+                    Debug.log("scenePhase changed to: \(newPhase)")
                     if newPhase == .active {
-                        print("🏃 DEBUG: Scene became active, calling fetchElements()")
+                        Debug.log("Scene became active, calling fetchElements()")
                         contentViewModel.fetchElements()
                     }
                 }
