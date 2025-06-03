@@ -320,9 +320,22 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 
                 // Only update if we got new data
                 if !processedElements.isEmpty {
-                    Debug.logMap("Background update: Got \(processedElements.count) new elements")
-                    self?.allElements = processedElements
+                    Debug.logMap("Background update: Got \(processedElements.count) new elements, merging with existing \(self?.allElements.count ?? 0)")
+                    
+                    // 🔧 FIX: Merge new elements with existing ones
+                    let existingElements = self?.allElements ?? []
+                    var elementsDictionary = Dictionary(uniqueKeysWithValues: existingElements.map { ($0.id, $0) })
+                    
+                    // Update/add new elements
+                    processedElements.forEach { element in
+                        elementsDictionary[element.id] = element
+                    }
+                    
+                    let mergedElements = Array(elementsDictionary.values)
+                    self?.allElements = mergedElements
                     self?.forceMapRefresh = true
+                    
+                    Debug.logMap("After merge: Total elements = \(mergedElements.count)")
                 } else {
                     Debug.log("Background update: No new data available")
                 }

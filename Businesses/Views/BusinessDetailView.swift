@@ -3,6 +3,7 @@
 import SwiftUI
 import CoreLocation
 import MapKit
+import Foundation
 
 @available(iOS 17.0, *)
 struct BusinessDetailView: View {
@@ -52,6 +53,8 @@ struct BusinessDetailView: View {
             BusinessMapSection(element: element)
         }
         .onAppear {
+            Debug.log("BusinessDetailView appeared for element: \(element.id)")
+            Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
             elementCellViewModel.updateAddress()
         }
         .listStyle(InsetGroupedListStyle()) // Consistent list style
@@ -89,6 +92,7 @@ struct BusinessDetailsSection: View {
                         .font(.subheadline)
                 }
             }
+            
             // Business Address
             VStack (alignment: .leading, spacing: 3) {
                 Text(NSLocalizedString("address_label", comment: "Label for address"))
@@ -102,42 +106,43 @@ struct BusinessDetailsSection: View {
                 }
             }
             
-            // Business Website
-            if let website = element.osmJSON?.tags?.website ?? element.osmJSON?.tags?.contactWebsite {
-                let displayWebsite = website
-                    .replacingOccurrences(of: "http://", with: "")
-                    .replacingOccurrences(of: "https://", with: "")
-                    .replacingOccurrences(of: "http://www.", with: "")
-                    .replacingOccurrences(of: "https://www.", with: "")
-                    .replacingOccurrences(of: "www.", with: "")
-                    .trimmingCharacters(in: .whitespaces)
+            // Business Website - Only show if valid
+            if let website = element.osmJSON?.tags?.website ?? element.osmJSON?.tags?.contactWebsite,
+               let validURL = website.cleanedWebsiteURL() {
                 
                 VStack (alignment: .leading, spacing: 3) {
                     Text(NSLocalizedString("website_label", comment: "Label for website"))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
-                    Link(destination: URL(string: website)!) {
-                        Text(displayWebsite)
+                    Link(destination: validURL) {
+                        Text(website.cleanedForDisplay())
                             .lineLimit(1)
                     }
                 }
             }
             
-            // Business Phone
-            if let phone = element.osmJSON?.tags?.phone ?? element.osmJSON?.tags?.contactPhone, let url = URL(string:"tel://\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "+", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: ""))") {
-                VStack (alignment: .leading, spacing: 3) {
-                    Text(NSLocalizedString("phone_label", comment: "Label for phone"))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    Link(destination: url) {
-                        Text(phone)
-                            .lineLimit(1)
+            // Business Phone - Simple worldwide approach
+            if let phone = element.osmJSON?.tags?.phone ?? element.osmJSON?.tags?.contactPhone {
+                let (cleanPhone, isValid) = phone.cleanedPhoneNumber()
+                
+                if isValid, let url = URL(string: "tel:\(cleanPhone)") {
+                    VStack (alignment: .leading, spacing: 3) {
+                        Text(NSLocalizedString("phone_label", comment: "Label for phone"))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Link(destination: url) {
+                            Text(phone.displayablePhoneNumber()) // Show original with minimal cleanup
+                                .lineLimit(1)
+                        }
                     }
+                } else {
+                    let _ = Debug.log("Invalid phone number: '\(phone)'")
                 }
             }
             
+            // Opening Hours
             if let openingHours = element.osmJSON?.tags?.openingHours {
                 VStack (alignment: .leading, spacing: 3) {
                     Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))

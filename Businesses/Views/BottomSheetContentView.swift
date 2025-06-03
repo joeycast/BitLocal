@@ -26,6 +26,7 @@ struct BottomSheetContentView: View {
                                 userLocation: viewModel.userLocation,
                                 contentViewModel: viewModel
                             )
+                            .id(element.id)
                         }
                 }
             }

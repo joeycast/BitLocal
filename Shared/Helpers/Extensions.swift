@@ -162,3 +162,120 @@ extension Image {
             .foregroundColor(color)
     }
 }
+
+
+// Website string cleaning
+extension String {
+    func cleanedWebsiteURL() -> URL? {
+        // Remove common prefixes for display
+        let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check for obvious junk data patterns
+        guard !trimmed.isEmpty,
+              !trimmed.contains("currency:"),  // Detect currency tag contamination
+              !trimmed.contains("=yes"),       // Detect tag value contamination
+              !trimmed.contains("payment:"),   // Detect payment tag contamination
+              !trimmed.contains("addr:"),      // Detect address tag contamination
+              trimmed.count < 200,             // Reasonable URL length limit
+              !trimmed.contains("\n"),         // No line breaks
+              !trimmed.contains("\t")          // No tabs
+        else {
+            Debug.log("Rejected junk URL: '\(trimmed)'")
+            return nil
+        }
+        
+        // Clean up the URL
+        var cleanURL = trimmed
+        
+        // Remove multiple protocols if they exist
+        cleanURL = cleanURL.replacingOccurrences(of: "https://http://", with: "https://")
+        cleanURL = cleanURL.replacingOccurrences(of: "http://https://", with: "https://")
+        
+        // Try to create URL as-is first
+        if let url = URL(string: cleanURL), url.scheme != nil {
+            return url
+        }
+        
+        // If no protocol, add https://
+        if !cleanURL.hasPrefix("http://") && !cleanURL.hasPrefix("https://") {
+            cleanURL = "https://\(cleanURL)"
+        }
+        
+        // Final attempt
+        if let url = URL(string: cleanURL), url.scheme != nil {
+            return url
+        }
+        
+        Debug.log("Could not create valid URL from: '\(trimmed)'")
+        return nil
+    }
+    
+    func cleanedForDisplay() -> String {
+        return self
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .replacingOccurrences(of: "www.", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+
+// Simplified international phone number handling
+extension String {
+    func cleanedPhoneNumber() -> (cleaned: String, isValid: Bool) {
+        // Just remove whitespace and common separators for tel: links
+        let cleaned = self.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "(", with: "")
+            .replacingOccurrences(of: ")", with: "")
+            .replacingOccurrences(of: ".", with: "")
+        
+        let isValid = isValidPhoneNumber(cleaned)
+        return (cleaned, isValid)
+    }
+    
+    private func isValidPhoneNumber(_ phone: String) -> Bool {
+        // Minimal validation - just reject obvious junk
+        guard !phone.isEmpty,
+              phone.count >= 4,  // Minimum reasonable length
+              phone.count <= 20, // Maximum reasonable length
+              
+              // Reject obvious junk data patterns
+              !phone.contains("currency:"),
+              !phone.contains("=yes"),
+              !phone.contains("http"),
+              !phone.contains("@"),
+              !phone.contains("www.")
+        else {
+            return false
+        }
+        
+        // Must be mostly digits (allow + for country codes)
+        let validChars = phone.filter({ $0.isNumber || $0 == "+" }).count
+        let totalChars = phone.count
+        
+        // At least 70% should be digits or +
+        guard validChars * 10 >= totalChars * 7 else { // 70% = 7/10
+            return false
+        }
+        
+        // Must contain at least 4 digits
+        let digitCount = phone.filter { $0.isNumber }.count
+        return digitCount >= 4
+    }
+    
+    // Don't format - just clean up obvious issues
+    func displayablePhoneNumber() -> String {
+        let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Only clean up obvious formatting issues, preserve everything else
+        guard !trimmed.isEmpty else { return self }
+        
+        // Remove excessive whitespace but preserve intentional formatting
+        let cleaned = trimmed.replacingOccurrences(of: "  +", with: " ")
+                           .replacingOccurrences(of: "+ ", with: "+")
+        
+        return cleaned
+    }
+}
