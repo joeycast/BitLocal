@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreLocation
 import Foundation // for DebugUtils
+import UIKit     // ← added, for checking userInterfaceIdiom
 
 struct OnboardingPage {
     let titleKey: String
@@ -24,6 +25,12 @@ struct OnboardingView: View {
     @State private var locationManager = CLLocationManager()
     @State private var locationDelegate = LocationPermissionDelegate()
     @State private var iconScale: CGFloat = 1.0
+
+    // ──────────────── START: iPad‐Detection Helper ────────────────
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+    // ──────────────── END: iPad‐Detection Helper ──────────────────
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
@@ -57,149 +64,187 @@ struct OnboardingView: View {
     ]
 
     var body: some View {
-        ZStack {
-            // Background layers
-            pages[currentPage].bgColor.ignoresSafeArea()
-            Color(UIColor.systemBackground)
-                .opacity(0.95)
-                .ignoresSafeArea()
+        GeometryReader { fullGeo in
+            // Determine if we're on an iPad in landscape orientation
+            let isLandscape = fullGeo.size.width > fullGeo.size.height
+            let isPadLandscape = isPad && isLandscape
 
-            VStack(spacing: 28) {
-                // Bouncing icon with smooth transition (prevents distortion)
-                GeometryReader { geo in
-                    ZStack {
-                        // Keyed on currentPage to ensure a new view for each icon, enabling smooth transition
+            ZStack {
+                // Background layers (same for both)
+                pages[currentPage].bgColor.ignoresSafeArea()
+                Color(UIColor.systemBackground)
+                    .opacity(0.95)
+                    .ignoresSafeArea()
+
+                VStack(spacing: isPadLandscape ? 40 : (isPad ? 40 : 28)) {
+                    // Bouncing icon with smooth transition
+                    GeometryReader { iconGeo in
                         ZStack {
-                            Circle()
-                                .fill(pages[currentPage].bgColor)
-                                .frame(width: 120, height: 120)
-                                .shadow(color: pages[currentPage].bgColor.opacity(0.3), radius: 16, x: 0, y: 8)
-                            Image(pages[currentPage].image)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 68, height: 68)
-                                .foregroundColor(.white)
-                                .scaleEffect(iconScale)
-                                .offset(y: pages[currentPage].image == "navigation-arrow-fill" ? 2 : 0)
-                                .offset(x: pages[currentPage].image == "navigation-arrow-fill" ? -4 : 0)
-                                .offset(x: pages[currentPage].image == "currency-btc-bold" ? 1 : 0)
-                        }
-                        .id(currentPage)
-                        .animation(.easeInOut(duration: 0.5), value: currentPage)
-                    }
-                    .position(x: geo.size.width / 2, y: geo.size.height * 1.0)
-                }
-                .frame(height: 200)
+                            // Keyed on currentPage for smooth transition
+                            ZStack {
+                                // Circle size: slightly smaller in pad-landscape
+                                Circle()
+                                    .fill(pages[currentPage].bgColor)
+                                    .frame(
+                                        width: isPadLandscape ? 140 : (isPad ? 180 : 120),
+                                        height: isPadLandscape ? 140 : (isPad ? 180 : 120)
+                                    )
+                                    .shadow(
+                                        color: pages[currentPage].bgColor.opacity(0.3),
+                                        radius: isPadLandscape ? 16 : (isPad ? 24 : 16),
+                                        x: 0,
+                                        y: isPadLandscape ? 8 : (isPad ? 12 : 8)
+                                    )
 
-                // Title & subtitle
-                VStack(spacing: 12) {
-                    Text(LocalizedStringKey(pages[currentPage].titleKey))
-                        .font(.largeTitle).bold()
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.primary)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                        .id("title\(currentPage)")
-                        .animation(.spring(), value: currentPage)
-
-                    Text(LocalizedStringKey(pages[currentPage].subtitleKey))
-                        .font(.title3)
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 14)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                        .id("subtitle\(currentPage)")
-                        .animation(.spring(response: 0.6), value: currentPage)
-                }
-                .padding(.top, 50)
-
-                Spacer()
-
-                // 🔹 Indicator always visible
-                HStack(spacing: 8) {
-                    ForEach(pages.indices, id: \.self) { i in
-                        Capsule()
-                            .fill(i == currentPage
-                                  ? pages[currentPage].bgColor
-                                  : Color.gray.opacity(0.3))
-                            .frame(width: i == currentPage ? 32 : 12, height: 8)
-                            .animation(.easeInOut(duration: 0.25), value: currentPage)
-                    }
-                }
-                .padding(.bottom, 12)
-
-                // 🔹 Page-specific controls
-                if pages[currentPage].isLocationPage {
-                    // Location permission UI
-                    VStack(spacing: 16) {
-                        Button {
-                            requestLocationPermission()
-                        } label: {
-                            HStack {
-                                Image(systemName: "location.fill")
-                                Text("onboarding_button_enable_location")
+                                // Image size: slightly smaller in pad-landscape
+                                Image(pages[currentPage].image)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(
+                                        width: isPadLandscape ? 80 : (isPad ? 100 : 68),
+                                        height: isPadLandscape ? 80 : (isPad ? 100 : 68)
+                                    )
+                                    .foregroundColor(.white)
+                                    .scaleEffect(iconScale)
+                                    .offset(
+                                        y: pages[currentPage].image == "navigation-arrow-fill" ? 2 : 0
+                                    )
+                                    .offset(
+                                        x: pages[currentPage].image == "navigation-arrow-fill" ? -4 : 0
+                                    )
+                                    .offset(
+                                        x: pages[currentPage].image == "currency-btc-bold" ? 1 : 0
+                                    )
                             }
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(pages[currentPage].bgColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(14)
-                            .shadow(color: pages[currentPage].bgColor.opacity(0.3), radius: 4, x: 0, y: 2)
+                            .id(currentPage)
+                            .animation(.easeInOut(duration: 0.5), value: currentPage)
                         }
+                        .position(
+                            x: iconGeo.size.width / 2,
+                            y: iconGeo.size.height * 1.0
+                        )
+                    }
+                    .frame(height: isPadLandscape ? 220 : (isPad ? 300 : 200))
 
+                    // Title & subtitle
+                    VStack(spacing: isPadLandscape ? 12 : (isPad ? 16 : 12)) {
+                        Text(LocalizedStringKey(pages[currentPage].titleKey))
+                            .font(
+                                isPadLandscape
+                                    ? .system(size: 30, weight: .bold)
+                                    : (isPad ? .system(size: 36, weight: .bold) : .largeTitle.bold())
+                            )
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.primary)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                            .id("title\(currentPage)")
+                            .animation(.spring(), value: currentPage)
+
+                        Text(LocalizedStringKey(pages[currentPage].subtitleKey))
+                            .font(
+                                isPadLandscape
+                                    ? .title3
+                                    : (isPad ? .title : .title3)
+                            )
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, isPadLandscape ? 16 : (isPad ? 24 : 14))
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                            .id("subtitle\(currentPage)")
+                            .animation(.spring(response: 0.6), value: currentPage)
+                    }
+                    .padding(.top, isPadLandscape ? 50 : (isPad ? 80 : 50))
+
+                    Spacer()
+
+                    // Indicator
+                    HStack(spacing: isPadLandscape ? 10 : (isPad ? 12 : 8)) {
+                        ForEach(pages.indices, id: \.self) { i in
+                            Capsule()
+                                .fill(
+                                    i == currentPage
+                                        ? pages[currentPage].bgColor
+                                        : Color.gray.opacity(0.3)
+                                )
+                                .frame(
+                                    width: i == currentPage
+                                        ? (isPadLandscape ? 32 : (isPad ? 40 : 32))
+                                        : (isPadLandscape ? 12 : (isPad ? 16 : 12)),
+                                    height: isPadLandscape ? 10 : (isPad ? 12 : 8)
+                                )
+                                .animation(.easeInOut(duration: 0.25), value: currentPage)
+                        }
+                    }
+                    .padding(.bottom, isPadLandscape ? 16 : (isPad ? 20 : 12))
+
+                    // Page-specific controls
+                    if pages[currentPage].isLocationPage {
+                        // Location permission UI
+                        VStack(spacing: isPadLandscape ? 20 : (isPad ? 24 : 16)) {
+                            Button {
+                                requestLocationPermission()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "location.fill")
+                                    Text("onboarding_button_enable_location")
+                                }
+                                .font(isPadLandscape ? .system(size: 20, weight: .semibold) : (isPad ? .system(size: 22, weight: .semibold) : .headline))
+                                .frame(maxWidth: isPadLandscape ? 420 : (isPad ? 500 : 340))
+                                .padding(.vertical, isPadLandscape ? 16 : (isPad ? 20 : 16))
+                                .background(pages[currentPage].bgColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(14)
+                                .shadow(
+                                    color: pages[currentPage].bgColor.opacity(0.3),
+                                    radius: isPadLandscape ? 4 : (isPad ? 6 : 4),
+                                    x: 0,
+                                    y: isPadLandscape ? 2 : (isPad ? 4 : 2)
+                                )
+                            }
+
+                            Button {
+                                proceedToNextPage()
+                            } label: {
+                                Text("onboarding_button_location_skip")
+                                    .font(isPadLandscape ? .system(size: 16) : (isPad ? .system(size: 18) : .subheadline))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, isPadLandscape ? 12 : (isPad ? 16 : 6))
+                        .padding(.bottom, isPadLandscape ? 20 : (isPad ? 30 : 20))
+
+                    } else {
+                        // Next / Get Started button
                         Button {
                             proceedToNextPage()
                         } label: {
-                            Text("onboarding_button_location_skip")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 20)
-
-                } else {
-                    // Next / Get Started button
-                    Button {
-                        proceedToNextPage()
-                    } label: {
-                        Text(currentPage == pages.count - 1 ? "onboarding_button_get_started" : "onboarding_button_next")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            Text(
+                                currentPage == pages.count - 1
+                                    ? "onboarding_button_get_started"
+                                    : "onboarding_button_next"
+                            )
+                            .font(isPadLandscape ? .system(size: 20, weight: .semibold) : (isPad ? .system(size: 22, weight: .semibold) : .headline))
+                            .frame(maxWidth: isPadLandscape ? 420 : (isPad ? 500 : 340))
+                            .padding(.vertical, isPadLandscape ? 16 : (isPad ? 20 : 16))
                             .background(pages[currentPage].bgColor)
                             .foregroundColor(.white)
                             .cornerRadius(14)
-                            .shadow(color: pages[currentPage].bgColor.opacity(0.3), radius: 4, x: 0, y: 2)
-                            .scaleEffect(currentPage == pages.count - 1 ? 1.05 : 1.0)
+                            .shadow(
+                                color: pages[currentPage].bgColor.opacity(0.3),
+                                radius: isPadLandscape ? 4 : (isPad ? 6 : 4),
+                                x: 0,
+                                y: isPadLandscape ? 2 : (isPad ? 4 : 2)
+                            )
                             .animation(.spring(response: 0.4), value: currentPage)
+                        }
+                        .padding(.horizontal, isPadLandscape ? 12 : (isPad ? 16 : 6))
+                        .padding(.bottom, isPadLandscape ? 20 : (isPad ? 34 : 26))
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 26)
                 }
+                .frame(maxWidth: isPad ? 600 : 460)
+                .padding(.horizontal, isPadLandscape ? 16 : (isPad ? 32 : 0))
+                .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
             }
-            .frame(maxWidth: 460)
-            .padding(.horizontal)
-            .onAppear {
-                // Start bouncing
-                withAnimation(
-                    Animation.easeInOut(duration: 0.9)
-                        .repeatForever(autoreverses: true)
-                ) {
-                    iconScale = 1.08
-                }
-                locationManager.delegate = locationDelegate
-            }
-            .onChange(of: currentPage) {
-                iconScale = 1.0
-                withAnimation(
-                    Animation.easeInOut(duration: 0.9)
-                        .repeatForever(autoreverses: true)
-                ) {
-                    iconScale = 1.08
-                }
-            }
-            .animation(.easeInOut(duration: 0.4), value: currentPage)
         }
     }
 
