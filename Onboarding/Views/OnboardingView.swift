@@ -20,7 +20,7 @@ struct OnboardingPage {
 
 struct OnboardingView: View {
     @EnvironmentObject var viewModel: ContentViewModel
-    @Binding var didCompleteOnboarding: Bool
+    @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @State private var currentPage = 0
     @State private var locationManager = CLLocationManager()
     @State private var locationDelegate = LocationPermissionDelegate()
