@@ -18,6 +18,7 @@ struct LoadingScreenView: View {
                 .padding(.bottom, 16)
             Text("loading_subtitle") // Localized
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
             Spacer()
