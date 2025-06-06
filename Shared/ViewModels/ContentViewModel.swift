@@ -222,11 +222,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil, animated: Bool = true) {
         let updatedSpan = span ?? region.span
 
-        // If this is the first time setting the region, do it synchronously
+        // If this is the first time setting the region, do it asynchronously on the main queue
         if !initialRegionSet {
-            self.region = MKCoordinateRegion(center: center, span: updatedSpan)
-            self.mapView?.setRegion(self.region, animated: animated)
-            initialRegionSet = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.region = MKCoordinateRegion(center: center, span: updatedSpan)
+                self.mapView?.setRegion(self.region, animated: animated)
+                self.initialRegionSet = true
+            }
         } else {
             // For subsequent changes, defer to avoid publishing during view updates
             DispatchQueue.main.async { [weak self] in

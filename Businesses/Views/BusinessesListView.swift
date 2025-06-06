@@ -84,7 +84,9 @@ struct BusinessesListView: View {
             let newVM = ElementCellViewModel(element: element,
                                              userLocation: viewModel.userLocation,
                                              viewModel: viewModel)
-            viewModel.cellViewModels[element.id] = newVM
+            DispatchQueue.main.async {
+                viewModel.cellViewModels[element.id] = newVM
+            }
             return newVM
         }
     }
