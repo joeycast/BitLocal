@@ -219,10 +219,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Update map region
     func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil, animated: Bool = true) {
         let updatedSpan = span ?? region.span
+        // Immediately update the MKMapView
+        mapView?.setRegion(MKCoordinateRegion(center: center, span: updatedSpan), animated: animated)
+        // Defer updating the published `region` property
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.region = MKCoordinateRegion(center: center, span: updatedSpan)
-            self.mapView?.setRegion(self.region, animated: animated)
         }
     }
     
