@@ -19,7 +19,7 @@ struct RootView: View {
                 .environmentObject(contentViewModel)
             
             if !didCompleteOnboarding {
-                OnboardingView(didCompleteOnboarding: $didCompleteOnboarding)
+                OnboardingView()
                     .environmentObject(contentViewModel)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                     .zIndex(999)
@@ -39,7 +39,7 @@ struct RootView: View {
                 contentViewModel.fetchElements()
             }
         }
-        .onChange(of: didCompleteOnboarding) { completed in
+        .onChange(of: didCompleteOnboarding) { _, completed in
             Debug.log("onboarding completion changed to: \(completed)")
 
             guard completed else { return }

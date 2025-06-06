@@ -40,7 +40,7 @@ struct OpenStreetMapAttributionView: View {
                 }
             }
         }
-        .onChange(of: scenePhase) { newScenePhase in
+        .onChange(of: scenePhase) { _, newScenePhase in
             if newScenePhase == .active {
                 withAnimation(.easeInOut(duration: 0)) {
                     isFaded = false

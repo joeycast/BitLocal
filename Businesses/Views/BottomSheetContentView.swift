@@ -40,11 +40,11 @@ struct BottomSheetContentView: View {
                     }
                 }
             }
-            .onChange(of: geometry.size.height) { newHeight in
+            .onChange(of: geometry.size.height) { _, newHeight in
                 viewModel.bottomPadding = newHeight
                 Debug.log("BottomSheetContentView height updated: \(newHeight)")
             }
-            .onChange(of: viewModel.path) { newPath in
+            .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")
                 if let selectedElement = newPath.last {
                     // If detail view is pushed, zoom to element

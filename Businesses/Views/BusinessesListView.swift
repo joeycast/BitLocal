@@ -64,7 +64,7 @@ struct BusinessesListView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .padding(.top)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onChange(of: viewModel.path) { newPath in
+                .onChange(of: viewModel.path) { _, newPath in
                     if let element = newPath.last {
                         // Delay zoom until after navigation completes
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -163,7 +163,7 @@ struct ElementCell: View {
                 PaymentIcons(element: viewModel.element)
             }
         }
-        .onChange(of: viewModel.viewModel.userLocation) { _ in
+        .onChange(of: viewModel.viewModel.userLocation) { _, _ in
             viewModel.onCellAppear()
         }
     }

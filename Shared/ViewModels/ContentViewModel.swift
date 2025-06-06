@@ -219,8 +219,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Update map region
     func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil, animated: Bool = true) {
         let updatedSpan = span ?? region.span
-        self.region = MKCoordinateRegion(center: center, span: updatedSpan)
-        mapView?.setRegion(self.region, animated: animated)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.region = MKCoordinateRegion(center: center, span: updatedSpan)
+            self.mapView?.setRegion(self.region, animated: animated)
+        }
     }
     
     // Deselect the currently selected annotation

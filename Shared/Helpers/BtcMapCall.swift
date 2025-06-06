@@ -143,7 +143,7 @@ class APIManager {
     
     private func updateCacheWithFetchedElements(fetchedElements: [Element]) {
         DispatchQueue.global(qos: .utility).async {
-            var cachedElements = self.loadElementsFromFile() ?? []
+            let cachedElements = self.loadElementsFromFile() ?? []
             var elementsDictionary = Dictionary(uniqueKeysWithValues: cachedElements.map { ($0.id, $0) })
             fetchedElements.forEach { element in
                 elementsDictionary[element.id] = element
@@ -197,9 +197,9 @@ class APIManager {
                     let fetchedElements = try decoder.decode([Element].self, from: data)
 
                     // Log OSM tags for each element
-                    for el in fetchedElements {
+//                    for el in fetchedElements {
 //                        Debug.logMap("OSM tags for element \(el.id): \(String(describing: el.osmJSON?.tags))")
-                    }
+//                    }
 
                     Debug.logAPI("Decoded \(fetchedElements.count) elements.")
 
