@@ -10,9 +10,10 @@ import SwiftUI
 
 struct LoadingScreenView: View {
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 0) {
             Spacer()
             ProgressView("loading_title") // Localized
+                .bold()
                 .progressViewStyle(.circular)
                 .font(.title2)
                 .padding(.bottom, 16)

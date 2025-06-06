@@ -1402,49 +1402,49 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Einen Moment! Wir suchen die besten Bitcoin-Orte in deiner Nähe."
+            "value" : "Einen Moment! Wir suchen die besten bitcoin-Orte in deiner Nähe."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hang tight! We’re fetching all the best Bitcoin spots near you."
+            "value" : "Hang tight! We’re fetching all the best bitcoin spots near you."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¡Un momento! Buscamos los mejores lugares con Bitcoin cerca de ti."
+            "value" : "¡Un momento! Buscamos los mejores lugares con bitcoin cerca de ti."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¡Aguarda! Estamos encontrando los mejores lugares Bitcoin cerca de ti."
+            "value" : "¡Aguarda! Estamos encontrando los mejores lugares bitcoin cerca de ti."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un instant! Nous cherchons les meilleurs endroits Bitcoin près de chez vous."
+            "value" : "Un instant! Nous cherchons les meilleurs endroits bitcoin près de chez vous."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un instant! On trouve les meilleurs commerces Bitcoin près de chez vous."
+            "value" : "Un instant! On trouve les meilleurs commerces bitcoin près de chez vous."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un attimo! Stiamo cercando i migliori luoghi Bitcoin vicino a te."
+            "value" : "Un attimo! Stiamo cercando i migliori luoghi bitcoin vicino a te."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Even geduld! We halen de beste Bitcoin-plekken bij jou in de buurt op."
+            "value" : "Even geduld! We halen de beste bitcoin-plekken bij jou in de buurt op."
           }
         },
         "th" : {
