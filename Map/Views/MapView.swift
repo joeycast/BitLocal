@@ -59,10 +59,15 @@ struct MapView: UIViewRepresentable {
         // Auto-center on user location when map loads
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if let userLocation = viewModel.locationManager.location {
+                // Center the map and mark initial region as set
                 viewModel.centerMap(to: userLocation.coordinate)
+                viewModel.initialRegionSet = true
+                // Update the viewModel.region to match the visible map rect
+                let center = userLocation.coordinate
+                let spanLatitude = mapView.region.span.latitudeDelta
+                let spanLongitude = mapView.region.span.longitudeDelta
+                viewModel.region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: spanLatitude, longitudeDelta: spanLongitude))
             } else {
-                // Request location and center when available
-//                viewModel.locationManager.requestWhenInUseAuthorization()
                 viewModel.locationManager.startUpdatingLocation()
             }
         }

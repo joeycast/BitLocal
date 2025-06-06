@@ -70,15 +70,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         // Update map view to show user location
         DispatchQueue.main.async {
-            self.updateMapRegion(center: latestLocation.coordinate)
+            // Always center with padding to account for UI insets
+            self.centerMap(to: latestLocation.coordinate)
+            // Manually keep `region` in sync for SwiftUI bindings
+            let currentSpan = self.region.span
+            self.region = MKCoordinateRegion(center: latestLocation.coordinate, span: currentSpan)
+            // Mark initial region as set on first update
+            if !self.initialRegionSet {
+                self.initialRegionSet = true
+            }
             self.userLocation = latestLocation
             self.userLocationSubject.send(latestLocation)
-            
-            // 🔧 ADD THIS: Center map for returning users when location finally comes in
-            if !self.allElements.isEmpty {
-                Debug.logMap("Centering map for returning user (location received after cache load)")
-                self.centerMap(to: latestLocation.coordinate)
-            }
         }
         manager.stopUpdatingLocation() // Stop updating location once we have the user's location
         isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
@@ -219,12 +221,19 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Update map region
     func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil, animated: Bool = true) {
         let updatedSpan = span ?? region.span
-        // Immediately update the MKMapView
-        mapView?.setRegion(MKCoordinateRegion(center: center, span: updatedSpan), animated: animated)
-        // Defer updating the published `region` property
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+
+        // If this is the first time setting the region, do it synchronously
+        if !initialRegionSet {
             self.region = MKCoordinateRegion(center: center, span: updatedSpan)
+            self.mapView?.setRegion(self.region, animated: animated)
+            initialRegionSet = true
+        } else {
+            // For subsequent changes, defer to avoid publishing during view updates
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.region = MKCoordinateRegion(center: center, span: updatedSpan)
+                self.mapView?.setRegion(self.region, animated: animated)
+            }
         }
     }
     
