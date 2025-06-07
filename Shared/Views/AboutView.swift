@@ -14,6 +14,9 @@ struct AboutView: View {
     // Contribute section links
     let suggestABusinessEmail = URL(string:"mailto:support@bitlocal.app")!
     
+    // Support BitLocal links
+     let supportBitLocalURL = URL(string: "https://strike.me/joeycast/")!
+    
     // Contact section links
     let generalSupportInquiriesEmail = URL(string:"mailto:support@bitlocal.app")!
     let reportABugEmail = URL(string:"mailto:support@bitlocal.app")!
@@ -21,18 +24,18 @@ struct AboutView: View {
     
     // Socials section links
     let twitterURL = URL(string:"https://twitter.com/bitlocal_app")!
-    //    let discordURL = URL(string:"")!
     //    let nostrURL = URL(string:"")!
     
+    // More from Brink 13 Labs links
+    let bitcoinLivePriceChartURL = URL(string: "https://brink13labs.com")!
+    
     // Other section links
-    let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
-    let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md")!
+    let brink13LabsWebsite = URL(string: "https://brink13labs.com")!
     let bitlocalWebsite = URL(string: "https://www.bitlocal.app")!
+    let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md")!
     let btcMapURL = URL(string: "https://btcmap.org/")!
     let openStreetMapURL = URL(string: "https://openstreetmap.org/copyright")!
-    
-    // Tip Jar links
-     let tipJarURL = URL(string: "https://strike.me/joeycast/")!
+    let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
     
     let iconSize: CGFloat = 20
     
@@ -60,7 +63,7 @@ struct AboutView: View {
                 if Locale.current.region?.identifier == "US" {
                     Section(header: Text("support_bitlocal_section"),
                             footer: Text("support_bitlocal_footer")) {
-                        Link(destination: tipJarURL) {
+                        Link(destination: supportBitLocalURL) {
                             HStack(spacing: 10) {
                                 Image("hand-heart-fill")
                                     .aboutIconStyle(size: iconSize)
@@ -107,14 +110,17 @@ struct AboutView: View {
                             Spacer()
                         }
                     }
-                    //                    Link(destination: discordURL,
-                    //                         label: {
-                    //                        Label("Discord", systemImage: "link")
-                    //                    })
-                    //                    Link(destination: nostrURL,
-                    //                         label: {
-                    //                        Label("Nostr", systemImage: "link")
-                    //                    })
+                }
+                // More from Birnk 13 Labs section
+                Section(header: Text("more_from_brink_13_Labs_section")) {
+                    Link(destination: bitcoinLivePriceChartURL) {
+                        HStack(spacing: 10) {
+                            Image("chart-line-up-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("bitcoin_live_price_chart_button_label")
+                            Spacer()
+                        }
+                    }
                 }
                 // Other section
                 Section(header: Text("other_section")) {
@@ -123,6 +129,14 @@ struct AboutView: View {
                             Image("compass-fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("bitlocal_website")
+                            Spacer()
+                        }
+                    }
+                    Link(destination: brink13LabsWebsite) {
+                        HStack(spacing: 10) {
+                            Image("compass-fill")
+                                .aboutIconStyle(size: iconSize)
+                            Text("brink_13_labs_website")
                             Spacer()
                         }
                     }

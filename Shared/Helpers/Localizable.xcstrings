@@ -504,6 +504,65 @@
         }
       }
     },
+    "bitcoin_live_price_chart_button_label" : {
+      "comment" : "Bitcoin Live Price Chart button label",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart für Apple TV"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart for Apple TV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart para Apple TV"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart para Apple TV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart pour Apple TV"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart pour Apple TV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart per Apple TV"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart voor Apple TV"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin Live Price Chart สำหรับ Apple TV"
+          }
+        }
+      }
+    },
     "bitcoin_resources" : {
       "comment" : "Link or section for external Bitcoin resources",
       "extractionState" : "manual",
@@ -679,6 +738,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "เว็บไซต์ BitLocal"
+          }
+        }
+      }
+    },
+    "brink_13_labs_website" : {
+      "comment" : "Brink 13 Labs, LLC website button label",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brink 13 Labs, LLC"
           }
         }
       }
@@ -1805,6 +1923,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "มาตรฐาน"
+          }
+        }
+      }
+    },
+    "more_from_brink_13_Labs_section" : {
+      "comment" : "More from Brink 13 Labs section header",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mehr von Brink 13 Labs"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More from Brink 13 Labs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más de Brink 13 Labs"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más de Brink 13 Labs"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus de Brink 13 Labs"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus de Brink 13 Labs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altri da Brink 13 Labs"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meer van Brink 13 Labs"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แอปอื่นจาก Brink 13 Labs"
           }
         }
       }
