@@ -31,8 +31,8 @@ struct AboutView: View {
     let btcMapURL = URL(string: "https://btcmap.org/")!
     let openStreetMapURL = URL(string: "https://openstreetmap.org/copyright")!
     
-    // Support Development links
-    // let tipJarURL = URL(string: "")!
+    // Tip Jar links
+     let tipJarURL = URL(string: "https://strike.me/joeycast/")!
     
     let iconSize: CGFloat = 20
     
@@ -54,6 +54,19 @@ struct AboutView: View {
                                 .aboutIconStyle(size: iconSize)
                             Text("suggest_a_business")
                             Spacer()
+                        }
+                    }
+                }
+                if Locale.current.region?.identifier == "US" {
+                    Section(header: Text("support_bitlocal_section"),
+                            footer: Text("support_bitlocal_footer")) {
+                        Link(destination: tipJarURL) {
+                            HStack(spacing: 10) {
+                                Image("hand-heart-fill")
+                                    .aboutIconStyle(size: iconSize)
+                                Text("support_bitlocal_button_label")
+                                Spacer()
+                            }
                         }
                     }
                 }
@@ -146,24 +159,6 @@ struct AboutView: View {
                         }
                     }
                 }
-                // Support Development section
-                //                Section(header: Text("Support Development"),
-                //                        footer: Text("Support developing by tipping using Bitcoin over Lightning.")) {
-                //                    Label("Tip Jar", systemImage: "bolt.circle.fill")
-                //                }
-                //                Section(header: Text("Logs")) {
-                //                    Button("Show Logs") {
-                //                        self.showingLogs = true
-                //                    }
-                //                    .sheet(isPresented: $showingLogs) {
-                //                        // Display logs in a scrollable text view
-                //                        ScrollView {
-                //                            Text(LogManager.shared.allLogs())
-                //                                .padding()
-                //                                .font(.system(.body, design: .monospaced))
-                //                        }
-                //                    }
-                //                }
                 Section {
                     Button {
                         UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")

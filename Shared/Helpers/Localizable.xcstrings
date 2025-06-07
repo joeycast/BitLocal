@@ -96,55 +96,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal ist eine App, die von Joe Castagnaro in Nashville, TN entwickelt wurde. Ziel von BitLocal ist es, die Hyperbitcoinisierung zu unterstützen, indem Menschen mit lokalen Unternehmen verbunden werden, die Bitcoin akzeptieren – mein Beitrag zur Bitcoin-Community. Die Standortdaten in BitLocal stammen von OpenStreetMap über die BTC Map API."
+            "value" : "BitLocal ist eine App, die von Brink 13 Labs, LLC in Nashville, TN entwickelt wurde. Ziel von BitLocal ist es, die Hyperbitcoinisierung zu unterstützen, indem Menschen mit lokalen Unternehmen verbunden werden, die Bitcoin akzeptieren – mein Beitrag zur Bitcoin-Community. Die Standortdaten in BitLocal stammen von OpenStreetMap über die BTC Map API."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal is an app developed by Joe Castagnaro in Nashville, TN. BitLocal’s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is my contribution to the bitcoin community. Location data displayed in BitLocal is retrieved from OpenStreetMap through the BTC Map API."
+            "value" : "BitLocal is an app developed by Brink 13 Labs, LLC in Nashville, TN. BitLocal’s mission is to support hyperbitcoinization by connecting people with local businesses that accept bitcoin and is our contribution to the bitcoin community. Location data displayed in BitLocal is retrieved from OpenStreetMap through the BTC Map API."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal es una aplicación desarrollada por Joe Castagnaro en Nashville, TN. La misión de BitLocal es apoyar la hiperbitcoinización conectando a personas con negocios locales que aceptan bitcoin y es mi contribución a la comunidad bitcoin. Los datos de ubicación que se muestran en BitLocal se obtienen de OpenStreetMap a través de la API de BTC Map."
+            "value" : "BitLocal es una aplicación desarrollada por Brink 13 Labs, LLC en Nashville, TN. La misión de BitLocal es apoyar la hiperbitcoinización conectando a personas con negocios locales que aceptan bitcoin y es mi contribución a la comunidad bitcoin. Los datos de ubicación que se muestran en BitLocal se obtienen de OpenStreetMap a través de la API de BTC Map."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal es una aplicación desarrollada por Joe Castagnaro en Nashville, TN. La misión de BitLocal es apoyar la hiperbitcoinización conectando a las personas con negocios locales que aceptan bitcoin; es mi contribución a la comunidad bitcoiner. Los datos de ubicación en BitLocal se obtienen de OpenStreetMap mediante la API de BTC Map."
+            "value" : "BitLocal es una aplicación desarrollada por Brink 13 Labs, LLC en Nashville, TN. La misión de BitLocal es apoyar la hiperbitcoinización conectando a las personas con negocios locales que aceptan bitcoin; es mi contribución a la comunidad bitcoiner. Los datos de ubicación en BitLocal se obtienen de OpenStreetMap mediante la API de BTC Map."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal est une application développée par Joe Castagnaro à Nashville, Tennessee. La mission de BitLocal est de soutenir l’hyperbitcoinisation en connectant les utilisateurs avec des commerces locaux qui acceptent le bitcoin. C’est ma contribution à la communauté Bitcoin. Les données de localisation affichées dans BitLocal proviennent d’OpenStreetMap via l’API BTC Map."
+            "value" : "BitLocal est une application développée par Brink 13 Labs, LLC à Nashville, Tennessee. La mission de BitLocal est de soutenir l’hyperbitcoinisation en connectant les utilisateurs avec des commerces locaux qui acceptent le bitcoin. C’est ma contribution à la communauté Bitcoin. Les données de localisation affichées dans BitLocal proviennent d’OpenStreetMap via l’API BTC Map."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal est une application développée par Joe Castagnaro à Nashville, Tennessee. La mission de BitLocal est de soutenir l’hyperbitcoinisation en reliant les gens aux commerces locaux qui acceptent le bitcoin. C’est ma contribution à la communauté Bitcoin. Les données de localisation affichées dans BitLocal proviennent d’OpenStreetMap grâce à l’API BTC Map."
+            "value" : "BitLocal est une application développée par Brink 13 Labs, LLC à Nashville, Tennessee. La mission de BitLocal est de soutenir l’hyperbitcoinisation en reliant les gens aux commerces locaux qui acceptent le bitcoin. C’est ma contribution à la communauté Bitcoin. Les données de localisation affichées dans BitLocal proviennent d’OpenStreetMap grâce à l’API BTC Map."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal è un'app sviluppata da Joe Castagnaro a Nashville, Tennessee. La missione di BitLocal è sostenere l’iperbitcoinizzazione collegando le persone alle attività locali che accettano bitcoin: è il mio contributo alla comunità Bitcoin. I dati sulla posizione visualizzati in BitLocal sono ottenuti da OpenStreetMap tramite l’API di BTC Map."
+            "value" : "BitLocal è un'app sviluppata da Brink 13 Labs, LLC a Nashville, Tennessee. La missione di BitLocal è sostenere l’iperbitcoinizzazione collegando le persone alle attività locali che accettano bitcoin: è il mio contributo alla comunità Bitcoin. I dati sulla posizione visualizzati in BitLocal sono ottenuti da OpenStreetMap tramite l’API di BTC Map."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal is een app ontwikkeld door Joe Castagnaro in Nashville, TN. De missie van BitLocal is om hyperbitcoinisatie te ondersteunen door mensen te verbinden met lokale bedrijven die bitcoin accepteren. Het is mijn bijdrage aan de bitcoincommunity. Locatiegegevens in BitLocal worden opgehaald via OpenStreetMap met behulp van de BTC Map API."
+            "value" : "BitLocal is een app ontwikkeld door Brink 13 Labs, LLC in Nashville, TN. De missie van BitLocal is om hyperbitcoinisatie te ondersteunen door mensen te verbinden met lokale bedrijven die bitcoin accepteren. Het is mijn bijdrage aan de bitcoincommunity. Locatiegegevens in BitLocal worden opgehaald via OpenStreetMap met behulp van de BTC Map API."
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BitLocal เป็นแอปที่พัฒนาโดย Joe Castagnaro ในแนชวิลล์ รัฐเทนเนสซี ภารกิจของ BitLocal คือสนับสนุนการใช้บิตคอยน์อย่างแพร่หลาย โดยเชื่อมต่อผู้คนกับธุรกิจท้องถิ่นที่รับบิตคอยน์ ซึ่งเป็นส่วนหนึ่งของการมีส่วนร่วมในชุมชนบิตคอยน์ ข้อมูลตำแหน่งที่แสดงใน BitLocal ดึงมาจาก OpenStreetMap ผ่าน API ของ BTC Map"
+            "value" : "BitLocal เป็นแอปที่พัฒนาโดย Brink 13 Labs, LLC ในแนชวิลล์ รัฐเทนเนสซี ภารกิจของ BitLocal คือสนับสนุนการใช้บิตคอยน์อย่างแพร่หลาย โดยเชื่อมต่อผู้คนกับธุรกิจท้องถิ่นที่รับบิตคอยน์ ซึ่งเป็นส่วนหนึ่งของการมีส่วนร่วมในชุมชนบิตคอยน์ ข้อมูลตำแหน่งที่แสดงใน BitLocal ดึงมาจาก OpenStreetMap ผ่าน API ของ BTC Map"
           }
         }
       }
@@ -2293,49 +2293,49 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lokal einkaufen, mit Bitcoin bezahlen"
+            "value" : "Lokal einkaufen, \nmit Bitcoin bezahlen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shop Local, Pay in Bitcoin"
+            "value" : "Shop Local, \nPay in Bitcoin"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compra local, paga con bitcoin"
+            "value" : "Compra local, \npaga con bitcoin"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compra localmente, paga con bitcoin"
+            "value" : "Compra localmente, \npaga con bitcoin"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Achetez local, payez en bitcoin"
+            "value" : "Achetez local, \npayez en bitcoin"
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Achetez localement, payez en bitcoin"
+            "value" : "Achetez localement, \npayez en bitcoin"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Acquista locale, paga in bitcoin"
+            "value" : "Acquista locale, \npaga in bitcoin"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Koop lokaal, betaal met bitcoin"
+            "value" : "Koop lokaal, \nbetaal met bitcoin"
           }
         },
         "th" : {
@@ -3654,6 +3654,183 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "เสนอฟีเจอร์"
+          }
+        }
+      }
+    },
+    "support_bitlocal_button_label" : {
+      "comment" : "Support BitLocal Button Label",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitcoin-Spende senden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send a Bitcoin Tip"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar una propina en Bitcoin"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar una propina en Bitcoin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer un pourboire en Bitcoin"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer un pourboire en Bitcoin"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia una mancia in Bitcoin"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stuur een Bitcoin-fooi"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ส่งทิปด้วยบิตคอยน์"
+          }
+        }
+      }
+    },
+    "support_bitlocal_footer" : {
+      "comment" : "Support BitLocal section footer",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal wird von einem unabhängigen Entwickler erstellt und gepflegt. Alle Funktionen sind kostenlos. Trinkgelder sind völlig freiwillig und schalten keine zusätzlichen Funktionen frei. Mit einem Tippen auf die Schaltfläche öffnet sich unsere Trinkgeld-Seite im Browser (außerhalb des App-Store-Zahlungssystems)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal is built and maintained by a solo, independent developer. All features are free. Tips are purely optional and never unlock extra functionality. Tapping the button opens our tip page in your browser (outside the App Store payment system)."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal está desarrollado y mantenido por un desarrollador independiente. Todas las funciones son gratuitas. Las propinas son completamente opcionales y no desbloquean funciones adicionales. Al tocar el botón, se abre nuestra página de propinas en el navegador (fuera del sistema de pagos del App Store)."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal está desarrollado y mantenido por un desarrollador independiente. Todas las funciones son gratuitas. Las propinas son completamente opcionales y no desbloquean funciones adicionales. Al tocar el botón, se abrirá nuestra página de propinas en el navegador (fuera del sistema de pagos del App Store)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal est conçu et maintenu par un développeur indépendant. Toutes les fonctionnalités sont gratuites. Les pourboires sont totalement facultatifs et ne débloquent aucune fonctionnalité supplémentaire. En appuyant sur le bouton, vous ouvrez notre page de pourboires dans votre navigateur (en dehors du système de paiement de l’App Store)."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal est conçu et maintenu par un développeur indépendant. Toutes les fonctionnalités sont gratuites. Les pourboires sont entièrement facultatifs et ne débloquent aucune fonctionnalité supplémentaire. En appuyant sur le bouton, vous ouvrirez notre page de pourboires dans votre navigateur (à l’extérieur du système de paiement de l’App Store)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal è sviluppato e mantenuto da un singolo sviluppatore indipendente. Tutte le funzionalità sono gratuite. Le mance sono completamente facoltative e non sbloccano funzionalità aggiuntive. Toccando il pulsante si apre la nostra pagina delle mance nel browser (fuori dal sistema di pagamento dell’App Store)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal is gebouwd en onderhouden door een onafhankelijke ontwikkelaar. Alle functies zijn gratis. Fooien zijn volledig optioneel en ontgrendelen geen extra functionaliteit. Door op de knop te tikken, wordt onze tippagina in je browser geopend (buiten het App Store-betalingssysteem)."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal สร้างและดูแลโดยนักพัฒนาอิสระเพียงคนเดียว ฟีเจอร์ทั้งหมดใช้งานได้ฟรี ทิปเป็นเรื่องตามสมัครใจและไม่ได้ปลดล็อกฟีเจอร์เพิ่มเติม การแตะปุ่มจะเปิดหน้าทิปของเราในเบราว์เซอร์ (นอกระบบการชำระเงินของ App Store)"
+          }
+        }
+      }
+    },
+    "support_bitlocal_section" : {
+      "comment" : "Support BitLocal section header",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal unterstützen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support BitLocal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoya BitLocal"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoyar BitLocal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soutenez BitLocal"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soutenir BitLocal"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostieni BitLocal"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steun BitLocal"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "สนับสนุน BitLocal"
           }
         }
       }
