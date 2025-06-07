@@ -26,11 +26,44 @@ struct OnboardingView: View {
     @State private var locationDelegate = LocationPermissionDelegate()
     @State private var iconScale: CGFloat = 1.0
 
-    // ──────────────── START: iPad‐Detection Helper ────────────────
+    // ──────────────── Device Detection Helpers ────────────────
     private var isPad: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
     }
-    // ──────────────── END: iPad‐Detection Helper ──────────────────
+    
+    // Screen size categories based on actual dimensions
+    private func screenSizeCategory(width: CGFloat, height: CGFloat) -> ScreenCategory {
+        let minDimension = min(width, height)
+        let maxDimension = max(width, height)
+        
+        if isPad {
+            if minDimension >= 1000 { // iPad 13" and larger
+                return .iPadLarge
+            } else if minDimension >= 800 { // iPad 11"
+                return .iPadMedium
+            } else { // iPad mini
+                return .iPadSmall
+            }
+        } else {
+            if minDimension <= 375 { // iPhone SE and smaller
+                return .iPhoneSmall
+            } else if maxDimension >= 850 { // iPhone Pro Max
+                return .iPhoneLarge
+            } else { // Regular iPhones
+                return .iPhoneMedium
+            }
+        }
+    }
+    
+    enum ScreenCategory {
+        case iPhoneSmall
+        case iPhoneMedium
+        case iPhoneLarge
+        case iPadSmall
+        case iPadMedium
+        case iPadLarge
+    }
+    // ──────────────── End Device Detection ──────────────────
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
@@ -65,75 +98,65 @@ struct OnboardingView: View {
 
     var body: some View {
         GeometryReader { fullGeo in
-            // Determine if we're on an iPad in landscape orientation
+            let screenCategory = screenSizeCategory(width: fullGeo.size.width, height: fullGeo.size.height)
             let isLandscape = fullGeo.size.width > fullGeo.size.height
-            let isPadLandscape = isPad && isLandscape
+            
+            // Dynamic sizing based on screen dimensions
+            let circleSize = getCircleSize(for: screenCategory, isLandscape: isLandscape)
+            let iconSize = getIconSize(for: screenCategory, isLandscape: isLandscape)
+            let titleFont = getTitleFont(for: screenCategory, isLandscape: isLandscape, width: fullGeo.size.width)
+            let subtitleFont = getSubtitleFont(for: screenCategory, isLandscape: isLandscape)
+            let spacing = getSpacing(for: screenCategory, isLandscape: isLandscape)
+            let buttonFont = getButtonFont(for: screenCategory, isLandscape: isLandscape)
+            let maxContentWidth = getMaxContentWidth(for: screenCategory, width: fullGeo.size.width)
 
             ZStack {
-                // Background layers (same for both)
+                // Background layers
                 pages[currentPage].bgColor.ignoresSafeArea()
                 Color(UIColor.systemBackground)
                     .opacity(0.95)
                     .ignoresSafeArea()
 
-                VStack(spacing: isPadLandscape ? 40 : (isPad ? 40 : 28)) {
-                    // Bouncing icon with smooth transition
-                    GeometryReader { iconGeo in
-                        ZStack {
-                            // Keyed on currentPage for smooth transition
-                            ZStack {
-                                // Circle size: slightly smaller in pad-landscape
-                                Circle()
-                                    .fill(pages[currentPage].bgColor)
-                                    .frame(
-                                        width: isPadLandscape ? 140 : (isPad ? 180 : 120),
-                                        height: isPadLandscape ? 140 : (isPad ? 180 : 120)
-                                    )
-                                    .shadow(
-                                        color: pages[currentPage].bgColor.opacity(0.3),
-                                        radius: isPadLandscape ? 16 : (isPad ? 24 : 16),
-                                        x: 0,
-                                        y: isPadLandscape ? 8 : (isPad ? 12 : 8)
-                                    )
+                VStack(spacing: 0) {
+                    // Position icon at 1/4 from top for iPhones, 1/3 for iPads
+                    Spacer()
+                        .frame(height: fullGeo.size.height * (isPad ? 0.33 : 0.25) - circleSize / 2)
+                    
+                    // Icon
+                    ZStack {
+                        Circle()
+                            .fill(pages[currentPage].bgColor)
+                            .frame(width: circleSize, height: circleSize)
+                            .shadow(
+                                color: pages[currentPage].bgColor.opacity(0.3),
+                                radius: circleSize * 0.133,
+                                x: 0,
+                                y: circleSize * 0.067
+                            )
 
-                                // Image size: slightly smaller in pad-landscape
-                                Image(pages[currentPage].image)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(
-                                        width: isPadLandscape ? 80 : (isPad ? 100 : 68),
-                                        height: isPadLandscape ? 80 : (isPad ? 100 : 68)
-                                    )
-                                    .foregroundColor(.white)
-                                    .scaleEffect(iconScale)
-                                    .offset(
-                                        y: pages[currentPage].image == "navigation-arrow-fill" ? 2 : 0
-                                    )
-                                    .offset(
-                                        x: pages[currentPage].image == "navigation-arrow-fill" ? -4 : 0
-                                    )
-                                    .offset(
-                                        x: pages[currentPage].image == "currency-btc-bold" ? 1 : 0
-                                    )
-                            }
-                            .id(currentPage)
-                            .animation(.easeInOut(duration: 0.5), value: currentPage)
-                        }
-                        .position(
-                            x: iconGeo.size.width / 2,
-                            y: iconGeo.size.height * 1.0
-                        )
+                        Image(pages[currentPage].image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: iconSize, height: iconSize)
+                            .foregroundColor(.white)
+                            .scaleEffect(iconScale)
+                            .offset(
+                                y: pages[currentPage].image == "navigation-arrow-fill" ? 2 : 0
+                            )
+                            .offset(
+                                x: pages[currentPage].image == "navigation-arrow-fill" ? -4 : 0
+                            )
+                            .offset(
+                                x: pages[currentPage].image == "currency-btc-bold" ? 1 : 0
+                            )
                     }
-                    .frame(height: isPadLandscape ? 220 : (isPad ? 300 : 200))
+                    .id(currentPage)
+                    .animation(.easeInOut(duration: 0.5), value: currentPage)
 
                     // Title & subtitle
-                    VStack(spacing: isPadLandscape ? 12 : (isPad ? 16 : 12)) {
+                    VStack(spacing: spacing.text) {
                         Text(LocalizedStringKey(pages[currentPage].titleKey))
-                            .font(
-                                isPadLandscape
-                                    ? .system(size: 30, weight: .bold)
-                                    : (isPad ? .system(size: 36, weight: .bold) : .largeTitle.bold())
-                            )
+                            .font(titleFont)
                             .multilineTextAlignment(.center)
                             .foregroundColor(.primary)
                             .transition(.move(edge: .leading).combined(with: .opacity))
@@ -141,24 +164,20 @@ struct OnboardingView: View {
                             .animation(.spring(), value: currentPage)
 
                         Text(LocalizedStringKey(pages[currentPage].subtitleKey))
-                            .font(
-                                isPadLandscape
-                                    ? .title3
-                                    : (isPad ? .title : .title3)
-                            )
+                            .font(subtitleFont)
                             .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
-                            .padding(.horizontal, isPadLandscape ? 16 : (isPad ? 24 : 14))
+                            .padding(.horizontal, spacing.textHorizontal)
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                             .id("subtitle\(currentPage)")
                             .animation(.spring(response: 0.6), value: currentPage)
                     }
-                    .padding(.top, isPadLandscape ? 50 : (isPad ? 80 : 50))
+                    .padding(.top, spacing.afterIcon)
 
                     Spacer()
 
                     // Indicator
-                    HStack(spacing: isPadLandscape ? 10 : (isPad ? 12 : 8)) {
+                    HStack(spacing: spacing.indicator) {
                         ForEach(pages.indices, id: \.self) { i in
                             Capsule()
                                 .fill(
@@ -167,20 +186,18 @@ struct OnboardingView: View {
                                         : Color.gray.opacity(0.3)
                                 )
                                 .frame(
-                                    width: i == currentPage
-                                        ? (isPadLandscape ? 32 : (isPad ? 40 : 32))
-                                        : (isPadLandscape ? 12 : (isPad ? 16 : 12)),
-                                    height: isPadLandscape ? 10 : (isPad ? 12 : 8)
+                                    width: i == currentPage ? spacing.indicatorWidthActive : spacing.indicatorWidth,
+                                    height: spacing.indicatorHeight
                                 )
                                 .animation(.easeInOut(duration: 0.25), value: currentPage)
                         }
                     }
-                    .padding(.bottom, isPadLandscape ? 16 : (isPad ? 20 : 12))
+                    .padding(.bottom, spacing.indicatorBottom)
 
                     // Page-specific controls
                     if pages[currentPage].isLocationPage {
                         // Location permission UI
-                        VStack(spacing: isPadLandscape ? 20 : (isPad ? 24 : 16)) {
+                        VStack(spacing: spacing.button) {
                             Button {
                                 requestLocationPermission()
                             } label: {
@@ -188,17 +205,17 @@ struct OnboardingView: View {
                                     Image(systemName: "location.fill")
                                     Text("onboarding_button_enable_location")
                                 }
-                                .font(isPadLandscape ? .system(size: 20, weight: .semibold) : (isPad ? .system(size: 22, weight: .semibold) : .headline))
-                                .frame(maxWidth: isPadLandscape ? 420 : (isPad ? 500 : 340))
-                                .padding(.vertical, isPadLandscape ? 16 : (isPad ? 20 : 16))
+                                .font(buttonFont)
+                                .frame(maxWidth: min(maxContentWidth * 0.9, 500))
+                                .padding(.vertical, spacing.buttonPadding)
                                 .background(pages[currentPage].bgColor)
                                 .foregroundColor(.white)
                                 .cornerRadius(14)
                                 .shadow(
                                     color: pages[currentPage].bgColor.opacity(0.3),
-                                    radius: isPadLandscape ? 4 : (isPad ? 6 : 4),
+                                    radius: 6,
                                     x: 0,
-                                    y: isPadLandscape ? 2 : (isPad ? 4 : 2)
+                                    y: 3
                                 )
                             }
 
@@ -206,12 +223,12 @@ struct OnboardingView: View {
                                 proceedToNextPage()
                             } label: {
                                 Text("onboarding_button_location_skip")
-                                    .font(isPadLandscape ? .system(size: 16) : (isPad ? .system(size: 18) : .subheadline))
+                                    .font(.body)
                                     .foregroundColor(.secondary)
                             }
                         }
-                        .padding(.horizontal, isPadLandscape ? 12 : (isPad ? 16 : 6))
-                        .padding(.bottom, isPadLandscape ? 20 : (isPad ? 30 : 20))
+                        .padding(.horizontal, spacing.buttonHorizontal)
+                        .padding(.bottom, spacing.bottomPadding)
 
                     } else {
                         // Next / Get Started button
@@ -223,29 +240,212 @@ struct OnboardingView: View {
                                     ? "onboarding_button_get_started"
                                     : "onboarding_button_next"
                             )
-                            .font(isPadLandscape ? .system(size: 20, weight: .semibold) : (isPad ? .system(size: 22, weight: .semibold) : .headline))
-                            .frame(maxWidth: isPadLandscape ? 420 : (isPad ? 500 : 340))
-                            .padding(.vertical, isPadLandscape ? 16 : (isPad ? 20 : 16))
+                            .font(buttonFont)
+                            .frame(maxWidth: min(maxContentWidth * 0.9, 500))
+                            .padding(.vertical, spacing.buttonPadding)
                             .background(pages[currentPage].bgColor)
                             .foregroundColor(.white)
                             .cornerRadius(14)
                             .shadow(
                                 color: pages[currentPage].bgColor.opacity(0.3),
-                                radius: isPadLandscape ? 4 : (isPad ? 6 : 4),
+                                radius: 6,
                                 x: 0,
-                                y: isPadLandscape ? 2 : (isPad ? 4 : 2)
+                                y: 3
                             )
                             .animation(.spring(response: 0.4), value: currentPage)
                         }
-                        .padding(.horizontal, isPadLandscape ? 12 : (isPad ? 16 : 6))
-                        .padding(.bottom, isPadLandscape ? 20 : (isPad ? 34 : 26))
+                        .padding(.horizontal, spacing.buttonHorizontal)
+                        .padding(.bottom, spacing.bottomPadding)
                     }
                 }
-                .frame(maxWidth: isPad ? 600 : 460)
-                .padding(.horizontal, isPadLandscape ? 16 : (isPad ? 32 : 0))
+                .frame(maxWidth: maxContentWidth)
+                .padding(.horizontal, isPad ? 32 : 16)
                 .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
             }
         }
+    }
+    
+    // MARK: - Dynamic Sizing Functions
+    
+    private func getCircleSize(for category: ScreenCategory, isLandscape: Bool) -> CGFloat {
+        switch category {
+        case .iPhoneSmall:
+            return 110
+        case .iPhoneMedium:
+            return 120
+        case .iPhoneLarge:
+            return 130
+        case .iPadSmall:
+            return 160
+        case .iPadMedium, .iPadLarge:
+            return 180
+        }
+    }
+    
+    private func getIconSize(for category: ScreenCategory, isLandscape: Bool) -> CGFloat {
+        let circleSize = getCircleSize(for: category, isLandscape: isLandscape)
+        return circleSize * 0.56
+    }
+    
+    private func getTitleFont(for category: ScreenCategory, isLandscape: Bool, width: CGFloat) -> Font {
+        switch category {
+        case .iPhoneSmall:
+            return .system(size: 28, weight: .bold)
+        case .iPhoneMedium:
+            return .largeTitle.bold()
+        case .iPhoneLarge:
+            return .system(size: 34, weight: .bold)
+        case .iPadSmall:
+            return .system(size: 36, weight: .bold)
+        case .iPadMedium, .iPadLarge:
+            return .system(size: 42, weight: .bold)
+        }
+    }
+    
+    private func getSubtitleFont(for category: ScreenCategory, isLandscape: Bool) -> Font {
+        switch category {
+        case .iPhoneSmall:
+            return .body
+        case .iPhoneMedium:
+            return .title3
+        case .iPhoneLarge:
+            return .title2
+        case .iPadSmall:
+            return .title
+        case .iPadMedium, .iPadLarge:
+            return .system(size: 26)
+        }
+    }
+    
+    private func getButtonFont(for category: ScreenCategory, isLandscape: Bool) -> Font {
+        switch category {
+        case .iPhoneSmall:
+            return .system(size: 17, weight: .semibold)
+        case .iPhoneMedium:
+            return .headline
+        case .iPhoneLarge:
+            return .system(size: 19, weight: .semibold)
+        case .iPadSmall:
+            return .system(size: 22, weight: .semibold)
+        case .iPadMedium, .iPadLarge:
+            return .system(size: 24, weight: .semibold)
+        }
+    }
+    
+    private func getMaxContentWidth(for category: ScreenCategory, width: CGFloat) -> CGFloat {
+        switch category {
+        case .iPhoneSmall, .iPhoneMedium:
+            return 460
+        case .iPhoneLarge:
+            return 500
+        case .iPadSmall:
+            return min(600, width * 0.8)
+        case .iPadMedium:
+            return min(700, width * 0.75)
+        case .iPadLarge:
+            return min(800, width * 0.7)
+        }
+    }
+    
+    private func getSpacing(for category: ScreenCategory, isLandscape: Bool) -> SpacingValues {
+        switch category {
+        case .iPhoneSmall:
+            return SpacingValues(
+                main: 20,
+                text: 10,
+                textHorizontal: 8,
+                afterIcon: 30,
+                button: 14,
+                buttonPadding: 14,
+                buttonHorizontal: 6,
+                bottomPadding: 16,
+                indicator: 8,
+                indicatorWidth: 12,
+                indicatorWidthActive: 28,
+                indicatorHeight: 8,
+                indicatorBottom: 10
+            )
+        case .iPhoneMedium:
+            return SpacingValues(
+                main: 28,
+                text: 12,
+                textHorizontal: 8,
+                afterIcon: 40,
+                button: 16,
+                buttonPadding: 16,
+                buttonHorizontal: 6,
+                bottomPadding: 26,
+                indicator: 8,
+                indicatorWidth: 12,
+                indicatorWidthActive: 32,
+                indicatorHeight: 8,
+                indicatorBottom: 12
+            )
+        case .iPhoneLarge:
+            return SpacingValues(
+                main: 32,
+                text: 14,
+                textHorizontal: 10,
+                afterIcon: 50,
+                button: 18,
+                buttonPadding: 18,
+                buttonHorizontal: 8,
+                bottomPadding: 30,
+                indicator: 10,
+                indicatorWidth: 14,
+                indicatorWidthActive: 36,
+                indicatorHeight: 10,
+                indicatorBottom: 14
+            )
+        case .iPadSmall:
+            return SpacingValues(
+                main: 36,
+                text: 16,
+                textHorizontal: 22,
+                afterIcon: 40,
+                button: 20,
+                buttonPadding: 20,
+                buttonHorizontal: 16,
+                bottomPadding: 30,
+                indicator: 12,
+                indicatorWidth: 16,
+                indicatorWidthActive: 40,
+                indicatorHeight: 12,
+                indicatorBottom: 20
+            )
+        case .iPadMedium, .iPadLarge:
+            return SpacingValues(
+                main: 40,
+                text: 18,
+                textHorizontal: 24,
+                afterIcon: 50,
+                button: 24,
+                buttonPadding: 22,
+                buttonHorizontal: 16,
+                bottomPadding: 34,
+                indicator: 14,
+                indicatorWidth: 18,
+                indicatorWidthActive: 44,
+                indicatorHeight: 14,
+                indicatorBottom: 22
+            )
+        }
+    }
+    
+    private struct SpacingValues {
+        let main: CGFloat
+        let text: CGFloat
+        let textHorizontal: CGFloat
+        let afterIcon: CGFloat
+        let button: CGFloat
+        let buttonPadding: CGFloat
+        let buttonHorizontal: CGFloat
+        let bottomPadding: CGFloat
+        let indicator: CGFloat
+        let indicatorWidth: CGFloat
+        let indicatorWidthActive: CGFloat
+        let indicatorHeight: CGFloat
+        let indicatorBottom: CGFloat
     }
 
     private func requestLocationPermission() {
