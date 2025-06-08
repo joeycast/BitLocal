@@ -37,11 +37,11 @@ struct MapButtonsView: View {
             }
             
             
-            // 🧭 Locate-me button
+            // 🧭 Locate-me button - FIXED VERSION
             Button {
                 if let currentLoc = viewModel.userLocation {
-                    // 1️⃣ If we already have a userLocation, just re-center immediately:
-                    viewModel.centerMap(to: currentLoc.coordinate)
+                    // 1️⃣ FIXED: Use the new centerMapToUserLocation method that forces centering
+                    viewModel.centerMapToUserLocation()
                     
                 } else {
                     // 2️⃣ Otherwise, ask for permission and wait for onReceive to fire
@@ -83,10 +83,11 @@ struct MapButtonsView: View {
                 }
             }
         }
-        // 🔄 Watch for the first non-nil userLocation after tapping:
+        // 🔄 FIXED: Watch for the first non-nil userLocation after tapping and use forced centering
         .onReceive(viewModel.$userLocation.compactMap { $0 }) { newLocation in
             guard shouldCenterOnLocation else { return }
-            viewModel.centerMap(to: newLocation.coordinate)
+            // FIXED: Use centerMapToUserLocation which forces centering
+            viewModel.centerMapToUserLocation()
             shouldCenterOnLocation = false
             viewModel.locationManager.stopUpdatingLocation()
             viewModel.isUpdatingLocation = false

@@ -23,7 +23,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var path: [Element] = []
     @Published var selectedElement: Element?
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
-    // @Published var elements: [Element]? = nil
     @Published private(set) var allElements: [Element] = []
     @Published var visibleElements: [Element] = []
     @Published var isLoading: Bool = false
@@ -39,14 +38,39 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let geocoder = Geocoder(maxConcurrentRequests: 5)
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
     
+    // Startup state tracking
+    @Published var isInitialStartup = true
+    @Published var hasLoadedInitialData = false
+    
+    // App state tracking
+    @Published var appState: AppState = .active
+    private var hasBeenInactive = false
+    
+    private var lastCenteredCoordinate: CLLocationCoordinate2D?
+    
     private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: AnyCancellable?
-    weak var mapView: MKMapView?
+    
+    // Use a queue for thread-safe access to mapView
+    private let mapViewQueue = DispatchQueue(label: "mapview.queue", qos: .userInitiated)
+    private var _mapView: MKMapView?
+    
+    var mapView: MKMapView? {
+        get {
+            return mapViewQueue.sync { _mapView }
+        }
+        set {
+            mapViewQueue.sync { _mapView = newValue }
+        }
+    }
+    
+    enum AppState {
+        case active, inactive, background
+    }
     
     override init() {
         super.init()
         locationManager.delegate = self
-        mapView?.delegate = self
         setupCenterMapSubscription()
         visibleElementsSubject
             .receive(on: RunLoop.main)
@@ -56,20 +80,97 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             .store(in: &cancellables)
     }
     
+    func handleAppBecameActive() {
+        Debug.log("App became active - previous state: \(appState)")
+        let wasInactive = hasBeenInactive
+        
+        // Batch state changes to minimize UI updates
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.appState = .active
+            self.hasBeenInactive = false
+            
+            // Only fetch if we were previously inactive/background and don't have data
+            if wasInactive && (self.allElements.isEmpty || self.shouldRefreshAfterInactive()) {
+                Debug.log("App returning from inactive state - refreshing data")
+                self.refreshAfterInactive()
+            }
+        }
+    }
+
+    func handleAppBecameInactive() {
+        Debug.log("App became inactive")
+        // Use async to batch potential state changes during rapid transitions
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.appState = .inactive
+            self.hasBeenInactive = true
+        }
+    }
+
+    func handleAppEnteredBackground() {
+        Debug.log("App entered background")
+        // Background state change is final, update immediately
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.appState = .background
+            self.hasBeenInactive = true
+        }
+    }
+
+    private func shouldRefreshAfterInactive() -> Bool {
+        // Add logic to determine if refresh is needed
+        // For example, check if last update was more than X minutes ago
+        return true // For now, always refresh
+    }
+
+    private func refreshAfterInactive() {
+        // Reset states that might be stale
+        self.isLoading = false
+        self.forceMapRefresh = true
+        
+        // Restart location if we don't have user location
+        if self.userLocation == nil {
+            self.requestWhenInUseLocationPermission()
+        }
+        
+        // Fetch fresh data
+        self.fetchElements()
+    }
+    
     // Request location
     func requestWhenInUseLocationPermission() {
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.startUpdatingLocation()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            Debug.log("Requesting location permission - current auth status: \(self.locationManager.authorizationStatus.rawValue)")
+            
+            if self.locationManager.authorizationStatus == .notDetermined {
+                self.locationManager.requestWhenInUseAuthorization()
+            }
+            
+            if self.locationManager.authorizationStatus == .authorizedWhenInUse ||
+               self.locationManager.authorizationStatus == .authorizedAlways {
+                self.isUpdatingLocation = true
+                self.locationManager.startUpdatingLocation()
+            }
+        }
     }
     
     // Get latest location
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let latestLocation = locations.first else {
-            // TODO: Show an error
+            Debug.log("No location in didUpdateLocations")
             return
         }
+        
+        Debug.log("Location updated: \(latestLocation.coordinate)")
+        
         // Update map view to show user location
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             // Always center with padding to account for UI insets
             self.centerMap(to: latestLocation.coordinate)
             // Manually keep `region` in sync for SwiftUI bindings
@@ -88,8 +189,34 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     
     // locationManager failure scenario (could not get user location)
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // TODO: Need better error handling
         Debug.log("LocationManager error: \(error.localizedDescription)")
+        DispatchQueue.main.async { [weak self] in
+            self?.isUpdatingLocation = false
+        }
+    }
+    
+    // Handle authorization changes
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        Debug.log("Location authorization changed to: \(status.rawValue)")
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            switch status {
+            case .authorizedWhenInUse, .authorizedAlways:
+                if self.userLocation == nil {
+                    self.isUpdatingLocation = true
+                    manager.startUpdatingLocation()
+                }
+            case .denied, .restricted:
+                self.isUpdatingLocation = false
+                Debug.log("Location access denied or restricted")
+            case .notDetermined:
+                Debug.log("Location authorization not determined")
+            @unknown default:
+                Debug.log("Unknown location authorization status")
+            }
+        }
     }
     
     // Calculate distance between element and user location
@@ -137,7 +264,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Zoom to element
     func zoomToElement(_ element: Element) {
         guard let mapView = mapView,
-              let targetCoordinate = element.mapCoordinate else { return }
+              let targetCoordinate = element.mapCoordinate else {
+            Debug.log("Cannot zoom to element - mapView or coordinate missing")
+            return
+        }
+
+        Debug.log("Zooming to element: \(element.id)")
 
         let targetCamera = MKMapCamera(
             lookingAtCenter: targetCoordinate,
@@ -157,27 +289,32 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let duration: TimeInterval = 0.5
         let selectionDelay: TimeInterval = inCluster ? 0.8 : 0.1
 
-        UIView.animate(
-            withDuration: duration,
-            animations: {
-                mapView.setCamera(targetCamera, animated: false)
-            },
-            completion: { _ in
-                DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
-                    if let annotation = mapView.annotations.first(where: {
-                        ($0 as? Annotation)?.element?.id == element.id
-                    }) {
-                        mapView.selectAnnotation(annotation, animated: true)
+        DispatchQueue.main.async {
+            UIView.animate(
+                withDuration: duration,
+                animations: {
+                    mapView.setCamera(targetCamera, animated: false)
+                },
+                completion: { _ in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
+                        if let annotation = mapView.annotations.first(where: {
+                            ($0 as? Annotation)?.element?.id == element.id
+                        }) {
+                            mapView.selectAnnotation(annotation, animated: true)
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
     
     private func setupCenterMapSubscription() {
         centerMapToCoordinateSubject
             .sink { [weak self] coordinate in
-                guard let self = self, let mapView = self.mapView else { return }
+                guard let self = self, let mapView = self.mapView else {
+                    Debug.log("Cannot center map - mapView missing")
+                    return
+                }
                 let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                 let region = MKCoordinateRegion(center: coordinate, span: newZoomLevel)
                 let edgePadding = UIEdgeInsets(
@@ -186,36 +323,95 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     bottom: bottomPadding + 100,
                     right: 20
                 )
-                mapView.setCameraBoundary(MKMapView.CameraBoundary(coordinateRegion: region), animated: true)
-                mapView.setVisibleMapRect(region.mapRect, edgePadding: edgePadding, animated: true)
+                
+                DispatchQueue.main.async {
+                    mapView.setCameraBoundary(MKMapView.CameraBoundary(coordinateRegion: region), animated: true)
+                    mapView.setVisibleMapRect(region.mapRect, edgePadding: edgePadding, animated: true)
+                }
             }
             .store(in: &cancellables)
     }
 
-    func centerMap(to coordinate: CLLocationCoordinate2D) {
-        guard let mapView = mapView else { return }
-
-        // Build a small MKMapRect around the user location:
-        let mapPoint = MKMapPoint(coordinate)
-        let metersPerPoint = MKMapPointsPerMeterAtLatitude(coordinate.latitude)
-        let mapSize = MKMapSize(width: 10000 * metersPerPoint, height: 10000 * metersPerPoint)
-        let mapRect = MKMapRect(
-            origin: MKMapPoint(x: mapPoint.x - mapSize.width / 2,
-                               y: mapPoint.y - mapSize.height / 2),
-            size: mapSize
-        )
-
-        // If on iPad, center with NO horizontal inset—so the map pane centers user dot visually.
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-            mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
-        } else {
-            // iPhone: preserve your bottom‐sheet inset (unchanged)
-            let screenHeight = UIScreen.main.bounds.height
-            let bottomSheetHeight = screenHeight * (0.8 / 3.0)
-            let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: bottomSheetHeight, right: 0)
-            mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
+    func centerMap(to coordinate: CLLocationCoordinate2D, force: Bool = false) {
+        guard let mapView = mapView else {
+            Debug.log("Cannot center map - mapView is nil")
+            return
         }
+
+        // Allow centering if:
+        // 1. Force is true (user explicitly requested it)
+        // 2. Never centered before
+        // 3. Coordinate is significantly different
+        // 4. Map's current center is far from target (user moved map)
+        
+        let shouldCenter: Bool
+        
+        if force {
+            shouldCenter = true
+            Debug.log("Centering map (forced) to coordinate: \(coordinate)")
+        } else if lastCenteredCoordinate == nil {
+            shouldCenter = true
+            Debug.log("Centering map (first time) to coordinate: \(coordinate)")
+        } else if let lastCoord = lastCenteredCoordinate {
+            let coordinateDistance = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
+                .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+            
+            let currentCenter = mapView.region.center
+            let currentCenterDistance = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
+                .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+            
+            // Center if coordinate changed significantly OR map was moved away from target
+            shouldCenter = coordinateDistance > 10 || currentCenterDistance > 100
+            
+            if !shouldCenter {
+                Debug.log("Skipping centerMap - coordinate similar (\(coordinateDistance)m) and map close to target (\(currentCenterDistance)m)")
+                return
+            } else {
+                Debug.log("Centering map to coordinate: \(coordinate) (coord change: \(coordinateDistance)m, map drift: \(currentCenterDistance)m)")
+            }
+        } else {
+            shouldCenter = true
+            Debug.log("Centering map to coordinate: \(coordinate)")
+        }
+        
+        if shouldCenter {
+            lastCenteredCoordinate = coordinate
+            
+            // Build a small MKMapRect around the user location:
+            let mapPoint = MKMapPoint(coordinate)
+            let metersPerPoint = MKMapPointsPerMeterAtLatitude(coordinate.latitude)
+            let mapSize = MKMapSize(width: 10000 * metersPerPoint, height: 10000 * metersPerPoint)
+            let mapRect = MKMapRect(
+                origin: MKMapPoint(x: mapPoint.x - mapSize.width / 2,
+                                   y: mapPoint.y - mapSize.height / 2),
+                size: mapSize
+            )
+
+            DispatchQueue.main.async {
+                // If on iPad, center with NO horizontal inset—so the map pane centers user dot visually.
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+                    mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
+                } else {
+                    // iPhone: preserve your bottom‐sheet inset (unchanged)
+                    let screenHeight = UIScreen.main.bounds.height
+                    let bottomSheetHeight = screenHeight * (0.8 / 3.0)
+                    let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: bottomSheetHeight, right: 0)
+                    mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
+                }
+            }
+        }
+    }
+    
+    // Add a method for user-initiated centering (location button)
+    func centerMapToUserLocation() {
+        guard let userLocation = userLocation else {
+            Debug.log("Cannot center to user location - location not available")
+            return
+        }
+        
+        Debug.log("User requested centering to location")
+        centerMap(to: userLocation.coordinate, force: true)
     }
     
     // Update map region
@@ -243,104 +439,132 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Deselect the currently selected annotation
     func deselectAnnotation() {
         selectedElement = nil
-        DispatchQueue.main.async {
-            self.mapView?.selectedAnnotations.forEach { annotation in
-                self.mapView?.deselectAnnotation(annotation, animated: true)
+        DispatchQueue.main.async { [weak self] in
+            self?.mapView?.selectedAnnotations.forEach { annotation in
+                self?.mapView?.deselectAnnotation(annotation, animated: true)
             }
         }
     }
 
     // Fetch elements using the APIManager and update the published elements property
+    // Optimized to reduce startup calls
     func fetchElements() {
-        Debug.log("fetchElements() called!")
-        Debug.log("fetchElements() called - isLoading: \(isLoading)")
+        Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup)")
         
-        // Prevent concurrent calls
-        guard !isLoading else {
-            Debug.log("Already loading, skipping duplicate call")
-            return
-        }
-        
-        isLoading = true
-        
-        // IMPORTANT: Load from cache into memory first if allElements is empty
-        if allElements.isEmpty {
-            if let cachedElements = APIManager.shared.loadElementsFromFile(), !cachedElements.isEmpty {
-                Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
-                allElements = cachedElements
-                // Set loading to false since we have data now
-                isLoading = false
-                
-                // 🔧 Center map for returning users who have cached data
-                if let userLoc = userLocation {
-                    Debug.logMap("Centering map to user location for returning user")
-                    centerMap(to: userLoc.coordinate)
-                } else {
-                    Debug.logMap("No user location yet - requesting location for returning user")
-                    // Start location updates if we don't have location yet
-                    locationManager.requestWhenInUseAuthorization()
-                    locationManager.startUpdatingLocation()
-                }
-                
-                // Still check for updates, but don't block UI
-                checkForUpdatesInBackground()
+        // Prevent concurrent calls - use main queue for thread safety
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            guard !self.isLoading else {
+                Debug.log("Already loading, skipping duplicate call")
                 return
             }
-        }
-        
-        // Check if this is a fresh start after cache clear
-        let wasCacheEmpty = !APIManager.shared.hasCachedData()
-        let currentElementsEmpty = allElements.isEmpty
-        Debug.logCache("Cache empty before fetch: \(wasCacheEmpty)")
-        Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
-        
-        APIManager.shared.getElements { [weak self] elements in
-            DispatchQueue.main.async {
-                let processedElements = elements ?? []
-                Debug.logAPI("Processed \(processedElements.count) elements")
-                
-                // Update allElements if:
-                // 1. We got new data, OR
-                // 2. Cache was empty (fresh start), OR
-                // 3. Current data is empty (recovery scenario)
-                let shouldUpdate = !processedElements.isEmpty || wasCacheEmpty || currentElementsEmpty
-                
-                if shouldUpdate {
-                    Debug.logMap("Updating allElements with \(processedElements.count) elements")
-                    self?.allElements = processedElements
+            
+            self.isLoading = true
+            
+            // IMPORTANT: Load from cache into memory first if allElements is empty
+            if self.allElements.isEmpty {
+                if let cachedElements = APIManager.shared.loadElementsFromFile(), !cachedElements.isEmpty {
+                    Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
+                    self.allElements = cachedElements
+                    self.hasLoadedInitialData = true
+                    self.isLoading = false
                     
-                    // Force map refresh if cache was empty (indicating fresh data load)
-                    if wasCacheEmpty && !processedElements.isEmpty {
-                        Debug.logMap("Setting forceMapRefresh = true (cache was empty, got \(processedElements.count) elements)")
-                        self?.forceMapRefresh = true
-                    } else if currentElementsEmpty && !processedElements.isEmpty {
-                        Debug.logMap("Setting forceMapRefresh = true (recovery from empty state)")
-                        self?.forceMapRefresh = true
+                    // Center map for returning users who have cached data
+                    if let userLoc = self.userLocation {
+                        Debug.logMap("Centering map to user location for returning user")
+                        self.centerMap(to: userLoc.coordinate)
                     } else {
-                        Debug.logMap("NOT setting forceMapRefresh - wasCacheEmpty: \(wasCacheEmpty), currentEmpty: \(currentElementsEmpty), elements.count: \(processedElements.count)")
+                        Debug.logMap("No user location yet - requesting location for returning user")
+                        self.requestWhenInUseLocationPermission()
                     }
-                } else {
-                    Debug.log("Skipping allElements update - got 0 elements, cache wasn't empty, and current data exists")
+                    
+                    // For initial startup, delay background updates to avoid immediate API call
+                    if self.isInitialStartup {
+                        Debug.log("Initial startup - delaying background updates by 5 seconds")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                            self.checkForUpdatesInBackground()
+                        }
+                    } else {
+                        // Still check for updates, but don't block UI
+                        self.checkForUpdatesInBackground()
+                    }
+                    return
                 }
-                
-                self?.isLoading = false
-                Debug.logMap("Current forceMapRefresh state: \(self?.forceMapRefresh ?? false)")
+            }
+            
+            // Check if this is a fresh start after cache clear
+            let wasCacheEmpty = !APIManager.shared.hasCachedData()
+            let currentElementsEmpty = self.allElements.isEmpty
+            Debug.logCache("Cache empty before fetch: \(wasCacheEmpty)")
+            Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
+            
+            APIManager.shared.getElements { [weak self] elements in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    
+                    let processedElements = elements ?? []
+                    Debug.logAPI("Processed \(processedElements.count) elements from API")
+                    
+                    // CRITICAL FIX: Handle different scenarios properly
+                    if currentElementsEmpty || wasCacheEmpty {
+                        // Fresh start - use the fetched elements directly
+                        if !processedElements.isEmpty {
+                            Debug.logMap("Fresh start - setting allElements to \(processedElements.count) elements")
+                            self.allElements = processedElements
+                            self.hasLoadedInitialData = true
+                            self.forceMapRefresh = true
+                        }
+                    } else {
+                        // Incremental update - merge with existing elements
+                        if !processedElements.isEmpty {
+                            Debug.logMap("Incremental update - merging \(processedElements.count) new elements with existing \(self.allElements.count)")
+                            
+                            // Merge logic: update existing elements or add new ones
+                            var elementsDictionary = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
+                            
+                            // Update/add new elements
+                            processedElements.forEach { element in
+                                elementsDictionary[element.id] = element
+                            }
+                            
+                            let mergedElements = Array(elementsDictionary.values)
+                            self.allElements = mergedElements
+                            self.forceMapRefresh = true
+                            
+                            Debug.logMap("After merge: Total elements = \(mergedElements.count)")
+                        } else {
+                            Debug.log("No new elements from API - keeping existing \(self.allElements.count) elements")
+                        }
+                    }
+                    
+                    self.isLoading = false
+                    
+                    // Mark initial startup as complete
+                    if self.isInitialStartup {
+                        self.isInitialStartup = false
+                    }
+                }
             }
         }
     }
 
     // Background update check that doesn't block UI
     private func checkForUpdatesInBackground() {
+        Debug.log("Starting background update check")
+        
         APIManager.shared.getElements { [weak self] elements in
             DispatchQueue.main.async {
+                guard let self = self else { return }
+                
                 let processedElements = elements ?? []
                 
                 // Only update if we got new data
                 if !processedElements.isEmpty {
-                    Debug.logMap("Background update: Got \(processedElements.count) new elements, merging with existing \(self?.allElements.count ?? 0)")
+                    Debug.logMap("Background update: Got \(processedElements.count) new elements, merging with existing \(self.allElements.count)")
                     
-                    // 🔧 FIX: Merge new elements with existing ones
-                    let existingElements = self?.allElements ?? []
+                    // CRITICAL FIX: Always merge, never replace
+                    let existingElements = self.allElements
                     var elementsDictionary = Dictionary(uniqueKeysWithValues: existingElements.map { ($0.id, $0) })
                     
                     // Update/add new elements
@@ -349,10 +573,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
                     
                     let mergedElements = Array(elementsDictionary.values)
-                    self?.allElements = mergedElements
-                    self?.forceMapRefresh = true
+                    self.allElements = mergedElements
+                    self.forceMapRefresh = true
                     
-                    Debug.logMap("After merge: Total elements = \(mergedElements.count)")
+                    Debug.logMap("After background merge: Total elements = \(mergedElements.count)")
                 } else {
                     Debug.log("Background update: No new data available")
                 }

@@ -40,8 +40,12 @@ struct MapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         
-        // Store reference to mapView in viewModel
-        viewModel.mapView = mapView
+        Debug.log("MapView.makeUIView() called - creating new MKMapView")
+        
+        // Store reference to mapView in viewModel - ensure main queue
+        DispatchQueue.main.async {
+            self.viewModel.mapView = mapView
+        }
         
         // Set the delegate to the Coordinator
         mapView.delegate = context.coordinator
@@ -51,56 +55,90 @@ struct MapView: UIViewRepresentable {
         
         // Show user location on the map
         mapView.showsUserLocation = true
-//        mapView.userTrackingMode = .follow
         
         // Set initial map type
         mapView.mapType = mapType
         
-        // Auto-center on user location when map loads
+        // FIXED: Only auto-request location if onboarding is complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if let userLocation = viewModel.locationManager.location {
+            // Check if onboarding has been completed
+            let didCompleteOnboarding = UserDefaults.standard.bool(forKey: "didCompleteOnboarding")
+            
+            if let userLocation = self.viewModel.locationManager.location {
+                Debug.log("MapView.makeUIView - centering to existing location: \(userLocation.coordinate)")
                 // Center the map and mark initial region as set
-                viewModel.centerMap(to: userLocation.coordinate)
-                viewModel.initialRegionSet = true
+                self.viewModel.centerMap(to: userLocation.coordinate)
+                self.viewModel.initialRegionSet = true
                 // Update the viewModel.region to match the visible map rect
                 let center = userLocation.coordinate
                 let spanLatitude = mapView.region.span.latitudeDelta
                 let spanLongitude = mapView.region.span.longitudeDelta
-                viewModel.region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: spanLatitude, longitudeDelta: spanLongitude))
+                self.viewModel.region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: spanLatitude, longitudeDelta: spanLongitude))
+            } else if didCompleteOnboarding {
+                // Only request location automatically if onboarding is complete
+                Debug.log("MapView.makeUIView - no user location, requesting location updates (onboarding complete)")
+                self.viewModel.requestWhenInUseLocationPermission()
             } else {
-                viewModel.locationManager.startUpdatingLocation()
+                // During onboarding - don't request location automatically
+                Debug.log("MapView.makeUIView - onboarding not complete, skipping automatic location request")
             }
         }
 
         return mapView
     }
-    
+
     // Update the MKMapView when the SwiftUI view updates
     func updateUIView(_ mapView: MKMapView, context: Context) {
-        Debug.logMap("MapView.updateUIView() called!")
-
-        // Update padding in Coordinator
-        context.coordinator.updatePadding(top: topPadding, bottom: bottomPadding)
-        
-        if mapView.mapType != mapType {
-            mapView.mapType = mapType
+        // CRITICAL: Don't update UI when app is not active
+        guard viewModel.appState == .active else {
+            Debug.logMap("MapView.updateUIView() - SKIPPED (app state: \(viewModel.appState))")
+            return
         }
         
-        // Initial annotation load if data exists
+        // Skip updates during initial startup until data is loaded
+        guard viewModel.hasLoadedInitialData else {
+            Debug.logMap("MapView.updateUIView() - SKIPPED (waiting for initial data)")
+            return
+        }
+        
+        Debug.logMap("MapView.updateUIView() called!")
+
+        // Ensure mapView reference is current (only update if different)
+        if viewModel.mapView !== mapView {
+            Debug.log("MapView.updateUIView - updating mapView reference")
+            viewModel.mapView = mapView
+        }
+
+        // Batch property updates to minimize individual triggers
+        var needsUpdate = false
+        
+        // Check padding changes
+        let currentPadding = (context.coordinator.topPadding, context.coordinator.bottomPadding)
+        let newPadding = (topPadding, bottomPadding)
+        if currentPadding != newPadding {
+            context.coordinator.updatePadding(top: topPadding, bottom: bottomPadding)
+            needsUpdate = true
+        }
+        
+        // Check map type changes
+        if mapView.mapType != mapType {
+            mapView.mapType = mapType
+            needsUpdate = true
+        }
+        
+        // Handle elements updates (most important)
         if let elements = elements, !elements.isEmpty {
             let elementsHash = elements.hashValue
             let shouldForceUpdate = viewModel.forceMapRefresh
             let hashChanged = context.coordinator.lastElementsHash != elementsHash
             
-            Debug.logMap("MapView.updateUIView called:")
-            Debug.logMap("   - Elements count: \(elements.count)")
-            Debug.logMap("   - Elements hash: \(elementsHash)")
-            Debug.logMap("   - Last hash: \(context.coordinator.lastElementsHash ?? -1)")
-            Debug.logMap("   - Hash changed: \(hashChanged)")
-            Debug.logMap("   - Force refresh: \(shouldForceUpdate)")
-            Debug.logMap("   - Will update: \(hashChanged || shouldForceUpdate)")
-            
+            // Only log details if we're actually going to update
             if hashChanged || shouldForceUpdate {
+                Debug.logMap("MapView.updateUIView - Elements update needed:")
+                Debug.logMap("   - Elements count: \(elements.count)")
+                Debug.logMap("   - Hash changed: \(hashChanged)")
+                Debug.logMap("   - Force refresh: \(shouldForceUpdate)")
+                
                 context.coordinator.lastElementsHash = elementsHash
                 context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
                 Debug.logMap("Annotations updated!")
@@ -112,11 +150,22 @@ struct MapView: UIViewRepresentable {
                         Debug.logMap("Reset forceMapRefresh to false")
                     }
                 }
-            } else {
-                Debug.logMap("Skipping annotation update (no changes)")
+                needsUpdate = true
             }
-        } else {
-            Debug.logMap("MapView.updateUIView: No elements to display (count: \(elements?.count ?? 0))")
+        } else if elements?.isEmpty == true {
+            // Only clear if we actually have annotations to clear
+            let currentAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+            if !currentAnnotations.isEmpty {
+                Debug.logMap("MapView.updateUIView: Clearing \(currentAnnotations.count) annotations")
+                mapView.removeAnnotations(currentAnnotations)
+                needsUpdate = true
+            }
+        }
+        
+        // Only log if we actually did something
+        if !needsUpdate {
+            // Silent skip - don't log unless debugging
+            // Debug.logMap("MapView.updateUIView: No changes needed")
         }
     }
     

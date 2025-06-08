@@ -5,7 +5,6 @@ import MapKit
 import CoreLocation
 import Combine
 import Foundation
-import Foundation // for Debug logging
 
 @available(iOS 17.0, *)
 struct BusinessesListView: View {
@@ -18,6 +17,7 @@ struct BusinessesListView: View {
     var userLocation: CLLocation?
     
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
+    @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
     
     private var sortedElements: [Element] {
         elements.sorted { (element1, element2) -> Bool in
@@ -75,6 +75,33 @@ struct BusinessesListView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
+        // OPTIMIZED: Only log significant location changes at the list level
+        .onChange(of: viewModel.userLocation) { _, newLocation in
+            handleUserLocationChange(newLocation)
+        }
+    }
+    
+    // OPTIMIZED: Centralized location change handling with deduplication
+    private func handleUserLocationChange(_ newLocation: CLLocation?) {
+        guard let newLocation = newLocation else { return }
+        
+        // Only log/process if location actually changed significantly (>10 meters)
+        if let lastCoord = lastLoggedLocation {
+            let lastLoc = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
+            let currentLoc = CLLocation(latitude: newLocation.coordinate.latitude, longitude: newLocation.coordinate.longitude)
+            
+            if lastLoc.distance(from: currentLoc) < 10 {
+                return // Skip if location hasn't changed significantly
+            }
+        }
+        
+        lastLoggedLocation = newLocation.coordinate
+        Debug.log("User location updated in BusinessesListView: \(newLocation.coordinate.latitude), \(newLocation.coordinate.longitude)")
+        
+        // Update cell view models that need refresh
+        for cellVM in cellViewModels.values {
+            cellVM.updateUserLocationIfNeeded(newLocation)
+        }
     }
     
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
@@ -165,10 +192,12 @@ struct ElementCell: View {
                 PaymentIcons(element: viewModel.element)
             }
         }
-        .onChange(of: viewModel.viewModel.userLocation) { _, _ in
-            viewModel.onCellAppear()
-        }
+        // REMOVED: Redundant onChange that was causing excessive logging
+        // .onChange(of: viewModel.viewModel.userLocation) { _, _ in
+        //     viewModel.onCellAppear()
+        // }
     }
+    
     private var distanceText: some View {
         let formattedDistance: String? = {
             if let distance = localizedDistanceString(for: viewModel.element) {
@@ -227,25 +256,32 @@ class ElementCellViewModel: ObservableObject {
     let element: Element
     let viewModel: ContentViewModel
     @Published var address: Address?
-    @Published var userLocation: CLLocation? {
-        didSet {
-            Debug.log("User location set: \(userLocation?.coordinate.latitude ?? 0), \(userLocation?.coordinate.longitude ?? 0)")
-        }
-    }
+    
+    // OPTIMIZED: Remove the excessive logging from userLocation didSet
+    @Published var userLocation: CLLocation?
+    
     static var geocodingCache: [String: Address] = [:]
     private let geocoder = CLGeocoder()
     private var userLocationCancellable: AnyCancellable?
+    private var lastLocationUpdate: CLLocationCoordinate2D?
     
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
         self.userLocation = userLocation
         self.viewModel = viewModel
         
-        // Observe changes to userLocation if needed
-        self.userLocationCancellable = viewModel.$userLocation.sink { [weak self] newLocation in
-            self?.userLocation = newLocation
-            // Perform any updates needed when userLocation changes
-        }
+        // OPTIMIZED: Subscribe to location changes but with deduplication
+        self.userLocationCancellable = viewModel.$userLocation
+            .removeDuplicates { oldLocation, newLocation in
+                // Only update if location changed significantly
+                guard let old = oldLocation, let new = newLocation else {
+                    return oldLocation == nil && newLocation == nil
+                }
+                return old.distance(from: new) < 10 // Less than 10 meters
+            }
+            .sink { [weak self] newLocation in
+                self?.userLocation = newLocation
+            }
         
         // Attempt to retrieve cached address
         if let cachedAddress = ElementCellViewModel.geocodingCache[addressCacheKey] {
@@ -259,6 +295,20 @@ class ElementCellViewModel: ObservableObject {
     deinit {
         // Cancel the subscription when the view model is deallocated
         userLocationCancellable?.cancel()
+    }
+    
+    // OPTIMIZED: Add method for manual location updates with deduplication
+    func updateUserLocationIfNeeded(_ newLocation: CLLocation) {
+        // Only update if location changed significantly
+        if let lastCoord = lastLocationUpdate {
+            let lastLoc = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
+            if lastLoc.distance(from: newLocation) < 10 {
+                return // Skip if location hasn't changed significantly
+            }
+        }
+        
+        lastLocationUpdate = newLocation.coordinate
+        self.userLocation = newLocation
     }
     
     func onCellAppear() {

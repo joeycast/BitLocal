@@ -22,8 +22,6 @@ struct OnboardingView: View {
     @EnvironmentObject var viewModel: ContentViewModel
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @State private var currentPage = 0
-    @State private var locationManager = CLLocationManager()
-    @State private var locationDelegate = LocationPermissionDelegate()
     @State private var iconScale: CGFloat = 1.0
 
     // ──────────────── Device Detection Helpers ────────────────
@@ -449,8 +447,12 @@ struct OnboardingView: View {
     }
 
     private func requestLocationPermission() {
-        locationManager.requestWhenInUseAuthorization()
-        viewModel.locationManager.startUpdatingLocation()
+        Debug.log("OnboardingView: User tapped Enable Location button")
+        
+        // Use the ContentViewModel's location manager to ensure consistency
+        viewModel.requestWhenInUseLocationPermission()
+        
+        // Proceed to next page after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             proceedToNextPage()
         }
