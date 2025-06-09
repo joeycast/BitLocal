@@ -75,6 +75,7 @@ struct IPadLayoutView: View {
                     bottomPadding: viewModel.bottomPadding,
                     mapType: selectedMapType
                 )
+                .id("PersistentMap")
                 .ignoresSafeArea()
                 .onAppear {
                     viewModel.locationManager.startUpdatingLocation()

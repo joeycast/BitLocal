@@ -38,6 +38,16 @@ struct MapView: UIViewRepresentable {
     
     // Create and configure the MKMapView
     func makeUIView(context: Context) -> MKMapView {
+        // Reuse existing MKMapView on iPad to preserve region
+        if let existingMap = viewModel.mapView {
+            Debug.log("MapView.makeUIView() - reusing existing MKMapView")
+            // Reattach delegate and config
+            existingMap.delegate = context.coordinator
+            setupCluster(mapView: existingMap)
+            existingMap.showsUserLocation = true
+            existingMap.mapType = mapType
+            return existingMap
+        }
         let mapView = MKMapView()
         
         Debug.log("MapView.makeUIView() called - creating new MKMapView")
@@ -61,13 +71,15 @@ struct MapView: UIViewRepresentable {
         
         // FIXED: Only auto-request location if onboarding is complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // Check if onboarding has been completed
             let didCompleteOnboarding = UserDefaults.standard.bool(forKey: "didCompleteOnboarding")
-            
+            guard !self.viewModel.initialRegionSet else {
+                Debug.log("MapView.makeUIView - initial region already set, skipping auto-centering")
+                return
+            }
             if let userLocation = self.viewModel.locationManager.location {
                 Debug.log("MapView.makeUIView - centering to existing location: \(userLocation.coordinate)")
                 // Center the map and mark initial region as set
-                self.viewModel.centerMap(to: userLocation.coordinate)
+                self.viewModel.centerMap(to: userLocation.coordinate, force: true)
                 self.viewModel.initialRegionSet = true
                 // Update the viewModel.region to match the visible map rect
                 let center = userLocation.coordinate

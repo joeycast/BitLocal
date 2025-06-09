@@ -164,27 +164,26 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             Debug.log("No location in didUpdateLocations")
             return
         }
-        
+
         Debug.log("Location updated: \(latestLocation.coordinate)")
-        
-        // Update map view to show user location
+
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            // Always center with padding to account for UI insets
-            self.centerMap(to: latestLocation.coordinate)
-            // Manually keep `region` in sync for SwiftUI bindings
-            let currentSpan = self.region.span
-            self.region = MKCoordinateRegion(center: latestLocation.coordinate, span: currentSpan)
-            // Mark initial region as set on first update
+
+            // Only center the map on the user's location if this is the first update (initial launch)
             if !self.initialRegionSet {
+                self.centerMap(to: latestLocation.coordinate)
                 self.initialRegionSet = true
             }
+
+            // Always update userLocation and region for other uses, but don't recenter the map
+            let currentSpan = self.region.span
+            self.region = MKCoordinateRegion(center: latestLocation.coordinate, span: currentSpan)
             self.userLocation = latestLocation
             self.userLocationSubject.send(latestLocation)
         }
-        manager.stopUpdatingLocation() // Stop updating location once we have the user's location
-        isUpdatingLocation = false    // Set isUpdatingLocation to false so the progress view disappears
+        manager.stopUpdatingLocation()
+        isUpdatingLocation = false
     }
     
     // locationManager failure scenario (could not get user location)
