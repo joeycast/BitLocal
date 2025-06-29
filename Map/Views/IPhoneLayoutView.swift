@@ -74,44 +74,60 @@ struct IPhoneLayoutView: View {
                 .padding(.bottom, geometry.size.height * 0.3 + 10),
                 alignment: .bottomTrailing
             )
-            // Only show bottom sheet after onboarding is complete
-            .bottomSheet(
-                presentationDetents: [.fraction(0.3), .medium, .large],
-                isPresented: .constant(didCompleteOnboarding), // Changed this line
-                dragIndicator: .visible,
-                sheetCornerRadius: 20,
-                largestUndimmedIdentifier: .medium,
-                interactiveDisabled: true,
-                forcedColorScheme: nil, // Let the content handle its own color scheme
-                content: {
-                    BottomSheetContentView(visibleElements: visibleElements)
-                        .id("\(appearance.rawValue)-\(systemColorScheme)")
-                        .environmentObject(viewModel)
-                        .background(Color(UIColor.systemBackground))
-                        .preferredColorScheme(effectiveColorScheme)
-                        .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
-                        .sheet(isPresented: $showingAbout) {
-                            AboutView()
-                        }
-                },
-                onDismiss: {
-                    Debug.log("Bottom sheet dismissed")
-                }
-            )
+//            // Only show bottom sheet after onboarding is complete
+//            .bottomSheet(
+//                presentationDetents: [.fraction(0.3), .medium, .large],
+//                isPresented: .constant(didCompleteOnboarding), // Changed this line
+//                dragIndicator: .visible,
+//                sheetCornerRadius: 20,
+//                largestUndimmedIdentifier: .medium,
+//                interactiveDisabled: true,
+//                forcedColorScheme: nil, // Let the content handle its own color scheme
+//                content: {
+//                    BottomSheetContentView(visibleElements: visibleElements)
+//                        .id("\(appearance.rawValue)-\(systemColorScheme)")
+//                        .environmentObject(viewModel)
+//                        .background(Color(UIColor.systemBackground))
+//                        .preferredColorScheme(effectiveColorScheme)
+//                        .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
+//                        .sheet(isPresented: $showingAbout) {
+//                            AboutView()
+//                        }
+//                },
+//                onDismiss: {
+//                    Debug.log("Bottom sheet dismissed")
+//                }
+//            )
+            .sheet(isPresented: .constant(didCompleteOnboarding), onDismiss: {
+                Debug.log("Bottom sheet dismissed")
+            }) {
+                BottomSheetContentView(visibleElements: visibleElements)
+                    .id("\(appearance.rawValue)-\(systemColorScheme)")
+                    .environmentObject(viewModel)
+//                    .preferredColorScheme(effectiveColorScheme)
+//                    .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
+                    .presentationDetents([.fraction(0.3), .medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .interactiveDismissDisabled(true)
+                    .presentationBackgroundInteraction(.enabled)
+                    .sheet(isPresented: $showingAbout) {
+                        AboutView()
+                    }
+            }
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.25), value: appearance)
             .animation(.easeInOut(duration: 0.25), value: systemColorScheme)
         }
     }
 
-    private var effectiveColorScheme: ColorScheme? {
-        switch appearance {
-        case .system:
-            return nil // Let system decide
-        case .light:
-            return .light
-        case .dark:
-            return .dark
-        }
-    }
+//    private var effectiveColorScheme: ColorScheme? {
+//        switch appearance {
+//        case .system:
+//            return nil // Let system decide
+//        case .light:
+//            return .light
+//        case .dark:
+//            return .dark
+//        }
+//    }
 }

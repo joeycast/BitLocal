@@ -49,17 +49,22 @@ struct BusinessesListView: View {
             // 3️⃣ Show the list when we have elements
             else {
                 List {
-                    Section(footer: footerView) {
+                    Section {
                         ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
                             let cellVM = cellViewModel(for: element)
                             NavigationLink(value: element) {
                                 ElementCell(viewModel: cellVM)
                             }
+                            .listRowBackground(Color.clear)
                         }
+                        // Insert the footer as its own row:
+                        footerView
+                            .listRowBackground(Color.clear)
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .background(Color.clear)
                 .environment(\.defaultMinListRowHeight, 0)
                 .navigationBarTitleDisplayMode(.inline)
                 .padding(.top)
@@ -160,6 +165,7 @@ struct ElementCell: View {
                     viewModel.element.osmJSON?.tags?.operator ??
                     NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
                 )
+                    .foregroundColor(.primary)
                     .fontWeight(.semibold)
                     .lineLimit(1)
                     .minimumScaleFactor(1)

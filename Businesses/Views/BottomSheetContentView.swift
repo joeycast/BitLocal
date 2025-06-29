@@ -30,7 +30,7 @@ struct BottomSheetContentView: View {
                         }
                 }
             }
-            .background(Color(uiColor: .systemBackground))
+            .ignoresSafeArea(edges: .bottom)
             .onAppear {
                 DispatchQueue.main.async {
                     let bottomSheetHeight = geometry.size.height

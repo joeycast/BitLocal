@@ -3,50 +3,50 @@ import Foundation // for Debug logging
 import MapKit
 import CoreLocation
 
-@available(iOS 17.0, *)
-// Bottom Sheet
-extension View {
-    @ViewBuilder
-    func bottomSheet<Content: View>(
-        presentationDetents: Set<PresentationDetent>,
-        isPresented: Binding<Bool>,
-        dragIndicator: Visibility = .visible,
-        sheetCornerRadius: CGFloat?,
-        largestUndimmedIdentifier: UISheetPresentationController.Detent.Identifier = .medium,
-        interactiveDisabled: Bool = true,
-        // 1) Pass in a color scheme
-        forcedColorScheme: ColorScheme? = nil,
-        @ViewBuilder content: @escaping ()->Content,
-        onDismiss: @escaping()->()
-    ) -> some View {
-        self
-            .sheet(isPresented: isPresented) {
-                onDismiss()
-            } content: {
-                content()
-                // 2) Apply the color scheme if provided
-                    .preferredColorScheme(forcedColorScheme)
-                    .presentationDetents(presentationDetents)
-                    .presentationDragIndicator(dragIndicator)
-                    .interactiveDismissDisabled(interactiveDisabled)
-                    .presentationBackgroundInteraction(.enabled)
-                    .onAppear {
-                        guard let windows = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
-                            return
-                        }
-                        if let controller = windows.windows.first?.rootViewController?.presentedViewController,
-                           let sheet = controller.presentationController as? UISheetPresentationController {
-                            
-                            controller.presentedViewController?.view.tintAdjustmentMode = .normal
-                            sheet.largestUndimmedDetentIdentifier = largestUndimmedIdentifier
-                            sheet.preferredCornerRadius = sheetCornerRadius
-                        } else {
-                            Debug.log("NO CONTROLLER FOUND")
-                        }
-                    }
-            }
-    }
-}
+//@available(iOS 17.0, *)
+//// Bottom Sheet
+//extension View {
+//    @ViewBuilder
+//    func bottomSheet<Content: View>(
+//        presentationDetents: Set<PresentationDetent>,
+//        isPresented: Binding<Bool>,
+//        dragIndicator: Visibility = .visible,
+//        sheetCornerRadius: CGFloat?,
+//        largestUndimmedIdentifier: UISheetPresentationController.Detent.Identifier = .medium,
+//        interactiveDisabled: Bool = true,
+//        // 1) Pass in a color scheme
+//        forcedColorScheme: ColorScheme? = nil,
+//        @ViewBuilder content: @escaping ()->Content,
+//        onDismiss: @escaping()->()
+//    ) -> some View {
+//        self
+//            .sheet(isPresented: isPresented) {
+//                onDismiss()
+//            } content: {
+//                content()
+//                // 2) Apply the color scheme if provided
+//                    .preferredColorScheme(forcedColorScheme)
+//                    .presentationDetents(presentationDetents)
+//                    .presentationDragIndicator(dragIndicator)
+//                    .interactiveDismissDisabled(interactiveDisabled)
+//                    .presentationBackgroundInteraction(.enabled)
+//                    .onAppear {
+//                        guard let windows = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+//                            return
+//                        }
+//                        if let controller = windows.windows.first?.rootViewController?.presentedViewController,
+//                           let sheet = controller.presentationController as? UISheetPresentationController {
+//                            
+//                            controller.presentedViewController?.view.tintAdjustmentMode = .normal
+//                            sheet.largestUndimmedDetentIdentifier = largestUndimmedIdentifier
+//                            sheet.preferredCornerRadius = sheetCornerRadius
+//                        } else {
+//                            Debug.log("NO CONTROLLER FOUND")
+//                        }
+//                    }
+//            }
+//    }
+//}
 
 //
 extension CLLocationCoordinate2D: Equatable {
