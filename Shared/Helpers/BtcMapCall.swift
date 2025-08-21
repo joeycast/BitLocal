@@ -237,7 +237,13 @@ class APIManager {
         clearCache()
         getElements(completion: completion)
     }
-    
+
+    /// Reset the last update timestamp to the default value
+    func resetLastUpdateKey() {
+        UserDefaults.standard.set("2000-01-01T00:00:00.000Z", forKey: lastUpdateKey)
+        Debug.logCache("Reset lastUpdateKey to default baseline")
+    }
+
     /// Check if cache exists AND contains valid data
     func hasCachedData() -> Bool {
         guard FileManager.default.fileExists(atPath: elementsFileURL.path) else {

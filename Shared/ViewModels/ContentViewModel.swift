@@ -497,7 +497,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             let currentElementsEmpty = self.allElements.isEmpty
             Debug.logCache("Cache empty before fetch: \(wasCacheEmpty)")
             Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
-            
+
+            if wasCacheEmpty {
+                Debug.logCache("Cache missing - resetting last update timestamp")
+                APIManager.shared.resetLastUpdateKey()
+            }
+
             APIManager.shared.getElements { [weak self] elements in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
