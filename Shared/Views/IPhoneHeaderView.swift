@@ -30,6 +30,7 @@ struct IPhoneHeaderView: View {
             GeometryReader { geometry in
                 let height = geometry.size.height * 0.15
                 Rectangle()
+                    .fill(.thinMaterial) // Remove if glassy effect is not desired
                     .cornerRadius(10)
                     .foregroundColor(backgroundColorForCurrentScheme)
                     .opacity(1)
