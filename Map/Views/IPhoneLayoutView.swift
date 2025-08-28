@@ -104,8 +104,8 @@ struct IPhoneLayoutView: View {
                 BottomSheetContentView(visibleElements: visibleElements)
                     .id("\(appearance.rawValue)-\(systemColorScheme)")
                     .environmentObject(viewModel)
-//                    .preferredColorScheme(effectiveColorScheme)
-//                    .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
+                    .preferredColorScheme(effectiveColorScheme)  // To respect appearance
+//                    .presentationBackground(Color(UIColor.systemBackground))  // Keeps background opaque, resolves based on the preferred scheme
                     .presentationDetents([.fraction(0.3), .medium, .large])
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(true)
@@ -120,14 +120,14 @@ struct IPhoneLayoutView: View {
         }
     }
 
-//    private var effectiveColorScheme: ColorScheme? {
-//        switch appearance {
-//        case .system:
-//            return nil // Let system decide
-//        case .light:
-//            return .light
-//        case .dark:
-//            return .dark
-//        }
-//    }
+    private var effectiveColorScheme: ColorScheme? {
+        switch appearance {
+        case .system:
+            return systemColorScheme  // Explicitly use the current system scheme
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
 }
