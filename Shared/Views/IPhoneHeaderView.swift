@@ -29,18 +29,25 @@ struct IPhoneHeaderView: View {
         ZStack {
             GeometryReader { geometry in
                 let height = geometry.size.height * 0.15
-                Rectangle()
-                    .cornerRadius(10)
-                    .foregroundColor(backgroundColorForCurrentScheme)
-                    .opacity(1)
-                    .frame(width: screenWidth, height: height)
-                    .padding(.top, -10)
-                    .ignoresSafeArea()
-                    .onAppear {
-                        DispatchQueue.main.async {
-                            viewModel.topPadding = height
-                        }
+                Group {
+                    if #available(iOS 26.0, *) {
+                        Rectangle()
+                            .fill(.thinMaterial)
+                    } else {
+                        Rectangle()
                     }
+                }
+                .cornerRadius(10)
+                .foregroundColor(backgroundColorForCurrentScheme)
+                .opacity(1)
+                .frame(width: screenWidth, height: height)
+                .padding(.top, -10)
+                .ignoresSafeArea()
+                .onAppear {
+                    DispatchQueue.main.async {
+                        viewModel.topPadding = height
+                    }
+                }
             }
             VStack(alignment: .leading) {
                 HStack {

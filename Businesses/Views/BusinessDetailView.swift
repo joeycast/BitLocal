@@ -84,6 +84,8 @@ struct BusinessDetailsSection: View {
     
     var body: some View {
         Section(header: Text(NSLocalizedString("business_details_section", comment: "Section header for business details"))) {
+            
+            // TO DO: Determine necessity of this block of code
             if let distance = BusinessDetailView(element: element, userLocation: nil, contentViewModel: ContentViewModel()).localizedDistanceString() {
                 HStack {
                     Image(systemName: "location")
