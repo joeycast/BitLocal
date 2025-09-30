@@ -3,7 +3,100 @@
 import SwiftUI
 import CoreLocation
 import MapKit
+import Contacts
 import Foundation
+
+// Helper function to open location in Maps with full details
+func openLocationInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?) {
+    Debug.log("openLocationInMaps called - Name: \(name ?? "nil"), Street#: \(address?.streetNumber ?? "nil"), Street: \(address?.streetName ?? "nil"), City: \(address?.cityOrTownName ?? "nil")")
+
+    // Build search query with name and address to help find the actual place
+    var searchQuery = ""
+    if let name = name {
+        searchQuery = name
+    }
+
+    // Build full street address with number
+    var fullAddress = ""
+    if let streetNumber = address?.streetNumber, !streetNumber.isEmpty {
+        fullAddress = streetNumber + " "
+    }
+    if let streetName = address?.streetName {
+        fullAddress += streetName
+    }
+
+    if !fullAddress.isEmpty, let city = address?.cityOrTownName {
+        if !searchQuery.isEmpty {
+            searchQuery += ", "
+        }
+        searchQuery += "\(fullAddress), \(city)"
+    }
+
+    Debug.log("Search query: \(searchQuery)")
+
+    // If we have a search query, try to find the actual place in Apple Maps
+    if !searchQuery.isEmpty {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = searchQuery
+        request.region = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
+
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            if let mapItem = response?.mapItems.first {
+                Debug.log("MKLocalSearch found match: \(mapItem.name ?? "nil")")
+                // Found a matching place in Apple Maps - open it
+                mapItem.openInMaps(launchOptions: nil)
+            } else {
+                Debug.log("MKLocalSearch failed, using fallback. Error: \(error?.localizedDescription ?? "none")")
+                // Fallback: open with coordinates if search fails
+                openCoordinateInMaps(coordinate: coordinate, name: name, address: address)
+            }
+        }
+    } else {
+        Debug.log("No search query, using fallback")
+        // No search info available, fallback to coordinates
+        openCoordinateInMaps(coordinate: coordinate, name: name, address: address)
+    }
+}
+
+// Fallback function to open just the coordinates
+private func openCoordinateInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?) {
+    var addressDict: [String: Any] = [:]
+
+    // Build full street address with street number
+    var fullStreet = ""
+    if let streetNumber = address?.streetNumber, !streetNumber.isEmpty {
+        fullStreet = streetNumber
+    }
+    if let streetName = address?.streetName {
+        if !fullStreet.isEmpty {
+            fullStreet += " "
+        }
+        fullStreet += streetName
+    }
+    if !fullStreet.isEmpty {
+        addressDict[CNPostalAddressStreetKey] = fullStreet
+    }
+
+    if let city = address?.cityOrTownName {
+        addressDict[CNPostalAddressCityKey] = city
+    }
+
+    if let state = address?.regionOrStateName {
+        addressDict[CNPostalAddressStateKey] = state
+    }
+
+    if let postalCode = address?.postalCode {
+        addressDict[CNPostalAddressPostalCodeKey] = postalCode
+    }
+
+    Debug.log("Opening coordinate in Maps - Name: \(name ?? "nil"), Street: \(fullStreet), City: \(addressDict[CNPostalAddressCityKey] ?? "nil"), State: \(addressDict[CNPostalAddressStateKey] ?? "nil"), Zip: \(addressDict[CNPostalAddressPostalCodeKey] ?? "nil")")
+
+    let placemark = MKPlacemark(coordinate: coordinate, addressDictionary: addressDict)
+    let mapItem = MKMapItem(placemark: placemark)
+    mapItem.name = name
+    mapItem.openInMaps(launchOptions: nil)
+}
 
 @available(iOS 17.0, *)
 struct BusinessDetailView: View {
@@ -96,49 +189,76 @@ struct BusinessDetailsSection: View {
             }
             
             // Business Address
-            VStack (alignment: .leading, spacing: 3) {
-                Text(NSLocalizedString("address_label", comment: "Label for address"))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                if let coord = element.mapCoordinate {
-                    Link(destination: URL(string: "maps://?saddr=&daddr=\(coord.latitude),\(coord.longitude)")!) {
-                        Text("\(elementCellViewModel.address?.streetNumber != nil && !elementCellViewModel.address!.streetNumber!.isEmpty ? elementCellViewModel.address!.streetNumber! + " " : "")\(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
+            if let coord = element.mapCoordinate {
+                Button(action: {
+                    openLocationInMaps(coordinate: coord, name: element.osmJSON?.tags?.name, address: elementCellViewModel.address)
+                }) {
+                    VStack (alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text(NSLocalizedString("address_label", comment: "Label for address"))
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("\(elementCellViewModel.address?.streetNumber != nil && !elementCellViewModel.address!.streetNumber!.isEmpty ? elementCellViewModel.address!.streetNumber! + " " : "")\(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
+                                .multilineTextAlignment(.leading)
+                                .foregroundColor(.accentColor)
+
+                            Spacer()
+                        }
                     }
                 }
+                .buttonStyle(.plain)
             }
             
             // Business Website - Only show if valid
             if let website = element.osmJSON?.tags?.website ?? element.osmJSON?.tags?.contactWebsite,
                let validURL = website.cleanedWebsiteURL() {
-                
-                VStack (alignment: .leading, spacing: 3) {
-                    Text(NSLocalizedString("website_label", comment: "Label for website"))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    Link(destination: validURL) {
-                        Text(website.cleanedForDisplay())
-                            .lineLimit(1)
+
+                Link(destination: validURL) {
+                    VStack (alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text(NSLocalizedString("website_label", comment: "Label for website"))
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text(website.cleanedForDisplay())
+                                .lineLimit(1)
+                                .foregroundColor(.accentColor)
+
+                            Spacer()
+                        }
                     }
                 }
+                .buttonStyle(.plain)
             }
             
             // Business Phone - Simple worldwide approach
             if let phone = element.osmJSON?.tags?.phone ?? element.osmJSON?.tags?.contactPhone {
                 let (cleanPhone, isValid) = phone.cleanedPhoneNumber()
-                
+
                 if isValid, let url = URL(string: "tel:\(cleanPhone)") {
-                    VStack (alignment: .leading, spacing: 3) {
-                        Text(NSLocalizedString("phone_label", comment: "Label for phone"))
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Link(destination: url) {
-                            Text(phone.displayablePhoneNumber()) // Show original with minimal cleanup
-                                .lineLimit(1)
+                    Link(destination: url) {
+                        VStack (alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(NSLocalizedString("phone_label", comment: "Label for phone"))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            HStack {
+                                Text(phone.displayablePhoneNumber()) // Show original with minimal cleanup
+                                    .lineLimit(1)
+                                    .foregroundColor(.accentColor)
+
+                                Spacer()
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                 } else {
                     let _ = Debug.log("Invalid phone number: '\(phone)'")
                 }
