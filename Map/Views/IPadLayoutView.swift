@@ -39,7 +39,6 @@ struct IPadLayoutView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         InfoButtonView(showingAbout: $showingAbout)
-                            .padding(.trailing)
                     }
                     ToolbarItem(placement: .principal) {
                         CustomiPadNavigationStackTitleView()
