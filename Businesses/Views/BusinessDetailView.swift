@@ -109,10 +109,17 @@ struct BusinessDetailView: View {
     
     var element: Element
     var userLocation: CLLocation?
+    var currentDetent: PresentationDetent?
     
-    init(element: Element, userLocation: CLLocation?, contentViewModel: ContentViewModel) {
+    init(
+        element: Element,
+        userLocation: CLLocation?,
+        contentViewModel: ContentViewModel,
+        currentDetent: PresentationDetent? = nil
+    ) {
         self.element = element
         self.userLocation = userLocation
+        self.currentDetent = currentDetent
         self._elementCellViewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation, viewModel: contentViewModel))
     }
     
@@ -141,10 +148,15 @@ struct BusinessDetailView: View {
     var body: some View {
         List {
             BusinessDescriptionSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessDetailsSection(element: element, elementCellViewModel: elementCellViewModel)
+                .clearListRowBackground(if: shouldUseGlassyRows)
             PaymentDetailsSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessMapSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
         }
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
@@ -152,7 +164,21 @@ struct BusinessDetailView: View {
         }
         .listStyle(InsetGroupedListStyle()) // Consistent list style
         .navigationTitle(element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
-        .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)    }
+        .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)
+    }
+}
+
+extension BusinessDetailView {
+    private var shouldHideSheetBackground: Bool {
+        guard let detent = currentDetent else { return false }
+        return detent != .large
+    }
+    
+    private var shouldUseGlassyRows: Bool {
+        guard let detent = currentDetent else { return false }
+        guard #available(iOS 26.0, *) else { return false }
+        return detent != .large
+    }
 }
 
 // BusinessDescriptionSection

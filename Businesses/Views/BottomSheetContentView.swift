@@ -13,21 +13,28 @@ import Foundation // for Debug logging
 struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
     var visibleElements: [Element]
+    @Binding var currentDetent: PresentationDetent
 
     var body: some View {
         GeometryReader { geometry in
             VStack {
                 NavigationStack(path: $viewModel.path) {
-                    BusinessesListView(elements: visibleElements)
+                    BusinessesListView(
+                        elements: visibleElements,
+                        currentDetent: currentDetent
+                    )
                         .environmentObject(viewModel)
                         .navigationDestination(for: Element.self) { element in
                             BusinessDetailView(
                                 element: element,
                                 userLocation: viewModel.userLocation,
-                                contentViewModel: viewModel
+                                contentViewModel: viewModel,
+                                currentDetent: currentDetent
                             )
                             .id(element.id)
+                            .clearNavigationContainerBackgroundIfAvailable()
                         }
+                        .clearNavigationContainerBackgroundIfAvailable()
                 }
             }
             .ignoresSafeArea(edges: .bottom)

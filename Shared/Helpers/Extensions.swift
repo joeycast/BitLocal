@@ -163,6 +163,27 @@ extension Image {
     }
 }
 
+@available(iOS 17.0, *)
+extension View {
+    @ViewBuilder
+    func clearNavigationContainerBackgroundIfAvailable() -> some View {
+        if #available(iOS 18.0, *) {
+            self.containerBackground(.clear, for: .navigation)
+        } else {
+            self
+        }
+    }
+    
+    @ViewBuilder
+    func clearListRowBackground(if condition: Bool) -> some View {
+        if condition {
+            self.listRowBackground(Color.clear)
+        } else {
+            self
+        }
+    }
+}
+
 
 // Website string cleaning
 extension String {

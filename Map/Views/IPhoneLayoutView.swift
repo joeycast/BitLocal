@@ -27,6 +27,7 @@ struct IPhoneLayoutView: View {
     @Environment(\.colorScheme) private var systemColorScheme
     
     private var appearance: Appearance { appearanceManager.appearance }
+    @State private var bottomSheetDetent: PresentationDetent = .fraction(0.3)
 
     var body: some View {
         GeometryReader { geometry in
@@ -101,12 +102,19 @@ struct IPhoneLayoutView: View {
             .sheet(isPresented: .constant(didCompleteOnboarding), onDismiss: {
                 Debug.log("Bottom sheet dismissed")
             }) {
-                BottomSheetContentView(visibleElements: visibleElements)
+                BottomSheetContentView(
+                    visibleElements: visibleElements,
+                    currentDetent: $bottomSheetDetent
+                )
                     .id("\(appearance.rawValue)-\(systemColorScheme)")
                     .environmentObject(viewModel)
                     .preferredColorScheme(effectiveColorScheme)  // To respect appearance
 //                    .presentationBackground(Color(UIColor.systemBackground))  // Keeps background opaque, resolves based on the preferred scheme
-                    .presentationDetents([.fraction(0.3), .medium, .large])
+                    .presentationDetents([
+                        .fraction(0.3),
+                        .medium,
+                        .large
+                    ], selection: $bottomSheetDetent)
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(true)
                     .presentationBackgroundInteraction(.enabled)

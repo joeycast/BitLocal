@@ -15,6 +15,7 @@ struct BusinessesListView: View {
     let maxListResults = 25
     var elements: [Element]
     var userLocation: CLLocation?
+    var currentDetent: PresentationDetent? = nil
     
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
@@ -55,15 +56,16 @@ struct BusinessesListView: View {
                             NavigationLink(value: element) {
                                 ElementCell(viewModel: cellVM)
                             }
-                            .listRowBackground(Color.clear)
+                            .clearListRowBackground(if: shouldUseGlassyRows)
                         }
                         // Insert the footer as its own row:
                         footerView
-                            .listRowBackground(Color.clear)
+                            .clearListRowBackground(if: shouldUseGlassyRows)
                     }
+                    .clearListRowBackground(if: shouldUseGlassyRows)
                 }
                 .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
                 .background(Color.clear)
                 .environment(\.defaultMinListRowHeight, 0)
                 .navigationBarTitleDisplayMode(.inline)
@@ -145,6 +147,17 @@ struct BusinessesListView: View {
         }
         .font(.footnote)
         .foregroundColor(.secondary)
+    }
+    
+    private var shouldHideSheetBackground: Bool {
+        guard let detent = currentDetent else { return false }
+        return detent != .large
+    }
+    
+    private var shouldUseGlassyRows: Bool {
+        guard let detent = currentDetent else { return false }
+        guard #available(iOS 26.0, *) else { return false }
+        return detent != .large
     }
 }
 
