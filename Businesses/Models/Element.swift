@@ -101,7 +101,7 @@ struct Element: Codable, Identifiable, Hashable {
 }
 
 // MARK: - Address
-struct Address {
+struct Address: Codable {
     let streetNumber: String?
     let streetName: String?
     let cityOrTownName: String?

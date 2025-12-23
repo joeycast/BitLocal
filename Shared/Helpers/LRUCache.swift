@@ -32,6 +32,18 @@ class LRUCache<Key: Hashable, Value> {
         cache[key] = CacheItem(value: value)
         lruKeys.append(key)
     }
+
+    func allValues() -> [Key: Value] {
+        return cache.mapValues { $0.value }
+    }
+
+    func setValues(_ values: [Key: Value]) {
+        cache.removeAll()
+        lruKeys.removeAll()
+        for (key, value) in values {
+            setValue(value, forKey: key)
+        }
+    }
     
     private struct CacheItem {
         let value: Value

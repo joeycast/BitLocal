@@ -279,8 +279,6 @@ class ElementCellViewModel: ObservableObject {
     // OPTIMIZED: Remove the excessive logging from userLocation didSet
     @Published var userLocation: CLLocation?
     
-    static var geocodingCache: [String: Address] = [:]
-    private let geocoder = CLGeocoder()
     private var userLocationCancellable: AnyCancellable?
     private var lastLocationUpdate: CLLocationCoordinate2D?
     
@@ -302,12 +300,18 @@ class ElementCellViewModel: ObservableObject {
                 self?.userLocation = newLocation
             }
         
-        // Attempt to retrieve cached address
-        if let cachedAddress = ElementCellViewModel.geocodingCache[addressCacheKey] {
-            self.address = cachedAddress
+        // Attempt to retrieve cached address, but prefer OSM-tagged fields when present
+        if let cachedAddress = getCachedAddress() {
+            self.address = mergedAddress(preferred: element.address, fallback: cachedAddress)
         } else {
-            // Start geocoding immediately
+            self.address = element.address
+        }
+        // Start geocoding only if we don't already have a complete address
+        if !isAddressComplete(self.address) {
             self.updateAddress()
+        } else if let address = self.address {
+            setCachedAddress(address)
+            viewModel.scheduleGeocodingCacheSave()
         }
     }
     
@@ -361,30 +365,74 @@ class ElementCellViewModel: ObservableObject {
 
     func updateAddress() {
         // Check if the address is already cached
-        if let cachedAddress = ElementCellViewModel.geocodingCache[addressCacheKey] {
-            self.address = cachedAddress
-            return
+        if let cachedAddress = getCachedAddress() {
+            let merged = mergedAddress(preferred: element.address, fallback: cachedAddress)
+            self.address = merged
+            if isAddressComplete(merged) {
+                return
+            }
+        } else if let preferred = element.address {
+            self.address = preferred
+            if isAddressComplete(preferred) {
+                setCachedAddress(preferred)
+                viewModel.scheduleGeocodingCacheSave()
+                return
+            }
         }
 
         guard let coord = element.mapCoordinate else { return }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
 
         // Perform geocoding
-        geocoder.reverseGeocodeLocation(location) { [weak self] (placemarks, error) in
-            guard let self = self, let placemark = placemarks?.first else { return }
+        viewModel.geocoder.reverseGeocode(location: location) { [weak self] placemark in
+            guard let self = self, let placemark = placemark else { return }
             let address = Address(
-                streetNumber: placemark.subThoroughfare ?? "",
-                streetName: placemark.thoroughfare ?? "",
-                cityOrTownName: placemark.locality ?? "",
-                postalCode: placemark.postalCode ?? "",
-                regionOrStateName: placemark.administrativeArea ?? "",
-                countryName: placemark.country ?? ""
+                streetNumber: self.normalized(placemark.subThoroughfare),
+                streetName: self.normalized(placemark.thoroughfare),
+                cityOrTownName: self.normalized(placemark.locality),
+                postalCode: self.normalized(placemark.postalCode),
+                regionOrStateName: self.normalized(placemark.administrativeArea),
+                countryName: self.normalized(placemark.country)
             )
             DispatchQueue.main.async {
-                self.address = address
-                ElementCellViewModel.geocodingCache[self.addressCacheKey] = address
+                let merged = self.mergedAddress(preferred: self.element.address, fallback: address)
+                self.address = merged
+                if let merged = merged {
+                    self.setCachedAddress(merged)
+                    self.viewModel.scheduleGeocodingCacheSave()
+                }
             }
         }
+    }
+
+    private func normalized(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    private func isAddressComplete(_ address: Address?) -> Bool {
+        guard let address = address else { return false }
+        return normalized(address.streetNumber) != nil &&
+            normalized(address.streetName) != nil &&
+            normalized(address.cityOrTownName) != nil
+    }
+
+    private func mergedAddress(preferred: Address?, fallback: Address?) -> Address? {
+        guard preferred != nil || fallback != nil else { return nil }
+        func pick(_ preferredValue: String?, _ fallbackValue: String?) -> String? {
+            return normalized(preferredValue) ?? normalized(fallbackValue)
+        }
+        return Address(
+            streetNumber: pick(preferred?.streetNumber, fallback?.streetNumber),
+            streetName: pick(preferred?.streetName, fallback?.streetName),
+            cityOrTownName: pick(preferred?.cityOrTownName, fallback?.cityOrTownName),
+            postalCode: pick(preferred?.postalCode, fallback?.postalCode),
+            regionOrStateName: pick(preferred?.regionOrStateName, fallback?.regionOrStateName),
+            countryName: pick(preferred?.countryName, fallback?.countryName)
+        )
     }
 }
 
@@ -415,25 +463,27 @@ struct PaymentIcons: View {
 class Geocoder {
     private let geocoder = CLGeocoder()
     private let semaphore: DispatchSemaphore
+    private let queue = DispatchQueue(label: "geocoder.queue", qos: .utility)
     
     init(maxConcurrentRequests: Int = 1) {
         semaphore = DispatchSemaphore(value: maxConcurrentRequests)
     }
     
     func reverseGeocode(location: CLLocation, completion: @escaping (CLPlacemark?) -> Void) {
-        semaphore.wait() // Wait for a free slot
-        
-        geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-            defer {
-                self.semaphore.signal() // Release the slot
+        queue.async {
+            self.semaphore.wait() // Wait for a free slot
+            self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+                defer {
+                    self.semaphore.signal() // Release the slot
+                }
+                
+                guard let placemark = placemarks?.first else {
+                    completion(nil)
+                    return
+                }
+                
+                completion(placemark)
             }
-            
-            guard let placemark = placemarks?.first else {
-                completion(nil)
-                return
-            }
-            
-            completion(placemark)
         }
     }
 }

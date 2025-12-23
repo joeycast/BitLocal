@@ -35,7 +35,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
     let visibleElementsSubject = PassthroughSubject<[Element], Never>()
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
-    let geocoder = Geocoder(maxConcurrentRequests: 5)
+    let geocoder = Geocoder(maxConcurrentRequests: 1)
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
     
     // Startup state tracking
@@ -47,6 +47,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var hasBeenInactive = false
     
     private var lastCenteredCoordinate: CLLocationCoordinate2D?
+    private var geocodingCacheSaveWorkItem: DispatchWorkItem?
+    private let geocodingCacheFileURL: URL = {
+        let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+        return (cachesDirectory ?? URL(fileURLWithPath: NSTemporaryDirectory()))
+            .appendingPathComponent("geocoding_cache.json")
+    }()
     
     private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: AnyCancellable?
@@ -70,6 +76,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     
     override init() {
         super.init()
+        loadGeocodingCache()
         locationManager.delegate = self
         setupCenterMapSubscription()
         visibleElementsSubject
@@ -116,6 +123,39 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             guard let self = self else { return }
             self.appState = .background
             self.hasBeenInactive = true
+            self.saveGeocodingCache()
+        }
+    }
+
+    func scheduleGeocodingCacheSave() {
+        geocodingCacheSaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.saveGeocodingCache()
+        }
+        geocodingCacheSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
+    }
+
+    private func loadGeocodingCache() {
+        guard let data = try? Data(contentsOf: geocodingCacheFileURL) else { return }
+        do {
+            let decoded = try JSONDecoder().decode([String: Address].self, from: data)
+            geocodingCache.setValues(decoded)
+            Debug.log("Loaded geocoding cache: \(decoded.count) entries")
+        } catch {
+            Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
+        }
+    }
+
+    private func saveGeocodingCache() {
+        let values = geocodingCache.allValues()
+        guard !values.isEmpty else { return }
+        do {
+            let data = try JSONEncoder().encode(values)
+            try data.write(to: geocodingCacheFileURL, options: [.atomic])
+            Debug.log("Saved geocoding cache: \(values.count) entries")
+        } catch {
+            Debug.log("Failed to save geocoding cache: \(error.localizedDescription)")
         }
     }
 
