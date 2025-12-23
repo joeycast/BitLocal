@@ -30,6 +30,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var bottomPadding: CGFloat = 0
     @Published var initialRegionSet = false // Track if initial region has been set
     @Published var forceMapRefresh = false // Flag to force map annotation refresh
+    @Published var selectionSource: SelectionSource = .unknown
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -73,6 +74,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     enum AppState {
         case active, inactive, background
     }
+
+    enum SelectionSource {
+        case mapAnnotation
+        case list
+        case unknown
+    }
     
     override init() {
         super.init()
@@ -85,6 +92,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self?.visibleElements = elements
             }
             .store(in: &cancellables)
+    }
+
+    func setSelectionSource(_ source: SelectionSource) {
+        selectionSource = source
+    }
+
+    func consumeSelectionSource() -> SelectionSource {
+        let source = selectionSource
+        selectionSource = .unknown
+        return source
     }
     
     func handleAppBecameActive() {
@@ -344,6 +361,25 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
                 }
             )
+        }
+    }
+
+    func selectAnnotation(for element: Element, animated: Bool = true) {
+        guard let mapView = mapView else { return }
+        if let cluster = mapView.annotations
+            .compactMap({ $0 as? MKClusterAnnotation })
+            .first(where: { cluster in
+                cluster.memberAnnotations.contains { member in
+                    (member as? Annotation)?.element?.id == element.id
+                }
+            }) {
+            mapView.selectAnnotation(cluster, animated: animated)
+            return
+        }
+        if let annotation = mapView.annotations.first(where: {
+            ($0 as? Annotation)?.element?.id == element.id
+        }) {
+            mapView.selectAnnotation(annotation, animated: animated)
         }
     }
     

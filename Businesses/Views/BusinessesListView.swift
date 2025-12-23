@@ -53,9 +53,20 @@ struct BusinessesListView: View {
                     Section {
                         ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
                             let cellVM = cellViewModel(for: element)
-                            NavigationLink(value: element) {
-                                ElementCell(viewModel: cellVM)
+                            Button {
+                                viewModel.setSelectionSource(.list)
+                                viewModel.selectAnnotation(for: element, animated: true)
+                                viewModel.path = [element]
+                            } label: {
+                                ZStack(alignment: .trailing) {
+                                    ElementCell(viewModel: cellVM)
+                                        .padding(.trailing, 18)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(.gray.opacity(0.6))
+                                }
                             }
+                            .buttonStyle(.plain)
                             .clearListRowBackground(if: shouldUseGlassyRows)
                         }
                         // Insert the footer as its own row:
@@ -71,14 +82,6 @@ struct BusinessesListView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .padding(.top)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onChange(of: viewModel.path) { _, newPath in
-                    if let element = newPath.last {
-                        // Delay zoom until after navigation completes
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            viewModel.zoomToElement(element)
-                        }
-                    }
-                }
             }
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
@@ -211,6 +214,7 @@ struct ElementCell: View {
                 PaymentIcons(element: viewModel.element)
             }
         }
+        .contentShape(Rectangle())
         // REMOVED: Redundant onChange that was causing excessive logging
         // .onChange(of: viewModel.viewModel.userLocation) { _, _ in
         //     viewModel.onCellAppear()

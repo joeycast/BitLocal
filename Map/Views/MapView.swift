@@ -341,6 +341,10 @@ struct MapView: UIViewRepresentable {
         
         // Handle annotation selection to update navigation path
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            if viewModel.selectionSource == .list {
+                viewModel.setSelectionSource(.unknown)
+                return
+            }
             if let cluster = view.annotation as? MKClusterAnnotation {
                 let annotations = cluster.memberAnnotations
                 
@@ -377,6 +381,7 @@ struct MapView: UIViewRepresentable {
             else if let annotation = view.annotation as? Annotation, let element = annotation.element {
                 // Restore the logic to display BusinessDetailView
                 DispatchQueue.main.async {
+                    self.viewModel.setSelectionSource(.mapAnnotation)
                     self.viewModel.path = [element] // Update path for NavigationStack
                     self.viewModel.selectedElement = element // Update the selected element
                     

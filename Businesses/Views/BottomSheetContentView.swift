@@ -55,7 +55,10 @@ struct BottomSheetContentView: View {
                 Debug.log("BottomSheet path changed (iPhone scenario)")
                 if let selectedElement = newPath.last {
                     // If detail view is pushed, zoom to element
-                    viewModel.zoomToElement(selectedElement)
+                    if viewModel.consumeSelectionSource() == .mapAnnotation {
+                        viewModel.zoomToElement(selectedElement)
+                    }
+                    viewModel.selectedElement = selectedElement
                 } else {
                     // If no element is selected (path is empty), deselect annotation
                     viewModel.deselectAnnotation()
