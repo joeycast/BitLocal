@@ -86,7 +86,7 @@ struct Element: Codable, Identifiable, Hashable {
                 streetNumber: osmTags.addrHousenumber,
                 streetName: osmTags.addrStreet,
                 cityOrTownName: osmTags.addrCity,
-                postalCode: osmTags.addrPostcode,
+                postalCode: Address.normalizedPostalCode(osmTags.addrPostcode, countryName: nil),
                 regionOrStateName: osmTags.addrState,
                 countryName: nil
             )
@@ -116,6 +116,37 @@ struct Address: Codable {
         self.postalCode = postalCode
         self.regionOrStateName = regionOrStateName
         self.countryName = countryName
+    }
+}
+
+extension Address {
+    static func normalizedPostalCode(_ value: String?, countryName: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else {
+            return nil
+        }
+        if shouldStripZipExtension(value: trimmed, countryName: countryName) {
+            return String(trimmed.prefix(5))
+        }
+        return trimmed
+    }
+
+    private static func shouldStripZipExtension(value: String, countryName: String?) -> Bool {
+        let zipPlus4Pattern = #"^\d{5}-\d{4}$"#
+        guard value.range(of: zipPlus4Pattern, options: .regularExpression) != nil else {
+            return false
+        }
+        guard let countryName = countryName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !countryName.isEmpty else {
+            return true
+        }
+        let normalizedCountry = countryName.lowercased()
+        return normalizedCountry == "united states" ||
+            normalizedCountry == "united states of america" ||
+            normalizedCountry == "usa" ||
+            normalizedCountry == "u.s.a." ||
+            normalizedCountry == "us" ||
+            normalizedCountry == "u.s."
     }
 }
 

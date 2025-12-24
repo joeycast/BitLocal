@@ -394,7 +394,10 @@ class ElementCellViewModel: ObservableObject {
                 streetNumber: self.normalized(placemark.subThoroughfare),
                 streetName: self.normalized(placemark.thoroughfare),
                 cityOrTownName: self.normalized(placemark.locality),
-                postalCode: self.normalized(placemark.postalCode),
+                postalCode: Address.normalizedPostalCode(
+                    self.normalized(placemark.postalCode),
+                    countryName: self.normalized(placemark.country)
+                ),
                 regionOrStateName: self.normalized(placemark.administrativeArea),
                 countryName: self.normalized(placemark.country)
             )
@@ -433,7 +436,10 @@ class ElementCellViewModel: ObservableObject {
             streetNumber: pick(preferred?.streetNumber, fallback?.streetNumber),
             streetName: pick(preferred?.streetName, fallback?.streetName),
             cityOrTownName: pick(preferred?.cityOrTownName, fallback?.cityOrTownName),
-            postalCode: pick(preferred?.postalCode, fallback?.postalCode),
+            postalCode: Address.normalizedPostalCode(
+                pick(preferred?.postalCode, fallback?.postalCode),
+                countryName: pick(preferred?.countryName, fallback?.countryName)
+            ),
             regionOrStateName: pick(preferred?.regionOrStateName, fallback?.regionOrStateName),
             countryName: pick(preferred?.countryName, fallback?.countryName)
         )
