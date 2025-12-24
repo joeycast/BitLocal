@@ -28,6 +28,7 @@ struct AboutView: View {
     
     // More from Brink 13 Labs links
     let bitcoinLivePriceChartURL = URL(string: "https://brink13labs.com")!
+    let movematesMoveTogetherURL = URL(string: "https://apps.apple.com/us/app/movemates-move-together/id6748308903")!
     
     // Other section links
     let brink13LabsWebsite = URL(string: "https://brink13labs.com")!
@@ -119,6 +120,16 @@ struct AboutView: View {
                                 .aboutIconStyle(size: iconSize)
                             Text("bitcoin_live_price_chart_button_label")
                             Spacer()
+                        }
+                    }
+                    if Locale.current.region?.identifier == "US" {
+                        Link(destination: movematesMoveTogetherURL) {
+                            HStack(spacing: 10) {
+                                Image("person-simple-run-bold")
+                                    .aboutIconStyle(size: iconSize)
+                                Text("Movemates: Move Together")
+                                Spacer()
+                            }
                         }
                     }
                 }

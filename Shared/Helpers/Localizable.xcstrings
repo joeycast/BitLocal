@@ -2001,6 +2001,9 @@
         }
       }
     },
+    "Movemates: Move Together" : {
+
+    },
     "name_not_available" : {
       "comment" : "Fallback name for unavailable business name\nFallback name when no name is available",
       "localizations" : {
@@ -4503,5 +4506,5 @@
       }
     }
   },
-  "version" : "1.0"
+  "version" : "1.1"
 }
