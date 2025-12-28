@@ -5,8 +5,9 @@ struct AboutView: View {
     
     // For dismissing the SettingsView sheet
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var showingLogs = false
+    @State private var showingAddBusinessForm = false
     
     // App name
     let appName = "BitLocal"
@@ -52,11 +53,13 @@ struct AboutView: View {
                 // Contribute section
                 Section(header: Text("contribute_section"),
                         footer: Text("contribute_footer")) {
-                    Link(destination: suggestABusinessEmail) {
+                    Button {
+                        showingAddBusinessForm = true
+                    } label: {
                         HStack(spacing: 10) {
                             Image("storefront-fill")
                                 .aboutIconStyle(size: iconSize)
-                            Text("suggest_a_business")
+                            Text("add_business_to_map")
                             Spacer()
                         }
                     }
@@ -214,6 +217,9 @@ struct AboutView: View {
                         .bold() // or .fontWeight(.bold)
                 }
             )
+        }
+        .sheet(isPresented: $showingAddBusinessForm) {
+            AddBusinessFormView()
         }
     }
 }

@@ -11,6 +11,11 @@
 		F6004F962DED3F43001183AE /* Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F952DED3F43001183AE /* Debug.swift */; };
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
 		F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */; };
+		F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */; };
+		F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */; };
+		F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */; };
+		F63E80812EFC302700ED1F00 /* MailComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80802EFC302700ED1F00 /* MailComposer.swift */; };
+		F63E80832EFC554E00ED1F00 /* BusinessHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80822EFC554E00ED1F00 /* BusinessHours.swift */; };
 		F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F64093F42DE66D1700906C3E /* Localizable.xcstrings */; };
 		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
 		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
@@ -54,6 +59,11 @@
 		F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCategorySymbols.swift; sourceTree = "<group>"; };
 		F6004F952DED3F43001183AE /* Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug.swift; sourceTree = "<group>"; };
 		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
+		F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmission.swift; sourceTree = "<group>"; };
+		F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmissionViewModel.swift; sourceTree = "<group>"; };
+		F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBusinessFormView.swift; sourceTree = "<group>"; };
+		F63E80802EFC302700ED1F00 /* MailComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposer.swift; sourceTree = "<group>"; };
+		F63E80822EFC554E00ED1F00 /* BusinessHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessHours.swift; sourceTree = "<group>"; };
 		F64093F42DE66D1700906C3E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
@@ -150,6 +160,8 @@
 		F66E0B7A2DE33EE600D68897 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F63E80822EFC554E00ED1F00 /* BusinessHours.swift */,
+				F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */,
 				F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */,
 				F66E0BAE2DE340CB00D68897 /* Element.swift */,
 			);
@@ -159,6 +171,7 @@
 		F66E0B7B2DE33EE600D68897 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -166,6 +179,7 @@
 		F66E0B802DE33EE600D68897 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */,
 				F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */,
 				F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */,
 				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
@@ -215,6 +229,7 @@
 		F66E0B972DE33F1200D68897 /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
+				F63E80802EFC302700ED1F00 /* MailComposer.swift */,
 				F6004F952DED3F43001183AE /* Debug.swift */,
 				F64093F42DE66D1700906C3E /* Localizable.xcstrings */,
 				F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */,
@@ -427,6 +442,7 @@
 				F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */,
 				F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */,
 				F6004F962DED3F43001183AE /* Debug.swift in Sources */,
+				F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */,
 				F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */,
 				F66E0B902DE33EF800D68897 /* CompactSettingsPopoverView.swift in Sources */,
 				F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */,
@@ -436,6 +452,7 @@
 				F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */,
 				F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */,
 				F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */,
+				F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */,
 				F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */,
 				F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */,
 				F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */,
@@ -446,8 +463,11 @@
 				F66E0BA92DE33F1200D68897 /* AboutView.swift in Sources */,
 				F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */,
 				F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */,
+				F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */,
+				F63E80832EFC554E00ED1F00 /* BusinessHours.swift in Sources */,
 				F66E0BAB2DE33F1200D68897 /* EarlierThaniOS170View.swift in Sources */,
 				F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */,
+				F63E80812EFC302700ED1F00 /* MailComposer.swift in Sources */,
 				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
