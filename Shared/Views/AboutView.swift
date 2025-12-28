@@ -51,8 +51,7 @@ struct AboutView: View {
                     Text("about_description")
                 }
                 // Contribute section
-                Section(header: Text("contribute_section"),
-                        footer: Text("contribute_footer")) {
+                Section(header: Text("contribute_section")) {
                     Button {
                         showingAddBusinessForm = true
                     } label: {

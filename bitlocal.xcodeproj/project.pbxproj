@@ -16,6 +16,14 @@
 		F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */; };
 		F63E80812EFC302700ED1F00 /* MailComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80802EFC302700ED1F00 /* MailComposer.swift */; };
 		F63E80832EFC554E00ED1F00 /* BusinessHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80822EFC554E00ED1F00 /* BusinessHours.swift */; };
+		F63E80852F017BE900ED1F00 /* BusinessSubmissionStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80842F017BE900ED1F00 /* BusinessSubmissionStep.swift */; };
+		F63E808B2F017C0800ED1F00 /* BusinessDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80862F017C0800ED1F00 /* BusinessDetailsView.swift */; };
+		F63E808C2F017C0800ED1F00 /* BusinessHoursView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80872F017C0800ED1F00 /* BusinessHoursView.swift */; };
+		F63E808E2F017C0800ED1F00 /* BusinessPaymentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80892F017C0800ED1F00 /* BusinessPaymentsView.swift */; };
+		F63E808F2F017C0800ED1F00 /* ReviewSubmissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E808A2F017C0800ED1F00 /* ReviewSubmissionView.swift */; };
+		F63E80932F0180EC00ED1F00 /* MapPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80922F0180EC00ED1F00 /* MapPreviewView.swift */; };
+		F63E80942F0180EC00ED1F00 /* LocationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80902F0180EC00ED1F00 /* LocationSearchView.swift */; };
+		F63E80952F0180EC00ED1F00 /* ManualLocationEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80912F0180EC00ED1F00 /* ManualLocationEntryView.swift */; };
 		F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F64093F42DE66D1700906C3E /* Localizable.xcstrings */; };
 		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
 		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
@@ -64,6 +72,14 @@
 		F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBusinessFormView.swift; sourceTree = "<group>"; };
 		F63E80802EFC302700ED1F00 /* MailComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposer.swift; sourceTree = "<group>"; };
 		F63E80822EFC554E00ED1F00 /* BusinessHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessHours.swift; sourceTree = "<group>"; };
+		F63E80842F017BE900ED1F00 /* BusinessSubmissionStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmissionStep.swift; sourceTree = "<group>"; };
+		F63E80862F017C0800ED1F00 /* BusinessDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessDetailsView.swift; sourceTree = "<group>"; };
+		F63E80872F017C0800ED1F00 /* BusinessHoursView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessHoursView.swift; sourceTree = "<group>"; };
+		F63E80892F017C0800ED1F00 /* BusinessPaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessPaymentsView.swift; sourceTree = "<group>"; };
+		F63E808A2F017C0800ED1F00 /* ReviewSubmissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewSubmissionView.swift; sourceTree = "<group>"; };
+		F63E80902F0180EC00ED1F00 /* LocationSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSearchView.swift; sourceTree = "<group>"; };
+		F63E80912F0180EC00ED1F00 /* ManualLocationEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualLocationEntryView.swift; sourceTree = "<group>"; };
+		F63E80922F0180EC00ED1F00 /* MapPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPreviewView.swift; sourceTree = "<group>"; };
 		F64093F42DE66D1700906C3E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
@@ -160,6 +176,7 @@
 		F66E0B7A2DE33EE600D68897 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F63E80842F017BE900ED1F00 /* BusinessSubmissionStep.swift */,
 				F63E80822EFC554E00ED1F00 /* BusinessHours.swift */,
 				F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */,
 				F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */,
@@ -179,6 +196,13 @@
 		F66E0B802DE33EE600D68897 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				F63E80902F0180EC00ED1F00 /* LocationSearchView.swift */,
+				F63E80912F0180EC00ED1F00 /* ManualLocationEntryView.swift */,
+				F63E80922F0180EC00ED1F00 /* MapPreviewView.swift */,
+				F63E80862F017C0800ED1F00 /* BusinessDetailsView.swift */,
+				F63E80872F017C0800ED1F00 /* BusinessHoursView.swift */,
+				F63E80892F017C0800ED1F00 /* BusinessPaymentsView.swift */,
+				F63E808A2F017C0800ED1F00 /* ReviewSubmissionView.swift */,
 				F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */,
 				F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */,
 				F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */,
@@ -431,6 +455,9 @@
 				F66E0BB12DE35B9100D68897 /* AppearanceManager.swift in Sources */,
 				F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */,
 				F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */,
+				F63E80932F0180EC00ED1F00 /* MapPreviewView.swift in Sources */,
+				F63E80942F0180EC00ED1F00 /* LocationSearchView.swift in Sources */,
+				F63E80952F0180EC00ED1F00 /* ManualLocationEntryView.swift in Sources */,
 				F66E0B732DE33ED800D68897 /* MapView.swift in Sources */,
 				F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */,
 				F66E0B752DE33ED800D68897 /* IPadLayoutView.swift in Sources */,
@@ -441,6 +468,7 @@
 				F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */,
 				F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */,
 				F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */,
+				F63E80852F017BE900ED1F00 /* BusinessSubmissionStep.swift in Sources */,
 				F6004F962DED3F43001183AE /* Debug.swift in Sources */,
 				F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */,
 				F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */,
@@ -451,6 +479,10 @@
 				F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */,
 				F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */,
 				F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */,
+				F63E808B2F017C0800ED1F00 /* BusinessDetailsView.swift in Sources */,
+				F63E808C2F017C0800ED1F00 /* BusinessHoursView.swift in Sources */,
+				F63E808E2F017C0800ED1F00 /* BusinessPaymentsView.swift in Sources */,
+				F63E808F2F017C0800ED1F00 /* ReviewSubmissionView.swift in Sources */,
 				F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */,
 				F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */,
 				F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */,

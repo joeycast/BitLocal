@@ -43,6 +43,15 @@ class BusinessSubmissionViewModel: ObservableObject {
         lines.append("Relationship: \(submission.relationship.rawValue)")
         lines.append("")
 
+        // Coordinates
+        if let lat = submission.latitude, let lon = submission.longitude {
+            lines.append("=== COORDINATES ===")
+            lines.append("Latitude: \(lat)")
+            lines.append("Longitude: \(lon)")
+            lines.append("OSM URL: https://www.openstreetmap.org/?mlat=\(lat)&mlon=\(lon)#map=18/\(lat)/\(lon)")
+            lines.append("")
+        }
+
         // OpenStreetMap tags
         lines.append("=== OPENSTREETMAP TAGS ===")
 
@@ -89,6 +98,21 @@ class BusinessSubmissionViewModel: ObservableObject {
 
         // Business name
         lines.append("name=\(submission.businessName)")
+
+        // Feature type
+        if submission.osmFeatureType == .custom {
+            let customTag = submission.osmCustomTag.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !customTag.isEmpty {
+                if customTag.contains("=") {
+                    lines.append(customTag)
+                } else {
+                    lines.append("custom_category=\(customTag)")
+                }
+            }
+        } else if let key = submission.osmFeatureType.osmTagKey,
+                  let value = submission.osmFeatureType.osmTagValue {
+            lines.append("\(key)=\(value)")
+        }
 
         // Opening hours
         let hoursString = submission.weeklyHours.toOSMFormat()

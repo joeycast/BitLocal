@@ -110,4 +110,8 @@ struct WeeklyHours: Codable, Equatable {
 
         return formattedSegments.joined(separator: "; ")
     }
+
+    var hasAnyOpen: Bool {
+        Weekday.allCases.contains { self[$0].isOpen }
+    }
 }

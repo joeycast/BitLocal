@@ -4,30 +4,92 @@ import SwiftUI
 struct AddBusinessFormView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = BusinessSubmissionViewModel()
+    @State private var currentStep: BusinessSubmissionStep = .location
 
     var body: some View {
         NavigationView {
-            Form {
-                submitterSection
-                businessInfoSection
-                addressSection
-                contactSection
-                hoursSection
-                bitcoinPaymentSection
+            VStack(spacing: 0) {
+                stepIndicator
+
+                ZStack(alignment: .bottom) {
+                    Group {
+                        switch currentStep {
+                        case .location:
+                            LocationSearchView(
+                                submission: $viewModel.submission
+                            )
+                        case .details:
+                            BusinessDetailsView(
+                                submission: $viewModel.submission
+                            )
+                        case .payments:
+                            BusinessPaymentsView(
+                                submission: $viewModel.submission
+                            )
+                        case .hours:
+                            BusinessHoursView(
+                                submission: $viewModel.submission
+                            )
+                        case .review:
+                            ReviewSubmissionView(
+                                submission: $viewModel.submission
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    HStack {
+                        if currentStep != .location {
+                            Button(action: { goToPreviousStep() }) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 56, height: 56)
+                                    .background(Color.gray.opacity(0.7))
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                            }
+                        }
+
+                        Spacer()
+
+                        if currentStep == .review {
+                            Button(action: { submitForm() }) {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 56, height: 56)
+                                    .background(canSubmit ? Color.accentColor : Color.gray.opacity(0.5))
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                            }
+                            .disabled(!canSubmit)
+                        } else {
+                            Button(action: { goToNextStep() }) {
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 56, height: 56)
+                                    .background(canContinue ? Color.accentColor : Color.gray.opacity(0.5))
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                            }
+                            .disabled(!canContinue)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                    .safeAreaPadding(.bottom, 8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .navigationTitle(Text("add_business_form_title"))
+            .navigationTitle(currentStep.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("cancel_button") {
                         dismiss()
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("submit_button") {
-                        viewModel.validateAndSubmit()
-                    }
-                    .bold()
                 }
             }
             .sheet(isPresented: $viewModel.showingMailComposer) {
@@ -48,249 +110,62 @@ struct AddBusinessFormView: View {
                 Text(validationErrorMessage())
             }
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .interactiveDismissDisabled()
     }
 
-    private var submitterSection: some View {
-        Section {
-            TextField(text: $viewModel.submission.submitterName) {
-                Text("submitter_name_label")
-            }
-            TextField(text: $viewModel.submission.submitterEmail) {
-                Text("submitter_email_label")
-            }
-            .keyboardType(.emailAddress)
-            .textContentType(.emailAddress)
-            .autocapitalization(.none)
+    private var stepIndicator: some View {
+        VStack(spacing: 4) {
+            // Progress circles and lines
+            HStack(spacing: 0) {
+                ForEach(BusinessSubmissionStep.allCases, id: \.self) { step in
+                    VStack(spacing: 4) {
+                        Circle()
+                            .fill(step.rawValue <= currentStep.rawValue ? Color.accentColor : Color.gray.opacity(0.3))
+                            .frame(width: 10, height: 10)
 
-            Picker(selection: $viewModel.submission.relationship) {
-                ForEach(BusinessSubmission.SubmitterRelationship.allCases, id: \.self) { relationship in
-                    Text(LocalizedStringKey(relationship.localizedKey))
-                        .tag(relationship)
-                }
-            } label: {
-                Text("submitter_relationship_label")
-            }
-        } header: {
-            Text("submitter_section_header")
-        } footer: {
-            Text("submitter_section_footer")
-        }
-    }
-
-    private var businessInfoSection: some View {
-        Section {
-            TextField(text: $viewModel.submission.businessName) {
-                Text("business_name_label")
-            }
-            TextField(text: $viewModel.submission.businessDescription, axis: .vertical) {
-                Text("business_description_label")
-            }
-            .lineLimit(3...6)
-        } header: {
-            Text("business_info_section_header")
-        }
-    }
-
-    private var addressSection: some View {
-        Section {
-            HStack(spacing: 8) {
-                TextField(text: $viewModel.submission.streetNumber) {
-                    Text("street_number_label")
-                }
-                .keyboardType(.numbersAndPunctuation)
-                .frame(maxWidth: 80)
-
-                TextField(text: $viewModel.submission.streetName) {
-                    Text("street_name_label")
-                }
-            }
-
-            TextField(text: $viewModel.submission.city) {
-                Text("city_label")
-            }
-
-            TextField(text: $viewModel.submission.stateProvince) {
-                Text("state_province_label")
-            }
-
-            TextField(text: $viewModel.submission.country) {
-                Text("country_label")
-            }
-
-            TextField(text: $viewModel.submission.postalCode) {
-                Text("postal_code_label")
-            }
-            .keyboardType(.numbersAndPunctuation)
-        } header: {
-            Text("address_section_header")
-        }
-    }
-
-    private var contactSection: some View {
-        Section {
-            HStack(spacing: 8) {
-                TextField(text: $viewModel.submission.phoneCountryCode) {
-                    Text("+1")
-                }
-                .keyboardType(.phonePad)
-                .frame(maxWidth: 60)
-
-                TextField(text: $viewModel.submission.phoneNumber) {
-                    Text("phone_number_label")
-                }
-                .keyboardType(.phonePad)
-            }
-
-            TextField(text: $viewModel.submission.website) {
-                Text("website_label")
-            }
-            .keyboardType(.URL)
-            .textContentType(.URL)
-            .autocapitalization(.none)
-        } header: {
-            Text("contact_section_header")
-        }
-    }
-
-    private var hoursSection: some View {
-        Section {
-            ForEach(WeeklyHours.Weekday.allCases, id: \.self) { day in
-                let dayHours = dayHoursBinding(for: day)
-                
-                VStack(spacing: 0) {
-                    // Header Row: Day Name + Open/Close
-                    HStack {
-                        Text(LocalizedStringKey(day.localizedKey))
-                            .font(.system(.body, design: .rounded))
-                            .bold()
-                            .foregroundColor(dayHours.isOpen.wrappedValue ? .primary : .secondary)
-
-                        Spacer()
-
-                        Picker(selection: dayHours.isOpen) {
-                            Text("hours_closed").tag(false)
-                            Text("hours_open").tag(true)
-                        } label: {
-                            EmptyView()
-                        }
-                        .pickerStyle(.segmented)
-                        .fixedSize()
+                        Text(step.title)
+                            .font(.caption2)
+                            .foregroundColor(step == currentStep ? .primary : .secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 60)
+                            .lineLimit(2)
                     }
-                    .padding(.vertical, 4)
 
-                    // Time Picker Row (Visible only if Open)
-                    if dayHours.isOpen.wrappedValue {
-                        
-                        HStack {
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .center, spacing: 2) {
-                                Text("hours_open")
-                                    .font(.caption2)
-                                    .textCase(.uppercase)
-                                    .foregroundColor(.secondary)
-                                DatePicker(selection: dayHours.openTime, displayedComponents: .hourAndMinute) {
-                                    EmptyView()
-                                }
-                                .labelsHidden()
-                            }
-
-                            Image(systemName: "arrow.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 10) // Align visually with picker text
-
-                            VStack(alignment: .center, spacing: 2) {
-                                Text("hours_close")
-                                    .font(.caption2)
-                                    .textCase(.uppercase)
-                                    .foregroundColor(.secondary)
-                                DatePicker(selection: dayHours.closeTime, displayedComponents: .hourAndMinute) {
-                                    EmptyView()
-                                }
-                                .labelsHidden()
-                            }
-                            
-                            Spacer()
-
-                        }
-                        .padding(.vertical, 4)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                    if step != BusinessSubmissionStep.allCases.last {
+                        Rectangle()
+                            .fill(step.rawValue < currentStep.rawValue ? Color.accentColor : Color.gray.opacity(0.3))
+                            .frame(height: 2)
+                            .padding(.bottom, 20)
                     }
                 }
-                .animation(.snappy, value: dayHours.isOpen.wrappedValue)
             }
-        } header: {
-            HStack {
-                Text("business_hours_section_header")
-            }
-        } 
-    }
-
-    private func dayHoursBinding(for day: WeeklyHours.Weekday) -> Binding<DayHours> {
-        Binding(
-            get: { viewModel.submission.weeklyHours[day] },
-            set: { newValue in
-                viewModel.submission.weeklyHours[day] = newValue
-            }
-        )
-    }
-
-    private var bitcoinPaymentSection: some View {
-        Section {
-            HStack {
-                Text("payment_onchain_label")
-                    .font(.body)
-
-                Spacer()
-
-                Picker(selection: $viewModel.submission.acceptsOnChain) {
-                    Text("payment_not_accepted").tag(false)
-                    Text("payment_accepted").tag(true)
-                } label: {
-                    EmptyView()
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
-
-            HStack {
-                Text("payment_lightning_label")
-                    .font(.body)
-
-                Spacer()
-
-                Picker(selection: $viewModel.submission.acceptsLightning) {
-                    Text("payment_not_accepted").tag(false)
-                    Text("payment_accepted").tag(true)
-                } label: {
-                    EmptyView()
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
-
-            HStack {
-                Text("payment_lightning_contactless_label")
-                    .font(.body)
-
-                Spacer()
-
-                Picker(selection: $viewModel.submission.acceptsContactlessLightning) {
-                    Text("payment_not_accepted").tag(false)
-                    Text("payment_accepted").tag(true)
-                } label: {
-                    EmptyView()
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
-        } header: {
-            Text("bitcoin_payment_section_header")
-        } footer: {
-            Text("bitcoin_payment_section_footer")
+            .padding(.horizontal)
         }
+        .padding(.vertical, 12)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func goToNextStep() {
+        guard let nextStep = BusinessSubmissionStep(rawValue: currentStep.rawValue + 1) else {
+            return
+        }
+        withAnimation {
+            currentStep = nextStep
+        }
+    }
+
+    private func goToPreviousStep() {
+        guard let previousStep = BusinessSubmissionStep(rawValue: currentStep.rawValue - 1) else {
+            return
+        }
+        withAnimation {
+            currentStep = previousStep
+        }
+    }
+
+    private func submitForm() {
+        viewModel.validateAndSubmit()
     }
 
     private func validationErrorMessage() -> String {
@@ -304,5 +179,25 @@ struct AddBusinessFormView: View {
             }
         }
         return errorMessages.joined(separator: "\n")
+    }
+
+    private var canContinue: Bool {
+        switch currentStep {
+        case .location:
+            return viewModel.submission.latitude != nil && viewModel.submission.longitude != nil
+        case .details:
+            return true // Optional step
+        case .payments:
+            return viewModel.submission.hasAtLeastOneBitcoinPayment
+        case .hours:
+            return true // Optional step
+        case .review:
+            return false // Uses canSubmit
+        }
+    }
+
+    private var canSubmit: Bool {
+        !viewModel.submission.submitterName.isEmpty &&
+        viewModel.submission.isValidEmail(viewModel.submission.submitterEmail)
     }
 }
