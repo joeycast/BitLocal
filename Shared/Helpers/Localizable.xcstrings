@@ -5662,186 +5662,6 @@
         }
       }
     },
-    "osm_custom_tag_footer" : {
-      "comment" : "Helper text for custom OSM tag input",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwende den genauen OpenStreetMap-Tag-Schlüssel und -Wert."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use the exact OpenStreetMap tag key and value."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa la clave y el valor exactos de la etiqueta de OpenStreetMap."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa la clave y el valor exactos de la etiqueta de OpenStreetMap."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisez la clé et la valeur exactes du tag OpenStreetMap."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisez la clé et la valeur exactes du tag OpenStreetMap."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa la chiave e il valore esatti del tag OpenStreetMap."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gebruik de exacte OpenStreetMap-tagkey en -waarde."
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ใช้คีย์และค่าของแท็ก OpenStreetMap ที่ตรงตามจริง"
-          }
-        }
-      }
-    },
-    "osm_custom_tag_key_label" : {
-      "comment" : "Label for custom OSM tag key",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tag-Schlüssel"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tag key"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clave de etiqueta"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clave de etiqueta"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé du tag"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé du tag"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chiave del tag"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tag-sleutel"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "คีย์แท็ก"
-          }
-        }
-      }
-    },
-    "osm_custom_tag_key_placeholder" : {
-      "comment" : "Placeholder for custom OSM tag key",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "z. B. shop"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "e.g. shop"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ej., shop"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ej., shop"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ex., shop"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ex., shop"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "es. shop"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "bijv. shop"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "เช่น shop"
-          }
-        }
-      }
-    },
     "osm_custom_tag_label" : {
       "comment" : "Label for custom OSM tag input",
       "extractionState" : "manual",
@@ -5909,175 +5729,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "z. B. shop=music"
+            "value" : "z. B. Trommelbauer"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "e.g. shop=music"
+            "value" : "e.g. drum maker"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "p. ej., shop=music"
+            "value" : "p. ej., fabricante de tambores"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "p. ej., shop=music"
+            "value" : "p. ej., fabricante de tambores"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "p. ex., shop=music"
+            "value" : "p. ex., fabricant de tambours"
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "p. ex., shop=music"
+            "value" : "p. ex., fabricant de tambours"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "es. shop=music"
+            "value" : "es. produttore di tamburi"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bijv. shop=music"
+            "value" : "bijv. trommelmaker"
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "เช่น shop=music"
-          }
-        }
-      }
-    },
-    "osm_custom_tag_value_label" : {
-      "comment" : "Label for custom OSM tag value",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tag-Wert"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tag value"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valor de etiqueta"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valor de etiqueta"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valeur du tag"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valeur du tag"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valore del tag"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tagwaarde"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ค่าแท็ก"
-          }
-        }
-      }
-    },
-    "osm_custom_tag_value_placeholder" : {
-      "comment" : "Placeholder for custom OSM tag value",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "z. B. music"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "e.g. music"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ej., music"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ej., music"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ex., music"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "p. ex., music"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "es. music"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "bijv. music"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "เช่น music"
+            "value" : "เช่น ช่างทำกลอง"
           }
         }
       }
@@ -11069,55 +10769,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nicht festgelegt"
+            "value" : "Unbekannt"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not set"
+            "value" : "Unknown"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No establecido"
+            "value" : "Desconocido"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No establecido"
+            "value" : "Desconocido"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non défini"
+            "value" : "Inconnu"
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non défini"
+            "value" : "Inconnu"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non impostato"
+            "value" : "Sconosciuto"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niet ingesteld"
+            "value" : "Onbekend"
           }
         },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ไม่ได้ตั้งค่า"
+            "value" : "ไม่ทราบ"
           }
         }
       }

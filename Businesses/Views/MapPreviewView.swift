@@ -74,10 +74,9 @@ struct MapPreviewView: UIViewRepresentable {
                 annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
                 annotationView?.isDraggable = true
                 annotationView?.canShowCallout = false
-                annotationView?.markerTintColor = .systemRed
-            } else {
-                annotationView?.annotation = annotation
             }
+            annotationView?.annotation = annotation
+            annotationView?.markerTintColor = UIColor(named: "MarkerColor") ?? .systemRed
 
             return annotationView
         }

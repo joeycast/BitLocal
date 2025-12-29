@@ -31,12 +31,8 @@ struct BusinessDetailsView: View {
                         Text("osm_feature_type_label")
                     }
                     .pickerStyle(.menu)
-                } header: {
-                    Text("business_category_section_header")
-                }
 
-                if submission.osmFeatureType == .custom {
-                    Section {
+                    if submission.osmFeatureType == .custom {
                         TextField(
                             text: $submission.osmCustomTag,
                             prompt: Text("osm_custom_tag_placeholder")
@@ -44,6 +40,8 @@ struct BusinessDetailsView: View {
                             Text("osm_custom_tag_label")
                         }
                     }
+                } header: {
+                    Text("business_category_section_header")
                 }
 
                 Section {
