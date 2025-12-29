@@ -48,23 +48,6 @@ import CoreLocation
 //    }
 //}
 
-//
-extension CLLocationCoordinate2D: Equatable {
-    public static func == (lhs: CLLocationCoordinate2D, rhs: CLLocationCoordinate2D) -> Bool {
-        return lhs.latitude == rhs.latitude && lhs.longitude == rhs.longitude
-    }
-}
-
-
-//
-extension MKCoordinateRegion: Equatable {
-    public static func == (lhs: MKCoordinateRegion, rhs: MKCoordinateRegion) -> Bool {
-        return lhs.center == rhs.center &&
-        lhs.span.latitudeDelta == rhs.span.latitudeDelta &&
-        lhs.span.longitudeDelta == rhs.span.longitudeDelta
-    }
-}
-
 // Determine topmost view for displaying alerts
 extension UIViewController {
     func topMostViewController() -> UIViewController {
