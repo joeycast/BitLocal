@@ -521,6 +521,103 @@ extension BusinessSubmission {
         return errors
     }
 
+    func emailBody() -> String {
+        var lines: [String] = []
+
+        // Submitter info (not OSM tags, just context)
+        lines.append("=== SUBMITTER INFORMATION ===")
+        lines.append("Name: \(submitterName)")
+        lines.append("Email: \(submitterEmail)")
+        lines.append("Relationship: \(relationship.rawValue)")
+        lines.append("")
+
+        // Coordinates
+        if let lat = latitude, let lon = longitude {
+            lines.append("=== COORDINATES ===")
+            lines.append("Latitude: \(lat)")
+            lines.append("Longitude: \(lon)")
+            lines.append("OSM URL: https://www.openstreetmap.org/?mlat=\(lat)&mlon=\(lon)#map=18/\(lat)/\(lon)")
+            lines.append("")
+        }
+
+        // OpenStreetMap tags
+        lines.append("=== OPENSTREETMAP TAGS ===")
+
+        // Address
+        if !city.isEmpty {
+            lines.append("addr:city=\(city)")
+        }
+        if !streetNumber.isEmpty {
+            lines.append("addr:housenumber=\(streetNumber)")
+        }
+        if !postalCode.isEmpty {
+            lines.append("addr:postcode=\(postalCode)")
+        }
+        if !stateProvince.isEmpty {
+            lines.append("addr:state=\(stateProvince)")
+        }
+        if !streetName.isEmpty {
+            lines.append("addr:street=\(streetName)")
+        }
+
+        // Add check_date (today's date)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let today = dateFormatter.string(from: Date())
+        lines.append("check_date=\(today)")
+        lines.append("check_date:currency:XBT=\(today)")
+
+        // Contact info
+        if !phoneNumber.isEmpty {
+            let fullPhone = "\(phoneCountryCode)\(phoneNumber)"
+            lines.append("contact:phone=\(fullPhone)")
+        }
+        if let websiteURL = website.cleanedWebsiteURL() {
+            lines.append("contact:website=\(websiteURL.absoluteString)")
+        }
+
+        // Currency and payment
+        lines.append("currency:XBT=yes")
+
+        // Description
+        if !businessDescription.isEmpty {
+            lines.append("description=\(businessDescription)")
+        }
+
+        // Business name
+        lines.append("name=\(businessName)")
+
+        // Feature type
+        if osmFeatureType == .custom {
+            let customTag = osmCustomTag.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !customTag.isEmpty {
+                if customTag.contains("=") {
+                    lines.append(customTag)
+                } else {
+                    lines.append("custom_category=\(customTag)")
+                }
+            }
+        } else if let key = osmFeatureType.osmTagKey,
+                  let value = osmFeatureType.osmTagValue {
+            lines.append("\(key)=\(value)")
+        }
+
+        // Opening hours
+        let hoursString = weeklyHours.toOSMFormat()
+        if !hoursString.isEmpty {
+            lines.append("opening_hours=\(hoursString)")
+        }
+
+        // Payment methods
+        lines.append("payment:lightning=\(acceptsLightning ? "yes" : "no")")
+        if acceptsContactlessLightning {
+            lines.append("payment:lightning_contactless=yes")
+        }
+        lines.append("payment:onchain=\(acceptsOnChain ? "yes" : "no")")
+
+        return lines.joined(separator: "\n")
+    }
+
     enum ValidationError: Identifiable {
         case missingField(String)
         case invalidEmail

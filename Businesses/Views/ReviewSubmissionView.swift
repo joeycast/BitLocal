@@ -8,6 +8,15 @@ struct ReviewSubmissionView: View {
         Form {
             submitterSection
             reviewSection
+#if DEBUG
+            Section {
+                Text(submission.emailBody())
+                    .font(.caption)
+                    .textSelection(.enabled)
+            } header: {
+                Text("Debug Email Preview")
+            }
+#endif
         }
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 96)

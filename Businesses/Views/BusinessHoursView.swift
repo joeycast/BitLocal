@@ -42,7 +42,6 @@ struct BusinessHoursView: View {
 
                     if hoursPreset == .allWeek || hoursPreset == .weekdaysOnly {
                         HStack {
-                            Spacer()
 
                             VStack(alignment: .center, spacing: 2) {
                                 Text("hours_open")
@@ -54,12 +53,16 @@ struct BusinessHoursView: View {
                                 }
                                 .labelsHidden()
                             }
-
+                            
+                            Spacer()
+                            
                             Image(systemName: "arrow.right")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .padding(.top, 10)
-
+                            
+                            Spacer()
+                            
                             VStack(alignment: .center, spacing: 2) {
                                 Text("hours_close")
                                     .font(.caption2)
@@ -71,7 +74,6 @@ struct BusinessHoursView: View {
                                 .labelsHidden()
                             }
 
-                            Spacer()
                         }
                         .padding(.vertical, 4)
                         .onChange(of: presetOpenTime) { _, _ in applyPreset(hoursPreset) }
@@ -119,7 +121,6 @@ struct BusinessHoursView: View {
 
                     if dayHours.isOpen.wrappedValue {
                         HStack {
-                            Spacer()
 
                             VStack(alignment: .center, spacing: 2) {
                                 Text("hours_open")

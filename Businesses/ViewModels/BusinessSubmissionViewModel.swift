@@ -30,104 +30,12 @@ class BusinessSubmissionViewModel: ObservableObject {
     }
 
     func emailSubject() -> String {
-        "New Business Submission: \(submission.businessName)"
+        let name = submission.businessName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "New BitLocal Business Submission" : "New BitLocal Business Submission: \(name)"
     }
 
     func emailBody() -> String {
-        var lines: [String] = []
-
-        // Submitter info (not OSM tags, just context)
-        lines.append("=== SUBMITTER INFORMATION ===")
-        lines.append("Name: \(submission.submitterName)")
-        lines.append("Email: \(submission.submitterEmail)")
-        lines.append("Relationship: \(submission.relationship.rawValue)")
-        lines.append("")
-
-        // Coordinates
-        if let lat = submission.latitude, let lon = submission.longitude {
-            lines.append("=== COORDINATES ===")
-            lines.append("Latitude: \(lat)")
-            lines.append("Longitude: \(lon)")
-            lines.append("OSM URL: https://www.openstreetmap.org/?mlat=\(lat)&mlon=\(lon)#map=18/\(lat)/\(lon)")
-            lines.append("")
-        }
-
-        // OpenStreetMap tags
-        lines.append("=== OPENSTREETMAP TAGS ===")
-
-        // Address
-        if !submission.city.isEmpty {
-            lines.append("addr:city=\(submission.city)")
-        }
-        if !submission.streetNumber.isEmpty {
-            lines.append("addr:housenumber=\(submission.streetNumber)")
-        }
-        if !submission.postalCode.isEmpty {
-            lines.append("addr:postcode=\(submission.postalCode)")
-        }
-        if !submission.stateProvince.isEmpty {
-            lines.append("addr:state=\(submission.stateProvince)")
-        }
-        if !submission.streetName.isEmpty {
-            lines.append("addr:street=\(submission.streetName)")
-        }
-
-        // Add check_date (today's date)
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let today = dateFormatter.string(from: Date())
-        lines.append("check_date=\(today)")
-        lines.append("check_date:currency:XBT=\(today)")
-
-        // Contact info
-        if !submission.phoneNumber.isEmpty {
-            let fullPhone = "\(submission.phoneCountryCode)\(submission.phoneNumber)"
-            lines.append("contact:phone=\(fullPhone)")
-        }
-        if let websiteURL = submission.website.cleanedWebsiteURL() {
-            lines.append("contact:website=\(websiteURL.absoluteString)")
-        }
-
-        // Currency and payment
-        lines.append("currency:XBT=yes")
-
-        // Description
-        if !submission.businessDescription.isEmpty {
-            lines.append("description=\(submission.businessDescription)")
-        }
-
-        // Business name
-        lines.append("name=\(submission.businessName)")
-
-        // Feature type
-        if submission.osmFeatureType == .custom {
-            let customTag = submission.osmCustomTag.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !customTag.isEmpty {
-                if customTag.contains("=") {
-                    lines.append(customTag)
-                } else {
-                    lines.append("custom_category=\(customTag)")
-                }
-            }
-        } else if let key = submission.osmFeatureType.osmTagKey,
-                  let value = submission.osmFeatureType.osmTagValue {
-            lines.append("\(key)=\(value)")
-        }
-
-        // Opening hours
-        let hoursString = submission.weeklyHours.toOSMFormat()
-        if !hoursString.isEmpty {
-            lines.append("opening_hours=\(hoursString)")
-        }
-
-        // Payment methods
-        lines.append("payment:lightning=\(submission.acceptsLightning ? "yes" : "no")")
-        if submission.acceptsContactlessLightning {
-            lines.append("payment:lightning_contactless=yes")
-        }
-        lines.append("payment:onchain=\(submission.acceptsOnChain ? "yes" : "no")")
-
-        return lines.joined(separator: "\n")
+        submission.emailBody()
     }
 
     private func openMailtoURL() {
