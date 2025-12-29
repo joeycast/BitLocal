@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import UIKit
 
 @available(iOS 17.0, *)
 struct MapButtonsView: View {
@@ -39,38 +40,20 @@ struct MapButtonsView: View {
             
             // 🧭 Locate-me button - FIXED VERSION
             Button {
-                if let currentLoc = viewModel.userLocation {
-                    // 1️⃣ FIXED: Use the new centerMapToUserLocation method that forces centering
-                    viewModel.centerMapToUserLocation()
-                    
-                } else {
-                    // 2️⃣ Otherwise, ask for permission and wait for onReceive to fire
-                    viewModel.locationManager.requestWhenInUseAuthorization()
-                    viewModel.isUpdatingLocation = true
-                    viewModel.locationManager.startUpdatingLocation()
-                    shouldCenterOnLocation = true
-                    
-                    // Optional: your existing timeout logic
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                        guard viewModel.isUpdatingLocation else { return }
-                        let alert = UIAlertController(
-                            title: NSLocalizedString("location_alert_title", comment: ""),
-                            message: nil,
-                            preferredStyle: .alert
-                        )
-                        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
-                                              style: .default))
-                        if let windowScene = UIApplication.shared.connectedScenes
-                            .first as? UIWindowScene,
-                           let rootVC = windowScene.windows.first?.rootViewController
-                        {
-                            rootVC.topMostViewController()
-                                .present(alert, animated: true)
-                        }
-                        viewModel.locationManager.stopUpdatingLocation()
-                        viewModel.isUpdatingLocation = false
-                        shouldCenterOnLocation = false
+                switch viewModel.locationManager.authorizationStatus {
+                case .denied, .restricted:
+                    presentLocationSettingsAlert()
+                case .notDetermined:
+                    requestAndCenterOnNextLocation()
+                case .authorizedAlways, .authorizedWhenInUse:
+                    if viewModel.userLocation != nil {
+                        // Use the new centerMapToUserLocation method that forces centering.
+                        viewModel.centerMapToUserLocation()
+                    } else {
+                        requestAndCenterOnNextLocation()
                     }
+                @unknown default:
+                    requestAndCenterOnNextLocation()
                 }
             } label: {
                 ZStack {
@@ -91,6 +74,61 @@ struct MapButtonsView: View {
             shouldCenterOnLocation = false
             viewModel.locationManager.stopUpdatingLocation()
             viewModel.isUpdatingLocation = false
+        }
+    }
+
+    private func requestAndCenterOnNextLocation() {
+        viewModel.locationManager.requestWhenInUseAuthorization()
+        viewModel.isUpdatingLocation = true
+        viewModel.locationManager.startUpdatingLocation()
+        shouldCenterOnLocation = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            guard viewModel.isUpdatingLocation else { return }
+            presentLocationTimeoutAlert()
+            viewModel.locationManager.stopUpdatingLocation()
+            viewModel.isUpdatingLocation = false
+            shouldCenterOnLocation = false
+        }
+    }
+
+    private func presentLocationTimeoutAlert() {
+        let alert = UIAlertController(
+            title: NSLocalizedString("location_alert_title", comment: ""),
+            message: nil,
+            preferredStyle: .alert
+        )
+        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
+                              style: .default))
+        presentAlert(alert)
+    }
+
+    private func presentLocationSettingsAlert() {
+        let alert = UIAlertController(
+            title: NSLocalizedString("location_alert_title", comment: ""),
+            message: NSLocalizedString("location_settings_message", comment: ""),
+            preferredStyle: .alert
+        )
+        alert.addAction(.init(title: NSLocalizedString("open_settings_button", comment: ""),
+                              style: .default,
+                              handler: { _ in
+                                  guard let settingsURL = URL(string: UIApplication.openSettingsURLString),
+                                        UIApplication.shared.canOpenURL(settingsURL) else {
+                                      return
+                                  }
+                                  UIApplication.shared.open(settingsURL)
+                              }))
+        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
+                              style: .cancel))
+        presentAlert(alert)
+    }
+
+    private func presentAlert(_ alert: UIAlertController) {
+        if let windowScene = UIApplication.shared.connectedScenes
+            .first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            rootVC.topMostViewController()
+                .present(alert, animated: true)
         }
     }
 }

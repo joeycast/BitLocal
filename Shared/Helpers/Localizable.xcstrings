@@ -3809,6 +3809,66 @@
         }
       }
     },
+    "location_settings_message" : {
+      "comment" : "Alert message directing users to enable Location in Settings",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gehe zu Einstellungen > Apps > BitLocal > Standort, um den Zugriff zu erlauben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Settings > Apps > BitLocal > Location to enable access."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ve a Ajustes > Apps > BitLocal > Ubicación para habilitar el acceso."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ve a Ajustes > Apps > BitLocal > Ubicación para habilitar el acceso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allez dans Réglages > Apps > BitLocal > Localisation pour activer l’accès."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allez dans Réglages > Apps > BitLocal > Localisation pour activer l’accès."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vai su Impostazioni > App > BitLocal > Posizione per abilitare l’accesso."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ga naar Instellingen > Apps > BitLocal > Locatie om toegang in te schakelen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไปที่ การตั้งค่า > แอป > BitLocal > ตำแหน่ง เพื่อเปิดการเข้าถึง"
+          }
+        }
+      }
+    },
     "locations_returned_footer" : {
       "comment" : "Footer: N locations returned, top M displayed",
       "localizations" : {
