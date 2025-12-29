@@ -24,6 +24,7 @@
 		F63E80932F0180EC00ED1F00 /* MapPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80922F0180EC00ED1F00 /* MapPreviewView.swift */; };
 		F63E80942F0180EC00ED1F00 /* LocationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80902F0180EC00ED1F00 /* LocationSearchView.swift */; };
 		F63E80952F0180EC00ED1F00 /* ManualLocationEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80912F0180EC00ED1F00 /* ManualLocationEntryView.swift */; };
+		F63E80972F02F97700ED1F00 /* SPEC.md in Resources */ = {isa = PBXBuildFile; fileRef = F63E80962F02F97700ED1F00 /* SPEC.md */; };
 		F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F64093F42DE66D1700906C3E /* Localizable.xcstrings */; };
 		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
 		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
@@ -80,6 +81,7 @@
 		F63E80902F0180EC00ED1F00 /* LocationSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSearchView.swift; sourceTree = "<group>"; };
 		F63E80912F0180EC00ED1F00 /* ManualLocationEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualLocationEntryView.swift; sourceTree = "<group>"; };
 		F63E80922F0180EC00ED1F00 /* MapPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPreviewView.swift; sourceTree = "<group>"; };
+		F63E80962F02F97700ED1F00 /* SPEC.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SPEC.md; sourceTree = "<group>"; };
 		F64093F42DE66D1700906C3E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
@@ -317,6 +319,7 @@
 		F6B565B62DA322FD00EE992E = {
 			isa = PBXGroup;
 			children = (
+				F63E80962F02F97700ED1F00 /* SPEC.md */,
 				F6EFC28F2DE6A06F00D573E1 /* Onboarding */,
 				F66E0BA12DE33F1200D68897 /* Shared */,
 				F66E0B722DE33ED800D68897 /* Map */,
@@ -439,6 +442,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F67937782DE206F000A49AC3 /* LICENSE in Resources */,
+				F63E80972F02F97700ED1F00 /* SPEC.md in Resources */,
 				F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */,
 				F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */,
 				F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */,
