@@ -89,9 +89,6 @@ struct BusinessHoursView: View {
                     customHoursSection
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: 84)
-            }
     }
 
     private var customHoursSection: some View {

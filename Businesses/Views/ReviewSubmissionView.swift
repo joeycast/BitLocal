@@ -18,9 +18,6 @@ struct ReviewSubmissionView: View {
             }
 #endif
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 96)
-        }
     }
 
     private var submitterSection: some View {

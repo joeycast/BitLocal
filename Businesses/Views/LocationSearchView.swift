@@ -108,9 +108,6 @@ struct LocationSearchView: View {
 
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 96)
-        }
         .sheet(isPresented: $showingManualEntry) {
             ManualLocationEntryView(
                 submission: $submission,
@@ -206,9 +203,6 @@ struct LocationSearchView: View {
                     }
                 }
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 96)
         }
     }
 }

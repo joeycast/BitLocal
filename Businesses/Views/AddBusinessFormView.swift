@@ -5,6 +5,10 @@ struct AddBusinessFormView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = BusinessSubmissionViewModel()
     @State private var currentStep: BusinessSubmissionStep = .location
+    private let actionButtonSize: CGFloat = 56
+    private let actionBarBottomPadding: CGFloat = 12
+    private let actionBarSafeAreaPadding: CGFloat = 8
+    private let contentBottomClearance: CGFloat = 12
 
     var body: some View {
         NavigationView {
@@ -37,6 +41,9 @@ struct AddBusinessFormView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .safeAreaInset(edge: .bottom) {
+                        Color.clear.frame(height: contentBottomInset)
+                    }
 
                     HStack {
                         if currentStep != .location {
@@ -44,7 +51,7 @@ struct AddBusinessFormView: View {
                                 Image(systemName: "chevron.left")
                                     .font(.system(size: 20, weight: .semibold))
                                     .foregroundColor(.white)
-                                    .frame(width: 56, height: 56)
+                                    .frame(width: actionButtonSize, height: actionButtonSize)
                                     .background(Color.gray.opacity(0.7))
                                     .clipShape(Circle())
                                     .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
@@ -58,7 +65,7 @@ struct AddBusinessFormView: View {
                                 Image(systemName: "paperplane.fill")
                                     .font(.system(size: 20, weight: .semibold))
                                     .foregroundColor(.white)
-                                    .frame(width: 56, height: 56)
+                                    .frame(width: actionButtonSize, height: actionButtonSize)
                                     .background(canSubmit ? Color.accentColor : Color.gray.opacity(0.5))
                                     .clipShape(Circle())
                                     .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
@@ -69,7 +76,7 @@ struct AddBusinessFormView: View {
                                 Image(systemName: "arrow.right")
                                     .font(.system(size: 20, weight: .semibold))
                                     .foregroundColor(.white)
-                                    .frame(width: 56, height: 56)
+                                    .frame(width: actionButtonSize, height: actionButtonSize)
                                     .background(canContinue ? Color.accentColor : Color.gray.opacity(0.5))
                                     .clipShape(Circle())
                                     .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
@@ -78,8 +85,8 @@ struct AddBusinessFormView: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-                    .safeAreaPadding(.bottom, 8)
+                    .padding(.bottom, actionBarBottomPadding)
+                    .safeAreaPadding(.bottom, actionBarSafeAreaPadding)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -199,5 +206,9 @@ struct AddBusinessFormView: View {
     private var canSubmit: Bool {
         !viewModel.submission.submitterName.isEmpty &&
         viewModel.submission.isValidEmail(viewModel.submission.submitterEmail)
+    }
+
+    private var contentBottomInset: CGFloat {
+        actionButtonSize + actionBarBottomPadding + actionBarSafeAreaPadding + contentBottomClearance
     }
 }
