@@ -147,8 +147,15 @@ struct LocationSearchView: View {
                         coordinate: selectedLocation?.coordinate ?? CLLocationCoordinate2D(),
                         mapType: mapType,
                         onCoordinateChange: { newCoordinate in
-                            searchViewModel.reverseGeocode(coordinate: newCoordinate) { location in
-                                selectedLocation = location
+                            submission.latitude = newCoordinate.latitude
+                            submission.longitude = newCoordinate.longitude
+                            if let currentLocation = selectedLocation {
+                                selectedLocation = SearchLocation(
+                                    title: currentLocation.title,
+                                    subtitle: currentLocation.subtitle,
+                                    coordinate: newCoordinate,
+                                    addressComponents: currentLocation.addressComponents
+                                )
                             }
                         }
                     )
