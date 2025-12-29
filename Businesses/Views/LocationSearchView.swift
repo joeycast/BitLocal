@@ -7,7 +7,7 @@ struct LocationSearchView: View {
 
     @StateObject private var searchViewModel = LocationSearchViewModel()
     @State private var showingManualEntry = false
-    @State private var mapType: MKMapType = .standard
+    @State private var mapType: MKMapType = .hybrid
     @State private var selectedLocation: SearchLocation? {
         didSet {
             // Automatically save location data to submission when selected
