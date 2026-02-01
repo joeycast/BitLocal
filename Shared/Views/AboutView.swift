@@ -218,7 +218,7 @@ struct AboutView: View {
             )
         }
         .sheet(isPresented: $showingAddBusinessForm) {
-            AddBusinessFormView()
+            AddBusinessInfoView()
         }
     }
 }

@@ -638,6 +638,606 @@
         }
       }
     },
+    "add_business_info_cta_button" : {
+      "comment" : "Button to open BTC Map add location page",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihr Unternehmen auf BTC Map hinzufügen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Your Business on BTC Map"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade tu negocio en BTC Map"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega tu negocio en BTC Map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez votre établissement sur BTC Map"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez votre commerce sur BTC Map"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi la tua attività su BTC Map"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg je bedrijf toe op BTC Map"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เพิ่มธุรกิจของคุณบน BTC Map"
+          }
+        }
+      }
+    },
+    "add_business_info_data_source_description" : {
+      "comment" : "Description explaining BitLocal uses BTC Map data",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal zeigt Bitcoin-akzeptierende Unternehmen von BTC Map an, einer von der Community gepflegten offenen Datenbank von Händlern weltweit."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal displays Bitcoin-accepting businesses from BTC Map, a community-maintained open database of merchants worldwide."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal muestra negocios que aceptan Bitcoin de BTC Map, una base de datos abierta de comerciantes mantenida por la comunidad en todo el mundo."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal muestra negocios que aceptan Bitcoin de BTC Map, una base de datos abierta de comerciantes mantenida por la comunidad en todo el mundo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal affiche les commerces acceptant le Bitcoin depuis BTC Map, une base de données ouverte de commerçants maintenue par la communauté dans le monde entier."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal affiche les commerces acceptant le Bitcoin depuis BTC Map, une base de données ouverte de commerçants maintenue par la communauté dans le monde entier."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal mostra le attività che accettano Bitcoin da BTC Map, un database aperto di commercianti mantenuto dalla comunità in tutto il mondo."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal toont Bitcoin-accepterende bedrijven van BTC Map, een door de gemeenschap onderhouden open database van handelaren wereldwijd."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal แสดงธุรกิจที่รับ Bitcoin จาก BTC Map ซึ่งเป็นฐานข้อมูลเปิดของผู้ค้าที่ดูแลโดยชุมชนทั่วโลก"
+          }
+        }
+      }
+    },
+    "add_business_info_data_source_title" : {
+      "comment" : "Title for data source info card",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unterstützt von BTC Map"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Powered by BTC Map"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impulsado por BTC Map"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impulsado por BTC Map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propulsé par BTC Map"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propulsé par BTC Map"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alimentato da BTC Map"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mogelijk gemaakt door BTC Map"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ขับเคลื่อนโดย BTC Map"
+          }
+        }
+      }
+    },
+    "add_business_info_footer" : {
+      "comment" : "Footer text on add business info screen",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sobald Ihr Unternehmen zu BTC Map hinzugefügt wurde, erscheint es automatisch in BitLocal, wenn die App ihre Daten das nächste Mal aktualisiert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once your business is added to BTC Map, it will automatically appear in BitLocal the next time the app refreshes its data."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una vez que tu negocio se añada a BTC Map, aparecerá automáticamente en BitLocal la próxima vez que la aplicación actualice sus datos."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una vez que tu negocio se agregue a BTC Map, aparecerá automáticamente en BitLocal la próxima vez que la aplicación actualice sus datos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une fois votre établissement ajouté à BTC Map, il apparaîtra automatiquement dans BitLocal lors de la prochaine actualisation des données."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une fois votre commerce ajouté à BTC Map, il apparaîtra automatiquement dans BitLocal lors de la prochaine actualisation des données."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una volta aggiunta la tua attività a BTC Map, apparirà automaticamente in BitLocal al prossimo aggiornamento dei dati dell'app."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zodra je bedrijf is toegevoegd aan BTC Map, verschijnt het automatisch in BitLocal wanneer de app de gegevens ververst."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เมื่อธุรกิจของคุณถูกเพิ่มใน BTC Map แล้ว จะปรากฏใน BitLocal โดยอัตโนมัติเมื่อแอปรีเฟรชข้อมูลครั้งถัดไป"
+          }
+        }
+      }
+    },
+    "add_business_info_leaving_app" : {
+      "comment" : "Note below the CTA button about leaving the app",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie werden zu btcmap.org weitergeleitet, um Ihre Einreichung abzuschließen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You'll be taken to btcmap.org to complete your submission."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serás redirigido a btcmap.org para completar tu envío."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serás redirigido a btcmap.org para completar tu envío."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous serez redirigé vers btcmap.org pour compléter votre soumission."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous serez redirigé vers btcmap.org pour compléter votre soumission."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verrai reindirizzato a btcmap.org per completare la tua richiesta."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je wordt doorgestuurd naar btcmap.org om je aanvraag te voltooien."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คุณจะถูกนำไปยัง btcmap.org เพื่อดำเนินการส่งข้อมูลให้เสร็จสิ้น"
+          }
+        }
+      }
+    },
+    "add_business_info_timing_description" : {
+      "comment" : "Description explaining timing expectations",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Bearbeitungszeiten variieren je nach Verfügbarkeit der Freiwilligen. Die meisten Einreichungen werden innerhalb weniger Tage überprüft, aber es kann in Stoßzeiten länger dauern."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processing times vary depending on volunteer availability. Most submissions are reviewed within a few days, but it may take longer during busy periods."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los tiempos de procesamiento varían según la disponibilidad de los voluntarios. La mayoría de los envíos se revisan en unos pocos días, pero puede tardar más durante períodos de alta demanda."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los tiempos de procesamiento varían según la disponibilidad de los voluntarios. La mayoría de los envíos se revisan en unos pocos días, pero puede tardar más durante períodos de alta demanda."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les délais de traitement varient selon la disponibilité des bénévoles. La plupart des soumissions sont examinées en quelques jours, mais cela peut prendre plus de temps pendant les périodes chargées."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les délais de traitement varient selon la disponibilité des bénévoles. La plupart des soumissions sont examinées en quelques jours, mais cela peut prendre plus de temps pendant les périodes achalandées."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I tempi di elaborazione variano a seconda della disponibilità dei volontari. La maggior parte delle richieste viene esaminata entro pochi giorni, ma potrebbe richiedere più tempo durante i periodi di maggiore attività."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwerkingstijden variëren afhankelijk van de beschikbaarheid van vrijwilligers. De meeste aanvragen worden binnen enkele dagen beoordeeld, maar het kan langer duren tijdens drukke periodes."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ระยะเวลาดำเนินการแตกต่างกันไปขึ้นอยู่กับความพร้อมของอาสาสมัคร การส่งข้อมูลส่วนใหญ่จะได้รับการตรวจสอบภายในไม่กี่วัน แต่อาจใช้เวลานานขึ้นในช่วงที่มีงานยุ่ง"
+          }
+        }
+      }
+    },
+    "add_business_info_timing_title" : {
+      "comment" : "Title for timing info card",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wann wird es erscheinen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When Will It Appear?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Cuándo aparecerá?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Cuándo aparecerá?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand apparaîtra-t-il ?"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand apparaîtra-t-il ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando apparirà?"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wanneer verschijnt het?"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "จะปรากฏเมื่อไหร่?"
+          }
+        }
+      }
+    },
+    "add_business_info_title" : {
+      "comment" : "Title for add business info screen",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So funktioniert das Hinzufügen eines Unternehmens"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How Adding a Business Works"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cómo funciona añadir un negocio"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cómo funciona agregar un negocio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment ajouter un établissement"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment ajouter un commerce"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come funziona l'aggiunta di un'attività"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoe een bedrijf toevoegen werkt"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "วิธีการเพิ่มธุรกิจ"
+          }
+        }
+      }
+    },
+    "add_business_info_volunteers_description" : {
+      "comment" : "Description explaining volunteer processing",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn Sie ein Unternehmen einreichen, prüfen freiwillige Community-Mitglieder bei BTC Map es und fügen es der Karte hinzu. Dies ist ein kostenloser Service, der von der Bitcoin-Community betrieben wird."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you submit a business, volunteer community members at BTC Map review and add it to the map. This is a free service maintained by the Bitcoin community."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando envías un negocio, miembros voluntarios de la comunidad de BTC Map lo revisan y lo añaden al mapa. Este es un servicio gratuito mantenido por la comunidad Bitcoin."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando envías un negocio, miembros voluntarios de la comunidad de BTC Map lo revisan y lo agregan al mapa. Este es un servicio gratuito mantenido por la comunidad Bitcoin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lorsque vous soumettez un établissement, des bénévoles de la communauté BTC Map l'examinent et l'ajoutent à la carte. C'est un service gratuit maintenu par la communauté Bitcoin."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lorsque vous soumettez un commerce, des bénévoles de la communauté BTC Map l'examinent et l'ajoutent à la carte. C'est un service gratuit maintenu par la communauté Bitcoin."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando invii un'attività, i membri volontari della comunità di BTC Map la esaminano e la aggiungono alla mappa. Questo è un servizio gratuito gestito dalla comunità Bitcoin."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wanneer je een bedrijf indient, beoordelen vrijwillige communityleden bij BTC Map het en voegen het toe aan de kaart. Dit is een gratis dienst die wordt onderhouden door de Bitcoin-gemeenschap."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เมื่อคุณส่งข้อมูลธุรกิจ อาสาสมัครในชุมชน BTC Map จะตรวจสอบและเพิ่มลงในแผนที่ นี่เป็นบริการฟรีที่ดูแลโดยชุมชน Bitcoin"
+          }
+        }
+      }
+    },
+    "add_business_info_volunteers_title" : {
+      "comment" : "Title for volunteers info card",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Von der Community betrieben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Community Powered"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impulsado por la comunidad"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impulsado por la comunidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propulsé par la communauté"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propulsé par la communauté"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestito dalla comunità"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aangedreven door de gemeenschap"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ขับเคลื่อนโดยชุมชน"
+          }
+        }
+      }
+    },
     "address_label" : {
       "comment" : "Label for address",
       "localizations" : {

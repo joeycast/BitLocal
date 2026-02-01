@@ -25,6 +25,7 @@
 		F63E80942F0180EC00ED1F00 /* LocationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80902F0180EC00ED1F00 /* LocationSearchView.swift */; };
 		F63E80952F0180EC00ED1F00 /* ManualLocationEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80912F0180EC00ED1F00 /* ManualLocationEntryView.swift */; };
 		F63E80972F02F97700ED1F00 /* SPEC.md in Resources */ = {isa = PBXBuildFile; fileRef = F63E80962F02F97700ED1F00 /* SPEC.md */; };
+		F63E80992F05000100ED1F00 /* AddBusinessInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80982F05000100ED1F00 /* AddBusinessInfoView.swift */; };
 		F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F64093F42DE66D1700906C3E /* Localizable.xcstrings */; };
 		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
 		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
@@ -82,6 +83,7 @@
 		F63E80912F0180EC00ED1F00 /* ManualLocationEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualLocationEntryView.swift; sourceTree = "<group>"; };
 		F63E80922F0180EC00ED1F00 /* MapPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPreviewView.swift; sourceTree = "<group>"; };
 		F63E80962F02F97700ED1F00 /* SPEC.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SPEC.md; sourceTree = "<group>"; };
+		F63E80982F05000100ED1F00 /* AddBusinessInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBusinessInfoView.swift; sourceTree = "<group>"; };
 		F64093F42DE66D1700906C3E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
@@ -206,6 +208,7 @@
 				F63E80892F017C0800ED1F00 /* BusinessPaymentsView.swift */,
 				F63E808A2F017C0800ED1F00 /* ReviewSubmissionView.swift */,
 				F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */,
+				F63E80982F05000100ED1F00 /* AddBusinessInfoView.swift */,
 				F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */,
 				F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */,
 				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
@@ -475,6 +478,7 @@
 				F63E80852F017BE900ED1F00 /* BusinessSubmissionStep.swift in Sources */,
 				F6004F962DED3F43001183AE /* Debug.swift in Sources */,
 				F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */,
+				F63E80992F05000100ED1F00 /* AddBusinessInfoView.swift in Sources */,
 				F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */,
 				F66E0B902DE33EF800D68897 /* CompactSettingsPopoverView.swift in Sources */,
 				F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */,
@@ -643,7 +647,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 45;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_APP_SANDBOX = YES;
@@ -669,7 +673,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.0.5;
+				MARKETING_VERSION = 2.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -692,7 +696,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 45;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_APP_SANDBOX = YES;
@@ -718,7 +722,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.0.5;
+				MARKETING_VERSION = 2.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
