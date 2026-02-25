@@ -17,6 +17,7 @@ struct Element: Codable, Identifiable, Hashable {
     let createdAt: String
     let updatedAt, deletedAt: String?
     var address: Address?
+    var v4Metadata: ElementV4Metadata?
 
     /// A convenience dictionary of OSM tags (e.g. "cuisine", "shop", "amenity"), suitable for lookup in ElementCategorySymbols.
     var osmTagsDict: [String: String]? {
@@ -69,6 +70,7 @@ struct Element: Codable, Identifiable, Hashable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"
+        case v4Metadata = "v4_metadata"
     }
     
     init(from decoder: Decoder) throws {
@@ -80,6 +82,7 @@ struct Element: Codable, Identifiable, Hashable {
         createdAt = try container.decode(String.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+        v4Metadata = try container.decodeIfPresent(ElementV4Metadata.self, forKey: .v4Metadata)
         
         if let osmTags = osmJSON?.tags {
             address = Address(
@@ -92,6 +95,41 @@ struct Element: Codable, Identifiable, Hashable {
             )
         } else {
             address = nil
+        }
+    }
+
+    init(
+        id: String,
+        osmJSON: OsmJSON?,
+        tags: Tags?,
+        createdAt: String,
+        updatedAt: String?,
+        deletedAt: String?,
+        address: Address? = nil,
+        v4Metadata: ElementV4Metadata? = nil
+    ) {
+        self.id = id
+        self.uuid = UUID()
+        self.osmJSON = osmJSON
+        self.tags = tags
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
+        self.v4Metadata = v4Metadata
+
+        if let address {
+            self.address = address
+        } else if let osmTags = osmJSON?.tags {
+            self.address = Address(
+                streetNumber: osmTags.addrHousenumber,
+                streetName: osmTags.addrStreet,
+                cityOrTownName: osmTags.addrCity,
+                postalCode: Address.normalizedPostalCode(osmTags.addrPostcode, countryName: nil),
+                regionOrStateName: osmTags.addrState,
+                countryName: nil
+            )
+        } else {
+            self.address = nil
         }
     }
     

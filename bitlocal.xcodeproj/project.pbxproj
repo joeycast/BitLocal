@@ -54,6 +54,7 @@
 		F66E0BAB2DE33F1200D68897 /* EarlierThaniOS170View.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */; };
 		F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B982DE33F1200D68897 /* ContentViewModel.swift */; };
 		F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */; };
+		F7C0A1013A5B100100000001 /* BTCMapV4Contracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */; };
 		F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0BAE2DE340CB00D68897 /* Element.swift */; };
 		F66E0BB12DE35B9100D68897 /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0BB02DE35B9100D68897 /* AppearanceManager.swift */; };
 		F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F67937602DE205E400A49AC3 /* Assets.xcassets */; };
@@ -110,6 +111,7 @@
 		F66E0B9B2DE33F1200D68897 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F66E0B9C2DE33F1200D68897 /* EarlierThaniOS170View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarlierThaniOS170View.swift; sourceTree = "<group>"; };
 		F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoButtonView.swift; sourceTree = "<group>"; };
+		F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapV4Contracts.swift; sourceTree = "<group>"; };
 		F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneHeaderView.swift; sourceTree = "<group>"; };
 		F66E0B9F2DE33F1200D68897 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		F66E0BAE2DE340CB00D68897 /* Element.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Element.swift; sourceTree = "<group>"; };
@@ -266,6 +268,7 @@
 				F66E0B942DE33F1200D68897 /* Extensions.swift */,
 				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
+				F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -509,6 +512,7 @@
 				F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */,
 				F63E80812EFC302700ED1F00 /* MailComposer.swift in Sources */,
 				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,
+				F7C0A1013A5B100100000001 /* BTCMapV4Contracts.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
