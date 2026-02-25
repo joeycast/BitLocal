@@ -38,6 +38,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
     let geocoder = Geocoder(maxConcurrentRequests: 1)
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
+    private let btcMapRepository: BTCMapRepositoryProtocol = BTCMapRepository.shared
     
     // Startup state tracking
     @Published var isInitialStartup = true
@@ -539,7 +540,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             
             // IMPORTANT: Load from cache into memory first if allElements is empty
             if self.allElements.isEmpty {
-                if let cachedElements = APIManager.shared.loadElementsFromFile(), !cachedElements.isEmpty {
+                if let cachedElements = self.btcMapRepository.loadCachedElements(), !cachedElements.isEmpty {
                     Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
                     self.allElements = cachedElements
                     self.hasLoadedInitialData = true
@@ -567,55 +568,28 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     return
                 }
             }
-            
-            // Check if this is a fresh start after cache clear
-            let wasCacheEmpty = !APIManager.shared.hasCachedData()
+
+            let hadAnyCache = self.btcMapRepository.hasCachedData()
             let currentElementsEmpty = self.allElements.isEmpty
-            Debug.logCache("Cache empty before fetch: \(wasCacheEmpty)")
+            Debug.logCache("Repository cache available before refresh: \(hadAnyCache)")
             Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
 
-            if wasCacheEmpty {
-                Debug.logCache("Cache missing - resetting last update timestamp")
-                APIManager.shared.resetLastUpdateKey()
-            }
-
-            APIManager.shared.getElements { [weak self] elements in
+            self.btcMapRepository.refreshElements { [weak self] elements in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
                     
-                    let processedElements = elements ?? []
-                    Debug.logAPI("Processed \(processedElements.count) elements from API")
-                    
-                    // CRITICAL FIX: Handle different scenarios properly
-                    if currentElementsEmpty || wasCacheEmpty {
-                        // Fresh start - use the fetched elements directly
-                        if !processedElements.isEmpty {
-                            Debug.logMap("Fresh start - setting allElements to \(processedElements.count) elements")
-                            self.allElements = processedElements
-                            self.hasLoadedInitialData = true
-                            self.forceMapRefresh = true
-                        }
+                    let refreshedElements = elements ?? []
+                    Debug.logAPI("Repository refresh returned \(refreshedElements.count) elements")
+
+                    if !refreshedElements.isEmpty {
+                        Debug.logMap("Setting allElements to repository snapshot (\(refreshedElements.count) elements)")
+                        self.allElements = refreshedElements
+                        self.hasLoadedInitialData = true
+                        self.forceMapRefresh = true
+                    } else if currentElementsEmpty && !hadAnyCache {
+                        Debug.log("Repository returned no data and no cache was available")
                     } else {
-                        // Incremental update - merge with existing elements
-                        if !processedElements.isEmpty {
-                            Debug.logMap("Incremental update - merging \(processedElements.count) new elements with existing \(self.allElements.count)")
-                            
-                            // Merge logic: update existing elements or add new ones
-                            var elementsDictionary = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
-                            
-                            // Update/add new elements
-                            processedElements.forEach { element in
-                                elementsDictionary[element.id] = element
-                            }
-                            
-                            let mergedElements = Array(elementsDictionary.values)
-                            self.allElements = mergedElements
-                            self.forceMapRefresh = true
-                            
-                            Debug.logMap("After merge: Total elements = \(mergedElements.count)")
-                        } else {
-                            Debug.log("No new elements from API - keeping existing \(self.allElements.count) elements")
-                        }
+                        Debug.log("Repository returned no updates - keeping existing \(self.allElements.count) elements")
                     }
                     
                     self.isLoading = false
@@ -632,31 +606,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Background update check that doesn't block UI
     private func checkForUpdatesInBackground() {
         Debug.log("Starting background update check")
-        
-        APIManager.shared.getElements { [weak self] elements in
+
+        btcMapRepository.refreshElements { [weak self] elements in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                
-                let processedElements = elements ?? []
-                
-                // Only update if we got new data
-                if !processedElements.isEmpty {
-                    Debug.logMap("Background update: Got \(processedElements.count) new elements, merging with existing \(self.allElements.count)")
-                    
-                    // CRITICAL FIX: Always merge, never replace
-                    let existingElements = self.allElements
-                    var elementsDictionary = Dictionary(uniqueKeysWithValues: existingElements.map { ($0.id, $0) })
-                    
-                    // Update/add new elements
-                    processedElements.forEach { element in
-                        elementsDictionary[element.id] = element
-                    }
-                    
-                    let mergedElements = Array(elementsDictionary.values)
-                    self.allElements = mergedElements
+
+                let refreshedElements = elements ?? []
+
+                if !refreshedElements.isEmpty {
+                    Debug.logMap("Background update: Repository returned \(refreshedElements.count) elements")
+                    self.allElements = refreshedElements
                     self.forceMapRefresh = true
-                    
-                    Debug.logMap("After background merge: Total elements = \(mergedElements.count)")
                 } else {
                     Debug.log("Background update: No new data available")
                 }
