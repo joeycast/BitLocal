@@ -31,6 +31,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var initialRegionSet = false // Track if initial region has been set
     @Published var forceMapRefresh = false // Flag to force map annotation refresh
     @Published var selectionSource: SelectionSource = .unknown
+    @Published var isMerchantSearchPresented = false
+    @Published var merchantSearchText = ""
+    @Published var merchantSearchResults: [V4PlaceRecord] = []
+    @Published var merchantSearchIsLoading = false
+    @Published var merchantSearchError: String?
+    @Published var merchantSearchUseMapCenter = true
+    @Published var merchantSearchRadiusKM: Double = 20
+    @Published var merchantSearchProviderFilter = ""
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -58,6 +66,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     
     private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: AnyCancellable?
+    private var latestMerchantSearchRequestID = UUID()
     
     // Use a queue for thread-safe access to mapView
     private let mapViewQueue = DispatchQueue(label: "mapview.queue", qos: .userInitiated)
@@ -520,6 +529,114 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self?.mapView?.deselectAnnotation(annotation, animated: true)
             }
         }
+    }
+
+    // MARK: - Merchant Search (v4)
+
+    func clearMerchantSearchResults() {
+        merchantSearchResults = []
+        merchantSearchError = nil
+        merchantSearchIsLoading = false
+    }
+
+    func performMerchantSearch() {
+        let trimmedName = merchantSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedProvider = merchantSearchProviderFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let tagName: String?
+        let tagValue: String?
+        if trimmedProvider.isEmpty {
+            tagName = nil
+            tagValue = nil
+        } else {
+            tagName = trimmedProvider.contains(":") ? trimmedProvider : "payment:\(trimmedProvider)"
+            tagValue = "yes"
+        }
+
+        let query = V4SearchQuery(
+            name: trimmedName.isEmpty ? nil : trimmedName,
+            lat: merchantSearchUseMapCenter ? region.center.latitude : nil,
+            lon: merchantSearchUseMapCenter ? region.center.longitude : nil,
+            radiusKM: merchantSearchUseMapCenter ? merchantSearchRadiusKM : nil,
+            tagName: tagName,
+            tagValue: tagValue
+        )
+
+        if query.isEmpty {
+            clearMerchantSearchResults()
+            return
+        }
+
+        let requestID = UUID()
+        latestMerchantSearchRequestID = requestID
+        merchantSearchIsLoading = true
+        merchantSearchError = nil
+
+        btcMapRepository.searchPlaces(query: query) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard self.latestMerchantSearchRequestID == requestID else { return }
+                self.merchantSearchIsLoading = false
+                switch result {
+                case .success(let records):
+                    self.merchantSearchResults = records
+                    self.merchantSearchError = nil
+                case .failure(let error):
+                    self.merchantSearchResults = []
+                    self.merchantSearchError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func selectMerchantSearchResult(_ record: V4PlaceRecord) {
+        let fallbackElement = V4PlaceToElementMapper.placeRecordToElement(record)
+        if let existing = allElements.first(where: { $0.id == fallbackElement.id }) {
+            presentMerchantSearchSelection(existing)
+            return
+        }
+
+        if record.lat != nil, record.lon != nil, shouldHydrateSearchResult(record) {
+            btcMapRepository.fetchPlace(id: record.idString) { [weak self] result in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    switch result {
+                    case .success(let fullRecord):
+                        let fullElement = V4PlaceToElementMapper.placeRecordToElement(fullRecord)
+                        self.presentMerchantSearchSelection(fullElement)
+                    case .failure:
+                        self.presentMerchantSearchSelection(fallbackElement)
+                    }
+                }
+            }
+        } else {
+            presentMerchantSearchSelection(fallbackElement)
+        }
+    }
+
+    private func shouldHydrateSearchResult(_ record: V4PlaceRecord) -> Bool {
+        // Search may return partial fields; hydrate when key detail fields are absent.
+        (record.description == nil && record.openingHours == nil) || (record.phone == nil && record.website == nil)
+    }
+
+    private func presentMerchantSearchSelection(_ element: Element) {
+        upsertElementIntoStore(element)
+
+        if let coordinate = element.mapCoordinate {
+            centerMap(to: coordinate, force: true)
+        }
+
+        setSelectionSource(.unknown)
+        selectedElement = element
+        path = [element]
+        isMerchantSearchPresented = false
+    }
+
+    private func upsertElementIntoStore(_ element: Element) {
+        var dictionary = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
+        dictionary[element.id] = element
+        allElements = Array(dictionary.values)
+        forceMapRefresh = true
     }
 
     // Fetch elements using the APIManager and update the published elements property

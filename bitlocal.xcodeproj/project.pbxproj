@@ -38,6 +38,7 @@
 		F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */; };
 		F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */; };
 		F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */; };
+		F7C0A1213A5B100100000003 /* MerchantSearchSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1203A5B100100000003 /* MerchantSearchSheetView.swift */; };
 		F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B872DE33EF800D68897 /* DistanceUnit.swift */; };
 		F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */; };
 		F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B862DE33EF800D68897 /* Appearance.swift */; };
@@ -97,6 +98,7 @@
 		F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheetContentView.swift; sourceTree = "<group>"; };
 		F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessDetailView.swift; sourceTree = "<group>"; };
 		F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessesListView.swift; sourceTree = "<group>"; };
+		F7C0A1203A5B100100000003 /* MerchantSearchSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchSheetView.swift; sourceTree = "<group>"; };
 		F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomiPadNavigationStackTitleView.swift; sourceTree = "<group>"; };
 		F66E0B862DE33EF800D68897 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		F66E0B872DE33EF800D68897 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
@@ -215,6 +217,7 @@
 				F63E80982F05000100ED1F00 /* AddBusinessInfoView.swift */,
 				F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */,
 				F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */,
+				F7C0A1203A5B100100000003 /* MerchantSearchSheetView.swift */,
 				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
 				F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */,
 			);
@@ -498,6 +501,7 @@
 				F63E808E2F017C0800ED1F00 /* BusinessPaymentsView.swift in Sources */,
 				F63E808F2F017C0800ED1F00 /* ReviewSubmissionView.swift in Sources */,
 				F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */,
+				F7C0A1213A5B100100000003 /* MerchantSearchSheetView.swift in Sources */,
 				F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */,
 				F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */,
 				F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */,

@@ -51,8 +51,18 @@ struct IPhoneHeaderView: View {
             }
             VStack(alignment: .leading) {
                 HStack {
-                    InfoButtonView(showingAbout: $showingAbout)
-                        .padding(.leading)
+                    HStack(spacing: 10) {
+                        InfoButtonView(showingAbout: $showingAbout)
+                        Button {
+                            viewModel.isMerchantSearchPresented = true
+                        } label: {
+                            Image(systemName: "magnifyingglass.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.accentColor)
+                                .accessibilityLabel("Search merchants")
+                        }
+                    }
+                    .padding(.leading)
                     Spacer()
                     Text("bitlocal")
                         .font(.custom("Fredoka-Medium", size: 28))
@@ -89,6 +99,12 @@ struct IPhoneHeaderView: View {
                 .transition(.scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity))
                 .zIndex(2)
             }
+        }
+        .sheet(isPresented: $viewModel.isMerchantSearchPresented) {
+            MerchantSearchSheetView()
+                .environmentObject(viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
     }
