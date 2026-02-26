@@ -197,6 +197,41 @@ struct V4PlaceCommentRecord: Codable, Hashable, Identifiable {
     }
 }
 
+struct V4PlaceCommentQuote: Codable, Hashable {
+    let quoteSat: Int
+
+    enum CodingKeys: String, CodingKey {
+        case quoteSat = "quote_sat"
+    }
+}
+
+struct V4PlaceBoostQuote: Codable, Hashable {
+    let quote30dSat: Int?
+    let quote90dSat: Int?
+    let quote365dSat: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case quote30dSat = "quote_30d_sat"
+        case quote90dSat = "quote_90d_sat"
+        case quote365dSat = "quote_365d_sat"
+    }
+}
+
+struct V4InvoiceOrderResponse: Codable, Hashable {
+    let invoiceID: String
+    let invoice: String
+
+    enum CodingKeys: String, CodingKey {
+        case invoiceID = "invoice_id"
+        case invoice
+    }
+}
+
+struct V4InvoiceRecord: Codable, Hashable {
+    let id: String
+    let status: String
+}
+
 struct V4SearchQuery: Hashable {
     var name: String?
     var lat: Double?
