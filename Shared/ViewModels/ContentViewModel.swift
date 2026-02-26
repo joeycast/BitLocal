@@ -44,6 +44,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var eventsIsLoading = false
     @Published var eventsError: String?
     @Published var eventsResults: [V4EventRecord] = []
+    @Published var isAreaBrowserPresented = false
+    @Published var areaBrowserQuery = ""
+    @Published var areaBrowserAreas: [V3AreaRecord] = []
+    @Published var areaBrowserIsLoading = false
+    @Published var areaBrowserError: String?
+    @Published var selectedAreaID: Int?
+    @Published var selectedAreaElementCount: Int?
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -581,6 +588,81 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
         updateMapRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05), animated: true)
         isEventsPresented = false
+    }
+
+    // MARK: - BTCMap Areas (v3 bridge)
+
+    func loadAreaBrowserAreas() {
+        areaBrowserIsLoading = true
+        areaBrowserError = nil
+        btcMapRepository.fetchV3Areas(updatedSince: "1970-01-01T00:00:00Z", limit: 500) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.areaBrowserIsLoading = false
+                switch result {
+                case .success(let areas):
+                    self.areaBrowserAreas = areas
+                        .filter { $0.bounds != nil }
+                        .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+                case .failure(let error):
+                    self.areaBrowserAreas = []
+                    self.areaBrowserError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func filteredAreaBrowserAreas() -> [V3AreaRecord] {
+        let q = areaBrowserQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return areaBrowserAreas }
+        return areaBrowserAreas.filter { area in
+            area.displayName.localizedStandardContains(q) ||
+            (area.urlAlias?.localizedStandardContains(q) ?? false) ||
+            (area.tags?["name:en"]?.localizedStandardContains(q) ?? false)
+        }
+    }
+
+    func selectArea(_ area: V3AreaRecord) {
+        selectedAreaID = area.id
+        selectedAreaElementCount = nil
+
+        if let region = mapRegion(for: area) {
+            updateMapRegion(center: region.center, span: region.span, animated: true)
+        }
+
+        btcMapRepository.fetchV3AreaElements(areaID: area.id, updatedSince: "1970-01-01T00:00:00Z", limit: 5000) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch result {
+                case .success(let rows):
+                    let activeCount = rows.filter { ($0.deletedAt?.isEmpty ?? true) }.count
+                    self.selectedAreaElementCount = activeCount
+                case .failure:
+                    self.selectedAreaElementCount = nil
+                }
+            }
+        }
+
+        isAreaBrowserPresented = false
+    }
+
+    private func mapRegion(for area: V3AreaRecord) -> MKCoordinateRegion? {
+        guard let bounds = area.bounds,
+              let minLat = bounds.minLat,
+              let maxLat = bounds.maxLat,
+              let minLon = bounds.minLon,
+              let maxLon = bounds.maxLon else { return nil }
+
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2
+        )
+        let latDelta = max((maxLat - minLat) * 1.2, 0.05)
+        let lonDelta = max((maxLon - minLon) * 1.2, 0.05)
+        return MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
+        )
     }
 
     func performMerchantSearch() {

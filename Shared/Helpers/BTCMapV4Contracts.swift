@@ -248,4 +248,66 @@ protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
     func loadCachedElements() -> [Element]?
     func hasCachedData() -> Bool
     func refreshElements(completion: @escaping ([Element]?) -> Void)
+    func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void)
+    func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void)
+}
+struct V3AreaBounds: Codable, Hashable {
+    let minLon: Double?
+    let minLat: Double?
+    let maxLon: Double?
+    let maxLat: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case minLon = "min_lon"
+        case minLat = "min_lat"
+        case maxLon = "max_lon"
+        case maxLat = "max_lat"
+    }
+}
+
+struct V3AreaRecord: Codable, Hashable, Identifiable {
+    let id: Int
+    let name: String?
+    let urlAlias: String?
+    let osmID: Int?
+    let osmType: String?
+    let tags: [String: String]?
+    let bounds: V3AreaBounds?
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case urlAlias = "url_alias"
+        case osmID = "osm_id"
+        case osmType = "osm_type"
+        case tags
+        case bounds
+        case updatedAt = "updated_at"
+    }
+
+    var displayName: String {
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty { return trimmed }
+        if let tagName = tags?["name"], !tagName.isEmpty { return tagName }
+        return "Area #\(id)"
+    }
+}
+
+struct V3AreaElementRecord: Codable, Hashable, Identifiable {
+    let id: String
+    let areaID: Int
+    let elementID: String
+    let createdAt: String?
+    let updatedAt: String?
+    let deletedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case areaID = "area_id"
+        case elementID = "element_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case deletedAt = "deleted_at"
+    }
 }

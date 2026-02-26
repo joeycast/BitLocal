@@ -53,6 +53,13 @@ struct IPadLayoutView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
+                            viewModel.isAreaBrowserPresented = true
+                        } label: {
+                            Image(systemName: "globe.americas")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
                             viewModel.isMerchantSearchPresented = true
                         } label: {
                             Image(systemName: "magnifyingglass")
@@ -156,6 +163,12 @@ struct IPadLayoutView: View {
         }
         .sheet(isPresented: $viewModel.isEventsPresented) {
             BTCMapEventsSheetView()
+                .environmentObject(viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $viewModel.isAreaBrowserPresented) {
+            BTCMapAreasSheetView()
                 .environmentObject(viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)

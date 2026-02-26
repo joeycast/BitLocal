@@ -62,6 +62,14 @@ struct IPhoneHeaderView: View {
                                 .accessibilityLabel("Browse BTCMap events")
                         }
                         Button {
+                            viewModel.isAreaBrowserPresented = true
+                        } label: {
+                            Image(systemName: "globe.americas.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.accentColor)
+                                .accessibilityLabel("Browse areas")
+                        }
+                        Button {
                             viewModel.isMerchantSearchPresented = true
                         } label: {
                             Image(systemName: "magnifyingglass.circle.fill")
@@ -116,6 +124,12 @@ struct IPhoneHeaderView: View {
         }
         .sheet(isPresented: $viewModel.isEventsPresented) {
             BTCMapEventsSheetView()
+                .environmentObject(viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $viewModel.isAreaBrowserPresented) {
+            BTCMapAreasSheetView()
                 .environmentObject(viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
