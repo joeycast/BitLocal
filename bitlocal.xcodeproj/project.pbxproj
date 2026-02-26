@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F7C0A2013A5B100100000101 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F7C0A2153A5B100100000115 /* XCTest.framework */; };
+		F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */; };
+		F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */; };
+		F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */; };
+		F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */; };
 		F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */; };
 		F6004F962DED3F43001183AE /* Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F952DED3F43001183AE /* Debug.swift */; };
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
@@ -68,7 +73,23 @@
 		F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		F7C0A2503A5B100100000150 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F6B565B72DA322FD00EE992E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F6B565BE2DA322FD00EE992E;
+			remoteInfo = bitlocal;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		F7C0A2103A5B100100000110 /* bitlocalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = bitlocalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4PlaceRecordDecodingTests.swift; sourceTree = "<group>"; };
+		F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4PlaceToElementMapperTests.swift; sourceTree = "<group>"; };
+		F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4SearchQueryEncodingTests.swift; sourceTree = "<group>"; };
+		F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapMergeTests.swift; sourceTree = "<group>"; };
+		F7C0A2153A5B100100000115 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCategorySymbols.swift; sourceTree = "<group>"; };
 		F6004F952DED3F43001183AE /* Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug.swift; sourceTree = "<group>"; };
 		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
@@ -134,6 +155,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		F7C0A2203A5B100100000120 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7C0A2013A5B100100000101 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F6B565BC2DA322FD00EE992E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -331,6 +360,7 @@
 		F6B565B62DA322FD00EE992E = {
 			isa = PBXGroup;
 			children = (
+				F7C0A2303A5B100100000130 /* bitlocalTests */,
 				F63E80962F02F97700ED1F00 /* SPEC.md */,
 				F6EFC28F2DE6A06F00D573E1 /* Onboarding */,
 				F66E0BA12DE33F1200D68897 /* Shared */,
@@ -353,6 +383,7 @@
 			isa = PBXGroup;
 			children = (
 				F6B565BF2DA322FD00EE992E /* bitlocal.app */,
+				F7C0A2103A5B100100000110 /* bitlocalTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -361,8 +392,20 @@
 			isa = PBXGroup;
 			children = (
 				F6B565F62DA327BE00EE992E /* CoreLocation.framework */,
+				F7C0A2153A5B100100000115 /* XCTest.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		F7C0A2303A5B100100000130 /* bitlocalTests */ = {
+			isa = PBXGroup;
+			children = (
+				F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */,
+				F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */,
+				F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */,
+				F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */,
+			);
+			path = bitlocalTests;
 			sourceTree = "<group>";
 		};
 		F6EFC28F2DE6A06F00D573E1 /* Onboarding */ = {
@@ -384,6 +427,25 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		F7C0A2403A5B100100000140 /* bitlocalTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F7C0A2723A5B100100000172 /* Build configuration list for PBXNativeTarget "bitlocalTests" */;
+			buildPhases = (
+				F7C0A2603A5B100100000160 /* Sources */,
+				F7C0A2203A5B100100000120 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F7C0A2513A5B100100000151 /* PBXTargetDependency */,
+			);
+			name = bitlocalTests;
+			packageProductDependencies = (
+			);
+			productName = bitlocalTests;
+			productReference = F7C0A2103A5B100100000110 /* bitlocalTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F6B565BE2DA322FD00EE992E /* bitlocal */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F6B565CB2DA322FE00EE992E /* Build configuration list for PBXNativeTarget "bitlocal" */;
@@ -417,6 +479,10 @@
 						CreatedOnToolsVersion = 16.3;
 						LastSwiftMigration = 1630;
 					};
+					F7C0A2403A5B100100000140 = {
+						CreatedOnToolsVersion = 17.0;
+						TestTargetID = F6B565BE2DA322FD00EE992E;
+					};
 				};
 			};
 			buildConfigurationList = F6B565BA2DA322FD00EE992E /* Build configuration list for PBXProject "bitlocal" */;
@@ -444,6 +510,7 @@
 			projectRoot = "";
 			targets = (
 				F6B565BE2DA322FD00EE992E /* bitlocal */,
+				F7C0A2403A5B100100000140 /* bitlocalTests */,
 			);
 		};
 /* End PBXProject section */
@@ -464,6 +531,17 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		F7C0A2603A5B100100000160 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */,
+				F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */,
+				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
+				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F6B565BB2DA322FD00EE992E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -525,6 +603,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F7C0A2513A5B100100000151 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F6B565BE2DA322FD00EE992E /* bitlocal */;
+			targetProxy = F7C0A2503A5B100100000150 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F6B565C92DA322FE00EE992E /* Debug */ = {
@@ -748,6 +834,65 @@
 			};
 			name = Release;
 		};
+		F7C0A2703A5B100100000170 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YUMLYCFT8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/bitlocal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/bitlocal";
+				TEST_TARGET_NAME = bitlocal;
+			};
+			name = Debug;
+		};
+		F7C0A2713A5B100100000171 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YUMLYCFT8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/bitlocal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/bitlocal";
+				TEST_TARGET_NAME = bitlocal;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -765,6 +910,15 @@
 			buildConfigurations = (
 				F6B565CC2DA322FE00EE992E /* Debug */,
 				F6B565CD2DA322FE00EE992E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F7C0A2723A5B100100000172 /* Build configuration list for PBXNativeTarget "bitlocalTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F7C0A2703A5B100100000170 /* Debug */,
+				F7C0A2713A5B100100000171 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

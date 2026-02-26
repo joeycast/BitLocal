@@ -635,7 +635,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         }
     }
 
-    fileprivate static func mergeElements(existing: [Element], incoming: [Element]) -> [Element] {
+    static func mergeElements(existing: [Element], incoming: [Element]) -> [Element] {
         var dictionary = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
         for element in incoming {
             let isDeleted = !(element.deletedAt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
@@ -720,4 +720,3 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         iso8601Basic.string(from: Date())
     }
 }
-
