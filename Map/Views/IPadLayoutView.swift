@@ -45,27 +45,6 @@ struct IPadLayoutView: View {
                             .frame(maxWidth: .infinity)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            viewModel.isEventsPresented = true
-                        } label: {
-                            Image(systemName: "calendar")
-                        }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            viewModel.isAreaBrowserPresented = true
-                        } label: {
-                            Image(systemName: "globe.americas")
-                        }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            viewModel.isMerchantSearchPresented = true
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                        }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
                         SettingsButtonView(
                             selectedMapType: selectedMapTypeBinding,
                             appearance: $appearance,
@@ -78,12 +57,20 @@ struct IPadLayoutView: View {
                         .opacity(1)
                     }
                 }
+                .searchable(
+                    text: $viewModel.unifiedSearchText,
+                    isPresented: $viewModel.isSearchActive,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Search merchants or regions…"
+                )
+        }
+        .onChange(of: viewModel.unifiedSearchText) { _, _ in
+            viewModel.performUnifiedSearch()
         }
         .sheet(isPresented: $showingAbout) {
             AboutView()
         }
         .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
-        .navigationBarTitleDisplayMode(.automatic)
     }
     
     private var mapPanel: some View {
@@ -155,24 +142,6 @@ struct IPadLayoutView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
-        .sheet(isPresented: $viewModel.isMerchantSearchPresented) {
-            MerchantSearchSheetView()
-                .environmentObject(viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $viewModel.isEventsPresented) {
-            BTCMapEventsSheetView()
-                .environmentObject(viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $viewModel.isAreaBrowserPresented) {
-            BTCMapAreasSheetView()
-                .environmentObject(viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
         .onChange(of: viewModel.path) { _, newPath in
             if let selectedElement = newPath.last {
                 if viewModel.consumeSelectionSource() == .mapAnnotation {

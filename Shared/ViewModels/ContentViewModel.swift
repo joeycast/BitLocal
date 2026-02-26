@@ -13,6 +13,11 @@ import CoreLocation
 import MapKit
 import Foundation // for Debug logging
 
+enum MapDisplayMode: String {
+    case merchants
+    case communities
+}
+
 @available(iOS 17.0, *)
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
@@ -31,27 +36,36 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var initialRegionSet = false // Track if initial region has been set
     @Published var forceMapRefresh = false // Flag to force map annotation refresh
     @Published var selectionSource: SelectionSource = .unknown
-    @Published var isMerchantSearchPresented = false
-    @Published var merchantSearchText = ""
+    // Unified search state
+    @Published var unifiedSearchText = ""
+    @Published var isSearchActive = false
+    @Published var localFilteredMerchants: [Element] = []
+    @Published var searchMatchingAreas: [V3AreaRecord] = []
+    // Remote merchant search
     @Published var merchantSearchResults: [V4PlaceRecord] = []
     @Published var merchantSearchIsLoading = false
     @Published var merchantSearchError: String?
     @Published var merchantSearchUseMapCenter = true
     @Published var merchantSearchRadiusKM: Double = 20
     @Published var merchantSearchProviderFilter = ""
-    @Published var isEventsPresented = false
+    // Events
     @Published var eventsIncludePast = false
     @Published var eventsIsLoading = false
     @Published var eventsError: String?
     @Published var eventsResults: [V4EventRecord] = []
-    @Published var isAreaBrowserPresented = false
-    @Published var areaBrowserQuery = ""
+    @Published var hasLoadedEvents = false
+    // Area browser
     @Published var areaBrowserAreas: [V3AreaRecord] = []
     @Published var areaBrowserIsLoading = false
     @Published var areaBrowserError: String?
     @Published var selectedAreaID: Int?
     @Published var selectedAreaElementCount: Int?
-    
+    @Published var hasLoadedAreas = false
+    // Community map mode
+    @Published var mapDisplayMode: MapDisplayMode = .merchants
+    private var cachedCommunityOverlays: [MKPolygon]?
+    private var lastOverlayAreasHash: Int?
+
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
     let visibleElementsSubject = PassthroughSubject<[Element], Never>()
@@ -78,6 +92,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     
     private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: AnyCancellable?
+    private var unifiedSearchDebounceTask: Task<Void, Never>?
     private var latestMerchantSearchRequestID = UUID()
     
     // Use a queue for thread-safe access to mapView
@@ -543,7 +558,123 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
+    // MARK: - Unified Search
+
+    func performUnifiedSearch() {
+        let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Always filter local merchants instantly
+        if query.isEmpty {
+            localFilteredMerchants = []
+            searchMatchingAreas = []
+            clearMerchantSearchResults()
+            return
+        }
+
+        // Filter cached merchants by name
+        localFilteredMerchants = allElements.filter { element in
+            let name = element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? ""
+            return name.localizedStandardContains(query)
+        }
+
+        // Filter cached areas
+        if !areaBrowserAreas.isEmpty {
+            searchMatchingAreas = areaBrowserAreas.filter { area in
+                area.displayName.localizedStandardContains(query) ||
+                (area.urlAlias?.localizedStandardContains(query) ?? false) ||
+                (area.tags?["name:en"]?.localizedStandardContains(query) ?? false)
+            }
+        }
+
+        // Debounce remote API search for 3+ chars
+        unifiedSearchDebounceTask?.cancel()
+        guard query.count >= 3 else {
+            clearMerchantSearchResults()
+            return
+        }
+
+        unifiedSearchDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                merchantSearchText = query
+                performRemoteMerchantSearch()
+            }
+        }
+    }
+
+    /// Lazy-load events on first list appearance
+    func ensureEventsLoaded() {
+        guard !hasLoadedEvents else { return }
+        hasLoadedEvents = true
+        loadBTCMapEvents()
+    }
+
+    /// Lazy-load areas on first list appearance (needed for search suggestions)
+    func ensureAreasLoaded() {
+        guard !hasLoadedAreas else { return }
+        hasLoadedAreas = true
+        loadAreaBrowserAreas()
+    }
+
+    // MARK: - Community Map Mode
+
+    var communityOverlays: [MKPolygon] {
+        let currentHash = areaBrowserAreas.hashValue
+        if let cached = cachedCommunityOverlays, lastOverlayAreasHash == currentHash {
+            return cached
+        }
+
+        var polygons: [MKPolygon] = []
+        for area in areaBrowserAreas {
+            guard let geoJSON = area.geoJSON else { continue }
+            for feature in geoJSON.features {
+                let geom = feature.geometry
+                switch geom.coordinates {
+                case .polygon(let rings):
+                    if let poly = mkPolygon(from: rings, title: area.displayName) {
+                        polygons.append(poly)
+                    }
+                case .multiPolygon(let multiRings):
+                    for rings in multiRings {
+                        if let poly = mkPolygon(from: rings, title: area.displayName) {
+                            polygons.append(poly)
+                        }
+                    }
+                }
+            }
+        }
+
+        cachedCommunityOverlays = polygons
+        lastOverlayAreasHash = currentHash
+        return polygons
+    }
+
+    private func mkPolygon(from rings: [[[Double]]], title: String) -> MKPolygon? {
+        guard let outerRing = rings.first, !outerRing.isEmpty else { return nil }
+        var coords = outerRing.compactMap { point -> CLLocationCoordinate2D? in
+            guard point.count >= 2 else { return nil }
+            return CLLocationCoordinate2D(latitude: point[1], longitude: point[0])
+        }
+        let polygon = MKPolygon(coordinates: &coords, count: coords.count)
+        polygon.title = title
+        return polygon
+    }
+
+    func toggleMapMode() {
+        if mapDisplayMode == .merchants {
+            mapDisplayMode = .communities
+            ensureAreasLoaded()
+        } else {
+            mapDisplayMode = .merchants
+        }
+        forceMapRefresh = true
+    }
+
     // MARK: - Merchant Search (v4)
+
+    /// Internal property for remote search text (synced from unifiedSearchText)
+    private var merchantSearchText: String = ""
 
     func clearMerchantSearchResults() {
         merchantSearchResults = []
@@ -587,7 +718,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         guard let lat = event.lat, let lon = event.lon else { return }
         let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
         updateMapRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05), animated: true)
-        isEventsPresented = false
     }
 
     // MARK: - BTCMap Areas (v3 bridge)
@@ -612,16 +742,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    func filteredAreaBrowserAreas() -> [V3AreaRecord] {
-        let q = areaBrowserQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return areaBrowserAreas }
-        return areaBrowserAreas.filter { area in
-            area.displayName.localizedStandardContains(q) ||
-            (area.urlAlias?.localizedStandardContains(q) ?? false) ||
-            (area.tags?["name:en"]?.localizedStandardContains(q) ?? false)
-        }
-    }
-
     func selectArea(_ area: V3AreaRecord) {
         selectedAreaID = area.id
         selectedAreaElementCount = nil
@@ -642,8 +762,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 }
             }
         }
-
-        isAreaBrowserPresented = false
     }
 
     private func mapRegion(for area: V3AreaRecord) -> MKCoordinateRegion? {
@@ -665,7 +783,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         )
     }
 
-    func performMerchantSearch() {
+    private func performRemoteMerchantSearch() {
         let trimmedName = merchantSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedProvider = merchantSearchProviderFilter.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -755,7 +873,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         setSelectionSource(.unknown)
         selectedElement = element
         path = [element]
-        isMerchantSearchPresented = false
     }
 
     private func upsertElementIntoStore(_ element: Element) {

@@ -15,6 +15,8 @@ struct BottomSheetContentView: View {
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
 
+    @State private var savedDetent: PresentationDetent?
+
     var body: some View {
         GeometryReader { geometry in
             VStack {
@@ -23,18 +25,35 @@ struct BottomSheetContentView: View {
                         elements: visibleElements,
                         currentDetent: currentDetent
                     )
-                        .environmentObject(viewModel)
-                        .navigationDestination(for: Element.self) { element in
-                            BusinessDetailView(
-                                element: element,
-                                userLocation: viewModel.userLocation,
-                                contentViewModel: viewModel,
-                                currentDetent: currentDetent
-                            )
-                            .id(element.id)
-                            .clearNavigationContainerBackgroundIfAvailable()
-                        }
+                    .environmentObject(viewModel)
+                    .toolbar(.hidden, for: .navigationBar)
+                    .navigationDestination(for: Element.self) { element in
+                        BusinessDetailView(
+                            element: element,
+                            userLocation: viewModel.userLocation,
+                            contentViewModel: viewModel,
+                            currentDetent: currentDetent
+                        )
+                        .id(element.id)
                         .clearNavigationContainerBackgroundIfAvailable()
+                    }
+                    .clearNavigationContainerBackgroundIfAvailable()
+                }
+                .onChange(of: viewModel.unifiedSearchText) { _, _ in
+                    viewModel.performUnifiedSearch()
+                }
+                .onChange(of: viewModel.isSearchActive) { _, isActive in
+                    if isActive {
+                        savedDetent = currentDetent
+                        currentDetent = .large
+                    } else {
+                        if let saved = savedDetent {
+                            currentDetent = saved
+                        }
+                        savedDetent = nil
+                        viewModel.unifiedSearchText = ""
+                        viewModel.performUnifiedSearch()
+                    }
                 }
             }
             .ignoresSafeArea(edges: .bottom)
@@ -54,13 +73,11 @@ struct BottomSheetContentView: View {
             .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")
                 if let selectedElement = newPath.last {
-                    // If detail view is pushed, zoom to element
                     if viewModel.consumeSelectionSource() == .mapAnnotation {
                         viewModel.zoomToElement(selectedElement)
                     }
                     viewModel.selectedElement = selectedElement
                 } else {
-                    // If no element is selected (path is empty), deselect annotation
                     viewModel.deselectAnnotation()
                 }
             }

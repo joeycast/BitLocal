@@ -351,6 +351,51 @@ struct V3AreaBounds: Codable, Hashable {
         case maxLat = "max_lat"
     }
 }
+// MARK: - GeoJSON Models
+
+struct GeoJSONFeatureCollection: Codable, Hashable {
+    let type: String
+    let features: [GeoJSONFeature]
+}
+
+struct GeoJSONFeature: Codable, Hashable {
+    let type: String
+    let geometry: GeoJSONGeometry
+}
+
+struct GeoJSONGeometry: Codable, Hashable {
+    let type: String
+    let coordinates: GeoJSONCoordinates
+}
+
+enum GeoJSONCoordinates: Codable, Hashable {
+    case polygon([[[Double]]])
+    case multiPolygon([[[[Double]]]])
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let multi = try? container.decode([[[[Double]]]].self) {
+            self = .multiPolygon(multi)
+        } else if let poly = try? container.decode([[[Double]]].self) {
+            self = .polygon(poly)
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unrecognized GeoJSON coordinates format")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .polygon(let coords):
+            try container.encode(coords)
+        case .multiPolygon(let coords):
+            try container.encode(coords)
+        }
+    }
+}
+
+// MARK: - V3AreaRecord
+
 struct V3AreaRecord: Codable, Hashable, Identifiable {
     let id: Int
     let name: String?
@@ -360,6 +405,7 @@ struct V3AreaRecord: Codable, Hashable, Identifiable {
     let tags: [String: String]?
     let bounds: V3AreaBounds?
     let updatedAt: String?
+    let geoJSON: GeoJSONFeatureCollection?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -372,11 +418,104 @@ struct V3AreaRecord: Codable, Hashable, Identifiable {
         case updatedAt = "updated_at"
     }
 
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        urlAlias = try container.decodeIfPresent(String.self, forKey: .urlAlias)
+        osmID = try container.decodeIfPresent(Int.self, forKey: .osmID)
+        osmType = try container.decodeIfPresent(String.self, forKey: .osmType)
+        bounds = try container.decodeIfPresent(V3AreaBounds.self, forKey: .bounds)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+
+        // Decode tags as mixed-type dictionary to extract geo_json
+        if let rawTags = try container.decodeIfPresent([String: AnyCodableValue].self, forKey: .tags) {
+            var stringTags: [String: String] = [:]
+            var parsedGeoJSON: GeoJSONFeatureCollection?
+
+            for (key, value) in rawTags {
+                if key == "geo_json" {
+                    // Re-encode the nested value and decode as GeoJSONFeatureCollection
+                    if let data = try? JSONEncoder().encode(value),
+                       let fc = try? JSONDecoder().decode(GeoJSONFeatureCollection.self, from: data) {
+                        parsedGeoJSON = fc
+                    }
+                } else if case .string(let s) = value {
+                    stringTags[key] = s
+                }
+            }
+
+            tags = stringTags.isEmpty ? nil : stringTags
+            geoJSON = parsedGeoJSON
+        } else {
+            tags = nil
+            geoJSON = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(urlAlias, forKey: .urlAlias)
+        try container.encodeIfPresent(osmID, forKey: .osmID)
+        try container.encodeIfPresent(osmType, forKey: .osmType)
+        try container.encodeIfPresent(tags, forKey: .tags)
+        try container.encodeIfPresent(bounds, forKey: .bounds)
+        try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
+    }
+
     var displayName: String {
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !trimmed.isEmpty { return trimmed }
         if let tagName = tags?["name"], !tagName.isEmpty { return tagName }
         return "Area #\(id)"
+    }
+}
+
+// MARK: - AnyCodableValue (thin wrapper for mixed-type JSON)
+
+enum AnyCodableValue: Codable, Hashable {
+    case string(String)
+    case int(Int)
+    case double(Double)
+    case bool(Bool)
+    case object([String: AnyCodableValue])
+    case array([AnyCodableValue])
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let s = try? container.decode(String.self) {
+            self = .string(s)
+        } else if let i = try? container.decode(Int.self) {
+            self = .int(i)
+        } else if let d = try? container.decode(Double.self) {
+            self = .double(d)
+        } else if let b = try? container.decode(Bool.self) {
+            self = .bool(b)
+        } else if let obj = try? container.decode([String: AnyCodableValue].self) {
+            self = .object(obj)
+        } else if let arr = try? container.decode([AnyCodableValue].self) {
+            self = .array(arr)
+        } else if container.decodeNil() {
+            self = .null
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported JSON value")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let s): try container.encode(s)
+        case .int(let i): try container.encode(i)
+        case .double(let d): try container.encode(d)
+        case .bool(let b): try container.encode(b)
+        case .object(let obj): try container.encode(obj)
+        case .array(let arr): try container.encode(arr)
+        case .null: try container.encodeNil()
+        }
     }
 }
 

@@ -8,18 +8,19 @@ import Foundation
 
 @available(iOS 17.0, *)
 struct BusinessesListView: View {
-    
+
     @EnvironmentObject var viewModel: ContentViewModel
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    
+
     let maxListResults = 25
     var elements: [Element]
     var userLocation: CLLocation?
     var currentDetent: PresentationDetent? = nil
-    
+
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
-    
+    @FocusState private var isSearchFieldFocused: Bool
+
     private var sortedElements: [Element] {
         elements.sorted { (element1, element2) -> Bool in
             guard let distance1 = viewModel.distanceInMiles(element: element1),
@@ -29,91 +30,265 @@ struct BusinessesListView: View {
             return distance1 < distance2
         }
     }
-    
+
     var body: some View {
-        Group {
-            // 1️⃣ Loading state
-            if viewModel.isLoading {
-                VStack {
-                    Spacer()
-                    LoadingScreenView()
-                    Spacer()
-                }
-            }
-            // 2️⃣ No locations after loading finishes
-            else if elements.isEmpty {
-                Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
-                    .foregroundColor(.gray)
-                    .font(.title3)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            }
-            // 3️⃣ Show the list when we have elements
-            else {
-                List {
-                    Section {
-                        ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
-                            let cellVM = cellViewModel(for: element)
-                            Button {
-                                viewModel.setSelectionSource(.list)
-                                viewModel.selectAnnotation(for: element, animated: true)
-                                viewModel.path = [element]
-                            } label: {
-                                ZStack(alignment: .trailing) {
-                                    ElementCell(viewModel: cellVM)
-                                        .padding(.trailing, 18)
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundColor(.gray.opacity(0.6))
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .clearListRowBackground(if: shouldUseGlassyRows)
-                        }
-                        // Insert the footer as its own row:
-                        footerView
-                            .clearListRowBackground(if: shouldUseGlassyRows)
+        VStack(spacing: 0) {
+            // Always-visible search bar
+            searchBar
+                .padding(.top, 20)
+                .padding(.bottom, 2)
+
+            Group {
+                if viewModel.isLoading {
+                    VStack {
+                        Spacer()
+                        LoadingScreenView()
+                        Spacer()
                     }
-                    .clearListRowBackground(if: shouldUseGlassyRows)
+                } else if viewModel.isSearchActive {
+                    searchResultsView
+                } else if elements.isEmpty {
+                    Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
+                        .foregroundStyle(.gray)
+                        .font(.title3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                } else {
+                    normalListView
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
-                .background(Color.clear)
-                .environment(\.defaultMinListRowHeight, 0)
-                .navigationBarTitleDisplayMode(.inline)
-                .padding(.top)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
-        // OPTIMIZED: Only log significant location changes at the list level
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
         }
+        .onChange(of: isSearchFieldFocused) { _, focused in
+            if focused && !viewModel.isSearchActive {
+                viewModel.isSearchActive = true
+            }
+        }
+        .onAppear {
+            viewModel.ensureEventsLoaded()
+            viewModel.ensureAreasLoaded()
+        }
     }
-    
-    // OPTIMIZED: Centralized location change handling with deduplication
+
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 15))
+            TextField("Search merchants or regions…", text: $viewModel.unifiedSearchText)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .focused($isSearchFieldFocused)
+                .submitLabel(.search)
+            if !viewModel.unifiedSearchText.isEmpty {
+                Button {
+                    viewModel.unifiedSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 15))
+                }
+            }
+            if viewModel.isSearchActive {
+                Button("Cancel") {
+                    isSearchFieldFocused = false
+                    viewModel.isSearchActive = false
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 12)
+        .background(Color(.tertiarySystemFill))
+        .clipShape(RoundedRectangle(cornerRadius: 18.5))
+        .padding(.horizontal, 16)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
+    }
+
+    // MARK: - Normal Mode (discovery hub)
+
+    private var normalListView: some View {
+        List {
+            // Events carousel (only renders if events exist)
+            EventsDiscoverySection()
+                .environmentObject(viewModel)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .clearListRowBackground(if: shouldUseGlassyRows)
+
+            // Merchant list
+            Section {
+                ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
+                    let cellVM = cellViewModel(for: element)
+                    Button {
+                        viewModel.setSelectionSource(.list)
+                        viewModel.selectAnnotation(for: element, animated: true)
+                        viewModel.path = [element]
+                    } label: {
+                        ZStack(alignment: .trailing) {
+                            ElementCell(viewModel: cellVM)
+                                .padding(.trailing, 18)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.gray.opacity(0.6))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .clearListRowBackground(if: shouldUseGlassyRows)
+                }
+
+                footerView
+                    .clearListRowBackground(if: shouldUseGlassyRows)
+            }
+            .clearListRowBackground(if: shouldUseGlassyRows)
+
+            // Browse All Regions
+            Section {
+                NavigationLink {
+                    AllRegionsListView()
+                        .environmentObject(viewModel)
+                } label: {
+                    Label("Browse All Regions", systemImage: "globe")
+                        .font(.subheadline.weight(.medium))
+                }
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            }
+            .clearListRowBackground(if: shouldUseGlassyRows)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .background(Color.clear)
+        .environment(\.defaultMinListRowHeight, 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Search Mode
+
+    private var searchResultsView: some View {
+        List {
+            // Matching regions
+            if !viewModel.searchMatchingAreas.isEmpty {
+                Section("Regions") {
+                    ForEach(viewModel.searchMatchingAreas.prefix(3)) { area in
+                        Button {
+                            viewModel.selectArea(area)
+                            viewModel.isSearchActive = false
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "globe")
+                                    .foregroundStyle(.accent)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(area.displayName)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    if let subtitle = areaSubtitle(area) {
+                                        Text(subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            // Local merchant matches
+            if !viewModel.localFilteredMerchants.isEmpty {
+                Section("Nearby") {
+                    ForEach(viewModel.localFilteredMerchants.prefix(10), id: \.id) { element in
+                        let cellVM = cellViewModel(for: element)
+                        Button {
+                            viewModel.setSelectionSource(.list)
+                            viewModel.selectAnnotation(for: element, animated: true)
+                            viewModel.path = [element]
+                        } label: {
+                            ElementCell(viewModel: cellVM)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            // Remote API results
+            if viewModel.merchantSearchIsLoading {
+                Section {
+                    HStack {
+                        ProgressView()
+                        Text("Searching…")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if !viewModel.merchantSearchResults.isEmpty {
+                let localIDs = Set(viewModel.localFilteredMerchants.map(\.id))
+                let deduped = viewModel.merchantSearchResults.filter { !localIDs.contains($0.idString) }
+                if !deduped.isEmpty {
+                    Section("More Results") {
+                        ForEach(deduped) { result in
+                            Button {
+                                viewModel.selectMerchantSearchResult(result)
+                            } label: {
+                                MerchantSearchResultRow(
+                                    result: result,
+                                    referenceLocation: searchReferenceLocation
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            // Empty state
+            if viewModel.localFilteredMerchants.isEmpty &&
+                viewModel.searchMatchingAreas.isEmpty &&
+                viewModel.merchantSearchResults.isEmpty &&
+                !viewModel.merchantSearchIsLoading &&
+                !viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Section {
+                    Text("No results found")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Helpers
+
+    private var searchReferenceLocation: CLLocation? {
+        if let userLocation = viewModel.userLocation { return userLocation }
+        let center = viewModel.region.center
+        return CLLocation(latitude: center.latitude, longitude: center.longitude)
+    }
+
+    private func areaSubtitle(_ area: V3AreaRecord) -> String? {
+        if let place = area.tags?["place"], !place.isEmpty { return place.capitalized }
+        if let boundary = area.tags?["boundary"], !boundary.isEmpty { return boundary.capitalized }
+        return area.urlAlias
+    }
+
     private func handleUserLocationChange(_ newLocation: CLLocation?) {
         guard let newLocation = newLocation else { return }
-        
-        // Only log/process if location actually changed significantly (>10 meters)
         if let lastCoord = lastLoggedLocation {
             let lastLoc = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
             let currentLoc = CLLocation(latitude: newLocation.coordinate.latitude, longitude: newLocation.coordinate.longitude)
-            
-            if lastLoc.distance(from: currentLoc) < 10 {
-                return // Skip if location hasn't changed significantly
-            }
+            if lastLoc.distance(from: currentLoc) < 10 { return }
         }
-        
         lastLoggedLocation = newLocation.coordinate
         Debug.log("User location updated in BusinessesListView: \(newLocation.coordinate.latitude), \(newLocation.coordinate.longitude)")
-        
-        // Update cell view models that need refresh
         for cellVM in cellViewModels.values {
             cellVM.updateUserLocationIfNeeded(newLocation)
         }
     }
-    
+
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
         if let vm = viewModel.cellViewModels[element.id] {
             return vm
@@ -127,7 +302,7 @@ struct BusinessesListView: View {
             return newVM
         }
     }
-    
+
     private var footerView: some View {
         Group {
             if sortedElements.count > maxListResults {
@@ -149,14 +324,14 @@ struct BusinessesListView: View {
             }
         }
         .font(.footnote)
-        .foregroundColor(.secondary)
+        .foregroundStyle(.secondary)
     }
-    
+
     private var shouldHideSheetBackground: Bool {
         guard let detent = currentDetent else { return false }
         return detent != .large
     }
-    
+
     private var shouldUseGlassyRows: Bool {
         guard let detent = currentDetent else { return false }
         guard #available(iOS 26.0, *) else { return false }

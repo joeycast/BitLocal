@@ -22,7 +22,25 @@ struct MapButtonsView: View {
     
     var body: some View {
         VStack(spacing: 10) {
-            
+
+            // Community / Merchants toggle
+            Button {
+                viewModel.toggleMapMode()
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 44, height: 44)
+                        .shadow(radius: 3)
+                    Image(systemName: viewModel.mapDisplayMode == .merchants
+                          ? "person.3.fill" : "mappin.and.ellipse")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .accessibilityLabel(viewModel.mapDisplayMode == .merchants
+                                ? "Show communities" : "Show merchants")
+
             Button(action: {
                 let newType: MKMapType = (selectedMapType == .standard) ? .hybrid : .standard
                 selectedMapTypeBinding.wrappedValue = newType

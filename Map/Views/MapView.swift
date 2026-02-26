@@ -174,6 +174,41 @@ struct MapView: UIViewRepresentable {
             }
         }
         
+        // Handle community/merchant display mode overlay sync
+        let currentMode = viewModel.mapDisplayMode
+        let modeChanged = context.coordinator.lastDisplayMode != currentMode
+
+        if modeChanged || (currentMode == .communities && viewModel.forceMapRefresh) {
+            context.coordinator.lastDisplayMode = currentMode
+
+            if currentMode == .communities {
+                // Remove merchant annotations
+                let merchantAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+                if !merchantAnnotations.isEmpty {
+                    mapView.removeAnnotations(merchantAnnotations)
+                }
+                // Sync overlays
+                let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
+                let desiredOverlays = Set(viewModel.communityOverlays)
+                let toRemove = existingOverlays.subtracting(desiredOverlays)
+                let toAdd = desiredOverlays.subtracting(existingOverlays)
+                if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
+                if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
+                Debug.logMap("Community mode: \(mapView.overlays.count) overlays on map")
+            } else {
+                // Remove all overlays
+                if !mapView.overlays.isEmpty {
+                    mapView.removeOverlays(mapView.overlays)
+                }
+                // Force annotation refresh
+                if let elements = elements, !elements.isEmpty {
+                    context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
+                }
+                Debug.logMap("Merchant mode: overlays cleared, annotations restored")
+            }
+            needsUpdate = true
+        }
+
         // Only log if we actually did something
         if !needsUpdate {
             // Silent skip - don't log unless debugging
@@ -200,7 +235,8 @@ struct MapView: UIViewRepresentable {
         private var cancellable: AnyCancellable?
         private var debounceTimer: AnyCancellable?
         var lastElementsHash: Int?
-        
+        var lastDisplayMode: MapDisplayMode = .merchants
+
         init(viewModel: ContentViewModel, topPadding: CGFloat, bottomPadding: CGFloat) {
             self.viewModel = viewModel
             self.topPadding = topPadding
@@ -414,6 +450,17 @@ struct MapView: UIViewRepresentable {
             }
         }
         
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polygon = overlay as? MKPolygon {
+                let renderer = MKPolygonRenderer(polygon: polygon)
+                renderer.strokeColor = UIColor(named: "MarkerColor") ?? .systemOrange
+                renderer.lineWidth = 2
+                renderer.fillColor = (UIColor(named: "MarkerColor") ?? .systemOrange).withAlphaComponent(0.15)
+                return renderer
+            }
+            return MKOverlayRenderer(overlay: overlay)
+        }
+
         // Update visible elements based on annotations in the visible map rect
         func updateVisibleElements(for mapView: MKMapView) {
             let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
