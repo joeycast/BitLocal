@@ -21,6 +21,20 @@
                ReferencedContainer = "container:bitlocal.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F7C0A2403A5B100100000140"
+               BuildableName = "bitlocalTests.xctest"
+               BlueprintName = "bitlocalTests"
+               ReferencedContainer = "container:bitlocal.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -29,6 +43,27 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F7C0A2403A5B100100000140"
+               BuildableName = "bitlocalTests.xctest"
+               BlueprintName = "bitlocalTests"
+               ReferencedContainer = "container:bitlocal.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "F6B565BE2DA322FD00EE992E"
+            BuildableName = "bitlocal.app"
+            BlueprintName = "bitlocal"
+            ReferencedContainer = "container:bitlocal.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
