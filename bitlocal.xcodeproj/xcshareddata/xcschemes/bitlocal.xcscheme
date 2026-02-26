@@ -55,15 +55,6 @@
             </BuildableReference>
          </TestableReference>
       </Testables>
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "F6B565BE2DA322FD00EE992E"
-            BuildableName = "bitlocal.app"
-            BlueprintName = "bitlocal"
-            ReferencedContainer = "container:bitlocal.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
