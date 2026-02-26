@@ -128,6 +128,15 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         }.resume()
     }
 
+    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+        guard var components = URLComponents(url: baseURL.appendingPathComponent("events"), resolvingAgainstBaseURL: false) else {
+            completion(.failure(BTCMapV4Error.invalidURL))
+            return
+        }
+        components.queryItems = query.queryItems()
+        performRequest(url: components.url, completion: completion)
+    }
+
     private func performRequest(url: URL?, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
         guard let url else {
             completion(.failure(BTCMapV4Error.invalidURL))
@@ -149,6 +158,34 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             }
             do {
                 let records = try self.decoder.decode([V4PlaceRecord].self, from: data)
+                completion(.success(records))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+
+    private func performRequest(url: URL?, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+        guard let url else {
+            completion(.failure(BTCMapV4Error.invalidURL))
+            return
+        }
+        session.dataTask(with: url) { data, response, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+            guard let data, let http = response as? HTTPURLResponse else {
+                completion(.failure(BTCMapV4Error.invalidResponse))
+                return
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let message = String(data: data.prefix(500), encoding: .utf8)
+                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
+                return
+            }
+            do {
+                let records = try self.decoder.decode([V4EventRecord].self, from: data)
                 completion(.success(records))
             } catch {
                 completion(.failure(error))
@@ -475,6 +512,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
 
     func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
         v4Client.fetchPlace(id: id, completion: completion)
+    }
+
+    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+        v4Client.fetchEvents(query: query, completion: completion)
     }
 
     private var dataSourceMode: BTCMapDataSourceMode {

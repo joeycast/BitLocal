@@ -39,6 +39,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var merchantSearchUseMapCenter = true
     @Published var merchantSearchRadiusKM: Double = 20
     @Published var merchantSearchProviderFilter = ""
+    @Published var isEventsPresented = false
+    @Published var eventsIncludePast = false
+    @Published var eventsIsLoading = false
+    @Published var eventsError: String?
+    @Published var eventsResults: [V4EventRecord] = []
     
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -537,6 +542,45 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         merchantSearchResults = []
         merchantSearchError = nil
         merchantSearchIsLoading = false
+    }
+
+    // MARK: - BTCMap Events (v4)
+
+    func clearEventsResults() {
+        eventsResults = []
+        eventsError = nil
+        eventsIsLoading = false
+    }
+
+    func loadBTCMapEvents() {
+        eventsIsLoading = true
+        eventsError = nil
+
+        let query = V4EventsQuery(includePast: eventsIncludePast, limit: 100)
+        btcMapRepository.fetchEvents(query: query) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.eventsIsLoading = false
+                switch result {
+                case .success(let events):
+                    self.eventsResults = events.sorted { lhs, rhs in
+                        let l = lhs.startsAt ?? lhs.updatedAt ?? ""
+                        let r = rhs.startsAt ?? rhs.updatedAt ?? ""
+                        return l < r
+                    }
+                case .failure(let error):
+                    self.eventsResults = []
+                    self.eventsError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func selectEvent(_ event: V4EventRecord) {
+        guard let lat = event.lat, let lon = event.lon else { return }
+        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        updateMapRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05), animated: true)
+        isEventsPresented = false
     }
 
     func performMerchantSearch() {

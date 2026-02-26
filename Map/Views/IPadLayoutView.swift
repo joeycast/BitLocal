@@ -46,6 +46,13 @@ struct IPadLayoutView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
+                            viewModel.isEventsPresented = true
+                        } label: {
+                            Image(systemName: "calendar")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
                             viewModel.isMerchantSearchPresented = true
                         } label: {
                             Image(systemName: "magnifyingglass")
@@ -143,6 +150,12 @@ struct IPadLayoutView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
         .sheet(isPresented: $viewModel.isMerchantSearchPresented) {
             MerchantSearchSheetView()
+                .environmentObject(viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $viewModel.isEventsPresented) {
+            BTCMapEventsSheetView()
                 .environmentObject(viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)

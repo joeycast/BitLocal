@@ -186,16 +186,62 @@ struct V4SearchQuery: Hashable {
     }
 }
 
+struct V4EventsQuery: Hashable {
+    var updatedSince: String?
+    var includePast: Bool = false
+    var limit: Int = 100
+
+    func queryItems() -> [URLQueryItem] {
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "include_past", value: includePast ? "true" : "false"),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        if let updatedSince, !updatedSince.isEmpty {
+            items.append(URLQueryItem(name: "updated_since", value: updatedSince))
+        }
+        return items
+    }
+}
+
+struct V4EventRecord: Codable, Hashable, Identifiable {
+    let id: Int
+    let lat: Double?
+    let lon: Double?
+    let name: String?
+    let website: String?
+    let startsAt: String?
+    let endsAt: String?
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case lat
+        case lon
+        case name
+        case website
+        case startsAt = "starts_at"
+        case endsAt = "ends_at"
+        case updatedAt = "updated_at"
+    }
+
+    var displayName: String {
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? "BTCMap Event #\(id)" : trimmed
+    }
+}
+
 protocol BTCMapV4ClientProtocol {
     func fetchSnapshot(completion: @escaping (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void)
     func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void)
     func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void)
     func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void)
+    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void)
 }
 
 protocol BTCMapSearchServiceProtocol {
     func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void)
     func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void)
+    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void)
 }
 
 protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
@@ -203,4 +249,3 @@ protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
     func hasCachedData() -> Bool
     func refreshElements(completion: @escaping ([Element]?) -> Void)
 }
-

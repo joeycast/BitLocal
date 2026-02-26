@@ -54,6 +54,14 @@ struct IPhoneHeaderView: View {
                     HStack(spacing: 10) {
                         InfoButtonView(showingAbout: $showingAbout)
                         Button {
+                            viewModel.isEventsPresented = true
+                        } label: {
+                            Image(systemName: "calendar.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.accentColor)
+                                .accessibilityLabel("Browse BTCMap events")
+                        }
+                        Button {
                             viewModel.isMerchantSearchPresented = true
                         } label: {
                             Image(systemName: "magnifyingglass.circle.fill")
@@ -102,6 +110,12 @@ struct IPhoneHeaderView: View {
         }
         .sheet(isPresented: $viewModel.isMerchantSearchPresented) {
             MerchantSearchSheetView()
+                .environmentObject(viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $viewModel.isEventsPresented) {
+            BTCMapEventsSheetView()
                 .environmentObject(viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
