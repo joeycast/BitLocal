@@ -128,6 +128,36 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         }.resume()
     }
 
+    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+        guard let encodedID = placeID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "https://api.btcmap.org/v4/places/\(encodedID)/comments") else {
+            completion(.failure(BTCMapV4Error.invalidURL))
+            return
+        }
+
+        session.dataTask(with: url) { data, response, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+            guard let data, let http = response as? HTTPURLResponse else {
+                completion(.failure(BTCMapV4Error.invalidResponse))
+                return
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let message = String(data: data.prefix(500), encoding: .utf8)
+                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
+                return
+            }
+            do {
+                let records = try self.decoder.decode([V4PlaceCommentRecord].self, from: data)
+                completion(.success(records))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+
     private func performRequest(url: URL?, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
         guard let url else {
             completion(.failure(BTCMapV4Error.invalidURL))
@@ -477,6 +507,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         v4Client.fetchPlace(id: id, completion: completion)
     }
 
+    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+        v4Client.fetchPlaceComments(placeID: placeID, completion: completion)
+    }
+
     private var dataSourceMode: BTCMapDataSourceMode {
         guard let raw = userDefaults.string(forKey: modeKey),
               let mode = BTCMapDataSourceMode(rawValue: raw) else {
@@ -720,4 +754,3 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         iso8601Basic.string(from: Date())
     }
 }
-

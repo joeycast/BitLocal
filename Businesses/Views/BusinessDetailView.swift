@@ -153,6 +153,8 @@ struct BusinessDetailView: View {
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapV4EnrichmentSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
+            BTCMapPlaceCommentsSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
             PaymentDetailsSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessMapSection(element: element)
@@ -180,6 +182,128 @@ extension BusinessDetailView {
         guard let detent = currentDetent else { return false }
         guard #available(iOS 26.0, *) else { return false }
         return detent != .large
+    }
+}
+
+struct BTCMapPlaceCommentsSection: View {
+    let element: Element
+
+    @State private var comments: [V4PlaceCommentRecord] = []
+    @State private var isLoading = false
+    @State private var errorText: String?
+    @State private var hasLoaded = false
+
+    private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
+
+    private var expectedCount: Int? { element.v4Metadata?.commentsCount }
+
+    var body: some View {
+        if shouldShowSection {
+            Section(header: Text("Comments")) {
+                if let expectedCount, expectedCount > 0, !hasLoaded {
+                    Button {
+                        loadComments()
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.down.circle")
+                            Text("Load \(expectedCount) comment\(expectedCount == 1 ? "" : "s")")
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if isLoading {
+                    HStack {
+                        ProgressView()
+                        Text("Loading comments…")
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                if let errorText, !errorText.isEmpty {
+                    Text(errorText)
+                        .foregroundColor(.red)
+                        .font(.subheadline)
+                }
+
+                if hasLoaded && comments.isEmpty && !isLoading && errorText == nil {
+                    Text("No comments found")
+                        .foregroundColor(.secondary)
+                }
+
+                ForEach(comments) { comment in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
+                            if let author = comment.authorDisplayName {
+                                Text(author)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            } else {
+                                Text("Anonymous")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if let createdAt = comment.createdAt, !createdAt.isEmpty {
+                                Text(createdAt.formattedBTCMapDate())
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if !comment.bodyText.isEmpty {
+                            Text(comment.bodyText)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                        }
+
+                        if let sats = comment.amountSats, sats > 0 {
+                            Text("\(sats) sats")
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.orange.opacity(0.12))
+                                .foregroundColor(.orange)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .task(id: element.id) {
+                // Auto-load only when BTCMap metadata suggests comments exist.
+                if (expectedCount ?? 0) > 0, !hasLoaded, !isLoading {
+                    loadComments()
+                }
+            }
+        }
+    }
+
+    private var shouldShowSection: Bool {
+        (expectedCount ?? 0) > 0 || hasLoaded || isLoading || errorText != nil
+    }
+
+    private func loadComments() {
+        guard !isLoading else { return }
+        isLoading = true
+        errorText = nil
+
+        repository.fetchPlaceComments(placeID: element.id) { result in
+            DispatchQueue.main.async {
+                isLoading = false
+                hasLoaded = true
+                switch result {
+                case .success(let comments):
+                    self.comments = comments
+                        .filter { !$0.bodyText.isEmpty }
+                        .sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
+                case .failure(let error):
+                    self.comments = []
+                    errorText = error.localizedDescription
+                }
+            }
+        }
     }
 }
 
