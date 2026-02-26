@@ -233,3 +233,134 @@ struct MerchantSearchResultRow: View {
     }
 }
 
+@available(iOS 17.0, *)
+struct BTCMapAreasSheetView: View {
+    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Search Areas") {
+                    TextField("City / region / country", text: $viewModel.areaBrowserQuery)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+
+                    if let selectedAreaID = viewModel.selectedAreaID {
+                        HStack {
+                            Text("Selected Area ID")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(String(selectedAreaID))
+                        }
+                        if let count = viewModel.selectedAreaElementCount {
+                            HStack {
+                                Text("Area Elements")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(String(count))
+                            }
+                        }
+                    }
+                }
+
+                if viewModel.areaBrowserIsLoading {
+                    Section {
+                        HStack {
+                            ProgressView()
+                            Text("Loading BTCMap areas…")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } else if let error = viewModel.areaBrowserError, !error.isEmpty {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                    }
+                }
+
+                Section("Areas") {
+                    let areas = viewModel.filteredAreaBrowserAreas()
+                    if areas.isEmpty, !viewModel.areaBrowserIsLoading {
+                        Text("No areas found")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(areas) { area in
+                            Button {
+                                viewModel.selectArea(area)
+                                dismiss()
+                            } label: {
+                                BTCMapAreaRow(area: area)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("BTCMap Areas")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") {
+                        viewModel.isAreaBrowserPresented = false
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Refresh") {
+                        viewModel.loadAreaBrowserAreas()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            if viewModel.areaBrowserAreas.isEmpty {
+                viewModel.loadAreaBrowserAreas()
+            }
+        }
+    }
+}
+
+@available(iOS 17.0, *)
+private struct BTCMapAreaRow: View {
+    let area: V3AreaRecord
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(area.displayName)
+                .font(.headline)
+                .foregroundColor(.primary)
+                .lineLimit(2)
+
+            HStack(spacing: 8) {
+                if let adminLevel = area.tags?["admin_level"], !adminLevel.isEmpty {
+                    areaBadge("admin \(adminLevel)", tint: .blue)
+                }
+                if let boundary = area.tags?["boundary"], !boundary.isEmpty {
+                    areaBadge(boundary, tint: .green)
+                }
+                if let place = area.tags?["place"], !place.isEmpty {
+                    areaBadge(place, tint: .orange)
+                }
+            }
+
+            if let alias = area.urlAlias, !alias.isEmpty {
+                Text(alias)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func areaBadge(_ text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.caption2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.12))
+            .foregroundColor(tint)
+            .clipShape(Capsule())
+    }
+}

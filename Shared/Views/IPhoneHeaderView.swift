@@ -54,6 +54,14 @@ struct IPhoneHeaderView: View {
                     HStack(spacing: 10) {
                         InfoButtonView(showingAbout: $showingAbout)
                         Button {
+                            viewModel.isAreaBrowserPresented = true
+                        } label: {
+                            Image(systemName: "globe.americas.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.accentColor)
+                                .accessibilityLabel("Browse areas")
+                        }
+                        Button {
                             viewModel.isMerchantSearchPresented = true
                         } label: {
                             Image(systemName: "magnifyingglass.circle.fill")
@@ -102,6 +110,12 @@ struct IPhoneHeaderView: View {
         }
         .sheet(isPresented: $viewModel.isMerchantSearchPresented) {
             MerchantSearchSheetView()
+                .environmentObject(viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $viewModel.isAreaBrowserPresented) {
+            BTCMapAreasSheetView()
                 .environmentObject(viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
