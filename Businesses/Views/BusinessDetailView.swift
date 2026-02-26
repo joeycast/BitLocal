@@ -151,6 +151,8 @@ struct BusinessDetailView: View {
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessDetailsSection(element: element, elementCellViewModel: elementCellViewModel)
                 .clearListRowBackground(if: shouldUseGlassyRows)
+            BTCMapV4EnrichmentSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
             PaymentDetailsSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessMapSection(element: element)
@@ -179,6 +181,206 @@ extension BusinessDetailView {
         guard #available(iOS 26.0, *) else { return false }
         return detent != .large
     }
+}
+
+struct BTCMapV4EnrichmentSection: View {
+    let element: Element
+
+    private var metadata: ElementV4Metadata? { element.v4Metadata }
+
+    private var verifiedDateText: String? {
+        guard let raw = metadata?.verifiedAt else { return nil }
+        return raw.formattedBTCMapDate()
+    }
+
+    private var boostedUntilText: String? {
+        guard let raw = metadata?.boostedUntil else { return nil }
+        return raw.formattedBTCMapDate()
+    }
+
+    private var socialLinks: [(label: String, value: String, url: URL?)] {
+        guard let metadata else { return [] }
+        return [
+            ("Twitter", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
+            ("Facebook", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
+            ("Instagram", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
+            ("Telegram", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
+            ("LINE", metadata.line, metadata.line.flatMap(URL.init(string:)))
+        ].compactMap { item in
+            guard let value = item.1?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+                return nil
+            }
+            return (item.0, value, item.2)
+        }
+    }
+
+    var body: some View {
+        if hasContent {
+            Section(header: Text("BTCMap")) {
+                if let imageURLString = metadata?.imageURL,
+                   let imageURL = URL(string: imageURLString) {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 180)
+                                .frame(maxWidth: .infinity)
+                                .clipShape(.rect(cornerRadius: 12))
+                        case .failure:
+                            EmptyView()
+                        case .empty:
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 120)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                }
+
+                if let verifiedDateText {
+                    detailRow(icon: "checkmark.seal.fill", tint: .green, label: "Verified", value: verifiedDateText)
+                }
+
+                if let commentsCount = metadata?.commentsCount {
+                    detailRow(icon: "text.bubble.fill", tint: .blue, label: "Comments", value: "\(commentsCount)")
+                }
+
+                if let boostedUntilText {
+                    detailRow(icon: "bolt.badge.clock.fill", tint: .orange, label: "Boosted Until", value: boostedUntilText)
+                }
+
+                if let paymentProvider = metadata?.paymentProvider, !paymentProvider.isEmpty {
+                    detailRow(icon: "creditcard.fill", tint: .accentColor, label: "Payment Provider", value: paymentProvider)
+                }
+
+                if let requiredAppURL = metadata?.requiredAppURL,
+                   let url = URL(string: requiredAppURL) {
+                    Link(destination: url) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: "app.badge.fill")
+                                    .foregroundStyle(.orange)
+                                Text("Required App")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(requiredAppURL)
+                                .font(.footnote)
+                                .foregroundStyle(.accent)
+                                .lineLimit(2)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let email = metadata?.email, let url = URL(string: "mailto:\(email)") {
+                    Link(destination: url) {
+                        textLinkRow(icon: "envelope.fill", label: "Email", value: email)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                ForEach(socialLinks, id: \.label) { social in
+                    if let url = social.url {
+                        Link(destination: url) {
+                            textLinkRow(icon: "link", label: social.label, value: social.value)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        textLinkRow(icon: "link", label: social.label, value: social.value)
+                    }
+                }
+
+                if let osmURLString = metadata?.osmURL, let osmURL = URL(string: osmURLString) {
+                    Link(destination: osmURL) {
+                        textLinkRow(icon: "globe", label: "OpenStreetMap", value: osmURLString)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var hasContent: Bool {
+        guard let metadata else { return false }
+        return [
+            metadata.verifiedAt,
+            metadata.boostedUntil,
+            metadata.paymentProvider,
+            metadata.requiredAppURL,
+            metadata.email,
+            metadata.twitter,
+            metadata.facebook,
+            metadata.instagram,
+            metadata.telegram,
+            metadata.line,
+            metadata.imageURL,
+            metadata.osmURL
+        ].contains { ($0?.isEmpty == false) } || metadata.commentsCount != nil
+    }
+
+    private func detailRow(icon: String, tint: Color, label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .foregroundStyle(.primary)
+            }
+        }
+    }
+
+    private func textLinkRow(icon: String, label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundColor(.accentColor)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .foregroundColor(.accentColor)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private func urlForSocialHandle(_ value: String, base: String) -> URL? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+        return URL(string: trimmed)
+    }
+    let sanitized = trimmed.hasPrefix("@") ? String(trimmed.dropFirst()) : trimmed
+    return URL(string: base + sanitized)
+}
+
+private extension String {
+    func formattedBTCMapDate() -> String {
+        if let date = ISO8601DateFormatter.fullPrecision.date(from: self) ?? ISO8601DateFormatter().date(from: self) {
+            return date.formatted(date: .abbreviated, time: .shortened)
+        }
+        return self
+    }
+}
+
+private extension ISO8601DateFormatter {
+    static let fullPrecision: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 }
 
 // BusinessDescriptionSection
