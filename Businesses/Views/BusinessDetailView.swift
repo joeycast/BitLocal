@@ -5,6 +5,7 @@ import CoreLocation
 import MapKit
 import Contacts
 import Foundation
+import UIKit
 
 // Helper function to open location in Maps with full details
 func openLocationInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?) {
@@ -153,6 +154,10 @@ struct BusinessDetailView: View {
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapV4EnrichmentSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
+            BTCMapPlaceCommentsSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            BTCMapPaidActionsSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
             PaymentDetailsSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessMapSection(element: element)
@@ -180,6 +185,418 @@ extension BusinessDetailView {
         guard let detent = currentDetent else { return false }
         guard #available(iOS 26.0, *) else { return false }
         return detent != .large
+    }
+}
+
+struct BTCMapPlaceCommentsSection: View {
+    let element: Element
+
+    @State private var comments: [V4PlaceCommentRecord] = []
+    @State private var isLoading = false
+    @State private var errorText: String?
+    @State private var hasLoaded = false
+
+    private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
+
+    private var expectedCount: Int? { element.v4Metadata?.commentsCount }
+
+    var body: some View {
+        if shouldShowSection {
+            Section(header: Text("Comments")) {
+                if let expectedCount, expectedCount > 0, !hasLoaded {
+                    Button {
+                        loadComments()
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.down.circle")
+                            Text("Load \(expectedCount) comment\(expectedCount == 1 ? "" : "s")")
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if isLoading {
+                    HStack {
+                        ProgressView()
+                        Text("Loading comments…")
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                if let errorText, !errorText.isEmpty {
+                    Text(errorText)
+                        .foregroundColor(.red)
+                        .font(.subheadline)
+                }
+
+                if hasLoaded && comments.isEmpty && !isLoading && errorText == nil {
+                    Text("No comments found")
+                        .foregroundColor(.secondary)
+                }
+
+                ForEach(comments) { comment in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
+                            if let author = comment.authorDisplayName {
+                                Text(author)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            } else {
+                                Text("Anonymous")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if let createdAt = comment.createdAt, !createdAt.isEmpty {
+                                Text(createdAt.formattedBTCMapDate())
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if !comment.bodyText.isEmpty {
+                            Text(comment.bodyText)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                        }
+
+                        if let sats = comment.amountSats, sats > 0 {
+                            Text("\(sats) sats")
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.orange.opacity(0.12))
+                                .foregroundColor(.orange)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .task(id: element.id) {
+                // Auto-load only when BTCMap metadata suggests comments exist.
+                if (expectedCount ?? 0) > 0, !hasLoaded, !isLoading {
+                    loadComments()
+                }
+            }
+        }
+    }
+
+    private var shouldShowSection: Bool {
+        (expectedCount ?? 0) > 0 || hasLoaded || isLoading || errorText != nil
+    }
+
+    private func loadComments() {
+        guard !isLoading else { return }
+        isLoading = true
+        errorText = nil
+
+        repository.fetchPlaceComments(placeID: element.id) { result in
+            DispatchQueue.main.async {
+                isLoading = false
+                hasLoaded = true
+                switch result {
+                case .success(let comments):
+                    self.comments = comments
+                        .filter { !$0.bodyText.isEmpty }
+                        .sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
+                case .failure(let error):
+                    self.comments = []
+                    errorText = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+struct BTCMapPaidActionsSection: View {
+    let element: Element
+
+    @State private var commentQuoteSat: Int?
+    @State private var boostQuote: V4PlaceBoostQuote?
+    @State private var commentDraft = ""
+    @State private var isLoadingQuotes = false
+    @State private var isSubmitting = false
+    @State private var actionError: String?
+    @State private var invoice: V4InvoiceOrderResponse?
+    @State private var invoiceStatus: String?
+    @State private var pollTask: Task<Void, Never>?
+
+    private let repository = BTCMapRepository.shared
+
+    var body: some View {
+        Section(header: Text("Support BTCMap")) {
+            if let invoice {
+                invoiceStatusBlock(invoice)
+            }
+
+            if isLoadingQuotes {
+                HStack {
+                    ProgressView()
+                    Text("Loading Lightning quotes…")
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                if commentQuoteSat != nil || boostQuote != nil {
+                    commentPurchaseBlock
+                    boostPurchaseBlock
+                } else {
+                    Button("Load Boost / Comment Quotes") {
+                        loadQuotes()
+                    }
+                }
+            }
+
+            if let actionError, !actionError.isEmpty {
+                Text(actionError)
+                    .foregroundColor(.red)
+                    .font(.subheadline)
+            }
+        }
+        .task(id: element.id) {
+            if commentQuoteSat == nil && boostQuote == nil && !isLoadingQuotes {
+                loadQuotes()
+            }
+        }
+        .onDisappear {
+            pollTask?.cancel()
+        }
+    }
+
+    @ViewBuilder
+    private var commentPurchaseBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Paid Comment")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if let commentQuoteSat {
+                    Text("\(commentQuoteSat) sats")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.blue.opacity(0.12))
+                        .foregroundColor(.blue)
+                        .clipShape(Capsule())
+                }
+            }
+
+            TextField("Leave a public BTCMap comment", text: $commentDraft, axis: .vertical)
+                .lineLimit(2...4)
+                .textInputAutocapitalization(.sentences)
+
+            Button {
+                submitPaidComment()
+            } label: {
+                Label("Create Comment Invoice", systemImage: "bolt.fill")
+            }
+            .disabled(isSubmitting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    @ViewBuilder
+    private var boostPurchaseBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Boost Listing")
+                .font(.subheadline.weight(.semibold))
+
+            HStack(spacing: 8) {
+                boostButton(days: 30, sats: boostQuote?.quote30dSat)
+                boostButton(days: 90, sats: boostQuote?.quote90dSat)
+                boostButton(days: 365, sats: boostQuote?.quote365dSat)
+            }
+        }
+    }
+
+    private func boostButton(days: Int, sats: Int?) -> some View {
+        Button {
+            submitBoost(days: days)
+        } label: {
+            VStack(spacing: 2) {
+                Text("\(days)d")
+                    .font(.caption.weight(.semibold))
+                Text(sats.map { "\($0)s" } ?? "n/a")
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color.orange.opacity(0.1))
+            .clipShape(.rect(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .disabled(isSubmitting || sats == nil)
+    }
+
+    @ViewBuilder
+    private func invoiceStatusBlock(_ invoice: V4InvoiceOrderResponse) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Lightning Invoice")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(invoiceStatus ?? "pending")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(statusColor.opacity(0.12))
+                    .foregroundColor(statusColor)
+                    .clipShape(Capsule())
+            }
+
+            Text(invoice.invoice)
+                .font(.caption.monospaced())
+                .textSelection(.enabled)
+                .lineLimit(3)
+
+            HStack {
+                Button("Copy Invoice") {
+                    UIPasteboard.general.string = invoice.invoice
+                }
+                Button("Refresh Status") {
+                    refreshInvoiceStatus()
+                }
+                .disabled(isSubmitting)
+            }
+            .font(.subheadline)
+        }
+    }
+
+    private var statusColor: Color {
+        let normalized = (invoiceStatus ?? "").lowercased()
+        if normalized.contains("paid") || normalized.contains("settled") || normalized.contains("complete") {
+            return .green
+        }
+        if normalized.contains("expired") || normalized.contains("failed") || normalized.contains("cancel") {
+            return .red
+        }
+        return .orange
+    }
+
+    private func loadQuotes() {
+        guard !isLoadingQuotes else { return }
+        isLoadingQuotes = true
+        actionError = nil
+
+        let group = DispatchGroup()
+        var loadedCommentQuote: Int?
+        var loadedBoostQuote: V4PlaceBoostQuote?
+        var firstError: Error?
+
+        group.enter()
+        repository.fetchPlaceCommentQuote { result in
+            if case .success(let quote) = result {
+                loadedCommentQuote = quote.quoteSat
+            } else if case .failure(let error) = result, firstError == nil {
+                firstError = error
+            }
+            group.leave()
+        }
+
+        group.enter()
+        repository.fetchPlaceBoostQuote { result in
+            if case .success(let quote) = result {
+                loadedBoostQuote = quote
+            } else if case .failure(let error) = result, firstError == nil {
+                firstError = error
+            }
+            group.leave()
+        }
+
+        group.notify(queue: .main) {
+            isLoadingQuotes = false
+            commentQuoteSat = loadedCommentQuote
+            boostQuote = loadedBoostQuote
+            if let firstError {
+                actionError = firstError.localizedDescription
+            }
+        }
+    }
+
+    private func submitPaidComment() {
+        let trimmed = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        isSubmitting = true
+        actionError = nil
+        repository.createPlaceComment(placeID: element.id, comment: trimmed) { result in
+            DispatchQueue.main.async {
+                isSubmitting = false
+                switch result {
+                case .success(let invoiceResponse):
+                    invoice = invoiceResponse
+                    invoiceStatus = "pending"
+                    startInvoicePolling(invoiceID: invoiceResponse.invoiceID)
+                case .failure(let error):
+                    actionError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func submitBoost(days: Int) {
+        isSubmitting = true
+        actionError = nil
+        repository.createPlaceBoost(placeID: element.id, days: days) { result in
+            DispatchQueue.main.async {
+                isSubmitting = false
+                switch result {
+                case .success(let invoiceResponse):
+                    invoice = invoiceResponse
+                    invoiceStatus = "pending"
+                    startInvoicePolling(invoiceID: invoiceResponse.invoiceID)
+                case .failure(let error):
+                    actionError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func refreshInvoiceStatus() {
+        guard let invoiceID = invoice?.invoiceID else { return }
+        repository.fetchInvoice(id: invoiceID) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let record):
+                    invoiceStatus = record.status
+                case .failure(let error):
+                    actionError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func startInvoicePolling(invoiceID: String) {
+        pollTask?.cancel()
+        pollTask = Task {
+            for _ in 0..<40 {
+                if Task.isCancelled { return }
+                await withCheckedContinuation { continuation in
+                    repository.fetchInvoice(id: invoiceID) { result in
+                        DispatchQueue.main.async {
+                            switch result {
+                            case .success(let record):
+                                invoiceStatus = record.status
+                                let normalized = record.status.lowercased()
+                                if normalized.contains("paid") || normalized.contains("settled") || normalized.contains("complete") || normalized.contains("expired") || normalized.contains("failed") || normalized.contains("cancel") {
+                                    continuation.resume()
+                                    return
+                                }
+                            case .failure(let error):
+                                actionError = error.localizedDescription
+                            }
+                            continuation.resume()
+                        }
+                    }
+                }
+
+                let status = (invoiceStatus ?? "").lowercased()
+                if status.contains("paid") || status.contains("settled") || status.contains("complete") || status.contains("expired") || status.contains("failed") || status.contains("cancel") {
+                    break
+                }
+
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
     }
 }
 

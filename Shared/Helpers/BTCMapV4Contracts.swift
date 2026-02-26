@@ -147,6 +147,91 @@ struct V4SyncState: Codable, Hashable {
     )
 }
 
+struct V4PlaceCommentRecord: Codable, Hashable, Identifiable {
+    let id: Int
+    let placeID: Int?
+    let createdAt: String?
+    let updatedAt: String?
+    let comment: String?
+    let text: String?
+    let message: String?
+    let content: String?
+    let name: String?
+    let nickname: String?
+    let displayName: String?
+    let authorName: String?
+    let senderName: String?
+    let amountSats: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case placeID = "place_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case comment
+        case text
+        case message
+        case content
+        case name
+        case nickname
+        case displayName = "display_name"
+        case authorName = "author_name"
+        case senderName = "sender_name"
+        case amountSats = "amount_sats"
+    }
+
+    var bodyText: String {
+        for value in [comment, text, message, content] {
+            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return ""
+    }
+
+    var authorDisplayName: String? {
+        for value in [displayName, authorName, senderName, nickname, name] {
+            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return nil
+    }
+}
+
+struct V4PlaceCommentQuote: Codable, Hashable {
+    let quoteSat: Int
+
+    enum CodingKeys: String, CodingKey {
+        case quoteSat = "quote_sat"
+    }
+}
+
+struct V4PlaceBoostQuote: Codable, Hashable {
+    let quote30dSat: Int?
+    let quote90dSat: Int?
+    let quote365dSat: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case quote30dSat = "quote_30d_sat"
+        case quote90dSat = "quote_90d_sat"
+        case quote365dSat = "quote_365d_sat"
+    }
+}
+
+struct V4InvoiceOrderResponse: Codable, Hashable {
+    let invoiceID: String
+    let invoice: String
+
+    enum CodingKeys: String, CodingKey {
+        case invoiceID = "invoice_id"
+        case invoice
+    }
+}
+
+struct V4InvoiceRecord: Codable, Hashable {
+    let id: String
+    let status: String
+}
+
 struct V4SearchQuery: Hashable {
     var name: String?
     var lat: Double?
@@ -236,12 +321,14 @@ protocol BTCMapV4ClientProtocol {
     func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void)
     func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void)
     func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void)
+    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void)
 }
 
 protocol BTCMapSearchServiceProtocol {
     func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void)
     func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void)
     func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void)
+    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void)
 }
 
 protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
@@ -264,7 +351,6 @@ struct V3AreaBounds: Codable, Hashable {
         case maxLat = "max_lat"
     }
 }
-
 struct V3AreaRecord: Codable, Hashable, Identifiable {
     let id: Int
     let name: String?
