@@ -13,6 +13,7 @@ struct MerchantSearchSheetView: View {
     var body: some View {
         NavigationStack {
             List {
+                summarySection
                 querySection
                 statusSection
                 resultsSection
@@ -37,6 +38,20 @@ struct MerchantSearchSheetView: View {
         }
         .onDisappear {
             debounceTask?.cancel()
+        }
+    }
+
+    private var summarySection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Find merchants by name, provider, or map radius", systemImage: "magnifyingglass")
+                    .font(.subheadline.weight(.semibold))
+
+                Text("Results open the merchant detail and recenter the map.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
         }
     }
 
@@ -98,8 +113,14 @@ struct MerchantSearchSheetView: View {
     private var resultsSection: some View {
         Section("Results") {
             if viewModel.merchantSearchResults.isEmpty {
-                Text("No results yet")
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(emptyResultsTitle)
+                        .font(.subheadline.weight(.semibold))
+                    Text(emptyResultsSubtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
             } else {
                 ForEach(viewModel.merchantSearchResults) { result in
                     Button {
@@ -129,6 +150,25 @@ struct MerchantSearchSheetView: View {
         let hasProvider = !viewModel.merchantSearchProviderFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasArea = viewModel.merchantSearchUseMapCenter
         return !(nameCount >= 3 || hasProvider || hasArea)
+    }
+
+    private var emptyResultsTitle: String {
+        if viewModel.merchantSearchIsLoading { return "Searching…" }
+        if hasEnteredSearchInputs { return "No matching merchants" }
+        return "Start a search"
+    }
+
+    private var emptyResultsSubtitle: String {
+        if hasEnteredSearchInputs {
+            return "Try a different name, provider tag, or radius."
+        }
+        return "Enter at least 3 letters, a provider tag, or search near the current map center."
+    }
+
+    private var hasEnteredSearchInputs: Bool {
+        let name = viewModel.merchantSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let provider = viewModel.merchantSearchProviderFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !name.isEmpty || !provider.isEmpty || viewModel.merchantSearchUseMapCenter
     }
 
     private func scheduleSearch() {
@@ -194,6 +234,7 @@ struct MerchantSearchResultRow: View {
             }
         }
         .padding(.vertical, 4)
+        .contentShape(.rect)
     }
 
     private var distanceText: String? {
@@ -241,6 +282,17 @@ struct BTCMapEventsSheetView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Bitcoin meetups and events from BTCMap", systemImage: "calendar")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Selecting an event centers the map when coordinates are available.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 Section("Options") {
                     Toggle("Include past events", isOn: $viewModel.eventsIncludePast)
                         .onChange(of: viewModel.eventsIncludePast) { _, _ in
@@ -258,15 +310,21 @@ struct BTCMapEventsSheetView: View {
                     }
                 } else if let error = viewModel.eventsError, !error.isEmpty {
                     Section {
-                        Text(error)
-                            .foregroundColor(.red)
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
                     }
                 }
 
                 Section("Events") {
                     if viewModel.eventsResults.isEmpty, !viewModel.eventsIsLoading {
-                        Text("No events found")
-                            .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("No events found")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Try enabling past events or refresh again later.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
                     } else {
                         ForEach(viewModel.eventsResults) { event in
                             Button {
@@ -345,6 +403,7 @@ private struct BTCMapEventRow: View {
             }
         }
         .padding(.vertical, 4)
+        .opacity((event.lat == nil || event.lon == nil) ? 0.6 : 1.0)
     }
 
     private func formattedEventDate(_ raw: String?) -> String? {
@@ -379,6 +438,17 @@ struct BTCMapAreasSheetView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Browse BTCMap regions and coverage areas", systemImage: "globe.americas")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Selecting an area recenters the map and fetches an area element count.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 Section("Search Areas") {
                     TextField("City / region / country", text: $viewModel.areaBrowserQuery)
                         .textInputAutocapitalization(.never)
@@ -412,8 +482,8 @@ struct BTCMapAreasSheetView: View {
                     }
                 } else if let error = viewModel.areaBrowserError, !error.isEmpty {
                     Section {
-                        Text(error)
-                            .foregroundColor(.red)
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
                     }
                 }
 
@@ -490,6 +560,7 @@ private struct BTCMapAreaRow: View {
             }
         }
         .padding(.vertical, 4)
+        .contentShape(.rect)
     }
 
     private func areaBadge(_ text: String, tint: Color) -> some View {

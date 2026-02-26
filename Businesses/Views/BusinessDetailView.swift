@@ -214,6 +214,7 @@ struct BTCMapPlaceCommentsSection: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .padding(.vertical, 2)
                 }
 
                 if isLoading {
@@ -225,14 +226,20 @@ struct BTCMapPlaceCommentsSection: View {
                 }
 
                 if let errorText, !errorText.isEmpty {
-                    Text(errorText)
-                        .foregroundColor(.red)
+                    Label(errorText, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
                         .font(.subheadline)
                 }
 
                 if hasLoaded && comments.isEmpty && !isLoading && errorText == nil {
-                    Text("No comments found")
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("No comments found")
+                            .font(.subheadline.weight(.semibold))
+                        Text("BTCMap shows paid comments when available for this merchant.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
                 }
 
                 ForEach(comments) { comment in
@@ -272,6 +279,7 @@ struct BTCMapPlaceCommentsSection: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
                 }
             }
             .task(id: element.id) {
@@ -342,15 +350,17 @@ struct BTCMapPaidActionsSection: View {
                     commentPurchaseBlock
                     boostPurchaseBlock
                 } else {
-                    Button("Load Boost / Comment Quotes") {
+                    Button {
                         loadQuotes()
+                    } label: {
+                        Label("Load Boost / Comment Quotes", systemImage: "bolt.badge.clock")
                     }
                 }
             }
 
             if let actionError, !actionError.isEmpty {
-                Text(actionError)
-                    .foregroundColor(.red)
+                Label(actionError, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
                     .font(.subheadline)
             }
         }
@@ -382,17 +392,26 @@ struct BTCMapPaidActionsSection: View {
                 }
             }
 
+            Text("Comments are public on BTCMap after the Lightning invoice is paid.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
             TextField("Leave a public BTCMap comment", text: $commentDraft, axis: .vertical)
                 .lineLimit(2...4)
                 .textInputAutocapitalization(.sentences)
+                .padding(10)
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
+                .clipShape(.rect(cornerRadius: 10))
 
             Button {
                 submitPaidComment()
             } label: {
                 Label("Create Comment Invoice", systemImage: "bolt.fill")
             }
+            .buttonStyle(.borderedProminent)
             .disabled(isSubmitting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
@@ -400,6 +419,10 @@ struct BTCMapPaidActionsSection: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Boost Listing")
                 .font(.subheadline.weight(.semibold))
+
+            Text("Boosts improve visibility for this listing on BTCMap after payment confirms.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
                 boostButton(days: 30, sats: boostQuote?.quote30dSat)
@@ -421,11 +444,12 @@ struct BTCMapPaidActionsSection: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(Color.orange.opacity(0.1))
+            .background((sats == nil ? Color.gray : Color.orange).opacity(0.1))
             .clipShape(.rect(cornerRadius: 10))
         }
         .buttonStyle(.plain)
         .disabled(isSubmitting || sats == nil)
+        .opacity((isSubmitting || sats == nil) ? 0.6 : 1.0)
     }
 
     @ViewBuilder
@@ -448,18 +472,24 @@ struct BTCMapPaidActionsSection: View {
                 .font(.caption.monospaced())
                 .textSelection(.enabled)
                 .lineLimit(3)
+                .padding(10)
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
+                .clipShape(.rect(cornerRadius: 10))
 
             HStack {
                 Button("Copy Invoice") {
                     UIPasteboard.general.string = invoice.invoice
                 }
+                .buttonStyle(.bordered)
                 Button("Refresh Status") {
                     refreshInvoiceStatus()
                 }
+                .buttonStyle(.bordered)
                 .disabled(isSubmitting)
             }
             .font(.subheadline)
         }
+        .padding(.vertical, 4)
     }
 
     private var statusColor: Color {
@@ -648,9 +678,13 @@ struct BTCMapV4EnrichmentSection: View {
                         case .failure:
                             EmptyView()
                         case .empty:
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 120)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                                ProgressView()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 120)
                         @unknown default:
                             EmptyView()
                         }
