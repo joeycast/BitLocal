@@ -335,7 +335,9 @@ protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
     func loadCachedElements() -> [Element]?
     func hasCachedData() -> Bool
     func refreshElements(completion: @escaping ([Element]?) -> Void)
+    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void)
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void)
+    func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void)
     func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void)
 }
 struct V3AreaBounds: Codable, Hashable {
@@ -356,6 +358,51 @@ struct V3AreaBounds: Codable, Hashable {
 struct GeoJSONFeatureCollection: Codable, Hashable {
     let type: String
     let features: [GeoJSONFeature]
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case features
+        case geometry
+        case coordinates
+    }
+
+    init(type: String = "FeatureCollection", features: [GeoJSONFeature]) {
+        self.type = type
+        self.features = features
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let rootType = try container.decode(String.self, forKey: .type)
+
+        switch rootType.lowercased() {
+        case "featurecollection":
+            let features = try container.decode([GeoJSONFeature].self, forKey: .features)
+            self.init(type: "FeatureCollection", features: features)
+
+        case "feature":
+            let feature = try GeoJSONFeature(from: decoder)
+            self.init(features: [feature])
+
+        case "polygon", "multipolygon":
+            let geometry = try GeoJSONGeometry(from: decoder)
+            let feature = GeoJSONFeature(type: "Feature", geometry: geometry)
+            self.init(features: [feature])
+
+        default:
+            throw DecodingError.dataCorruptedError(
+                forKey: .type,
+                in: container,
+                debugDescription: "Unsupported GeoJSON root type: \(rootType)"
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode("FeatureCollection", forKey: .type)
+        try container.encode(features, forKey: .features)
+    }
 }
 
 struct GeoJSONFeature: Codable, Hashable {
@@ -519,6 +566,88 @@ enum AnyCodableValue: Codable, Hashable {
     }
 }
 
+// MARK: - V2AreaRecord (community map polygons)
+
+struct V2AreaRecord: Codable, Hashable, Identifiable {
+    let id: String
+    let tags: [String: String]?
+    let createdAt: String?
+    let updatedAt: String?
+    let deletedAt: String?
+    let geoJSON: GeoJSONFeatureCollection?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case tags
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case deletedAt = "deleted_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if let stringID = try? container.decode(String.self, forKey: .id) {
+            id = stringID
+        } else if let intID = try? container.decode(Int.self, forKey: .id) {
+            id = String(intID)
+        } else {
+            throw DecodingError.dataCorruptedError(forKey: .id, in: container, debugDescription: "Unsupported v2 area id type")
+        }
+
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+
+        if let rawTags = try container.decodeIfPresent([String: AnyCodableValue].self, forKey: .tags) {
+            var stringTags: [String: String] = [:]
+            var parsedGeoJSON: GeoJSONFeatureCollection?
+
+            for (key, value) in rawTags {
+                if key == "geo_json" {
+                    if let data = try? JSONEncoder().encode(value),
+                       let fc = try? JSONDecoder().decode(GeoJSONFeatureCollection.self, from: data) {
+                        parsedGeoJSON = fc
+                    }
+                    continue
+                }
+
+                switch value {
+                case .string(let s):
+                    stringTags[key] = s
+                case .bool(let b):
+                    stringTags[key] = b ? "true" : "false"
+                case .int(let i):
+                    stringTags[key] = String(i)
+                case .double(let d):
+                    stringTags[key] = String(d)
+                default:
+                    continue
+                }
+            }
+
+            tags = stringTags.isEmpty ? nil : stringTags
+            geoJSON = parsedGeoJSON
+        } else {
+            tags = nil
+            geoJSON = nil
+        }
+    }
+
+    var displayName: String {
+        if let name = tags?["name"], !name.isEmpty { return name }
+        return "Area \(id)"
+    }
+
+    var isDeleted: Bool {
+        !(deletedAt?.isEmpty ?? true)
+    }
+
+    var isCommunity: Bool {
+        tags?["type"] == "community"
+    }
+}
+
 struct V3AreaElementRecord: Codable, Hashable, Identifiable {
     let id: String
     let areaID: Int
@@ -534,5 +663,50 @@ struct V3AreaElementRecord: Codable, Hashable, Identifiable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try Self.decodeStringOrInt(forKey: .id, in: container, defaultValue: "")
+        areaID = try Self.decodeIntOrString(forKey: .areaID, in: container, defaultValue: -1)
+        elementID = try Self.decodeStringOrInt(forKey: .elementID, in: container, defaultValue: "")
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+    }
+
+    private static func decodeStringOrInt(
+        forKey key: CodingKeys,
+        in container: KeyedDecodingContainer<CodingKeys>,
+        defaultValue: String
+    ) throws -> String {
+        if let stringValue = try? container.decode(String.self, forKey: key) {
+            return stringValue
+        }
+        if let intValue = try? container.decode(Int.self, forKey: key) {
+            return String(intValue)
+        }
+        if (try? container.decodeNil(forKey: key)) == true {
+            return defaultValue
+        }
+        return defaultValue
+    }
+
+    private static func decodeIntOrString(
+        forKey key: CodingKeys,
+        in container: KeyedDecodingContainer<CodingKeys>,
+        defaultValue: Int
+    ) throws -> Int {
+        if let intValue = try? container.decode(Int.self, forKey: key) {
+            return intValue
+        }
+        if let stringValue = try? container.decode(String.self, forKey: key),
+           let intValue = Int(stringValue) {
+            return intValue
+        }
+        if (try? container.decodeNil(forKey: key)) == true {
+            return defaultValue
+        }
+        return defaultValue
     }
 }

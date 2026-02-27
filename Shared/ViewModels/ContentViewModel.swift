@@ -58,6 +58,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var areaBrowserAreas: [V3AreaRecord] = []
     @Published var areaBrowserIsLoading = false
     @Published var areaBrowserError: String?
+    @Published var communityMapAreas: [V2AreaRecord] = []
+    @Published var communityMapAreasIsLoading = false
+    @Published var hasLoadedCommunityMapAreas = false
+    @Published var selectedCommunityArea: V2AreaRecord?
+    @Published var presentedCommunityArea: V2AreaRecord?
+    @Published var communityMemberElements: [Element] = []
+    @Published var communityMemberElementIDs: Set<String> = []
+    @Published var communityMembersIsLoading = false
+    @Published var communityMembersError: String?
     @Published var selectedAreaID: Int?
     @Published var selectedAreaElementCount: Int?
     @Published var hasLoadedAreas = false
@@ -65,6 +74,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var mapDisplayMode: MapDisplayMode = .merchants
     private var cachedCommunityOverlays: [MKPolygon]?
     private var lastOverlayAreasHash: Int?
+    private var communityGeoJSONHydrationInFlight = false
+    private var requestedCommunityAreaDetailIDs = Set<Int>()
 
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -94,6 +105,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var debounceTimer: AnyCancellable?
     private var unifiedSearchDebounceTask: Task<Void, Never>?
     private var latestMerchantSearchRequestID = UUID()
+    private var latestCommunitySelectionRequestID = UUID()
     
     // Use a queue for thread-safe access to mapView
     private let mapViewQueue = DispatchQueue(label: "mapview.queue", qos: .userInitiated)
@@ -612,33 +624,125 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     /// Lazy-load areas on first list appearance (needed for search suggestions)
     func ensureAreasLoaded() {
-        guard !hasLoadedAreas else { return }
+        if areaBrowserIsLoading { return }
+        if hasLoadedAreas && !areaBrowserAreas.isEmpty { return }
         hasLoadedAreas = true
         loadAreaBrowserAreas()
+    }
+
+    /// Loads the BTC Map v2 areas feed used by btcmap.org's communities map.
+    func ensureCommunityMapAreasLoaded() {
+        if communityMapAreasIsLoading { return }
+        let currentCommunityGeoJSON = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted && $0.geoJSON != nil }.count
+        if hasLoadedCommunityMapAreas && !communityMapAreas.isEmpty {
+            if currentCommunityGeoJSON >= 100 { return }
+        }
+        hasLoadedCommunityMapAreas = true
+        communityMapAreasIsLoading = true
+        loadCommunityMapAreasV2Paginated(anchor: "2022-01-01T00:00:00.000Z", page: 1, accumulated: [:])
+    }
+
+    var mapElementsForCurrentDisplay: [Element] {
+        switch mapDisplayMode {
+        case .merchants:
+            return allElements
+        case .communities:
+            return selectedCommunityArea == nil ? [] : communityMemberElements
+        }
+    }
+
+    var isShowingCommunityMembersOnMap: Bool {
+        mapDisplayMode == .communities && selectedCommunityArea != nil
+    }
+
+    var communityListAreas: [V2AreaRecord] {
+        communityMapAreas
+            .filter { $0.isCommunity && !$0.isDeleted }
+            .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+    }
+
+    func communityArea(withID id: String) -> V2AreaRecord? {
+        communityMapAreas.first { $0.id == id }
+    }
+
+    private func loadCommunityMapAreasV2Paginated(anchor: String, page: Int, accumulated: [String: V2AreaRecord]) {
+        let pageLimit = 500
+        let maxPages = 20
+        btcMapRepository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch result {
+                case .failure(let error):
+                    self.communityMapAreasIsLoading = false
+                    self.hasLoadedCommunityMapAreas = false
+                    Debug.logAPI("loadCommunityMapAreasV2 page \(page) failed: \(error.localizedDescription)")
+
+                case .success(let areas):
+                    var merged = accumulated
+                    for area in areas {
+                        if area.isDeleted {
+                            merged.removeValue(forKey: area.id)
+                        } else {
+                            merged[area.id] = area
+                        }
+                    }
+
+                    let nextAnchor = areas.last?.updatedAt
+                    let shouldContinue = areas.count == pageLimit &&
+                        page < maxPages &&
+                        nextAnchor != nil &&
+                        nextAnchor != anchor
+
+                    if shouldContinue, let nextAnchor {
+                        self.loadCommunityMapAreasV2Paginated(anchor: nextAnchor, page: page + 1, accumulated: merged)
+                        return
+                    }
+
+                    self.communityMapAreasIsLoading = false
+                    self.communityMapAreas = Array(merged.values)
+                    self.forceMapRefresh = true
+                }
+            }
+        }
     }
 
     // MARK: - Community Map Mode
 
     var communityOverlays: [MKPolygon] {
-        let currentHash = areaBrowserAreas.hashValue
-        if let cached = cachedCommunityOverlays, lastOverlayAreasHash == currentHash {
-            return cached
-        }
+        let currentHash = communityMapAreas.isEmpty
+            ? areaBrowserAreas.hashValue
+            : communityMapAreas.hashValue
+        if let cached = cachedCommunityOverlays, lastOverlayAreasHash == currentHash { return cached }
 
         var polygons: [MKPolygon] = []
-        for area in areaBrowserAreas {
-            guard let geoJSON = area.geoJSON else { continue }
-            for feature in geoJSON.features {
-                let geom = feature.geometry
-                switch geom.coordinates {
-                case .polygon(let rings):
-                    if let poly = mkPolygon(from: rings, title: area.displayName) {
-                        polygons.append(poly)
+        if !communityMapAreas.isEmpty {
+            let v2CommunityAreas = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted && $0.geoJSON != nil }
+            for area in v2CommunityAreas {
+                guard let geoJSON = area.geoJSON else { continue }
+                for feature in geoJSON.features {
+                    let geom = feature.geometry
+                    switch geom.coordinates {
+                    case .polygon(let rings):
+                        polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: area.id))
+                    case .multiPolygon(let multiRings):
+                        for rings in multiRings {
+                            polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: area.id))
+                        }
                     }
-                case .multiPolygon(let multiRings):
-                    for rings in multiRings {
-                        if let poly = mkPolygon(from: rings, title: area.displayName) {
-                            polygons.append(poly)
+                }
+            }
+        } else {
+            let fallbackV3Areas = areaBrowserAreas.filter { $0.tags?["type"] == "community" && $0.geoJSON != nil }
+            for area in fallbackV3Areas {
+                guard let geoJSON = area.geoJSON else { continue }
+                for feature in geoJSON.features {
+                    let geom = feature.geometry
+                    switch geom.coordinates {
+                    case .polygon(let rings):
+                        polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: String(area.id)))
+                    case .multiPolygon(let multiRings):
+                        for rings in multiRings {
+                            polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: String(area.id)))
                         }
                     }
                 }
@@ -650,25 +754,389 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return polygons
     }
 
-    private func mkPolygon(from rings: [[[Double]]], title: String) -> MKPolygon? {
-        guard let outerRing = rings.first, !outerRing.isEmpty else { return nil }
-        var coords = outerRing.compactMap { point -> CLLocationCoordinate2D? in
+    private func mkPolygons(from rings: [[[Double]]], title: String, identifier: String?) -> [MKPolygon] {
+        guard let outerRing = rings.first, !outerRing.isEmpty else { return [] }
+        let coords = outerRing.compactMap { point -> CLLocationCoordinate2D? in
             guard point.count >= 2 else { return nil }
             return CLLocationCoordinate2D(latitude: point[1], longitude: point[0])
         }
-        let polygon = MKPolygon(coordinates: &coords, count: coords.count)
-        polygon.title = title
-        return polygon
+        guard coords.count >= 3 else { return [] }
+
+        let splitRings = splitRingAtAntimeridian(coords)
+        return splitRings.compactMap { ring in
+            guard ring.count >= 3 else { return nil }
+            var mutableRing = ring
+            let polygon = MKPolygon(coordinates: &mutableRing, count: mutableRing.count)
+            polygon.title = title
+            polygon.subtitle = identifier
+            return polygon
+        }
+    }
+
+    private func splitRingAtAntimeridian(_ ring: [CLLocationCoordinate2D]) -> [[CLLocationCoordinate2D]] {
+        var points = ring
+        if let first = points.first, let last = points.last, coordinatesNearlyEqual(first, last) {
+            points.removeLast()
+        }
+        guard points.count >= 3 else { return [] }
+
+        var fragments: [[CLLocationCoordinate2D]] = [[points[0]]]
+
+        for index in 0..<points.count {
+            let a = points[index]
+            let b = points[(index + 1) % points.count]
+            let delta = b.longitude - a.longitude
+
+            if abs(delta) <= 180 {
+                appendCoordinateIfNeeded(b, to: &fragments[fragments.count - 1])
+                continue
+            }
+
+            // Crossing the antimeridian; split at +/-180 and continue on the opposite seam.
+            let crossesEastward = delta < -180 // e.g. 170 -> -170 (across +180)
+            let seamCurrent: CLLocationDegrees = crossesEastward ? 180 : -180
+            let seamNext: CLLocationDegrees = crossesEastward ? -180 : 180
+            let adjustedBLon = crossesEastward ? (b.longitude + 360) : (b.longitude - 360)
+            let denominator = adjustedBLon - a.longitude
+
+            if denominator == 0 {
+                appendCoordinateIfNeeded(b, to: &fragments[fragments.count - 1])
+                continue
+            }
+
+            let t = max(0, min(1, (seamCurrent - a.longitude) / denominator))
+            let seamLat = a.latitude + ((b.latitude - a.latitude) * t)
+            let pointOnCurrentSeam = CLLocationCoordinate2D(latitude: seamLat, longitude: seamCurrent)
+            let pointOnNextSeam = CLLocationCoordinate2D(latitude: seamLat, longitude: seamNext)
+
+            appendCoordinateIfNeeded(pointOnCurrentSeam, to: &fragments[fragments.count - 1])
+
+            var nextFragment: [CLLocationCoordinate2D] = [pointOnNextSeam]
+            appendCoordinateIfNeeded(b, to: &nextFragment)
+            fragments.append(nextFragment)
+        }
+
+        return fragments.compactMap { fragment in
+            var cleaned = collapseConsecutiveDuplicates(fragment)
+            guard cleaned.count >= 3 else { return nil }
+            if let first = cleaned.first, let last = cleaned.last, !coordinatesNearlyEqual(first, last) {
+                cleaned.append(first)
+            }
+            // MKPolygon accepts open rings too, but closing produces more stable seam splits.
+            guard cleaned.count >= 4 else { return nil }
+            return cleaned
+        }
+    }
+
+    private func appendCoordinateIfNeeded(_ coordinate: CLLocationCoordinate2D, to ring: inout [CLLocationCoordinate2D]) {
+        if let last = ring.last, coordinatesNearlyEqual(last, coordinate) { return }
+        ring.append(coordinate)
+    }
+
+    private func collapseConsecutiveDuplicates(_ ring: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
+        var result: [CLLocationCoordinate2D] = []
+        for coordinate in ring {
+            appendCoordinateIfNeeded(coordinate, to: &result)
+        }
+        return result
+    }
+
+    private func coordinatesNearlyEqual(_ lhs: CLLocationCoordinate2D, _ rhs: CLLocationCoordinate2D) -> Bool {
+        abs(lhs.latitude - rhs.latitude) < 0.000001 &&
+        abs(lhs.longitude - rhs.longitude) < 0.000001
     }
 
     func toggleMapMode() {
         if mapDisplayMode == .merchants {
             mapDisplayMode = .communities
-            ensureAreasLoaded()
+            selectedCommunityArea = nil
+            communityMemberElements = []
+            communityMemberElementIDs = []
+            communityMembersError = nil
+            communityMembersIsLoading = false
+            ensureCommunityMapAreasLoaded()
         } else {
             mapDisplayMode = .merchants
+            selectedCommunityArea = nil
+            communityMemberElements = []
+            communityMemberElementIDs = []
+            communityMembersError = nil
+            communityMembersIsLoading = false
         }
         forceMapRefresh = true
+    }
+
+    func selectCommunity(_ area: V2AreaRecord, presentDetail: Bool = true) {
+        ensureAreasLoaded()
+        selectedCommunityArea = area
+        if presentDetail {
+            presentedCommunityArea = area
+        }
+        communityMembersError = nil
+        communityMembersIsLoading = true
+        communityMemberElements = []
+        communityMemberElementIDs = []
+        latestCommunitySelectionRequestID = UUID()
+        let requestID = latestCommunitySelectionRequestID
+
+        if let region = mapRegion(forCommunityArea: area) {
+            updateMapRegion(center: region.center, span: region.span, animated: true)
+        }
+
+        // Match BTCMap community page behavior: derive members by polygon containment
+        // against the synced v4 places dataset. Fall back to v3 area-elements only when
+        // polygon data is unavailable.
+        if let polygonMembers = communityMembersFromPolygon(for: area) {
+            communityMemberElements = polygonMembers
+            communityMemberElementIDs = Set(polygonMembers.map(\.id))
+            communityMembersError = nil
+            communityMembersIsLoading = false
+            forceMapRefresh = true
+            return
+        }
+
+        // V2 area IDs are slugs (e.g. "bitcoin-cordoba"); resolve the matching
+        // V3 numeric ID via url_alias so we can query the area-elements endpoint.
+        resolveV3AreaID(for: area) { [weak self] resolvedID in
+            guard let self, let resolvedID else {
+                DispatchQueue.main.async {
+                    self?.communityMembersIsLoading = false
+                    self?.communityMembersError = "Could not resolve community"
+                    self?.forceMapRefresh = true
+                }
+                return
+            }
+            self.fetchCommunityMembers(areaID: resolvedID, requestID: requestID)
+        }
+    }
+
+    private func communityMembersFromPolygon(for area: V2AreaRecord) -> [Element]? {
+        guard let geoJSON = area.geoJSON else { return nil }
+        let polygons = geoJSONPolygons(from: geoJSON)
+        guard !polygons.isEmpty else { return nil }
+
+        return allElements.filter { element in
+            guard let coordinate = element.mapCoordinate else { return false }
+            return polygons.contains { polygon in
+                coordinateInPolygon(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude,
+                    rings: polygon
+                )
+            }
+        }
+    }
+
+    private func geoJSONPolygons(from collection: GeoJSONFeatureCollection) -> [[[[Double]]]] {
+        var polygons: [[[[Double]]]] = []
+        for feature in collection.features {
+            switch feature.geometry.coordinates {
+            case .multiPolygon(let multipolygon):
+                polygons.append(contentsOf: multipolygon)
+            case .polygon(let polygon):
+                polygons.append(polygon)
+            }
+        }
+        return polygons
+    }
+
+    private func coordinateInPolygon(latitude: Double, longitude: Double, rings: [[[Double]]]) -> Bool {
+        guard let outer = rings.first, pointInRing(latitude: latitude, longitude: longitude, ring: outer) else {
+            return false
+        }
+
+        // Exclude points that are inside holes.
+        for hole in rings.dropFirst() {
+            if pointInRing(latitude: latitude, longitude: longitude, ring: hole) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private func pointInRing(latitude: Double, longitude: Double, ring: [[Double]]) -> Bool {
+        guard ring.count >= 3 else { return false }
+        var inside = false
+        var j = ring.count - 1
+
+        for i in ring.indices {
+            guard ring[i].count >= 2, ring[j].count >= 2 else {
+                j = i
+                continue
+            }
+
+            let xi = ring[i][0]
+            let yi = ring[i][1]
+            let xj = ring[j][0]
+            let yj = ring[j][1]
+            let intersects = ((yi > latitude) != (yj > latitude))
+                && (longitude < (xj - xi) * (latitude - yi) / ((yj - yi) == 0 ? 1e-12 : (yj - yi)) + xi)
+
+            if intersects {
+                inside.toggle()
+            }
+            j = i
+        }
+        return inside
+    }
+
+    private func resolveV3AreaID(for area: V2AreaRecord, completion: @escaping (Int?) -> Void) {
+        // If the V2 ID is already numeric, use it directly.
+        if let parsed = Int(area.id) {
+            completion(parsed)
+            return
+        }
+        // The V3 url_alias lives inside tags, not the top-level urlAlias field.
+        // Check already-loaded V3 areas for a tags["url_alias"] match.
+        if let v3Match = areaBrowserAreas.first(where: { $0.tags?["url_alias"] == area.id }) {
+            completion(v3Match.id)
+            return
+        }
+        // V3 areas not loaded yet — fetch and search for a match.
+        btcMapRepository.fetchV3Areas(updatedSince: "1970-01-01T00:00:00Z", limit: 10000) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let areas):
+                    let match = areas.first(where: { $0.tags?["url_alias"] == area.id })
+                    completion(match?.id)
+                case .failure:
+                    completion(nil)
+                }
+            }
+        }
+    }
+
+    private func fetchCommunityMembers(areaID: Int, requestID: UUID) {
+        btcMapRepository.fetchV3AreaElements(areaID: areaID, updatedSince: "1970-01-01T00:00:00Z", limit: 10000) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard self.latestCommunitySelectionRequestID == requestID else { return }
+                switch result {
+                case .failure(let error):
+                    self.communityMemberElements = []
+                    self.communityMemberElementIDs = []
+                    self.communityMembersError = error.localizedDescription
+                    self.communityMembersIsLoading = false
+                case .success(let rows):
+                    let activeIDs = Set(rows.compactMap { row -> String? in
+                        let isDeleted = !(row.deletedAt?.isEmpty ?? true)
+                        guard !isDeleted else { return nil }
+                        let trimmed = row.elementID.trimmingCharacters(in: .whitespacesAndNewlines)
+                        return trimmed.isEmpty ? nil : trimmed
+                    })
+                    self.communityMemberElementIDs = activeIDs
+                    self.communityMembersError = nil
+
+                    let cachedMembers = self.allElements.filter { activeIDs.contains($0.id) }
+                    let cachedIDs = Set(cachedMembers.map(\.id))
+                    let missingIDs = activeIDs.subtracting(cachedIDs)
+
+                    if missingIDs.isEmpty {
+                        self.communityMemberElements = cachedMembers
+                        self.communityMembersIsLoading = false
+                    } else {
+                        self.communityMemberElements = cachedMembers
+                        self.communityMembersIsLoading = true
+                        self.hydrateMissingCommunityMembers(
+                            missingIDs: Array(missingIDs),
+                            seedMembers: cachedMembers,
+                            requestID: requestID
+                        )
+                    }
+                }
+                self.forceMapRefresh = true
+            }
+        }
+    }
+
+    private func hydrateMissingCommunityMembers(missingIDs: [String], seedMembers: [Element], requestID: UUID) {
+        guard !missingIDs.isEmpty else {
+            communityMembersIsLoading = false
+            return
+        }
+
+        let group = DispatchGroup()
+        let resultQueue = DispatchQueue(label: "community-members-hydration-results")
+        var hydratedMembers: [Element] = []
+
+        for id in missingIDs {
+            group.enter()
+            btcMapRepository.fetchPlace(id: id) { result in
+                defer { group.leave() }
+                guard case .success(let record) = result else { return }
+                let mapped = V4PlaceToElementMapper.placeRecordToElement(record)
+                if !(mapped.deletedAt?.isEmpty ?? true) { return }
+                resultQueue.sync {
+                    hydratedMembers.append(mapped)
+                }
+            }
+        }
+
+        group.notify(queue: .main) { [weak self] in
+            guard let self else { return }
+            guard self.latestCommunitySelectionRequestID == requestID else { return }
+
+            var byID = Dictionary(uniqueKeysWithValues: seedMembers.map { ($0.id, $0) })
+            for member in hydratedMembers {
+                byID[member.id] = member
+            }
+            self.communityMemberElements = Array(byID.values)
+
+            if !hydratedMembers.isEmpty {
+                var allByID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
+                for member in hydratedMembers {
+                    allByID[member.id] = member
+                }
+                self.allElements = Array(allByID.values)
+            }
+
+            self.communityMembersIsLoading = false
+            self.communityMembersError = nil
+            self.forceMapRefresh = true
+        }
+    }
+
+    func clearSelectedCommunity() {
+        selectedCommunityArea = nil
+        communityMemberElements = []
+        communityMemberElementIDs = []
+        communityMembersIsLoading = false
+        communityMembersError = nil
+        forceMapRefresh = true
+    }
+
+    private func mapRegion(forCommunityArea area: V2AreaRecord) -> MKCoordinateRegion? {
+        func parse(_ key: String) -> Double? {
+            guard let raw = area.tags?[key] else { return nil }
+            return Double(raw)
+        }
+
+        if let north = parse("box:north"),
+           let south = parse("box:south"),
+           let east = parse("box:east"),
+           let west = parse("box:west") {
+            let center = CLLocationCoordinate2D(latitude: (north + south) / 2, longitude: normalizedMidLongitude(west: west, east: east))
+            let latDelta = max(abs(north - south) * 1.2, 0.03)
+            let lonSpan = longitudeDeltaAcrossAntimeridian(west: west, east: east)
+            let lonDelta = max(lonSpan * 1.2, 0.03)
+            return MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta))
+        }
+        return nil
+    }
+
+    private func longitudeDeltaAcrossAntimeridian(west: Double, east: Double) -> Double {
+        let direct = abs(east - west)
+        return direct <= 180 ? direct : 360 - direct
+    }
+
+    private func normalizedMidLongitude(west: Double, east: Double) -> Double {
+        if abs(east - west) <= 180 {
+            return (west + east) / 2
+        }
+        let shiftedEast = east < west ? east + 360 : east
+        var mid = (west + shiftedEast) / 2
+        if mid > 180 { mid -= 360 }
+        return mid
     }
 
     // MARK: - Merchant Search (v4)
@@ -725,20 +1193,108 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func loadAreaBrowserAreas() {
         areaBrowserIsLoading = true
         areaBrowserError = nil
-        btcMapRepository.fetchV3Areas(updatedSince: "1970-01-01T00:00:00Z", limit: 500) { [weak self] result in
+        loadAreaBrowserAreasPaginated(anchor: "1970-01-01T00:00:00Z", page: 1, accumulated: [:])
+    }
+
+    private func loadAreaBrowserAreasPaginated(anchor: String, page: Int, accumulated: [Int: V3AreaRecord]) {
+        let pageLimit = 5000
+        let maxPages = 12
+        btcMapRepository.fetchV3Areas(updatedSince: anchor, limit: pageLimit) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.areaBrowserIsLoading = false
+
                 switch result {
-                case .success(let areas):
-                    self.areaBrowserAreas = areas
-                        .filter { $0.bounds != nil }
-                        .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
                 case .failure(let error):
+                    self.areaBrowserIsLoading = false
+                    Debug.logAPI("loadAreaBrowserAreas failed (page \(page)): \(error.localizedDescription)")
                     self.areaBrowserAreas = []
                     self.areaBrowserError = error.localizedDescription
+
+                case .success(let areas):
+                    var merged = accumulated
+                    for area in areas {
+                        merged[area.id] = area
+                    }
+
+                    let nextAnchor = areas.compactMap(\.updatedAt).max()
+                    let shouldContinue = areas.count >= pageLimit &&
+                        page < maxPages &&
+                        nextAnchor != nil &&
+                        nextAnchor != anchor
+
+                    if shouldContinue, let nextAnchor {
+                        self.loadAreaBrowserAreasPaginated(anchor: nextAnchor, page: page + 1, accumulated: merged)
+                        return
+                    }
+
+                    self.areaBrowserIsLoading = false
+                    let finalAreas = Array(merged.values)
+                    self.areaBrowserAreas = finalAreas
+                        .filter { $0.bounds != nil || $0.geoJSON != nil }
+                        .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+
+                    self.hydrateMissingCommunityAreaGeoJSONIfNeeded()
                 }
             }
+        }
+    }
+
+    private func hydrateMissingCommunityAreaGeoJSONIfNeeded() {
+        guard !communityGeoJSONHydrationInFlight else { return }
+
+        let missingCommunityIDs = areaBrowserAreas
+            .filter { $0.tags?["type"] == "community" && $0.geoJSON == nil }
+            .map(\.id)
+            .filter { !requestedCommunityAreaDetailIDs.contains($0) }
+
+        guard !missingCommunityIDs.isEmpty else { return }
+
+        communityGeoJSONHydrationInFlight = true
+        let batchIDs = Array(missingCommunityIDs.prefix(100))
+        batchIDs.forEach { requestedCommunityAreaDetailIDs.insert($0) }
+
+        let group = DispatchGroup()
+        let resultQueue = DispatchQueue(label: "bitlocal.community-geojson-hydration")
+        let semaphore = DispatchSemaphore(value: 8)
+        var hydrated: [V3AreaRecord] = []
+
+        for areaID in batchIDs {
+            group.enter()
+            semaphore.wait()
+            btcMapRepository.fetchV3Area(id: areaID) { [weak self] result in
+                defer {
+                    semaphore.signal()
+                    group.leave()
+                }
+                guard self != nil else { return }
+                switch result {
+                case .success(let area):
+                    if area.geoJSON != nil {
+                        resultQueue.sync { hydrated.append(area) }
+                    }
+                case .failure:
+                    break
+                }
+            }
+        }
+
+        group.notify(queue: .main) { [weak self] in
+            guard let self else { return }
+            self.communityGeoJSONHydrationInFlight = false
+
+            if !hydrated.isEmpty {
+                var byID = Dictionary(uniqueKeysWithValues: self.areaBrowserAreas.map { ($0.id, $0) })
+                for area in hydrated {
+                    byID[area.id] = area
+                }
+                self.areaBrowserAreas = Array(byID.values)
+                    .filter { $0.bounds != nil || $0.geoJSON != nil }
+                    .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+                self.forceMapRefresh = true
+            }
+
+            // Continue in batches until we exhaust missing community polygons.
+            self.hydrateMissingCommunityAreaGeoJSONIfNeeded()
         }
     }
 

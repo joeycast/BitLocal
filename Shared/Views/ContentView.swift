@@ -44,7 +44,7 @@ struct ContentView: View {
             if screenWidth > 768 || screenHeight > 1024 {
                 IPadLayoutView(
                     viewModel: viewModel,
-                    elements: viewModel.allElements,
+                    elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.visibleElements,
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
@@ -55,7 +55,7 @@ struct ContentView: View {
             } else {
                 IPhoneLayoutView(
                     viewModel: viewModel,
-                    elements: viewModel.allElements,
+                    elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.visibleElements,
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,

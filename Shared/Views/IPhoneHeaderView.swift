@@ -51,33 +51,7 @@ struct IPhoneHeaderView: View {
             }
             VStack(alignment: .leading) {
                 HStack {
-                    HStack(spacing: 10) {
-                        InfoButtonView(showingAbout: $showingAbout)
-                        Button {
-                            viewModel.isEventsPresented = true
-                        } label: {
-                            Image(systemName: "calendar.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.accentColor)
-                                .accessibilityLabel("Browse BTCMap events")
-                        }
-                        Button {
-                            viewModel.isAreaBrowserPresented = true
-                        } label: {
-                            Image(systemName: "globe.americas.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(.accentColor)
-                                .accessibilityLabel("Browse areas")
-                        }
-                        Button {
-                            viewModel.isMerchantSearchPresented = true
-                        } label: {
-                            Image(systemName: "magnifyingglass.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.accentColor)
-                                .accessibilityLabel("Search merchants")
-                        }
-                    }
+                    InfoButtonView(showingAbout: $showingAbout)
                     .padding(.leading)
                     Spacer()
                     Text("bitlocal")
@@ -115,24 +89,6 @@ struct IPhoneHeaderView: View {
                 .transition(.scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity))
                 .zIndex(2)
             }
-        }
-        .sheet(isPresented: $viewModel.isMerchantSearchPresented) {
-            MerchantSearchSheetView()
-                .environmentObject(viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $viewModel.isEventsPresented) {
-            BTCMapEventsSheetView()
-                .environmentObject(viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $viewModel.isAreaBrowserPresented) {
-            BTCMapAreasSheetView()
-                .environmentObject(viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
     }

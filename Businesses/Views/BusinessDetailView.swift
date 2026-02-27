@@ -202,7 +202,7 @@ struct BTCMapPlaceCommentsSection: View {
 
     var body: some View {
         if shouldShowSection {
-            Section(header: Text("Comments")) {
+            Section(header: Text("Community Reviews")) {
                 if let expectedCount, expectedCount > 0, !hasLoaded {
                     Button {
                         loadComments()
@@ -232,14 +232,10 @@ struct BTCMapPlaceCommentsSection: View {
                 }
 
                 if hasLoaded && comments.isEmpty && !isLoading && errorText == nil {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("No comments found")
-                            .font(.subheadline.weight(.semibold))
-                        Text("BTCMap shows paid comments when available for this merchant.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 2)
+                    Text("No reviews yet")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 2)
                 }
 
                 ForEach(comments) { comment in
@@ -269,13 +265,13 @@ struct BTCMapPlaceCommentsSection: View {
                         }
 
                         if let sats = comment.amountSats, sats > 0 {
-                            Text("\(sats) sats")
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.orange.opacity(0.12))
-                                .foregroundColor(.orange)
-                                .clipShape(Capsule())
+                            HStack(spacing: 2) {
+                                Image(systemName: "bolt.fill")
+                                    .font(.caption2)
+                                Text("~\(sats) sats")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.orange)
                         }
                     }
                     .padding(.vertical, 4)
@@ -334,39 +330,36 @@ struct BTCMapPaidActionsSection: View {
     private let repository = BTCMapRepository.shared
 
     var body: some View {
-        Section(header: Text("Support BTCMap")) {
-            if let invoice {
-                invoiceStatusBlock(invoice)
-            }
-
-            if isLoadingQuotes {
-                HStack {
-                    ProgressView()
-                    Text("Loading Lightning quotes…")
-                        .foregroundColor(.secondary)
+        Section(header: Text("Boost This Listing")) {
+            DisclosureGroup("Boost or comment on this listing") {
+                if let invoice {
+                    invoiceStatusBlock(invoice)
                 }
-            } else {
-                if commentQuoteSat != nil || boostQuote != nil {
-                    commentPurchaseBlock
-                    boostPurchaseBlock
+
+                if isLoadingQuotes {
+                    HStack {
+                        ProgressView()
+                        Text("Loading pricing…")
+                            .foregroundColor(.secondary)
+                    }
                 } else {
-                    Button {
-                        loadQuotes()
-                    } label: {
-                        Label("Load Boost / Comment Quotes", systemImage: "bolt.badge.clock")
+                    if commentQuoteSat != nil || boostQuote != nil {
+                        commentPurchaseBlock
+                        boostPurchaseBlock
+                    } else {
+                        Button {
+                            loadQuotes()
+                        } label: {
+                            Label("Load pricing", systemImage: "bolt.fill")
+                        }
                     }
                 }
-            }
 
-            if let actionError, !actionError.isEmpty {
-                Label(actionError, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .font(.subheadline)
-            }
-        }
-        .task(id: element.id) {
-            if commentQuoteSat == nil && boostQuote == nil && !isLoadingQuotes {
-                loadQuotes()
+                if let actionError, !actionError.isEmpty {
+                    Label(actionError, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .font(.subheadline)
+                }
             }
         }
         .onDisappear {
@@ -378,25 +371,21 @@ struct BTCMapPaidActionsSection: View {
     private var commentPurchaseBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Paid Comment")
+                Text("Leave a Review")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 if let commentQuoteSat {
-                    Text("\(commentQuoteSat) sats")
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.blue.opacity(0.12))
-                        .foregroundColor(.blue)
-                        .clipShape(Capsule())
+                    HStack(spacing: 2) {
+                        Image(systemName: "bolt.fill")
+                            .font(.caption2)
+                        Text("~\(commentQuoteSat) sats")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.orange)
                 }
             }
 
-            Text("Comments are public on BTCMap after the Lightning invoice is paid.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            TextField("Leave a public BTCMap comment", text: $commentDraft, axis: .vertical)
+            TextField("Write a review…", text: $commentDraft, axis: .vertical)
                 .lineLimit(2...4)
                 .textInputAutocapitalization(.sentences)
                 .padding(10)
@@ -406,7 +395,7 @@ struct BTCMapPaidActionsSection: View {
             Button {
                 submitPaidComment()
             } label: {
-                Label("Create Comment Invoice", systemImage: "bolt.fill")
+                Label("Submit Review", systemImage: "bolt.fill")
             }
             .buttonStyle(.borderedProminent)
             .disabled(isSubmitting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -420,27 +409,32 @@ struct BTCMapPaidActionsSection: View {
             Text("Boost Listing")
                 .font(.subheadline.weight(.semibold))
 
-            Text("Boosts improve visibility for this listing on BTCMap after payment confirms.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
             HStack(spacing: 8) {
-                boostButton(days: 30, sats: boostQuote?.quote30dSat)
-                boostButton(days: 90, sats: boostQuote?.quote90dSat)
-                boostButton(days: 365, sats: boostQuote?.quote365dSat)
+                boostButton(days: 30, label: "30 days", sats: boostQuote?.quote30dSat)
+                boostButton(days: 90, label: "90 days", sats: boostQuote?.quote90dSat)
+                boostButton(days: 365, label: "1 year", sats: boostQuote?.quote365dSat)
             }
         }
     }
 
-    private func boostButton(days: Int, sats: Int?) -> some View {
+    private func boostButton(days: Int, label: String, sats: Int?) -> some View {
         Button {
             submitBoost(days: days)
         } label: {
             VStack(spacing: 2) {
-                Text("\(days)d")
+                Text(label)
                     .font(.caption.weight(.semibold))
-                Text(sats.map { "\($0)s" } ?? "n/a")
-                    .font(.caption2)
+                if let sats {
+                    HStack(spacing: 1) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 8))
+                        Text("~\(sats)")
+                            .font(.caption2)
+                    }
+                } else {
+                    Text("—")
+                        .font(.caption2)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
@@ -456,7 +450,9 @@ struct BTCMapPaidActionsSection: View {
     private func invoiceStatusBlock(_ invoice: V4InvoiceOrderResponse) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Lightning Invoice")
+                Image(systemName: "bolt.fill")
+                    .foregroundColor(.orange)
+                Text("Invoice")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 Text(invoiceStatus ?? "pending")
@@ -468,26 +464,31 @@ struct BTCMapPaidActionsSection: View {
                     .clipShape(Capsule())
             }
 
-            Text(invoice.invoice)
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
-                .lineLimit(3)
-                .padding(10)
-                .background(Color(uiColor: .secondarySystemGroupedBackground))
-                .clipShape(.rect(cornerRadius: 10))
-
             HStack {
-                Button("Copy Invoice") {
+                Text(String(invoice.invoice.prefix(24)) + "…")
+                    .font(.caption.monospaced())
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                Button {
                     UIPasteboard.general.string = invoice.invoice
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                        .font(.caption)
                 }
                 .buttonStyle(.bordered)
-                Button("Refresh Status") {
-                    refreshInvoiceStatus()
-                }
-                .buttonStyle(.bordered)
-                .disabled(isSubmitting)
+                .controlSize(.small)
             }
-            .font(.subheadline)
+            .padding(10)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .clipShape(.rect(cornerRadius: 10))
+
+            Button("Refresh Status") {
+                refreshInvoiceStatus()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(isSubmitting)
         }
         .padding(.vertical, 4)
     }
@@ -663,7 +664,7 @@ struct BTCMapV4EnrichmentSection: View {
 
     var body: some View {
         if hasContent {
-            Section(header: Text("BTCMap")) {
+            Section(header: Text("Verification & Links")) {
                 if let imageURLString = metadata?.imageURL,
                    let imageURL = URL(string: imageURLString) {
                     AsyncImage(url: imageURL) { phase in

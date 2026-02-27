@@ -27,8 +27,15 @@ struct IPadLayoutView: View {
     
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
-            BusinessesListView(elements: visibleElements)
-                .environmentObject(viewModel)
+            Group {
+                if viewModel.mapDisplayMode == .communities {
+                    CommunitiesListView()
+                        .environmentObject(viewModel)
+                } else {
+                    BusinessesListView(elements: visibleElements)
+                        .environmentObject(viewModel)
+                }
+            }
                 .navigationDestination(for: Element.self) { element in
                     BusinessDetailView(
                         element: element,
@@ -66,6 +73,19 @@ struct IPadLayoutView: View {
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             viewModel.performUnifiedSearch()
+        }
+        .sheet(item: $viewModel.presentedCommunityArea) { area in
+            NavigationStack {
+                CommunityDetailView(area: area)
+                    .environmentObject(viewModel)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Close") {
+                                viewModel.presentedCommunityArea = nil
+                            }
+                        }
+                    }
+            }
         }
         .sheet(isPresented: $showingAbout) {
             AboutView()

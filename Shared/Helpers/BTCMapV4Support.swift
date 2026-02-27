@@ -363,17 +363,74 @@ final class BTCMapV3AreasClient {
         performRequest(url: components.url, completion: completion)
     }
 
+    func fetchArea(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) {
+        let url = baseURL.appendingPathComponent("areas").appendingPathComponent(String(id))
+        performSingleRequest(url: url, completion: completion)
+    }
+
     func fetchAreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void) {
-        guard var components = URLComponents(url: baseURL.appendingPathComponent("area-elements"), resolvingAgainstBaseURL: false) else {
-            completion(.failure(BTCMapV3Error.invalidURL))
-            return
+        let pageLimit = max(1, limit)
+        let maxPages = 50
+        var cursor = updatedSince
+        var page = 0
+        var collected: [V3AreaElementRecord] = []
+
+        func step() {
+            guard var components = URLComponents(url: baseURL.appendingPathComponent("area-elements"), resolvingAgainstBaseURL: false) else {
+                completion(.failure(BTCMapV3Error.invalidURL))
+                return
+            }
+            components.queryItems = [
+                URLQueryItem(name: "area_id", value: String(areaID)),
+                URLQueryItem(name: "updated_since", value: cursor),
+                URLQueryItem(name: "limit", value: String(pageLimit))
+            ]
+            guard let url = components.url else {
+                completion(.failure(BTCMapV3Error.invalidURL))
+                return
+            }
+
+            session.dataTask(with: url) { data, response, error in
+                if let error {
+                    completion(.failure(error))
+                    return
+                }
+                guard let data, let http = response as? HTTPURLResponse else {
+                    completion(.failure(BTCMapV3Error.invalidResponse))
+                    return
+                }
+                guard (200..<300).contains(http.statusCode) else {
+                    let message = String(data: data.prefix(500), encoding: .utf8)
+                    completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
+                    return
+                }
+                do {
+                    let decoded = try self.decoder.decode([V3AreaElementRecord].self, from: data)
+                    let filtered = decoded.filter { $0.areaID == areaID }
+                    if !filtered.isEmpty {
+                        collected.append(contentsOf: filtered)
+                    }
+
+                    page += 1
+                    let nextCursor = decoded.last?.updatedAt
+                    let canContinue = decoded.count == pageLimit
+                        && page < maxPages
+                        && nextCursor != nil
+                        && nextCursor != cursor
+
+                    guard canContinue, let nextCursor else {
+                        completion(.success(collected))
+                        return
+                    }
+                    cursor = nextCursor
+                    step()
+                } catch {
+                    completion(.failure(error))
+                }
+            }.resume()
         }
-        components.queryItems = [
-            URLQueryItem(name: "area_id", value: String(areaID)),
-            URLQueryItem(name: "updated_since", value: updatedSince),
-            URLQueryItem(name: "limit", value: String(limit))
-        ]
-        performRequest(url: components.url, completion: completion)
+
+        step()
     }
 
     private func performRequest<T: Decodable>(url: URL?, completion: @escaping (Result<[T], Error>) -> Void) {
@@ -397,6 +454,85 @@ final class BTCMapV3AreasClient {
             }
             do {
                 let decoded = try self.decoder.decode([T].self, from: data)
+                completion(.success(decoded))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+
+    private func performSingleRequest<T: Decodable>(url: URL?, completion: @escaping (Result<T, Error>) -> Void) {
+        guard let url else {
+            completion(.failure(BTCMapV3Error.invalidURL))
+            return
+        }
+        session.dataTask(with: url) { data, response, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+            guard let data, let http = response as? HTTPURLResponse else {
+                completion(.failure(BTCMapV3Error.invalidResponse))
+                return
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let message = String(data: data.prefix(500), encoding: .utf8)
+                completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
+                return
+            }
+            if let object = try? self.decoder.decode(T.self, from: data) {
+                completion(.success(object))
+                return
+            }
+            if let array = try? self.decoder.decode([T].self, from: data), let first = array.first {
+                completion(.success(first))
+                return
+            }
+            completion(.failure(BTCMapV3Error.invalidResponse))
+        }.resume()
+    }
+}
+
+final class BTCMapV2AreasClient {
+    private let session: URLSession
+    private let baseURL = URL(string: "https://api.btcmap.org/v2")!
+    private let decoder = JSONDecoder()
+
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
+
+    func fetchAreas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) {
+        guard var components = URLComponents(url: baseURL.appendingPathComponent("areas"), resolvingAgainstBaseURL: false) else {
+            completion(.failure(BTCMapV3Error.invalidURL))
+            return
+        }
+        components.queryItems = [
+            URLQueryItem(name: "updated_since", value: updatedSince),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+
+        guard let url = components.url else {
+            completion(.failure(BTCMapV3Error.invalidURL))
+            return
+        }
+
+        session.dataTask(with: url) { data, response, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+            guard let data, let http = response as? HTTPURLResponse else {
+                completion(.failure(BTCMapV3Error.invalidResponse))
+                return
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let message = String(data: data.prefix(500), encoding: .utf8)
+                completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
+                return
+            }
+            do {
+                let decoded = try self.decoder.decode([V2AreaRecord].self, from: data)
                 completion(.success(decoded))
             } catch {
                 completion(.failure(error))
@@ -642,6 +778,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     static let epochISO8601 = "1970-01-01T00:00:00Z"
 
     private let v2Client = BTCMapV2Client()
+    private let v2AreasClient = BTCMapV2AreasClient()
     private let v3Client = BTCMapV3AreasClient()
     private let v4Client: BTCMapV4ClientProtocol
     private let userDefaults: UserDefaults
@@ -712,6 +849,14 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
 
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
         v3Client.fetchAreas(updatedSince: updatedSince, limit: limit, completion: completion)
+    }
+
+    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) {
+        v2AreasClient.fetchAreas(updatedSince: updatedSince, limit: limit, completion: completion)
+    }
+
+    func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) {
+        v3Client.fetchArea(id: id, completion: completion)
     }
 
     func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void) {

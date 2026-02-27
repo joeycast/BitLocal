@@ -43,6 +43,7 @@ struct MapView: UIViewRepresentable {
             Debug.log("MapView.makeUIView() - reusing existing MKMapView")
             // Reattach delegate and config
             existingMap.delegate = context.coordinator
+            context.coordinator.installCommunityOverlayTapRecognizer(on: existingMap)
             setupCluster(mapView: existingMap)
             existingMap.showsUserLocation = true
             existingMap.mapType = mapType
@@ -59,6 +60,7 @@ struct MapView: UIViewRepresentable {
         
         // Set the delegate to the Coordinator
         mapView.delegate = context.coordinator
+        context.coordinator.installCommunityOverlayTapRecognizer(on: mapView)
         
         // Set up clustering
         setupCluster(mapView: mapView)
@@ -177,25 +179,37 @@ struct MapView: UIViewRepresentable {
         // Handle community/merchant display mode overlay sync
         let currentMode = viewModel.mapDisplayMode
         let modeChanged = context.coordinator.lastDisplayMode != currentMode
+        let currentAreaDataHash = viewModel.communityMapAreas.isEmpty
+            ? viewModel.areaBrowserAreas.hashValue
+            : viewModel.communityMapAreas.hashValue
+        let communityDataChanged = context.coordinator.lastCommunityAreasHash != currentAreaDataHash
 
-        if modeChanged || (currentMode == .communities && viewModel.forceMapRefresh) {
+        if modeChanged || (currentMode == .communities && (viewModel.forceMapRefresh || communityDataChanged)) {
             context.coordinator.lastDisplayMode = currentMode
 
             if currentMode == .communities {
-                // Remove merchant annotations
-                let merchantAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-                if !merchantAnnotations.isEmpty {
-                    mapView.removeAnnotations(merchantAnnotations)
+                context.coordinator.lastCommunityAreasHash = currentAreaDataHash
+                if viewModel.isShowingCommunityMembersOnMap {
+                    if !mapView.overlays.isEmpty {
+                        mapView.removeOverlays(mapView.overlays)
+                    }
+                    if let elements = elements {
+                        context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
+                    }
+                } else {
+                    let merchantAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+                    if !merchantAnnotations.isEmpty {
+                        mapView.removeAnnotations(merchantAnnotations)
+                    }
+                    let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
+                    let desiredOverlays = Set(viewModel.communityOverlays)
+                    let toRemove = existingOverlays.subtracting(desiredOverlays)
+                    let toAdd = desiredOverlays.subtracting(existingOverlays)
+                    if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
+                    if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
                 }
-                // Sync overlays
-                let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
-                let desiredOverlays = Set(viewModel.communityOverlays)
-                let toRemove = existingOverlays.subtracting(desiredOverlays)
-                let toAdd = desiredOverlays.subtracting(existingOverlays)
-                if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
-                if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
-                Debug.logMap("Community mode: \(mapView.overlays.count) overlays on map")
             } else {
+                context.coordinator.lastCommunityAreasHash = currentAreaDataHash
                 // Remove all overlays
                 if !mapView.overlays.isEmpty {
                     mapView.removeOverlays(mapView.overlays)
@@ -204,7 +218,6 @@ struct MapView: UIViewRepresentable {
                 if let elements = elements, !elements.isEmpty {
                     context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
                 }
-                Debug.logMap("Merchant mode: overlays cleared, annotations restored")
             }
             needsUpdate = true
         }
@@ -223,7 +236,7 @@ struct MapView: UIViewRepresentable {
     }
     
     // Coordinator class to handle MKMapViewDelegate methods and annotations management
-    class Coordinator: NSObject, MKMapViewDelegate {
+    class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         var viewModel: ContentViewModel
         var topPadding: CGFloat
         var bottomPadding: CGFloat
@@ -236,6 +249,8 @@ struct MapView: UIViewRepresentable {
         private var debounceTimer: AnyCancellable?
         var lastElementsHash: Int?
         var lastDisplayMode: MapDisplayMode = .merchants
+        var lastCommunityAreasHash: Int?
+        weak var overlayTapRecognizer: UITapGestureRecognizer?
 
         init(viewModel: ContentViewModel, topPadding: CGFloat, bottomPadding: CGFloat) {
             self.viewModel = viewModel
@@ -247,6 +262,51 @@ struct MapView: UIViewRepresentable {
         func updatePadding(top: CGFloat, bottom: CGFloat) {
             self.topPadding = top
             self.bottomPadding = bottom
+        }
+
+        func installCommunityOverlayTapRecognizer(on mapView: MKMapView) {
+            if let existing = mapView.gestureRecognizers?.first(where: { $0.name == "communityOverlayTap" }) as? UITapGestureRecognizer {
+                existing.removeTarget(nil, action: nil)
+                existing.addTarget(self, action: #selector(handleCommunityOverlayTap(_:)))
+                existing.delegate = self
+                overlayTapRecognizer = existing
+                return
+            }
+            let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleCommunityOverlayTap(_:)))
+            recognizer.name = "communityOverlayTap"
+            recognizer.cancelsTouchesInView = false
+            recognizer.delegate = self
+            mapView.addGestureRecognizer(recognizer)
+            overlayTapRecognizer = recognizer
+        }
+
+        @objc private func handleCommunityOverlayTap(_ recognizer: UITapGestureRecognizer) {
+            guard recognizer.state == .ended,
+                  let mapView = recognizer.view as? MKMapView,
+                  viewModel.mapDisplayMode == .communities,
+                  !viewModel.isShowingCommunityMembersOnMap else { return }
+
+            let tapPoint = recognizer.location(in: mapView)
+            let coordinate = mapView.convert(tapPoint, toCoordinateFrom: mapView)
+            let mapPoint = MKMapPoint(coordinate)
+
+            for overlay in mapView.overlays.reversed() {
+                guard let polygon = overlay as? MKPolygon else { continue }
+                guard let renderer = mapView.renderer(for: polygon) as? MKPolygonRenderer else { continue }
+                if renderer.path == nil {
+                    renderer.invalidatePath()
+                }
+                let rendererPoint = renderer.point(for: mapPoint)
+                guard let path = renderer.path, path.contains(rendererPoint) else { continue }
+                if let areaID = polygon.subtitle, let area = viewModel.communityArea(withID: areaID) {
+                    viewModel.selectCommunity(area)
+                }
+                break
+            }
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
         }
         
         // Smoothly expand the cluster and zoom to a specific annotation
