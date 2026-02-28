@@ -171,7 +171,13 @@ struct BusinessesListView: View {
                             viewModel.selectAnnotation(for: element, animated: true)
                             viewModel.path = [element]
                         } label: {
-                            ElementCell(viewModel: cellVM)
+                            ZStack(alignment: .trailing) {
+                                ElementCell(viewModel: cellVM)
+                                    .padding(.trailing, 18)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.gray.opacity(0.6))
+                            }
                         }
                         .buttonStyle(.plain)
                         .onAppear {
@@ -199,10 +205,16 @@ struct BusinessesListView: View {
                             Button {
                                 viewModel.selectMerchantSearchResult(result)
                             } label: {
-                                MerchantSearchResultRow(
-                                    result: result,
-                                    referenceLocation: searchReferenceLocation
-                                )
+                                ZStack(alignment: .trailing) {
+                                    MerchantSearchResultRow(
+                                        result: result,
+                                        referenceLocation: searchReferenceLocation
+                                    )
+                                    .padding(.trailing, 18)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.gray.opacity(0.6))
+                                }
                             }
                             .buttonStyle(.plain)
                         }
