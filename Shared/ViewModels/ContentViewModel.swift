@@ -45,7 +45,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var merchantSearchResults: [V4PlaceRecord] = []
     @Published var merchantSearchIsLoading = false
     @Published var merchantSearchError: String?
-    @Published var merchantSearchUseMapCenter = true
     @Published var merchantSearchRadiusKM: Double = 20
     @Published var merchantSearchProviderFilter = ""
     // Events
@@ -105,6 +104,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var debounceTimer: AnyCancellable?
     private var unifiedSearchDebounceTask: Task<Void, Never>?
     private var latestMerchantSearchRequestID = UUID()
+    private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
+    private var merchantSearchAnchorQuery = ""
+    private let merchantSearchRequeryDistanceMeters: CLLocationDistance = 5_000
     private var latestCommunitySelectionRequestID = UUID()
     private var hasScheduledCommunityPrefetch = false
     private var communityPrefetchWorkItem: DispatchWorkItem?
@@ -144,6 +146,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             .sink { [weak self] elements in
                 self?.visibleElements = elements
                 self?.hydratePlaceholderNamesIfNeeded(in: elements)
+                self?.refreshMerchantSearchFromVisibleElementsIfNeeded()
             }
             .store(in: &cancellables)
     }
@@ -689,6 +692,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             localFilteredMerchants = []
             searchMatchingAreas = []
             clearMerchantSearchResults()
+            merchantSearchAnchorCenter = nil
+            merchantSearchAnchorQuery = ""
             return
         }
 
@@ -696,31 +701,26 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         guard query.count >= 2 else {
             localFilteredMerchants = []
             clearMerchantSearchResults()
+            merchantSearchAnchorCenter = nil
+            merchantSearchAnchorQuery = ""
             return
         }
 
-        // Filter cached merchants by name
-        localFilteredMerchants = allElements.filter { element in
-            let searchable = [
-                element.osmJSON?.tags?.name,
-                element.osmJSON?.tags?.brand,
-                element.osmJSON?.tags?.operator,
-                element.displayName
-            ]
-            return searchable.compactMap { $0 }.contains { $0.localizedStandardContains(query) }
-        }
-        localFilteredMerchants.sort(by: merchantElementSearchSortOrder)
+        localFilteredMerchants = filteredMerchantElements(in: visibleElements, query: query)
         hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
 
         // Unified search in merchants context should only return merchants.
         searchMatchingAreas = []
 
-        // Debounce remote API search for 3+ chars
+        // Debounce remote API search for 2+ chars
         unifiedSearchDebounceTask?.cancel()
-        guard query.count >= 3 else {
+        guard query.count >= 2 else {
             clearMerchantSearchResults()
             return
         }
+
+        merchantSearchAnchorCenter = region.center
+        merchantSearchAnchorQuery = query
 
         unifiedSearchDebounceTask = Task {
             try? await Task.sleep(nanoseconds: 400_000_000)
@@ -730,6 +730,45 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 performRemoteMerchantSearch()
             }
         }
+    }
+
+    private func refreshMerchantSearchFromVisibleElementsIfNeeded() {
+        guard mapDisplayMode == .merchants else { return }
+        let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else { return }
+        localFilteredMerchants = filteredMerchantElements(in: visibleElements, query: query)
+        hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
+    }
+
+    private func filteredMerchantElements(in source: [Element], query: String) -> [Element] {
+        let filtered = source.filter { element in
+            let searchable = [
+                element.osmJSON?.tags?.name,
+                element.osmJSON?.tags?.brand,
+                element.osmJSON?.tags?.operator,
+                element.displayName
+            ]
+            return searchable.compactMap { $0 }.contains { $0.localizedStandardContains(query) }
+        }
+        return filtered.sorted(by: merchantElementSearchSortOrder)
+    }
+
+    func handleMerchantSearchMapRegionChange() {
+        guard mapDisplayMode == .merchants else { return }
+        let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else { return }
+        guard merchantSearchAnchorQuery == query,
+              let anchor = merchantSearchAnchorCenter else {
+            merchantSearchAnchorCenter = region.center
+            merchantSearchAnchorQuery = query
+            return
+        }
+
+        let anchorLocation = CLLocation(latitude: anchor.latitude, longitude: anchor.longitude)
+        let currentLocation = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+        let distance = anchorLocation.distance(from: currentLocation)
+        guard distance >= merchantSearchRequeryDistanceMeters else { return }
+        performUnifiedSearch()
     }
 
     /// Lazy-load events on first list appearance
@@ -1662,9 +1701,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         let query = V4SearchQuery(
             name: trimmedName.isEmpty ? nil : trimmedName,
-            lat: merchantSearchUseMapCenter ? region.center.latitude : nil,
-            lon: merchantSearchUseMapCenter ? region.center.longitude : nil,
-            radiusKM: merchantSearchUseMapCenter ? merchantSearchRadiusKM : nil,
+            lat: region.center.latitude,
+            lon: region.center.longitude,
+            radiusKM: merchantSearchRadiusKM,
             tagName: tagName,
             tagValue: tagValue
         )

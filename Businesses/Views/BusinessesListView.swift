@@ -19,6 +19,7 @@ struct BusinessesListView: View {
 
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
+    @State private var searchResultsLimit = 20
     @FocusState private var isSearchFieldFocused: Bool
 
     private var sortedElements: [Element] {
@@ -63,6 +64,15 @@ struct BusinessesListView: View {
             if focused && !viewModel.isSearchActive {
                 viewModel.isSearchActive = true
             }
+        }
+        .onChange(of: viewModel.unifiedSearchText) { _, _ in
+            searchResultsLimit = 20
+        }
+        .onChange(of: viewModel.region.center.latitude) { _, _ in
+            viewModel.handleMerchantSearchMapRegionChange()
+        }
+        .onChange(of: viewModel.region.center.longitude) { _, _ in
+            viewModel.handleMerchantSearchMapRegionChange()
         }
         .onAppear {
             viewModel.ensureEventsLoaded()
@@ -161,81 +171,37 @@ struct BusinessesListView: View {
 
     private var searchResultsView: some View {
         List {
-            // Local merchant matches
-            if !viewModel.localFilteredMerchants.isEmpty {
-                Section("Nearby") {
-                    ForEach(viewModel.localFilteredMerchants.prefix(10), id: \.id) { element in
-                        let cellVM = cellViewModel(for: element)
-                        Button {
-                            viewModel.setSelectionSource(.list)
-                            viewModel.selectAnnotation(for: element, animated: true)
-                            viewModel.path = [element]
-                        } label: {
-                            ZStack(alignment: .trailing) {
-                                ElementCell(viewModel: cellVM)
-                                    .padding(.trailing, 18)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.gray.opacity(0.6))
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .onAppear {
-                            viewModel.requestPlaceholderNameHydration(for: [element])
-                        }
-                    }
-                }
-            }
-
-            // Remote API results
-            if viewModel.merchantSearchIsLoading {
-                Section {
-                    HStack {
-                        ProgressView()
-                        Text("Searching…")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else if !viewModel.merchantSearchResults.isEmpty {
-                let localIDs = Set(viewModel.localFilteredMerchants.map(\.id))
-                let deduped = viewModel.merchantSearchResults.filter { !localIDs.contains($0.idString) }
-                if !deduped.isEmpty {
-                    Section("More Results") {
-                        ForEach(deduped) { result in
-                            Button {
-                                viewModel.selectMerchantSearchResult(result)
-                            } label: {
-                                ZStack(alignment: .trailing) {
-                                    MerchantSearchResultRow(
-                                        result: result,
-                                        referenceLocation: searchReferenceLocation
-                                    )
-                                    .padding(.trailing, 18)
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(.gray.opacity(0.6))
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-
-            // Empty state
-            let query = viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if query.count == 1 {
+            if trimmedSearchQuery.count == 1 {
                 Section {
                     Text("Type at least 2 characters to search")
                         .foregroundStyle(.secondary)
                 }
-            } else if viewModel.localFilteredMerchants.isEmpty &&
-                viewModel.merchantSearchResults.isEmpty &&
-                !viewModel.merchantSearchIsLoading &&
-                query.count >= 2 {
-                Section {
-                    Text("No results found")
-                        .foregroundStyle(.secondary)
+            } else if trimmedSearchQuery.count >= 2 {
+                Section("Results") {
+                    if displayedSearchResults.isEmpty && !viewModel.merchantSearchIsLoading {
+                        Text("No results found")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(displayedSearchResults) { item in
+                            merchantSearchRow(for: item)
+                        }
+                    }
+
+                    if viewModel.merchantSearchIsLoading {
+                        HStack {
+                            ProgressView()
+                            Text("Searching…")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if hasMoreSearchResults {
+                        Button("Load more results") {
+                            searchResultsLimit += 20
+                        }
+                        .frame(maxWidth: .infinity)
+                        .foregroundStyle(.accent)
+                    }
                 }
             }
         }
@@ -257,10 +223,94 @@ struct BusinessesListView: View {
         return CLLocation(latitude: center.latitude, longitude: center.longitude)
     }
 
+    private var trimmedSearchQuery: String {
+        viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var isFilteringMerchants: Bool {
-        !viewModel.unifiedSearchText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .isEmpty
+        !trimmedSearchQuery.isEmpty
+    }
+
+    private var unifiedSearchResults: [MerchantSearchItem] {
+        let localItems: [MerchantSearchItem] = viewModel.localFilteredMerchants.map { .local($0) }
+        let localIDs = Set(viewModel.localFilteredMerchants.map(\.id))
+        let remoteItems: [MerchantSearchItem] = viewModel.merchantSearchResults
+            .filter { !localIDs.contains($0.idString) }
+            .map { .remote($0) }
+        let combined = localItems + remoteItems
+        return combined.sorted(by: merchantSearchResultSortOrder)
+    }
+
+    private var displayedSearchResults: [MerchantSearchItem] {
+        Array(unifiedSearchResults.prefix(searchResultsLimit))
+    }
+
+    private var hasMoreSearchResults: Bool {
+        unifiedSearchResults.count > searchResultsLimit
+    }
+
+    private func merchantSearchResultSortOrder(_ lhs: MerchantSearchItem, _ rhs: MerchantSearchItem) -> Bool {
+        let lhsDistance = merchantResultDistance(lhs)
+        let rhsDistance = merchantResultDistance(rhs)
+        if lhsDistance != rhsDistance {
+            return lhsDistance < rhsDistance
+        }
+
+        let lhsName = lhs.title.localizedLowercase
+        let rhsName = rhs.title.localizedLowercase
+        if lhsName != rhsName {
+            return lhsName < rhsName
+        }
+
+        return lhs.id < rhs.id
+    }
+
+    private func merchantResultDistance(_ item: MerchantSearchItem) -> CLLocationDistance {
+        guard let reference = searchReferenceLocation else { return .greatestFiniteMagnitude }
+        guard let coordinate = item.coordinate else { return .greatestFiniteMagnitude }
+        let target = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        return reference.distance(from: target)
+    }
+
+    @ViewBuilder
+    private func merchantSearchRow(for item: MerchantSearchItem) -> some View {
+        switch item {
+        case .local(let element):
+            let cellVM = cellViewModel(for: element)
+            Button {
+                viewModel.setSelectionSource(.list)
+                viewModel.selectAnnotation(for: element, animated: true)
+                viewModel.path = [element]
+            } label: {
+                ZStack(alignment: .trailing) {
+                    ElementCell(viewModel: cellVM)
+                        .padding(.trailing, 18)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.gray.opacity(0.6))
+                }
+            }
+            .buttonStyle(.plain)
+            .onAppear {
+                viewModel.requestPlaceholderNameHydration(for: [element])
+            }
+        case .remote(let result):
+            Button {
+                viewModel.selectMerchantSearchResult(result)
+            } label: {
+                ZStack(alignment: .trailing) {
+                    MerchantSearchResultRow(
+                        result: result,
+                        referenceLocation: searchReferenceLocation
+                    )
+                    .padding(.trailing, 18)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.gray.opacity(0.6))
+                }
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private func handleUserLocationChange(_ newLocation: CLLocation?) {
@@ -339,6 +389,40 @@ struct BusinessesListView: View {
         guard let detent = currentDetent else { return false }
         guard #available(iOS 26.0, *) else { return false }
         return detent != .large
+    }
+}
+
+@available(iOS 17.0, *)
+private enum MerchantSearchItem: Identifiable {
+    case local(Element)
+    case remote(V4PlaceRecord)
+
+    var id: String {
+        switch self {
+        case .local(let element):
+            return "local-\(element.id)"
+        case .remote(let record):
+            return "remote-\(record.idString)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .local(let element):
+            return element.displayName ?? ""
+        case .remote(let record):
+            return record.displayName
+        }
+    }
+
+    var coordinate: CLLocationCoordinate2D? {
+        switch self {
+        case .local(let element):
+            return element.mapCoordinate
+        case .remote(let record):
+            guard let lat = record.lat, let lon = record.lon else { return nil }
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
     }
 }
 
