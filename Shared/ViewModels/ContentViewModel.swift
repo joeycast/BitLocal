@@ -106,6 +106,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var unifiedSearchDebounceTask: Task<Void, Never>?
     private var latestMerchantSearchRequestID = UUID()
     private var latestCommunitySelectionRequestID = UUID()
+    private var hasScheduledCommunityPrefetch = false
+    private var communityPrefetchWorkItem: DispatchWorkItem?
     private var placeholderNameHydrationInFlight = Set<String>()
     private var placeholderNameHydrationAttempted = Set<String>()
     
@@ -740,6 +742,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     /// Loads the BTC Map v2 areas feed used by btcmap.org's communities map.
     func ensureCommunityMapAreasLoaded() {
+        ensureAreasLoaded() // v3 fallback can render local communities immediately.
         if communityMapAreasIsLoading { return }
         let currentCommunityGeoJSON = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted && $0.geoJSON != nil }.count
         if hasLoadedCommunityMapAreas && !communityMapAreas.isEmpty {
@@ -764,8 +767,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     var communityListAreas: [V2AreaRecord] {
-        communityMapAreas
-            .filter { $0.isCommunity && !$0.isDeleted }
+        effectiveCommunityAreasForDisplay
             .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }
 
@@ -849,6 +851,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                         }
                     }
 
+                    // Publish progressively so visible communities can appear immediately.
+                    self.communityMapAreas = Array(merged.values)
+                    self.forceMapRefresh = true
+
                     let nextAnchor = areas.last?.updatedAt
                     let shouldContinue = areas.count == pageLimit &&
                         page < maxPages &&
@@ -861,8 +867,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
 
                     self.communityMapAreasIsLoading = false
-                    self.communityMapAreas = Array(merged.values)
-                    self.forceMapRefresh = true
                 }
             }
         }
@@ -871,41 +875,20 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // MARK: - Community Map Mode
 
     var communityOverlays: [MKPolygon] {
-        let currentHash = communityMapAreas.isEmpty
-            ? areaBrowserAreas.hashValue
-            : communityMapAreas.hashValue
+        let currentHash = effectiveCommunityAreasForDisplay.hashValue
         if let cached = cachedCommunityOverlays, lastOverlayAreasHash == currentHash { return cached }
 
         var polygons: [MKPolygon] = []
-        if !communityMapAreas.isEmpty {
-            let v2CommunityAreas = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted && $0.geoJSON != nil }
-            for area in v2CommunityAreas {
-                guard let geoJSON = area.geoJSON else { continue }
-                for feature in geoJSON.features {
-                    let geom = feature.geometry
-                    switch geom.coordinates {
-                    case .polygon(let rings):
+        for area in effectiveCommunityAreasForDisplay {
+            guard let geoJSON = area.geoJSON else { continue }
+            for feature in geoJSON.features {
+                let geom = feature.geometry
+                switch geom.coordinates {
+                case .polygon(let rings):
+                    polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: area.id))
+                case .multiPolygon(let multiRings):
+                    for rings in multiRings {
                         polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: area.id))
-                    case .multiPolygon(let multiRings):
-                        for rings in multiRings {
-                            polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: area.id))
-                        }
-                    }
-                }
-            }
-        } else {
-            let fallbackV3Areas = areaBrowserAreas.filter { $0.tags?["type"] == "community" && $0.geoJSON != nil }
-            for area in fallbackV3Areas {
-                guard let geoJSON = area.geoJSON else { continue }
-                for feature in geoJSON.features {
-                    let geom = feature.geometry
-                    switch geom.coordinates {
-                    case .polygon(let rings):
-                        polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: String(area.id)))
-                    case .multiPolygon(let multiRings):
-                        for rings in multiRings {
-                            polygons.append(contentsOf: mkPolygons(from: rings, title: area.displayName, identifier: String(area.id)))
-                        }
                     }
                 }
             }
@@ -914,6 +897,38 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         cachedCommunityOverlays = polygons
         lastOverlayAreasHash = currentHash
         return polygons
+    }
+
+    private var effectiveCommunityAreasForDisplay: [V2AreaRecord] {
+        let v2Areas = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted && $0.geoJSON != nil }
+        let fallbackAreas = fallbackCommunityAreasFromV3()
+
+        // While v2 is still loading, keep fallback communities visible and layer in v2 progressively.
+        if communityMapAreasIsLoading {
+            var merged = Dictionary(uniqueKeysWithValues: fallbackAreas.map { ($0.id, $0) })
+            for area in v2Areas { merged[area.id] = area }
+            return Array(merged.values)
+        }
+
+        return v2Areas.isEmpty ? fallbackAreas : v2Areas
+    }
+
+    private func fallbackCommunityAreasFromV3() -> [V2AreaRecord] {
+        areaBrowserAreas
+            .filter { area in
+                area.tags?["type"] == "community" &&
+                area.geoJSON != nil
+            }
+            .map { area in
+                V2AreaRecord(
+                    id: String(area.id),
+                    tags: area.tags,
+                    createdAt: nil,
+                    updatedAt: area.updatedAt,
+                    deletedAt: nil,
+                    geoJSON: area.geoJSON
+                )
+            }
     }
 
     private func mkPolygons(from rings: [[[Double]]], title: String, identifier: String?) -> [MKPolygon] {
@@ -1653,6 +1668,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                                     self.forceMapRefresh = true
                                 }
                                 self.isLoading = false
+                                self.scheduleCommunityPrefetchIfNeeded()
                                 if self.isInitialStartup {
                                     self.isInitialStartup = false
                                 }
@@ -1662,6 +1678,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
 
                     self.isLoading = false
+                    self.scheduleCommunityPrefetchIfNeeded()
                     
                     // Center map for returning users who have cached data
                     if let userLoc = self.userLocation {
@@ -1710,6 +1727,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
                     
                     self.isLoading = false
+                    self.scheduleCommunityPrefetchIfNeeded()
                     
                     // Mark initial startup as complete
                     if self.isInitialStartup {
@@ -1725,6 +1743,20 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             let rawName = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return Element.isPlaceholderName(rawName)
         }
+    }
+
+    private func scheduleCommunityPrefetchIfNeeded() {
+        guard !hasScheduledCommunityPrefetch else { return }
+        hasScheduledCommunityPrefetch = true
+
+        communityPrefetchWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            Debug.logAPI("Prefetching community datasets in background")
+            self.ensureCommunityMapAreasLoaded()
+        }
+        communityPrefetchWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
     }
 
     // Background update check that doesn't block UI

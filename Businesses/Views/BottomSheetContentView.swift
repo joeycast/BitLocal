@@ -162,7 +162,10 @@ struct CommunitiesListView: View {
                 }
             }
 
-            if viewModel.communityMapAreasIsLoading && filteredCommunities.isEmpty {
+            if viewModel.communityMapAreasIsLoading &&
+                viewModel.communityMapAreas.isEmpty &&
+                viewModel.areaBrowserAreas.isEmpty &&
+                filteredCommunities.isEmpty {
                 Section {
                     HStack {
                         ProgressView()

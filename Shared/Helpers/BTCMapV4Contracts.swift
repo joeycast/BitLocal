@@ -617,6 +617,22 @@ struct V2AreaRecord: Codable, Hashable, Identifiable {
         case deletedAt = "deleted_at"
     }
 
+    init(
+        id: String,
+        tags: [String: String]?,
+        createdAt: String?,
+        updatedAt: String?,
+        deletedAt: String?,
+        geoJSON: GeoJSONFeatureCollection?
+    ) {
+        self.id = id
+        self.tags = tags
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
+        self.geoJSON = geoJSON
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
