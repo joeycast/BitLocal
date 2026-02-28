@@ -15,8 +15,6 @@ struct BottomSheetContentView: View {
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
 
-    @State private var savedDetent: PresentationDetent?
-
     var body: some View {
         GeometryReader { geometry in
             VStack {
@@ -59,14 +57,7 @@ struct BottomSheetContentView: View {
                 }
                 .onChange(of: viewModel.isSearchActive) { _, isActive in
                     guard viewModel.mapDisplayMode != .communities else { return }
-                    if isActive {
-                        savedDetent = currentDetent
-                        currentDetent = .large
-                    } else {
-                        if let saved = savedDetent {
-                            currentDetent = saved
-                        }
-                        savedDetent = nil
+                    if !isActive {
                         viewModel.unifiedSearchText = ""
                         viewModel.performUnifiedSearch()
                     }
