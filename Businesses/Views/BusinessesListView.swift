@@ -146,19 +146,6 @@ struct BusinessesListView: View {
                     .clearListRowBackground(if: shouldUseGlassyRows)
             }
             .clearListRowBackground(if: shouldUseGlassyRows)
-
-            // Browse All Regions
-            Section {
-                NavigationLink {
-                    AllRegionsListView()
-                        .environmentObject(viewModel)
-                } label: {
-                    Label("Browse All Regions", systemImage: "globe")
-                        .font(.subheadline.weight(.medium))
-                }
-                .clearListRowBackground(if: shouldUseGlassyRows)
-            }
-            .clearListRowBackground(if: shouldUseGlassyRows)
         }
         .listStyle(.plain)
         .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
