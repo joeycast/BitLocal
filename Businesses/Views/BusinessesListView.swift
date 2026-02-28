@@ -177,21 +177,13 @@ struct BusinessesListView: View {
                         .foregroundStyle(.secondary)
                 }
             } else if trimmedSearchQuery.count >= 2 {
-                Section("Results") {
+                Section(viewModel.merchantSearchIsLoading ? "Searching…" : "Results") {
                     if displayedSearchResults.isEmpty && !viewModel.merchantSearchIsLoading {
                         Text("No results found")
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(displayedSearchResults) { item in
                             merchantSearchRow(for: item)
-                        }
-                    }
-
-                    if viewModel.merchantSearchIsLoading {
-                        HStack {
-                            ProgressView()
-                            Text("Searching…")
-                                .foregroundStyle(.secondary)
                         }
                     }
 
