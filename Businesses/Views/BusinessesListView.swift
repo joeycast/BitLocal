@@ -43,7 +43,7 @@ struct BusinessesListView: View {
                         LoadingScreenView()
                         Spacer()
                     }
-                } else if viewModel.isSearchActive {
+                } else if isFilteringMerchants {
                     searchResultsView
                 } else if elements.isEmpty {
                     Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
@@ -221,7 +221,10 @@ struct BusinessesListView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .background(Color.clear)
+        .environment(\.defaultMinListRowHeight, 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: Array(viewModel.localFilteredMerchants.prefix(20)))
@@ -234,6 +237,12 @@ struct BusinessesListView: View {
         if let userLocation = viewModel.userLocation { return userLocation }
         let center = viewModel.region.center
         return CLLocation(latitude: center.latitude, longitude: center.longitude)
+    }
+
+    private var isFilteringMerchants: Bool {
+        !viewModel.unifiedSearchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
     }
 
     private func handleUserLocationChange(_ newLocation: CLLocation?) {
