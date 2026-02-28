@@ -172,28 +172,24 @@ struct BusinessesListView: View {
     private var searchResultsView: some View {
         List {
             if trimmedSearchQuery.count == 1 {
-                Section {
-                    Text("Type at least 2 characters to search")
-                        .foregroundStyle(.secondary)
-                }
+                Text("Type at least 2 characters to search")
+                    .foregroundStyle(.secondary)
             } else if trimmedSearchQuery.count >= 2 {
-                Section(viewModel.merchantSearchIsLoading ? "Searching…" : "Results") {
-                    if displayedSearchResults.isEmpty && !viewModel.merchantSearchIsLoading {
-                        Text("No results found")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(displayedSearchResults) { item in
-                            merchantSearchRow(for: item)
-                        }
+                if displayedSearchResults.isEmpty && !viewModel.merchantSearchIsLoading {
+                    Text("No results found")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(displayedSearchResults) { item in
+                        merchantSearchRow(for: item)
                     }
+                }
 
-                    if hasMoreSearchResults {
-                        Button("Load more results") {
-                            searchResultsLimit += 20
-                        }
-                        .frame(maxWidth: .infinity)
-                        .foregroundStyle(.accent)
+                if hasMoreSearchResults {
+                    Button("Load more results") {
+                        searchResultsLimit += 20
                     }
+                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(.accent)
                 }
             }
         }
