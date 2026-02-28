@@ -370,16 +370,19 @@ struct MapView: UIViewRepresentable {
         // Efficiently update annotations by only adding/removing what's changed
         func updateAnnotations(mapView: MKMapView, elements: [Element]?) {
             guard let elements = elements else { return }
-            
-            let visibleRect = mapView.visibleMapRect
-            let centerCoordinate = mapView.centerCoordinate
+
+            let viewportRect = effectiveViewportRect(for: mapView)
+            let centerPoint = CGPoint(x: viewportRect.midX, y: viewportRect.midY)
+            let centerCoordinate = mapView.convert(centerPoint, toCoordinateFrom: mapView)
             let centerLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
-            
+
+            let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
+
             let visibleElements = elements.filter { element in
                 guard let coordinate = element.mapCoordinate else { return false }
                 let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
                 let distance = location.distance(from: centerLocation)
-                
+
                 let mapPoint = MKMapPoint(coordinate)
                 return visibleRect.contains(mapPoint) &&
                 distance <= 25 * 1609.344 && // 25 miles in meters
@@ -527,13 +530,42 @@ struct MapView: UIViewRepresentable {
 
         // Update visible elements based on annotations in the visible map rect
         func updateVisibleElements(for mapView: MKMapView) {
-            let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
+            let viewportRect = effectiveViewportRect(for: mapView)
+            let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
+            let visibleAnnotations = mapView.annotations(in: visibleRect)
             let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
             let latestByID = Dictionary(uniqueKeysWithValues: self.viewModel.allElements.map { ($0.id, $0) })
             let refreshed = visibleElements.compactMap { latestByID[$0.id] ?? $0 }
 
             self.viewModel.visibleElementsSubject.send(refreshed)
             self.viewModel.mapStoppedMovingSubject.send(())
+        }
+
+        private func effectiveViewportRect(for mapView: MKMapView) -> CGRect {
+            let insets = viewModel.mapListViewportInsets(for: mapView)
+            let rect = mapView.bounds.inset(by: insets)
+            guard rect.width > 1, rect.height > 1 else { return mapView.bounds }
+            return rect
+        }
+
+        private func effectiveVisibleMapRect(for mapView: MKMapView, viewportRect: CGRect) -> MKMapRect {
+            let topLeft = mapView.convert(
+                CGPoint(x: viewportRect.minX, y: viewportRect.minY),
+                toCoordinateFrom: mapView
+            )
+            let bottomRight = mapView.convert(
+                CGPoint(x: viewportRect.maxX, y: viewportRect.maxY),
+                toCoordinateFrom: mapView
+            )
+            let topLeftPoint = MKMapPoint(topLeft)
+            let bottomRightPoint = MKMapPoint(bottomRight)
+
+            return MKMapRect(
+                x: min(topLeftPoint.x, bottomRightPoint.x),
+                y: min(topLeftPoint.y, bottomRightPoint.y),
+                width: abs(topLeftPoint.x - bottomRightPoint.x),
+                height: abs(topLeftPoint.y - bottomRightPoint.y)
+            )
         }
     }
 }

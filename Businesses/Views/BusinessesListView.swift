@@ -23,10 +23,8 @@ struct BusinessesListView: View {
 
     private var sortedElements: [Element] {
         elements.sorted { (element1, element2) -> Bool in
-            guard let distance1 = viewModel.distanceInMiles(element: element1),
-                  let distance2 = viewModel.distanceInMiles(element: element2) else {
-                return false
-            }
+            let distance1 = viewModel.distanceFromListFocus(element: element1) ?? .greatestFiniteMagnitude
+            let distance2 = viewModel.distanceFromListFocus(element: element2) ?? .greatestFiniteMagnitude
             return distance1 < distance2
         }
     }

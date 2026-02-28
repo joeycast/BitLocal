@@ -412,6 +412,42 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let annotationLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
         return centerLocation.distance(from: annotationLocation)
     }
+
+    func distanceFromListFocus(element: Element) -> CLLocationDistance? {
+        guard let coordinate = element.mapCoordinate else { return nil }
+        let target = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+
+        if let focusCoordinate = listFocusCoordinate() {
+            let focus = CLLocation(latitude: focusCoordinate.latitude, longitude: focusCoordinate.longitude)
+            return focus.distance(from: target)
+        }
+
+        if let user = userLocation {
+            return user.distance(from: target)
+        }
+
+        let mapCenter = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+        return mapCenter.distance(from: target)
+    }
+
+    private func listFocusCoordinate() -> CLLocationCoordinate2D? {
+        guard UIDevice.current.userInterfaceIdiom == .phone,
+              let mapView = mapView else { return nil }
+
+        let insets = mapListViewportInsets(for: mapView)
+        let focusRect = mapView.bounds.inset(by: insets)
+        guard focusRect.width > 1, focusRect.height > 1 else { return mapView.centerCoordinate }
+
+        let centerPoint = CGPoint(x: focusRect.midX, y: focusRect.midY)
+        return mapView.convert(centerPoint, toCoordinateFrom: mapView)
+    }
+
+    func mapListViewportInsets(for mapView: MKMapView) -> UIEdgeInsets {
+        let topInset = max(topPadding, 0)
+        // Keep ordering stable by always assuming the smallest iPhone sheet detent.
+        let bottomInset = mapView.bounds.height * 0.30
+        return UIEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
+    }
     
     // Zoom to element
     func zoomToElement(_ element: Element) {
