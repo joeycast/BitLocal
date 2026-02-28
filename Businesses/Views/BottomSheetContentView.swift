@@ -132,36 +132,6 @@ struct CommunitiesListView: View {
 
     var body: some View {
         List {
-            if let selected = viewModel.selectedCommunityArea {
-                Section {
-                    Button {
-                        viewModel.clearSelectedCommunity()
-                    } label: {
-                        Label("Show All Communities", systemImage: "square.grid.2x2")
-                    }
-                    .buttonStyle(.plain)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(selected.displayName)
-                            .font(.headline)
-                        if viewModel.communityMembersIsLoading {
-                            Label("Loading community merchants…", systemImage: "hourglass")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else if let error = viewModel.communityMembersError, !error.isEmpty {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        } else {
-                            Text("\(viewModel.communityMemberElements.count) merchants on map")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-
             if viewModel.communityMapAreasIsLoading &&
                 viewModel.communityMapAreas.isEmpty &&
                 viewModel.areaBrowserAreas.isEmpty &&
@@ -197,6 +167,10 @@ struct CommunitiesListView: View {
         .listStyle(.plain)
         .searchable(text: $filterText, prompt: "Search communities…")
         .onAppear {
+            // Returning from detail should always restore the visible-community browsing state.
+            if viewModel.selectedCommunityArea != nil {
+                viewModel.clearSelectedCommunity()
+            }
             viewModel.ensureCommunityMapAreasLoaded()
         }
     }
