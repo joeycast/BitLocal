@@ -321,20 +321,26 @@ struct CommunityDetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(memberElements, id: \.id) { element in
-                        Button {
-                            viewModel.setSelectionSource(.list)
-                            viewModel.selectAnnotation(for: element, animated: true)
-                            viewModel.path = [element]
+                        NavigationLink {
+                            BusinessDetailView(
+                                element: element,
+                                userLocation: viewModel.userLocation,
+                                contentViewModel: viewModel
+                            )
+                            .onAppear {
+                                viewModel.setSelectionSource(.list)
+                                viewModel.selectAnnotation(for: element, animated: true)
+                                viewModel.selectedElement = element
+                            }
                         } label: {
                             ZStack(alignment: .trailing) {
                                 ElementCell(viewModel: cellViewModel(for: element))
-                                    .padding(.trailing, 18)
+                                .padding(.trailing, 18)
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(.gray.opacity(0.6))
                             }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
