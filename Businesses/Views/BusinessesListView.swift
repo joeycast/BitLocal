@@ -288,8 +288,8 @@ struct BusinessesListView: View {
 
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
         if let vm = viewModel.cellViewModels[element.id] {
-            let currentName = vm.element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let nextName = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let currentName = vm.element.displayName ?? ""
+            let nextName = element.displayName ?? ""
             let currentUpdated = vm.element.updatedAt ?? ""
             let nextUpdated = element.updatedAt ?? ""
             if currentName != nextName || currentUpdated != nextUpdated {

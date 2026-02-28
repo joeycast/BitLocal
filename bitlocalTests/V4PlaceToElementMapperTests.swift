@@ -41,7 +41,8 @@ final class V4PlaceToElementMapperTests: XCTestCase {
             osmAddrCity: "Nashville",
             osmAddrState: "TN",
             osmAddrPostcode: "37201",
-            osmOperator: "Cafe Bitcoin LLC"
+            osmOperator: "Cafe Bitcoin LLC",
+            osmBrand: nil
         )
 
         let element = V4PlaceToElementMapper.placeRecordToElement(record)

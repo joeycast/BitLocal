@@ -139,8 +139,13 @@ struct Element: Codable, Identifiable, Hashable {
 
     var displayName: String? {
         let name = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !name.isEmpty && !Self.isPlaceholderName(name) {
+        if !Self.isInvalidPrimaryName(name) {
             return name
+        }
+
+        let brandName = osmJSON?.tags?.brand?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !brandName.isEmpty {
+            return brandName
         }
 
         let operatorName = osmJSON?.tags?.operator?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -149,6 +154,13 @@ struct Element: Codable, Identifiable, Hashable {
         }
 
         return nil
+    }
+
+    static func isInvalidPrimaryName(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        if isPlaceholderName(trimmed) { return true }
+        return trimmed.lowercased() == "unnamed"
     }
 
     static func isPlaceholderName(_ value: String) -> Bool {
@@ -227,6 +239,7 @@ struct OsmTags: Codable {
     let addrCity, addrHousenumber, addrPostcode, addrState, addrStreet: String?
     let paymentBitcoin, currencyXBT, paymentOnchain, paymentLightning, paymentLightningContactless: String?
     let name, `operator`: String?
+    let brand: String?
     let description, descriptionEn, website, contactWebsite, phone, contactPhone, openingHours: String?
     let cuisine: String?
     let shop: String?
@@ -254,6 +267,7 @@ struct OsmTags: Codable {
         case paymentLightningContactless = "payment:lightning_contactless"
         case name
         case `operator`
+        case brand
         case description
         case descriptionEn = "description:en"
         case website

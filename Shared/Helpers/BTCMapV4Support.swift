@@ -35,7 +35,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         "osm:payment:bitcoin", "osm:currency:XBT", "osm:payment:onchain",
         "osm:payment:lightning", "osm:payment:lightning_contactless",
         "osm:addr:housenumber", "osm:addr:street", "osm:addr:city",
-        "osm:addr:state", "osm:addr:postcode", "osm:operator"
+        "osm:addr:state", "osm:addr:postcode", "osm:operator", "osm:brand"
     ]
 
     init(session: URLSession = .shared) {
@@ -547,6 +547,7 @@ struct V4PlaceToElementMapper {
         let osmTags = makeOsmTags(
             name: placeholderName,
             operatorName: nil,
+            brandName: nil,
             description: nil,
             website: nil,
             phone: nil,
@@ -622,6 +623,7 @@ struct V4PlaceToElementMapper {
         let osmTags = makeOsmTags(
             name: record.preferredName ?? "BTC Map Place #\(record.id)",
             operatorName: record.osmOperator,
+            brandName: record.osmBrand,
             description: record.description,
             website: record.website,
             phone: record.phone,
@@ -722,6 +724,7 @@ struct V4PlaceToElementMapper {
     private static func makeOsmTags(
         name: String?,
         operatorName: String?,
+        brandName: String?,
         description: String?,
         website: String?,
         phone: String?,
@@ -750,6 +753,7 @@ struct V4PlaceToElementMapper {
             paymentLightningContactless: paymentLightningContactless,
             name: name,
             operator: operatorName,
+            brand: brandName,
             description: description,
             descriptionEn: nil,
             website: website,

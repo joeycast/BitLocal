@@ -58,7 +58,8 @@ final class BTCMapMergeTests: XCTestCase {
             osmAddrCity: nil,
             osmAddrState: nil,
             osmAddrPostcode: nil,
-            osmOperator: nil
+            osmOperator: nil,
+            osmBrand: nil
         )
     }
 }

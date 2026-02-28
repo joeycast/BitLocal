@@ -84,6 +84,7 @@ struct V4PlaceRecord: Codable, Hashable, Identifiable {
     let osmAddrState: String?
     let osmAddrPostcode: String?
     let osmOperator: String?
+    let osmBrand: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -124,6 +125,7 @@ struct V4PlaceRecord: Codable, Hashable, Identifiable {
         case osmAddrState = "osm:addr:state"
         case osmAddrPostcode = "osm:addr:postcode"
         case osmOperator = "osm:operator"
+        case osmBrand = "osm:brand"
     }
 
     var idString: String { String(id) }

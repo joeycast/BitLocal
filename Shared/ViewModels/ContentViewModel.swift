@@ -151,7 +151,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private func hydratePlaceholderNamesIfNeeded(in elements: [Element]) {
         let candidateIDs = elements.compactMap { element -> String? in
             let name = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard name.hasPrefix("BTC Map Place #") else { return nil }
+            guard Element.isInvalidPrimaryName(name) else { return nil }
             return element.id
         }
 
@@ -694,8 +694,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         // Filter cached merchants by name
         localFilteredMerchants = allElements.filter { element in
-            let name = element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? ""
-            return name.localizedStandardContains(query)
+            let searchable = [
+                element.osmJSON?.tags?.name,
+                element.osmJSON?.tags?.brand,
+                element.osmJSON?.tags?.operator,
+                element.displayName
+            ]
+            return searchable.compactMap { $0 }.contains { $0.localizedStandardContains(query) }
         }
         hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
 
@@ -1069,7 +1074,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             communityMembersError = nil
             let placeholderIDs = polygonMembers.compactMap { member -> String? in
                 let name = member.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                return name.hasPrefix("BTC Map Place #") ? member.id : nil
+                return Element.isInvalidPrimaryName(name) ? member.id : nil
             }
             if placeholderIDs.isEmpty {
                 communityMembersIsLoading = false
@@ -1222,7 +1227,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     let missingIDs = activeIDs.subtracting(cachedIDs)
                     let placeholderIDs = cachedMembers.compactMap { member -> String? in
                         let name = member.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                        return name.hasPrefix("BTC Map Place #") ? member.id : nil
+                        return Element.isInvalidPrimaryName(name) ? member.id : nil
                     }
                     let idsToHydrate = Set(missingIDs).union(placeholderIDs)
 
@@ -1741,7 +1746,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private func hasPlaceholderNames(in elements: [Element]) -> Bool {
         elements.contains { element in
             let rawName = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return Element.isPlaceholderName(rawName)
+            return Element.isInvalidPrimaryName(rawName)
         }
     }
 
