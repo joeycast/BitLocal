@@ -1070,23 +1070,34 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func toggleMapMode() {
-        if mapDisplayMode == .merchants {
-            mapDisplayMode = .communities
-            selectedCommunityArea = nil
-            communityMemberElements = []
-            communityMemberElementIDs = []
-            communityMembersError = nil
-            communityMembersIsLoading = false
-            ensureCommunityMapAreasLoaded()
-        } else {
-            mapDisplayMode = .merchants
-            selectedCommunityArea = nil
-            communityMemberElements = []
-            communityMemberElementIDs = []
-            communityMembersError = nil
-            communityMembersIsLoading = false
-        }
+        let start = CFAbsoluteTimeGetCurrent()
+        let switchingToCommunities = mapDisplayMode == .merchants
+        Debug.log("⏱ toggleMapMode: START → switching to \(switchingToCommunities ? "communities" : "merchants")")
+
+        // Reset community state only when the values actually differ from defaults,
+        // avoiding unnecessary @Published emissions.
+        if selectedCommunityArea != nil { selectedCommunityArea = nil }
+        if !communityMemberElements.isEmpty { communityMemberElements = [] }
+        if !communityMemberElementIDs.isEmpty { communityMemberElementIDs = [] }
+        if communityMembersError != nil { communityMembersError = nil }
+        if communityMembersIsLoading { communityMembersIsLoading = false }
+
+        let afterReset = CFAbsoluteTimeGetCurrent()
+        Debug.log("⏱ toggleMapMode: resets done in \(String(format: "%.1f", (afterReset - start) * 1000))ms")
+
+        // Flip mode and refresh in a single pass.
+        mapDisplayMode = switchingToCommunities ? .communities : .merchants
         forceMapRefresh = true
+
+        let afterFlip = CFAbsoluteTimeGetCurrent()
+        Debug.log("⏱ toggleMapMode: mode flipped in \(String(format: "%.1f", (afterFlip - afterReset) * 1000))ms")
+
+        if switchingToCommunities {
+            ensureCommunityMapAreasLoaded()
+            Debug.log("⏱ toggleMapMode: ensureCommunityMapAreasLoaded in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - afterFlip) * 1000))ms")
+        }
+
+        Debug.log("⏱ toggleMapMode: TOTAL \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - start) * 1000))ms")
     }
 
     func selectCommunity(_ area: V2AreaRecord, presentDetail: Bool = true) {

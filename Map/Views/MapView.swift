@@ -103,6 +103,7 @@ struct MapView: UIViewRepresentable {
 
     // Update the MKMapView when the SwiftUI view updates
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        let updateStart = CFAbsoluteTimeGetCurrent()
         // CRITICAL: Don't update UI when app is not active
         guard viewModel.appState == .active else {
             Debug.logMap("MapView.updateUIView() - SKIPPED (app state: \(viewModel.appState))")
@@ -141,6 +142,9 @@ struct MapView: UIViewRepresentable {
         }
         
         // Handle elements updates (most important)
+        var shouldRefreshAnnotations = false
+        var refreshElementsHash: Int?
+        var refreshForce = false
         if let elements = elements, !elements.isEmpty {
             let elementsHash = elements.hashValue
             let shouldForceUpdate = viewModel.forceMapRefresh
@@ -154,8 +158,10 @@ struct MapView: UIViewRepresentable {
                 Debug.logMap("   - Force refresh: \(shouldForceUpdate)")
                 
                 context.coordinator.lastElementsHash = elementsHash
-                context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
-                Debug.logMap("Annotations updated!")
+                shouldRefreshAnnotations = true
+                refreshElementsHash = elementsHash
+                refreshForce = refreshForce || shouldForceUpdate
+                Debug.logMap("Annotations marked for update")
                 
                 // Reset the force refresh flag after using it
                 if shouldForceUpdate {
@@ -199,8 +205,10 @@ struct MapView: UIViewRepresentable {
 
                 // Only show pins for selected community members.
                 if viewModel.isShowingCommunityMembersOnMap {
-                    if let elements = elements {
-                        context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
+                if let elements = elements {
+                        shouldRefreshAnnotations = true
+                        refreshElementsHash = context.coordinator.lastElementsHash ?? elements.hashValue
+                        refreshForce = true
                     }
                 } else {
                     let merchantAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
@@ -216,16 +224,30 @@ struct MapView: UIViewRepresentable {
                 }
                 // Force annotation refresh
                 if let elements = elements, !elements.isEmpty {
-                    context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
+                    shouldRefreshAnnotations = true
+                    refreshElementsHash = context.coordinator.lastElementsHash ?? elements.hashValue
+                    refreshForce = true
                 }
             }
             needsUpdate = true
         }
 
-        // Only log if we actually did something
-        if !needsUpdate {
-            // Silent skip - don't log unless debugging
-            // Debug.logMap("MapView.updateUIView: No changes needed")
+        if shouldRefreshAnnotations, let elements = elements, !elements.isEmpty {
+            context.coordinator.updateAnnotations(
+                mapView: mapView,
+                elements: elements,
+                elementsHash: refreshElementsHash ?? elements.hashValue,
+                force: refreshForce
+            )
+            Debug.logMap("Annotations updated!")
+            needsUpdate = true
+        }
+
+        let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
+        if needsUpdate {
+            Debug.logMap("⏱ updateUIView: COMPLETED with changes in \(String(format: "%.1f", elapsed))ms")
+        } else if elapsed > 1.0 {
+            Debug.logMap("⏱ updateUIView: no-op but took \(String(format: "%.1f", elapsed))ms")
         }
     }
     
@@ -237,6 +259,17 @@ struct MapView: UIViewRepresentable {
     
     // Coordinator class to handle MKMapViewDelegate methods and annotations management
     class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
+        private struct AnnotationPassKey: Equatable {
+            let elementsHash: Int
+            let mapMode: MapDisplayMode
+            let showingCommunityMembers: Bool
+            let selectedCommunityID: String?
+            let viewportMinXBucket: Int
+            let viewportMinYBucket: Int
+            let viewportMaxXBucket: Int
+            let viewportMaxYBucket: Int
+        }
+
         var viewModel: ContentViewModel
         var topPadding: CGFloat
         var bottomPadding: CGFloat
@@ -250,6 +283,8 @@ struct MapView: UIViewRepresentable {
         var lastElementsHash: Int?
         var lastDisplayMode: MapDisplayMode = .merchants
         var lastCommunityAreasHash: Int?
+        private var lastAnnotationPassKey: AnnotationPassKey?
+        var lastVisibleElementIDs: [String] = []
         weak var overlayTapRecognizer: UITapGestureRecognizer?
 
         init(viewModel: ContentViewModel, topPadding: CGFloat, bottomPadding: CGFloat) {
@@ -368,7 +403,8 @@ struct MapView: UIViewRepresentable {
         }
         
         // Efficiently update annotations by only adding/removing what's changed
-        func updateAnnotations(mapView: MKMapView, elements: [Element]?) {
+        func updateAnnotations(mapView: MKMapView, elements: [Element]?, elementsHash: Int, force: Bool = false) {
+            let annStart = CFAbsoluteTimeGetCurrent()
             guard let elements = elements else { return }
 
             let sourceElements: [Element]
@@ -384,39 +420,83 @@ struct MapView: UIViewRepresentable {
             let viewportRect = effectiveViewportRect(for: mapView)
             let centerPoint = CGPoint(x: viewportRect.midX, y: viewportRect.midY)
             let centerCoordinate = mapView.convert(centerPoint, toCoordinateFrom: mapView)
-            let centerLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
 
             let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
+            let maxDistanceMeters = 25.0 * 1609.344
+            let centerLat = centerCoordinate.latitude
+            let centerLon = centerCoordinate.longitude
+            let viewportBucketScale = 1_000.0
+            let currentKey = AnnotationPassKey(
+                elementsHash: elementsHash,
+                mapMode: viewModel.mapDisplayMode,
+                showingCommunityMembers: viewModel.isShowingCommunityMembersOnMap,
+                selectedCommunityID: viewModel.selectedCommunityArea?.id,
+                viewportMinXBucket: Int((visibleRect.minX / viewportBucketScale).rounded()),
+                viewportMinYBucket: Int((visibleRect.minY / viewportBucketScale).rounded()),
+                viewportMaxXBucket: Int((visibleRect.maxX / viewportBucketScale).rounded()),
+                viewportMaxYBucket: Int((visibleRect.maxY / viewportBucketScale).rounded())
+            )
+            if !force, lastAnnotationPassKey == currentKey {
+                return
+            }
+            lastAnnotationPassKey = currentKey
 
             let visibleElements = sourceElements.filter { element in
-                guard let coordinate = element.mapCoordinate else { return false }
-                let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                let distance = location.distance(from: centerLocation)
+                // 1. Cheapest checks first — pure string comparisons
+                guard (element.deletedAt == nil || element.deletedAt == ""),
+                      (element.osmJSON?.tags?.name != nil || element.osmJSON?.tags?.operator != nil),
+                      let coordinate = element.mapCoordinate else { return false }
 
+                // 2. Rect containment — cheap math, eliminates most elements
                 let mapPoint = MKMapPoint(coordinate)
-                return visibleRect.contains(mapPoint) &&
-                distance <= 25 * 1609.344 && // 25 miles in meters
-                (element.deletedAt == nil || element.deletedAt == "") &&
-                (element.osmJSON?.tags?.name != nil || element.osmJSON?.tags?.operator != nil)
+                guard visibleRect.contains(mapPoint) else { return false }
+
+                // 3. Distance check — only for the few elements still in the rect.
+                //    Use Equirectangular approximation instead of CLLocation (avoids object allocation).
+                let dLat = (coordinate.latitude - centerLat) * .pi / 180.0
+                let dLon = (coordinate.longitude - centerLon) * .pi / 180.0
+                let cosLat = cos(centerLat * .pi / 180.0)
+                let approxDistance = 6_371_000.0 * sqrt(dLat * dLat + (dLon * cosLat) * (dLon * cosLat))
+                return approxDistance <= maxDistanceMeters
             }
-            
+
             let existingAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-            let existingElements = Set(existingAnnotations.compactMap { $0.element })
-            let newElements = Set(visibleElements)
-            
-            let annotationsToRemove = existingAnnotations.filter { !newElements.contains($0.element!) }
-            let elementsToAdd = newElements.subtracting(existingElements)
-            
+            var existingByID: [String: Annotation] = [:]
+            existingByID.reserveCapacity(existingAnnotations.count)
+            for annotation in existingAnnotations {
+                if let elementID = annotation.element?.id {
+                    existingByID[elementID] = annotation
+                }
+            }
+
+            var newByID: [String: Element] = [:]
+            newByID.reserveCapacity(visibleElements.count)
+            for element in visibleElements where newByID[element.id] == nil {
+                newByID[element.id] = element
+            }
+
+            let annotationsToRemove = existingByID.compactMap { id, annotation in
+                newByID[id] == nil ? annotation : nil
+            }
+            let elementsToAdd = newByID.compactMap { id, element in
+                existingByID[id] == nil ? element : nil
+            }
+
             mapView.removeAnnotations(annotationsToRemove)
-            
+
             let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
             mapView.addAnnotations(newAnnotations)
 
             let latestByID = Dictionary(uniqueKeysWithValues: sourceElements.map { ($0.id, $0) })
-            let refreshedVisibleElements = Array(newElements).compactMap { visible in
-                latestByID[visible.id] ?? visible
+            let visibleIDs = visibleElements.map(\.id)
+            let refreshedVisibleElements = visibleIDs.compactMap { id in
+                latestByID[id] ?? newByID[id]
             }
-            self.viewModel.visibleElementsSubject.send(refreshedVisibleElements)
+            if visibleIDs != lastVisibleElementIDs {
+                lastVisibleElementIDs = visibleIDs
+                self.viewModel.visibleElementsSubject.send(refreshedVisibleElements)
+            }
+            Debug.logMap("⏱ updateAnnotations: \(sourceElements.count) source → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - annStart) * 1000))ms")
         }
         
         // MARK: - MKMapViewDelegate Methods
@@ -517,7 +597,13 @@ struct MapView: UIViewRepresentable {
                 .delay(for: .seconds(0.5), scheduler: RunLoop.main)
                 .sink { [weak self] _ in
                     guard let self = self else { return }
-                    self.updateAnnotations(mapView: mapView, elements: self.viewModel.allElements)
+                    let all = self.viewModel.allElements
+                    self.updateAnnotations(
+                        mapView: mapView,
+                        elements: all,
+                        elementsHash: all.hashValue,
+                        force: false
+                    )
                 }
             
             if animated, let completion = mapRegionChangeCompletion {

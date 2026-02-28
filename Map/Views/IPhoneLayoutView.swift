@@ -73,9 +73,9 @@ struct IPhoneLayoutView: View {
                     userLocation: viewModel.userLocation,
                     isIPad: false
                 )
-                .padding(.trailing, 27)
-                .padding(.bottom, geometry.size.height * 0.3 + 10),
-                alignment: .bottomTrailing
+                .padding(.trailing, 18)
+                .padding(.top, max(headerHeight - 28, 62)),
+                alignment: .topTrailing
             )
 //            // Only show bottom sheet after onboarding is complete
 //            .bottomSheet(
@@ -147,4 +147,5 @@ struct IPhoneLayoutView: View {
             return .dark
         }
     }
+
 }
