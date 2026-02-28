@@ -66,7 +66,7 @@ struct BusinessesListView: View {
         }
         .onAppear {
             viewModel.ensureEventsLoaded()
-            viewModel.ensureAreasLoaded()
+            viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
         }
     }
 
@@ -77,7 +77,7 @@ struct BusinessesListView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
                 .font(.system(size: 15))
-            TextField("Search merchants or regions…", text: $viewModel.unifiedSearchText)
+            TextField("Search merchants…", text: $viewModel.unifiedSearchText)
                 .textFieldStyle(.plain)
                 .font(.body)
                 .focused($isSearchFieldFocused)
@@ -161,35 +161,6 @@ struct BusinessesListView: View {
 
     private var searchResultsView: some View {
         List {
-            // Matching regions
-            if !viewModel.searchMatchingAreas.isEmpty {
-                Section("Regions") {
-                    ForEach(viewModel.searchMatchingAreas.prefix(3)) { area in
-                        Button {
-                            viewModel.selectArea(area)
-                            viewModel.isSearchActive = false
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "globe")
-                                    .foregroundStyle(.accent)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(area.displayName)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    if let subtitle = areaSubtitle(area) {
-                                        Text(subtitle)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
             // Local merchant matches
             if !viewModel.localFilteredMerchants.isEmpty {
                 Section("Nearby") {
@@ -241,7 +212,6 @@ struct BusinessesListView: View {
 
             // Empty state
             if viewModel.localFilteredMerchants.isEmpty &&
-                viewModel.searchMatchingAreas.isEmpty &&
                 viewModel.merchantSearchResults.isEmpty &&
                 !viewModel.merchantSearchIsLoading &&
                 !viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -264,12 +234,6 @@ struct BusinessesListView: View {
         if let userLocation = viewModel.userLocation { return userLocation }
         let center = viewModel.region.center
         return CLLocation(latitude: center.latitude, longitude: center.longitude)
-    }
-
-    private func areaSubtitle(_ area: V3AreaRecord) -> String? {
-        if let place = area.tags?["place"], !place.isEmpty { return place.capitalized }
-        if let boundary = area.tags?["boundary"], !boundary.isEmpty { return boundary.capitalized }
-        return area.urlAlias
     }
 
     private func handleUserLocationChange(_ newLocation: CLLocation?) {

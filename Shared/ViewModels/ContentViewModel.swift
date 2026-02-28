@@ -704,14 +704,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
 
-        // Filter cached areas
-        if !areaBrowserAreas.isEmpty {
-            searchMatchingAreas = areaBrowserAreas.filter { area in
-                area.displayName.localizedStandardContains(query) ||
-                (area.urlAlias?.localizedStandardContains(query) ?? false) ||
-                (area.tags?["name:en"]?.localizedStandardContains(query) ?? false)
-            }
-        }
+        // Unified search in merchants context should only return merchants.
+        searchMatchingAreas = []
 
         // Debounce remote API search for 3+ chars
         unifiedSearchDebounceTask?.cancel()

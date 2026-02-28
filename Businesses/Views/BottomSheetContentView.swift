@@ -54,9 +54,11 @@ struct BottomSheetContentView: View {
                     .clearNavigationContainerBackgroundIfAvailable()
                 }
                 .onChange(of: viewModel.unifiedSearchText) { _, _ in
+                    guard viewModel.mapDisplayMode != .communities else { return }
                     viewModel.performUnifiedSearch()
                 }
                 .onChange(of: viewModel.isSearchActive) { _, isActive in
+                    guard viewModel.mapDisplayMode != .communities else { return }
                     if isActive {
                         savedDetent = currentDetent
                         currentDetent = .large
@@ -129,43 +131,49 @@ struct BottomSheetContentView: View {
 struct CommunitiesListView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @State private var filterText = ""
+    @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
-        List {
-            if viewModel.communityMapAreasIsLoading &&
-                viewModel.communityMapAreas.isEmpty &&
-                viewModel.areaBrowserAreas.isEmpty &&
-                filteredCommunities.isEmpty {
-                Section {
-                    HStack {
-                        ProgressView()
-                        Text("Loading communities…")
-                            .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            searchBar
+                .padding(.top, 20)
+                .padding(.bottom, 2)
+
+            List {
+                if viewModel.communityMapAreasIsLoading &&
+                    viewModel.communityMapAreas.isEmpty &&
+                    viewModel.areaBrowserAreas.isEmpty &&
+                    filteredCommunities.isEmpty {
+                    Section {
+                        HStack {
+                            ProgressView()
+                            Text("Loading communities…")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
-            }
 
-            Section("Communities") {
-                if filteredCommunities.isEmpty {
-                    Text("No communities in current map view")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(filteredCommunities) { area in
-                        NavigationLink {
-                            CommunityDetailView(area: area)
-                                .environmentObject(viewModel)
-                                .onAppear {
-                                    viewModel.selectCommunity(area, presentDetail: false)
-                                }
-                        } label: {
-                            CommunityRow(area: area)
+                Section("Communities") {
+                    if filteredCommunities.isEmpty {
+                        Text("No communities in current map view")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(filteredCommunities) { area in
+                            NavigationLink {
+                                CommunityDetailView(area: area)
+                                    .environmentObject(viewModel)
+                                    .onAppear {
+                                        viewModel.selectCommunity(area, presentDetail: false)
+                                    }
+                            } label: {
+                                CommunityRow(area: area)
+                            }
                         }
                     }
                 }
             }
+            .listStyle(.plain)
         }
-        .listStyle(.plain)
-        .searchable(text: $filterText, prompt: "Search communities…")
         .onAppear {
             // Returning from detail should always restore the visible-community browsing state.
             if viewModel.selectedCommunityArea != nil {
@@ -173,6 +181,33 @@ struct CommunitiesListView: View {
             }
             viewModel.ensureCommunityMapAreasLoaded()
         }
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 15))
+            TextField("Search communities…", text: $filterText)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .focused($isSearchFieldFocused)
+                .submitLabel(.search)
+            if !filterText.isEmpty {
+                Button {
+                    filterText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 15))
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 12)
+        .background(Color(.tertiarySystemFill))
+        .clipShape(RoundedRectangle(cornerRadius: 18.5))
+        .padding(.horizontal, 16)
     }
 
     private var filteredCommunities: [V2AreaRecord] {

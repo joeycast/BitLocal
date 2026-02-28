@@ -64,14 +64,9 @@ struct IPadLayoutView: View {
                         .opacity(1)
                     }
                 }
-                .searchable(
-                    text: $viewModel.unifiedSearchText,
-                    isPresented: $viewModel.isSearchActive,
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Search merchants or regions…"
-                )
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
+            guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
         }
         .sheet(item: $viewModel.presentedCommunityArea) { area in
