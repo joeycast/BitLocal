@@ -702,6 +702,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             ]
             return searchable.compactMap { $0 }.contains { $0.localizedStandardContains(query) }
         }
+        localFilteredMerchants.sort(by: merchantElementSearchSortOrder)
         hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
 
         // Unified search in merchants context should only return merchants.
@@ -1678,7 +1679,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self.merchantSearchIsLoading = false
                 switch result {
                 case .success(let records):
-                    self.merchantSearchResults = records
+                    self.merchantSearchResults = records.sorted(by: self.merchantRecordSearchSortOrder)
                     self.merchantSearchError = nil
                 case .failure(let error):
                     self.merchantSearchResults = []
@@ -1735,6 +1736,65 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         dictionary[element.id] = element
         allElements = Array(dictionary.values)
         forceMapRefresh = true
+    }
+
+    private func merchantElementSearchSortOrder(_ lhs: Element, _ rhs: Element) -> Bool {
+        let lhsDistance = merchantSearchDistance(for: lhs)
+        let rhsDistance = merchantSearchDistance(for: rhs)
+
+        if lhsDistance != rhsDistance {
+            return lhsDistance < rhsDistance
+        }
+
+        let lhsName = normalizedMerchantName(lhs.displayName ?? "")
+        let rhsName = normalizedMerchantName(rhs.displayName ?? "")
+        if lhsName != rhsName {
+            return lhsName < rhsName
+        }
+
+        return lhs.id < rhs.id
+    }
+
+    private func merchantRecordSearchSortOrder(_ lhs: V4PlaceRecord, _ rhs: V4PlaceRecord) -> Bool {
+        let lhsDistance = merchantSearchDistance(for: lhs)
+        let rhsDistance = merchantSearchDistance(for: rhs)
+
+        if lhsDistance != rhsDistance {
+            return lhsDistance < rhsDistance
+        }
+
+        let lhsName = normalizedMerchantName(lhs.displayName)
+        let rhsName = normalizedMerchantName(rhs.displayName)
+        if lhsName != rhsName {
+            return lhsName < rhsName
+        }
+
+        return lhs.id < rhs.id
+    }
+
+    private func merchantSearchDistance(for element: Element) -> CLLocationDistance {
+        guard let coordinate = element.mapCoordinate else { return .greatestFiniteMagnitude }
+        return merchantSearchDistance(latitude: coordinate.latitude, longitude: coordinate.longitude)
+    }
+
+    private func merchantSearchDistance(for record: V4PlaceRecord) -> CLLocationDistance {
+        guard let lat = record.lat, let lon = record.lon else { return .greatestFiniteMagnitude }
+        return merchantSearchDistance(latitude: lat, longitude: lon)
+    }
+
+    private func merchantSearchDistance(latitude: Double, longitude: Double) -> CLLocationDistance {
+        let target = CLLocation(latitude: latitude, longitude: longitude)
+
+        if let user = userLocation {
+            return user.distance(from: target)
+        }
+
+        let mapCenter = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+        return mapCenter.distance(from: target)
+    }
+
+    private func normalizedMerchantName(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
     }
 
     // Fetch elements using the APIManager and update the published elements property
