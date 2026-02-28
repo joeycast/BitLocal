@@ -1061,9 +1061,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         latestCommunitySelectionRequestID = UUID()
         let requestID = latestCommunitySelectionRequestID
 
-        if let region = mapRegion(forCommunityArea: area) {
-            updateMapRegion(center: region.center, span: region.span, animated: true)
-        }
+        fitMapToCommunity(area, animated: true)
 
         // Match BTCMap community page behavior: derive members by polygon containment
         // against the synced v4 places dataset. Fall back to v3 area-elements only when
@@ -1103,6 +1101,113 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             }
             self.fetchCommunityMembers(areaID: resolvedID, requestID: requestID)
         }
+    }
+
+    private func fitMapToCommunity(_ area: V2AreaRecord, animated: Bool) {
+        guard let mapView = mapView else {
+            if let region = mapRegion(forCommunityArea: area) {
+                updateMapRegion(center: region.center, span: region.span, animated: animated)
+            }
+            return
+        }
+
+        if let boundsRect = communityBoundingMapRect(for: area) {
+            var edgePadding = mapListViewportInsets(for: mapView)
+            edgePadding.top += 12
+            edgePadding.left += 20
+            edgePadding.bottom += 20
+            edgePadding.right += 20
+
+            DispatchQueue.main.async {
+                mapView.setVisibleMapRect(boundsRect, edgePadding: edgePadding, animated: animated)
+            }
+            return
+        }
+
+        if let region = mapRegion(forCommunityArea: area) {
+            updateMapRegion(center: region.center, span: region.span, animated: animated)
+        }
+    }
+
+    private func communityBoundingMapRect(for area: V2AreaRecord) -> MKMapRect? {
+        if let geoJSON = area.geoJSON, let geoRect = mapRectFromGeoJSON(geoJSON), !geoRect.isNull, !geoRect.isEmpty {
+            return expandedCommunityRectIfNeeded(geoRect)
+        }
+
+        func parse(_ key: String) -> Double? {
+            guard let raw = area.tags?[key] else { return nil }
+            return Double(raw)
+        }
+
+        if let north = parse("box:north"),
+           let south = parse("box:south"),
+           let east = parse("box:east"),
+           let west = parse("box:west") {
+            let topLeft = CLLocationCoordinate2D(latitude: north, longitude: west)
+            let bottomRight = CLLocationCoordinate2D(latitude: south, longitude: east)
+            let topLeftPoint = MKMapPoint(topLeft)
+            let bottomRightPoint = MKMapPoint(bottomRight)
+            let rect = MKMapRect(
+                x: min(topLeftPoint.x, bottomRightPoint.x),
+                y: min(topLeftPoint.y, bottomRightPoint.y),
+                width: abs(topLeftPoint.x - bottomRightPoint.x),
+                height: abs(topLeftPoint.y - bottomRightPoint.y)
+            )
+            if !rect.isNull, !rect.isEmpty {
+                return expandedCommunityRectIfNeeded(rect)
+            }
+        }
+
+        return nil
+    }
+
+    private func mapRectFromGeoJSON(_ geoJSON: GeoJSONFeatureCollection) -> MKMapRect? {
+        var rect = MKMapRect.null
+
+        func includeCoordinate(_ coordinate: [Double]) {
+            guard coordinate.count >= 2 else { return }
+            let lon = coordinate[0]
+            let lat = coordinate[1]
+            guard (-90...90).contains(lat), (-180...180).contains(lon) else { return }
+            let point = MKMapPoint(CLLocationCoordinate2D(latitude: lat, longitude: lon))
+            rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
+        }
+
+        for feature in geoJSON.features {
+            switch feature.geometry.coordinates {
+            case .polygon(let rings):
+                for ring in rings {
+                    for coordinate in ring {
+                        includeCoordinate(coordinate)
+                    }
+                }
+            case .multiPolygon(let polygons):
+                for rings in polygons {
+                    for ring in rings {
+                        for coordinate in ring {
+                            includeCoordinate(coordinate)
+                        }
+                    }
+                }
+            }
+        }
+
+        return rect.isNull ? nil : rect
+    }
+
+    private func expandedCommunityRectIfNeeded(_ rect: MKMapRect) -> MKMapRect {
+        let midpoint = MKMapPoint(x: rect.midX, y: rect.midY).coordinate
+        let minimumMeters: CLLocationDistance = 800
+        let minimumMapPoints = minimumMeters * MKMapPointsPerMeterAtLatitude(midpoint.latitude)
+
+        let additionalWidth = max(0, minimumMapPoints - rect.width)
+        let additionalHeight = max(0, minimumMapPoints - rect.height)
+
+        if additionalWidth == 0, additionalHeight == 0 {
+            return rect
+        }
+
+        return rect.insetBy(dx: -(additionalWidth / 2), dy: -(additionalHeight / 2))
     }
 
     private func communityMembersFromPolygon(for area: V2AreaRecord) -> [Element]? {
