@@ -211,10 +211,16 @@ struct BusinessesListView: View {
             }
 
             // Empty state
-            if viewModel.localFilteredMerchants.isEmpty &&
+            let query = viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if query.count == 1 {
+                Section {
+                    Text("Type at least 2 characters to search")
+                        .foregroundStyle(.secondary)
+                }
+            } else if viewModel.localFilteredMerchants.isEmpty &&
                 viewModel.merchantSearchResults.isEmpty &&
                 !viewModel.merchantSearchIsLoading &&
-                !viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                query.count >= 2 {
                 Section {
                     Text("No results found")
                         .foregroundStyle(.secondary)

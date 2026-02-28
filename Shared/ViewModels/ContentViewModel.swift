@@ -692,6 +692,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return
         }
 
+        // Avoid expensive broad matching/sorting on single-character queries.
+        guard query.count >= 2 else {
+            localFilteredMerchants = []
+            clearMerchantSearchResults()
+            return
+        }
+
         // Filter cached merchants by name
         localFilteredMerchants = allElements.filter { element in
             let searchable = [
