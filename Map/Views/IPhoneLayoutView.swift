@@ -28,6 +28,8 @@ struct IPhoneLayoutView: View {
     
     private var appearance: Appearance { appearanceManager.appearance }
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.3)
+    private let collapsedSheetDetent: PresentationDetent = .fraction(0.11)
+    private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
 
     var body: some View {
         GeometryReader { geometry in
@@ -111,7 +113,8 @@ struct IPhoneLayoutView: View {
                     .preferredColorScheme(effectiveColorScheme)  // To respect appearance
 //                    .presentationBackground(Color(UIColor.systemBackground))  // Keeps background opaque, resolves based on the preferred scheme
                     .presentationDetents([
-                        .fraction(0.3),
+                        collapsedSheetDetent,
+                        defaultSheetDetent,
                         .medium,
                         .large
                     ], selection: $bottomSheetDetent)
@@ -121,6 +124,12 @@ struct IPhoneLayoutView: View {
                     .sheet(isPresented: $showingAbout) {
                         AboutView()
                     }
+            }
+            .onChange(of: viewModel.isSearchActive) { _, isActive in
+                guard viewModel.mapDisplayMode == .merchants else { return }
+                if isActive && bottomSheetDetent == collapsedSheetDetent {
+                    bottomSheetDetent = defaultSheetDetent
+                }
             }
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.25), value: appearance)
