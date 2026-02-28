@@ -19,7 +19,7 @@ struct SettingsButtonView: View {
         Button(action: {
             onSettingsSelected?()
         }) {
-            Image("gear-six-fill")
+            Image(systemName: "gearshape.fill")
                 .aboutIconStyle(size: 18)
         }
         .accessibilityLabel(Text("settings_label_accessibility"))

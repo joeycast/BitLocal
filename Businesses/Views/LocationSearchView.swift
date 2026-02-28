@@ -170,7 +170,7 @@ struct LocationSearchView: View {
                                     .fill(Color.accentColor)
                                     .frame(width: 36, height: 36)
                                     .shadow(radius: 2)
-                                Image(mapType == .standard ? "globe-hemisphere-west-fill" : "map-trifold-fill")
+                                Image(systemName: mapType == .standard ? "globe.americas.fill" : "map.fill")
                                     .aboutIconStyle(size: 16, color: .white)
                             }
                         }

@@ -12,10 +12,8 @@ struct AddBusinessInfoView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     // Header section
                     VStack(spacing: 16) {
-                        Image("storefront-fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 60, height: 60)
+                        Image(systemName: "storefront.fill")
+                            .font(.system(size: 60))
                             .foregroundColor(.accentColor)
 
                         Text("add_business_info_title")
@@ -29,19 +27,19 @@ struct AddBusinessInfoView: View {
                     // Info cards
                     VStack(spacing: 16) {
                         InfoCard(
-                            icon: "handshake-fill",
+                            icon: "handshake.fill",
                             title: "add_business_info_data_source_title",
                             description: "add_business_info_data_source_description"
                         )
 
                         InfoCard(
-                            icon: "users-four-fill",
+                            icon: "person.3.fill",
                             title: "add_business_info_volunteers_title",
                             description: "add_business_info_volunteers_description"
                         )
 
                         InfoCard(
-                            icon: "clock-fill",
+                            icon: "clock.fill",
                             title: "add_business_info_timing_title",
                             description: "add_business_info_timing_description"
                         )
@@ -92,10 +90,8 @@ private struct InfoCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            Image(icon)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
+            Image(systemName: icon)
+                .font(.system(size: 24))
                 .foregroundColor(.accentColor)
 
             VStack(alignment: .leading, spacing: 4) {

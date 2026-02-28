@@ -13,7 +13,7 @@ import UIKit     // ← added, for checking userInterfaceIdiom
 struct OnboardingPage {
     let titleKey: String
     let subtitleKey: String
-    let image: String
+    let symbolName: String
     let bgColor: Color
     let isLocationPage: Bool
 }
@@ -67,28 +67,28 @@ struct OnboardingView: View {
         OnboardingPage(
             titleKey: "onboarding_discover_title",
             subtitleKey: "onboarding_discover_subtitle",
-            image: "currency-btc-bold",
+            symbolName: "bitcoinsign.circle.fill",
             bgColor: .accentColor,
             isLocationPage: false
         ),
         OnboardingPage(
             titleKey: "onboarding_map_title",
             subtitleKey: "onboarding_map_subtitle",
-            image: "map-trifold-fill",
+            symbolName: "map.fill",
             bgColor: .green,
             isLocationPage: false
         ),
         OnboardingPage(
             titleKey: "onboarding_location_title",
             subtitleKey: "onboarding_location_subtitle",
-            image: "navigation-arrow-fill",
+            symbolName: "location.fill",
             bgColor: .blue,
             isLocationPage: true
         ),
         OnboardingPage(
             titleKey: "onboarding_ready_title",
             subtitleKey: "onboarding_ready_subtitle",
-            image: "binoculars-fill",
+            symbolName: "binoculars.fill",
             bgColor: .purple,
             isLocationPage: false
         )
@@ -132,20 +132,20 @@ struct OnboardingView: View {
                                 y: circleSize * 0.067
                             )
 
-                        Image(pages[currentPage].image)
+                        Image(systemName: pages[currentPage].symbolName)
                             .resizable()
                             .scaledToFit()
                             .frame(width: iconSize, height: iconSize)
                             .foregroundColor(.white)
                             .scaleEffect(iconScale)
                             .offset(
-                                y: pages[currentPage].image == "navigation-arrow-fill" ? 2 : 0
+                                y: pages[currentPage].symbolName == "location.fill" ? 2 : 0
                             )
                             .offset(
-                                x: pages[currentPage].image == "navigation-arrow-fill" ? -4 : 0
+                                x: pages[currentPage].symbolName == "location.fill" ? -4 : 0
                             )
                             .offset(
-                                x: pages[currentPage].image == "currency-btc-bold" ? 1 : 0
+                                x: pages[currentPage].symbolName == "bitcoinsign.circle.fill" ? 1 : 0
                             )
                     }
                     .id(currentPage)
