@@ -69,6 +69,14 @@ struct BottomSheetContentView: View {
                         viewModel.performUnifiedSearch()
                     }
                 }
+                .onChange(of: viewModel.selectedCommunityArea?.id) { _, selectedID in
+                    guard selectedID != nil else { return }
+                    promoteSheetToLargeIfNeeded()
+                }
+                .onChange(of: viewModel.presentedCommunityArea?.id) { _, presentedID in
+                    guard presentedID != nil else { return }
+                    promoteSheetToLargeIfNeeded()
+                }
             }
             .ignoresSafeArea(edges: .bottom)
             .onAppear {
@@ -107,6 +115,13 @@ struct BottomSheetContentView: View {
                 }
             }
         )
+    }
+
+    private func promoteSheetToLargeIfNeeded() {
+        guard currentDetent != .large else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            currentDetent = .large
+        }
     }
 }
 
