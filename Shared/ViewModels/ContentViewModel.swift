@@ -763,12 +763,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         case .merchants:
             return allElements
         case .communities:
-            return []
+            return selectedCommunityArea == nil ? [] : communityMemberElements
         }
     }
 
     var isShowingCommunityMembersOnMap: Bool {
-        false
+        mapDisplayMode == .communities && selectedCommunityArea != nil
     }
 
     var communityListAreas: [V2AreaRecord] {

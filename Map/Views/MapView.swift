@@ -189,10 +189,16 @@ struct MapView: UIViewRepresentable {
 
             if currentMode == .communities {
                 context.coordinator.lastCommunityAreasHash = currentAreaDataHash
+                // Always keep community polygons visible while in community mode.
+                let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
+                let desiredOverlays = Set(viewModel.communityOverlays)
+                let toRemove = existingOverlays.subtracting(desiredOverlays)
+                let toAdd = desiredOverlays.subtracting(existingOverlays)
+                if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
+                if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
+
+                // Only show pins for selected community members.
                 if viewModel.isShowingCommunityMembersOnMap {
-                    if !mapView.overlays.isEmpty {
-                        mapView.removeOverlays(mapView.overlays)
-                    }
                     if let elements = elements {
                         context.coordinator.updateAnnotations(mapView: mapView, elements: elements)
                     }
@@ -201,12 +207,6 @@ struct MapView: UIViewRepresentable {
                     if !merchantAnnotations.isEmpty {
                         mapView.removeAnnotations(merchantAnnotations)
                     }
-                    let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
-                    let desiredOverlays = Set(viewModel.communityOverlays)
-                    let toRemove = existingOverlays.subtracting(desiredOverlays)
-                    let toAdd = desiredOverlays.subtracting(existingOverlays)
-                    if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
-                    if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
                 }
             } else {
                 context.coordinator.lastCommunityAreasHash = currentAreaDataHash
@@ -371,6 +371,16 @@ struct MapView: UIViewRepresentable {
         func updateAnnotations(mapView: MKMapView, elements: [Element]?) {
             guard let elements = elements else { return }
 
+            let sourceElements: [Element]
+            if viewModel.mapDisplayMode == .communities,
+               viewModel.selectedCommunityArea != nil,
+               !viewModel.communityMemberElementIDs.isEmpty {
+                let allowedIDs = viewModel.communityMemberElementIDs
+                sourceElements = elements.filter { allowedIDs.contains($0.id) }
+            } else {
+                sourceElements = elements
+            }
+
             let viewportRect = effectiveViewportRect(for: mapView)
             let centerPoint = CGPoint(x: viewportRect.midX, y: viewportRect.midY)
             let centerCoordinate = mapView.convert(centerPoint, toCoordinateFrom: mapView)
@@ -378,7 +388,7 @@ struct MapView: UIViewRepresentable {
 
             let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
 
-            let visibleElements = elements.filter { element in
+            let visibleElements = sourceElements.filter { element in
                 guard let coordinate = element.mapCoordinate else { return false }
                 let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
                 let distance = location.distance(from: centerLocation)
@@ -402,7 +412,7 @@ struct MapView: UIViewRepresentable {
             let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
             mapView.addAnnotations(newAnnotations)
 
-            let latestByID = Dictionary(uniqueKeysWithValues: elements.map { ($0.id, $0) })
+            let latestByID = Dictionary(uniqueKeysWithValues: sourceElements.map { ($0.id, $0) })
             let refreshedVisibleElements = Array(newElements).compactMap { visible in
                 latestByID[visible.id] ?? visible
             }
