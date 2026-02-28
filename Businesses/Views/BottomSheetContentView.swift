@@ -307,13 +307,7 @@ struct CommunityDetailView: View {
                                 viewModel.selectedElement = element
                             }
                         } label: {
-                            ZStack(alignment: .trailing) {
-                                ElementCell(viewModel: cellViewModel(for: element))
-                                .padding(.trailing, 18)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.gray.opacity(0.6))
-                            }
+                            ElementCell(viewModel: cellViewModel(for: element))
                         }
                     }
                 }
