@@ -542,30 +542,11 @@ struct MapView: UIViewRepresentable {
         }
 
         private func effectiveViewportRect(for mapView: MKMapView) -> CGRect {
-            let insets = viewModel.mapListViewportInsets(for: mapView)
-            let rect = mapView.bounds.inset(by: insets)
-            guard rect.width > 1, rect.height > 1 else { return mapView.bounds }
-            return rect
+            viewModel.mapListViewportRect(for: mapView)
         }
 
         private func effectiveVisibleMapRect(for mapView: MKMapView, viewportRect: CGRect) -> MKMapRect {
-            let topLeft = mapView.convert(
-                CGPoint(x: viewportRect.minX, y: viewportRect.minY),
-                toCoordinateFrom: mapView
-            )
-            let bottomRight = mapView.convert(
-                CGPoint(x: viewportRect.maxX, y: viewportRect.maxY),
-                toCoordinateFrom: mapView
-            )
-            let topLeftPoint = MKMapPoint(topLeft)
-            let bottomRightPoint = MKMapPoint(bottomRight)
-
-            return MKMapRect(
-                x: min(topLeftPoint.x, bottomRightPoint.x),
-                y: min(topLeftPoint.y, bottomRightPoint.y),
-                width: abs(topLeftPoint.x - bottomRightPoint.x),
-                height: abs(topLeftPoint.y - bottomRightPoint.y)
-            )
+            viewModel.mapRect(for: viewportRect, in: mapView)
         }
     }
 }

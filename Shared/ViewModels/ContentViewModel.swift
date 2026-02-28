@@ -434,9 +434,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         guard UIDevice.current.userInterfaceIdiom == .phone,
               let mapView = mapView else { return nil }
 
-        let insets = mapListViewportInsets(for: mapView)
-        let focusRect = mapView.bounds.inset(by: insets)
-        guard focusRect.width > 1, focusRect.height > 1 else { return mapView.centerCoordinate }
+        let focusRect = mapListViewportRect(for: mapView)
 
         let centerPoint = CGPoint(x: focusRect.midX, y: focusRect.midY)
         return mapView.convert(centerPoint, toCoordinateFrom: mapView)
@@ -447,6 +445,32 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         // Keep ordering stable by always assuming the smallest iPhone sheet detent.
         let bottomInset = mapView.bounds.height * 0.30
         return UIEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
+    }
+
+    func mapListViewportRect(for mapView: MKMapView) -> CGRect {
+        let rect = mapView.bounds.inset(by: mapListViewportInsets(for: mapView))
+        guard rect.width > 1, rect.height > 1 else { return mapView.bounds }
+        return rect
+    }
+
+    func mapRect(for viewportRect: CGRect, in mapView: MKMapView) -> MKMapRect {
+        let topLeft = mapView.convert(
+            CGPoint(x: viewportRect.minX, y: viewportRect.minY),
+            toCoordinateFrom: mapView
+        )
+        let bottomRight = mapView.convert(
+            CGPoint(x: viewportRect.maxX, y: viewportRect.maxY),
+            toCoordinateFrom: mapView
+        )
+        let topLeftPoint = MKMapPoint(topLeft)
+        let bottomRightPoint = MKMapPoint(bottomRight)
+
+        return MKMapRect(
+            x: min(topLeftPoint.x, bottomRightPoint.x),
+            y: min(topLeftPoint.y, bottomRightPoint.y),
+            width: abs(topLeftPoint.x - bottomRightPoint.x),
+            height: abs(topLeftPoint.y - bottomRightPoint.y)
+        )
     }
     
     // Zoom to element
@@ -743,6 +767,60 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         communityMapAreas
             .filter { $0.isCommunity && !$0.isDeleted }
             .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+    }
+
+    var visibleCommunityListAreas: [V2AreaRecord] {
+        let allAreas = communityListAreas
+        guard mapDisplayMode == .communities,
+              selectedCommunityArea == nil,
+              let mapView = mapView else {
+            return allAreas
+        }
+
+        let viewportRect = mapListViewportRect(for: mapView)
+        let visibleRect = mapRect(for: viewportRect, in: mapView)
+        let focusCoordinate = mapView.convert(
+            CGPoint(x: viewportRect.midX, y: viewportRect.midY),
+            toCoordinateFrom: mapView
+        )
+        let focusLocation = CLLocation(latitude: focusCoordinate.latitude, longitude: focusCoordinate.longitude)
+
+        var visibleIDs = Set<String>()
+        var mergedBoundsByAreaID: [String: MKMapRect] = [:]
+
+        for polygon in communityOverlays {
+            let areaID = (polygon.subtitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !areaID.isEmpty, polygon.boundingMapRect.intersects(visibleRect) else { continue }
+            visibleIDs.insert(areaID)
+            if let existing = mergedBoundsByAreaID[areaID] {
+                mergedBoundsByAreaID[areaID] = existing.union(polygon.boundingMapRect)
+            } else {
+                mergedBoundsByAreaID[areaID] = polygon.boundingMapRect
+            }
+        }
+
+        let filtered = allAreas.filter { visibleIDs.contains($0.id) }
+        return filtered.sorted { lhs, rhs in
+            let lhsDistance = communityDistanceFromFocus(areaID: lhs.id, focus: focusLocation, boundsByAreaID: mergedBoundsByAreaID)
+            let rhsDistance = communityDistanceFromFocus(areaID: rhs.id, focus: focusLocation, boundsByAreaID: mergedBoundsByAreaID)
+            if lhsDistance == rhsDistance {
+                return lhs.displayName.localizedStandardCompare(rhs.displayName) == .orderedAscending
+            }
+            return lhsDistance < rhsDistance
+        }
+    }
+
+    private func communityDistanceFromFocus(
+        areaID: String,
+        focus: CLLocation,
+        boundsByAreaID: [String: MKMapRect]
+    ) -> CLLocationDistance {
+        guard let rect = boundsByAreaID[areaID], !rect.isNull, !rect.isEmpty else {
+            return .greatestFiniteMagnitude
+        }
+        let midpoint = MKMapPoint(x: rect.midX, y: rect.midY).coordinate
+        let center = CLLocation(latitude: midpoint.latitude, longitude: midpoint.longitude)
+        return focus.distance(from: center)
     }
 
     func communityArea(withID id: String) -> V2AreaRecord? {

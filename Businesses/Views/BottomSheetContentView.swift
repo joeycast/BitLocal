@@ -153,13 +153,18 @@ struct CommunitiesListView: View {
             }
 
             Section("Communities") {
-                ForEach(filteredCommunities) { area in
-                    Button {
-                        viewModel.selectCommunity(area)
-                    } label: {
-                        CommunityRow(area: area)
+                if filteredCommunities.isEmpty {
+                    Text("No communities in current map view")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(filteredCommunities) { area in
+                        Button {
+                            viewModel.selectCommunity(area)
+                        } label: {
+                            CommunityRow(area: area)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -171,9 +176,10 @@ struct CommunitiesListView: View {
     }
 
     private var filteredCommunities: [V2AreaRecord] {
+        let baseAreas = viewModel.visibleCommunityListAreas
         let q = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return viewModel.communityListAreas }
-        return viewModel.communityListAreas.filter { area in
+        guard !q.isEmpty else { return baseAreas }
+        return baseAreas.filter { area in
             area.displayName.localizedStandardContains(q) ||
             (area.tags?["organization"]?.localizedStandardContains(q) ?? false) ||
             (area.tags?["continent"]?.localizedStandardContains(q) ?? false)
