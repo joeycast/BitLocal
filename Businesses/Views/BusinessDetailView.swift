@@ -170,7 +170,7 @@ struct BusinessDetailView: View {
             elementCellViewModel.updateAddress()
         }
         .listStyle(InsetGroupedListStyle()) // Consistent list style
-        .navigationTitle(element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
+        .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)
     }
 }
@@ -871,7 +871,7 @@ struct BusinessDetailsSection: View {
             // Business Address
             if let coord = element.mapCoordinate {
                 Button(action: {
-                    openLocationInMaps(coordinate: coord, name: element.osmJSON?.tags?.name, address: elementCellViewModel.address)
+                    openLocationInMaps(coordinate: coord, name: element.displayName, address: elementCellViewModel.address)
                 }) {
                     VStack (alignment: .leading, spacing: 3) {
                         HStack {

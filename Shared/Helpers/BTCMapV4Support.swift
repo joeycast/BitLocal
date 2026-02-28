@@ -27,7 +27,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
 
     // Includes a subset of v4 + explicit OSM tags needed for current UI parity
     private let syncFields = [
-        "id", "lat", "lon", "icon", "name", "address",
+        "id", "lat", "lon", "icon", "name", "display_name", "address",
         "opening_hours", "comments", "created_at", "updated_at", "deleted_at",
         "verified_at", "osm_id", "osm_url", "phone", "website", "email",
         "twitter", "facebook", "instagram", "telegram", "line",
@@ -620,7 +620,7 @@ struct V4PlaceToElementMapper {
         let createdAt = record.createdAt ?? record.updatedAt ?? BTCMapRepository.epochISO8601
         let updatedAt = record.updatedAt ?? createdAt
         let osmTags = makeOsmTags(
-            name: record.name ?? "BTC Map Place #\(record.id)",
+            name: record.preferredName ?? "BTC Map Place #\(record.id)",
             operatorName: record.osmOperator,
             description: record.description,
             website: record.website,
@@ -932,7 +932,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                     self.saveV4Elements(mapped)
                     var syncState = self.loadV4SyncState()
                     syncState.snapshotLastModifiedRFC1123 = payload.lastModified
-                    syncState.incrementalAnchorUpdatedSince = syncState.incrementalAnchorUpdatedSince ?? fallbackTimestamp
+                    // Snapshot payload omits names and rich fields. Force a full incremental
+                    // backfill once so cached elements are upgraded to complete place records.
+                    syncState.incrementalAnchorUpdatedSince = Self.epochISO8601
+                    syncState.schemaVersion = 0
                     self.saveV4SyncState(syncState)
                     startIncremental()
                 case .failure(let error):
@@ -956,7 +959,14 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         var anchor = syncState.incrementalAnchorUpdatedSince ?? Self.epochISO8601
         var merged = existing
         var pageCount = 0
-        let maxPages = 20
+        var maxPages = 20
+
+        if shouldForceFullNameBackfill(existing: existing, syncState: syncState) {
+            anchor = Self.epochISO8601
+            syncState.incrementalAnchorUpdatedSince = Self.epochISO8601
+            maxPages = 200
+            Debug.logAPI("BTCMapRepository: forcing one-time full v4 backfill to replace placeholder merchant names")
+        }
 
         func step() {
             pageCount += 1
@@ -970,6 +980,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                     completion(.failure(error))
                 case .success(let records):
                     if records.isEmpty {
+                        syncState.schemaVersion = V4SyncState.currentSchemaVersion
                         syncState.lastSuccessfulSyncAt = Self.currentISO8601()
                         self.saveV4Elements(merged)
                         self.saveV4SyncState(syncState)
@@ -992,6 +1003,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                     if records.count >= 5000 && pageCount < maxPages {
                         step()
                     } else {
+                        syncState.schemaVersion = V4SyncState.currentSchemaVersion
                         syncState.lastSuccessfulSyncAt = Self.currentISO8601()
                         self.saveV4SyncState(syncState)
                         completion(.success(merged))
@@ -1001,6 +1013,15 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         }
 
         step()
+    }
+
+    private func shouldForceFullNameBackfill(existing: [Element], syncState: V4SyncState) -> Bool {
+        guard syncState.schemaVersion < V4SyncState.currentSchemaVersion else { return false }
+        guard !existing.isEmpty else { return false }
+        return existing.contains { element in
+            let name = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return name.hasPrefix("BTC Map Place #")
+        }
     }
 
     private func loadV4Elements() -> [Element]? {
@@ -1060,7 +1081,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
             }
 
             if let current = dictionary[element.id] {
-                if isIncomingNewer(element, than: current) {
+                if shouldPreferIncoming(element, over: current) || isIncomingNewer(element, than: current) {
                     dictionary[element.id] = element
                 }
             } else {
@@ -1068,6 +1089,14 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
             }
         }
         return Array(dictionary.values)
+    }
+
+    private static func shouldPreferIncoming(_ incoming: Element, over current: Element) -> Bool {
+        let currentName = current.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let incomingName = incoming.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let currentIsPlaceholder = currentName.hasPrefix("BTC Map Place #")
+        let incomingIsPlaceholder = incomingName.hasPrefix("BTC Map Place #")
+        return currentIsPlaceholder && !incomingIsPlaceholder && !incomingName.isEmpty
     }
 
     private static func isIncomingNewer(_ incoming: Element, than current: Element) -> Bool {

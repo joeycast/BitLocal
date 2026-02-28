@@ -398,8 +398,12 @@ struct MapView: UIViewRepresentable {
             
             let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
             mapView.addAnnotations(newAnnotations)
-            
-            self.viewModel.visibleElementsSubject.send(Array(newElements))
+
+            let latestByID = Dictionary(uniqueKeysWithValues: elements.map { ($0.id, $0) })
+            let refreshedVisibleElements = Array(newElements).compactMap { visible in
+                latestByID[visible.id] ?? visible
+            }
+            self.viewModel.visibleElementsSubject.send(refreshedVisibleElements)
         }
         
         // MARK: - MKMapViewDelegate Methods
@@ -525,8 +529,10 @@ struct MapView: UIViewRepresentable {
         func updateVisibleElements(for mapView: MKMapView) {
             let visibleAnnotations = mapView.annotations(in: mapView.visibleMapRect)
             let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-            
-            self.viewModel.visibleElementsSubject.send(visibleElements)
+            let latestByID = Dictionary(uniqueKeysWithValues: self.viewModel.allElements.map { ($0.id, $0) })
+            let refreshed = visibleElements.compactMap { latestByID[$0.id] ?? $0 }
+
+            self.viewModel.visibleElementsSubject.send(refreshed)
             self.viewModel.mapStoppedMovingSubject.send(())
         }
     }

@@ -128,7 +128,12 @@ struct V4PlaceRecord: Codable, Hashable, Identifiable {
 
     var idString: String { String(id) }
     var hasCoordinates: Bool { lat != nil && lon != nil }
-    var displayName: String { name?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? name! : "BTC Map Place #\(id)" }
+    var preferredName: String? {
+        let canonical = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return canonical.isEmpty ? nil : canonical
+    }
+
+    var displayName: String { preferredName ?? "BTC Map Place #\(id)" }
 }
 
 struct V4SyncState: Codable, Hashable {
@@ -137,13 +142,41 @@ struct V4SyncState: Codable, Hashable {
     var lastSuccessfulSyncAt: String?
     var schemaVersion: Int
 
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 3
+
+    enum CodingKeys: String, CodingKey {
+        case snapshotLastModifiedRFC1123
+        case incrementalAnchorUpdatedSince
+        case lastSuccessfulSyncAt
+        case schemaVersion
+    }
+
+    init(
+        snapshotLastModifiedRFC1123: String?,
+        incrementalAnchorUpdatedSince: String?,
+        lastSuccessfulSyncAt: String?,
+        schemaVersion: Int
+    ) {
+        self.snapshotLastModifiedRFC1123 = snapshotLastModifiedRFC1123
+        self.incrementalAnchorUpdatedSince = incrementalAnchorUpdatedSince
+        self.lastSuccessfulSyncAt = lastSuccessfulSyncAt
+        self.schemaVersion = schemaVersion
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        snapshotLastModifiedRFC1123 = try container.decodeIfPresent(String.self, forKey: .snapshotLastModifiedRFC1123)
+        incrementalAnchorUpdatedSince = try container.decodeIfPresent(String.self, forKey: .incrementalAnchorUpdatedSince)
+        lastSuccessfulSyncAt = try container.decodeIfPresent(String.self, forKey: .lastSuccessfulSyncAt)
+        // Older persisted sync-state files did not include schemaVersion.
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 0
+    }
 
     static let empty = V4SyncState(
         snapshotLastModifiedRFC1123: nil,
         incrementalAnchorUpdatedSince: nil,
         lastSuccessfulSyncAt: nil,
-        schemaVersion: currentSchemaVersion
+        schemaVersion: 0
     )
 }
 

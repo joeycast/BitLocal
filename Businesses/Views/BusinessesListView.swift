@@ -138,6 +138,9 @@ struct BusinessesListView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .onAppear {
+                        viewModel.requestPlaceholderNameHydration(for: [element])
+                    }
                     .clearListRowBackground(if: shouldUseGlassyRows)
                 }
 
@@ -164,6 +167,9 @@ struct BusinessesListView: View {
         .background(Color.clear)
         .environment(\.defaultMinListRowHeight, 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: Array(sortedElements.prefix(maxListResults)))
+        }
     }
 
     // MARK: - Search Mode
@@ -212,6 +218,9 @@ struct BusinessesListView: View {
                             ElementCell(viewModel: cellVM)
                         }
                         .buttonStyle(.plain)
+                        .onAppear {
+                            viewModel.requestPlaceholderNameHydration(for: [element])
+                        }
                     }
                 }
             }
@@ -259,6 +268,9 @@ struct BusinessesListView: View {
         }
         .listStyle(.insetGrouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: Array(viewModel.localFilteredMerchants.prefix(20)))
+        }
     }
 
     // MARK: - Helpers
@@ -291,6 +303,21 @@ struct BusinessesListView: View {
 
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
         if let vm = viewModel.cellViewModels[element.id] {
+            let currentName = vm.element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let nextName = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let currentUpdated = vm.element.updatedAt ?? ""
+            let nextUpdated = element.updatedAt ?? ""
+            if currentName != nextName || currentUpdated != nextUpdated {
+                let refreshed = ElementCellViewModel(
+                    element: element,
+                    userLocation: viewModel.userLocation,
+                    viewModel: viewModel
+                )
+                DispatchQueue.main.async {
+                    viewModel.cellViewModels[element.id] = refreshed
+                }
+                return refreshed
+            }
             return vm
         } else {
             let newVM = ElementCellViewModel(element: element,
@@ -352,8 +379,7 @@ struct ElementCell: View {
             HStack {
                 // Business Name
                 Text(
-                    viewModel.element.osmJSON?.tags?.name ??
-                    viewModel.element.osmJSON?.tags?.operator ??
+                    viewModel.element.displayName ??
                     NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
                 )
                     .foregroundColor(.primary)

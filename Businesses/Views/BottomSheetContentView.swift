@@ -355,8 +355,8 @@ struct CommunityDetailView: View {
     private var memberElements: [Element] {
         guard sameSelectedCommunity else { return [] }
         return viewModel.communityMemberElements.sorted {
-            let lhs = $0.osmJSON?.tags?.name ?? $0.id
-            let rhs = $1.osmJSON?.tags?.name ?? $1.id
+            let lhs = $0.displayName ?? $0.id
+            let rhs = $1.displayName ?? $1.id
             return lhs.localizedStandardCompare(rhs) == .orderedAscending
         }
     }

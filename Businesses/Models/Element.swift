@@ -136,6 +136,24 @@ struct Element: Codable, Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
+
+    var displayName: String? {
+        let name = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !name.isEmpty && !Self.isPlaceholderName(name) {
+            return name
+        }
+
+        let operatorName = osmJSON?.tags?.operator?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !operatorName.isEmpty {
+            return operatorName
+        }
+
+        return nil
+    }
+
+    static func isPlaceholderName(_ value: String) -> Bool {
+        value.hasPrefix("BTC Map Place #")
+    }
 }
 
 // MARK: - Address

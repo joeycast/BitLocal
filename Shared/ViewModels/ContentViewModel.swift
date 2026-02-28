@@ -106,6 +106,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var unifiedSearchDebounceTask: Task<Void, Never>?
     private var latestMerchantSearchRequestID = UUID()
     private var latestCommunitySelectionRequestID = UUID()
+    private var placeholderNameHydrationInFlight = Set<String>()
+    private var placeholderNameHydrationAttempted = Set<String>()
     
     // Use a queue for thread-safe access to mapView
     private let mapViewQueue = DispatchQueue(label: "mapview.queue", qos: .userInitiated)
@@ -139,8 +141,53 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             .receive(on: RunLoop.main)
             .sink { [weak self] elements in
                 self?.visibleElements = elements
+                self?.hydratePlaceholderNamesIfNeeded(in: elements)
             }
             .store(in: &cancellables)
+    }
+
+    private func hydratePlaceholderNamesIfNeeded(in elements: [Element]) {
+        let candidateIDs = elements.compactMap { element -> String? in
+            let name = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard name.hasPrefix("BTC Map Place #") else { return nil }
+            return element.id
+        }
+
+        guard !candidateIDs.isEmpty else { return }
+        let idsToHydrate = candidateIDs.filter {
+            !placeholderNameHydrationInFlight.contains($0) && !placeholderNameHydrationAttempted.contains($0)
+        }
+        guard !idsToHydrate.isEmpty else { return }
+
+        let batch = Array(idsToHydrate.prefix(20))
+        batch.forEach {
+            placeholderNameHydrationInFlight.insert($0)
+            placeholderNameHydrationAttempted.insert($0)
+        }
+
+        for id in batch {
+            btcMapRepository.fetchPlace(id: id) { [weak self] result in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.placeholderNameHydrationInFlight.remove(id)
+
+                    guard case .success(let record) = result else { return }
+                    let hydrated = V4PlaceToElementMapper.placeRecordToElement(record)
+
+                    var byID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
+                    byID[id] = hydrated
+                    self.allElements = Array(byID.values)
+                    if self.selectedElement?.id == id {
+                        self.selectedElement = hydrated
+                    }
+                    self.forceMapRefresh = true
+                }
+            }
+        }
+    }
+
+    func requestPlaceholderNameHydration(for elements: [Element]) {
+        hydratePlaceholderNamesIfNeeded(in: elements)
     }
 
     func setSelectionSource(_ source: SelectionSource) {
@@ -588,6 +635,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             let name = element.osmJSON?.tags?.name ?? element.osmJSON?.tags?.operator ?? ""
             return name.localizedStandardContains(query)
         }
+        hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
 
         // Filter cached areas
         if !areaBrowserAreas.isEmpty {
@@ -890,7 +938,20 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             communityMemberElements = polygonMembers
             communityMemberElementIDs = Set(polygonMembers.map(\.id))
             communityMembersError = nil
-            communityMembersIsLoading = false
+            let placeholderIDs = polygonMembers.compactMap { member -> String? in
+                let name = member.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return name.hasPrefix("BTC Map Place #") ? member.id : nil
+            }
+            if placeholderIDs.isEmpty {
+                communityMembersIsLoading = false
+            } else {
+                communityMembersIsLoading = true
+                hydrateMissingCommunityMembers(
+                    missingIDs: placeholderIDs,
+                    seedMembers: polygonMembers,
+                    requestID: requestID
+                )
+            }
             forceMapRefresh = true
             return
         }
@@ -1030,15 +1091,20 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     let cachedMembers = self.allElements.filter { activeIDs.contains($0.id) }
                     let cachedIDs = Set(cachedMembers.map(\.id))
                     let missingIDs = activeIDs.subtracting(cachedIDs)
+                    let placeholderIDs = cachedMembers.compactMap { member -> String? in
+                        let name = member.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        return name.hasPrefix("BTC Map Place #") ? member.id : nil
+                    }
+                    let idsToHydrate = Set(missingIDs).union(placeholderIDs)
 
-                    if missingIDs.isEmpty {
+                    if idsToHydrate.isEmpty {
                         self.communityMemberElements = cachedMembers
                         self.communityMembersIsLoading = false
                     } else {
                         self.communityMemberElements = cachedMembers
                         self.communityMembersIsLoading = true
                         self.hydrateMissingCommunityMembers(
-                            missingIDs: Array(missingIDs),
+                            missingIDs: Array(idsToHydrate),
                             seedMembers: cachedMembers,
                             requestID: requestID
                         )
@@ -1460,6 +1526,27 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
                     self.allElements = cachedElements
                     self.hasLoadedInitialData = true
+                    let cachedHasPlaceholders = self.hasPlaceholderNames(in: cachedElements)
+
+                    if cachedHasPlaceholders {
+                        Debug.logAPI("Cached elements include placeholder names; performing immediate refresh")
+                        self.btcMapRepository.refreshElements { [weak self] elements in
+                            DispatchQueue.main.async {
+                                guard let self else { return }
+                                let refreshedElements = elements ?? []
+                                if !refreshedElements.isEmpty {
+                                    self.allElements = refreshedElements
+                                    self.forceMapRefresh = true
+                                }
+                                self.isLoading = false
+                                if self.isInitialStartup {
+                                    self.isInitialStartup = false
+                                }
+                            }
+                        }
+                        return
+                    }
+
                     self.isLoading = false
                     
                     // Center map for returning users who have cached data
@@ -1516,6 +1603,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
                 }
             }
+        }
+    }
+
+    private func hasPlaceholderNames(in elements: [Element]) -> Bool {
+        elements.contains { element in
+            let rawName = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return Element.isPlaceholderName(rawName)
         }
     }
 

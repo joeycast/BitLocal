@@ -66,7 +66,7 @@ extension UIViewController {
 
 extension Element: Equatable {
     static func == (lhs: Element, rhs: Element) -> Bool {
-        return lhs.uuid == rhs.uuid // Assuming 'uuid' is a unique identifier for each Element
+        return lhs.id == rhs.id
     }
 }
 
