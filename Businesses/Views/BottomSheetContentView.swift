@@ -212,9 +212,6 @@ private struct CommunityRow: View {
                 .foregroundStyle(.secondary)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
         }
         .contentShape(.rect)
     }
