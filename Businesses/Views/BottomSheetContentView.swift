@@ -44,20 +44,14 @@ struct BottomSheetContentView: View {
                         .id(element.id)
                         .clearNavigationContainerBackgroundIfAvailable()
                     }
-                    .clearNavigationContainerBackgroundIfAvailable()
-                }
-                .sheet(item: $viewModel.presentedCommunityArea) { area in
-                    NavigationStack {
-                        CommunityDetailView(area: area)
-                            .environmentObject(viewModel)
-                            .toolbar {
-                                ToolbarItem(placement: .topBarLeading) {
-                                    Button("Close") {
-                                        viewModel.presentedCommunityArea = nil
-                                    }
-                                }
-                            }
+                    .navigationDestination(isPresented: communityDetailBindingIsPresented) {
+                        if let area = viewModel.presentedCommunityArea {
+                            CommunityDetailView(area: area)
+                                .environmentObject(viewModel)
+                                .clearNavigationContainerBackgroundIfAvailable()
+                        }
                     }
+                    .clearNavigationContainerBackgroundIfAvailable()
                 }
                 .onChange(of: viewModel.unifiedSearchText) { _, _ in
                     viewModel.performUnifiedSearch()
@@ -102,6 +96,17 @@ struct BottomSheetContentView: View {
                 }
             }
         }
+    }
+
+    private var communityDetailBindingIsPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.presentedCommunityArea != nil },
+            set: { newValue in
+                if !newValue {
+                    viewModel.presentedCommunityArea = nil
+                }
+            }
+        )
     }
 }
 
@@ -158,12 +163,15 @@ struct CommunitiesListView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredCommunities) { area in
-                        Button {
-                            viewModel.selectCommunity(area)
+                        NavigationLink {
+                            CommunityDetailView(area: area)
+                                .environmentObject(viewModel)
+                                .onAppear {
+                                    viewModel.selectCommunity(area, presentDetail: false)
+                                }
                         } label: {
                             CommunityRow(area: area)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -299,7 +307,6 @@ struct CommunityDetailView: View {
                 } else {
                     ForEach(memberElements, id: \.id) { element in
                         Button {
-                            viewModel.presentedCommunityArea = nil
                             viewModel.setSelectionSource(.list)
                             viewModel.selectAnnotation(for: element, animated: true)
                             viewModel.path = [element]
