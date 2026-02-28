@@ -52,11 +52,102 @@ final class V4PlaceToElementMapperTests: XCTestCase {
         XCTAssertEqual(element.osmJSON?.lon, 20.0)
         XCTAssertEqual(element.osmJSON?.tags?.name, "Cafe Bitcoin")
         XCTAssertEqual(element.osmJSON?.tags?.openingHours, "24/7")
+        XCTAssertEqual(element.osmJSON?.tags?.amenity, "cafe")
         XCTAssertEqual(element.osmJSON?.tags?.paymentLightning, "yes")
         XCTAssertEqual(element.osmJSON?.tags?.addrCity, "Nashville")
         XCTAssertEqual(element.v4Metadata?.commentsCount, 3)
         XCTAssertEqual(element.v4Metadata?.verifiedAt, "2025-01-03T00:00:00Z")
         XCTAssertEqual(element.v4Metadata?.paymentProvider, "coinos")
         XCTAssertEqual(element.v4Metadata?.imageURL, "https://cdn.example.com/cafe.jpg")
+    }
+
+    func testMapsIconToShopCategoryWhenNeeded() {
+        let record = V4PlaceRecord(
+            id: 43,
+            lat: 10.0,
+            lon: 20.0,
+            icon: "computer",
+            name: "Bitcoin Computers",
+            address: nil,
+            openingHours: nil,
+            comments: nil,
+            createdAt: "2025-01-01T00:00:00Z",
+            updatedAt: "2025-01-02T00:00:00Z",
+            deletedAt: nil,
+            verifiedAt: nil,
+            osmID: nil,
+            osmURL: nil,
+            phone: nil,
+            website: nil,
+            twitter: nil,
+            facebook: nil,
+            instagram: nil,
+            line: nil,
+            telegram: nil,
+            email: nil,
+            boostedUntil: nil,
+            requiredAppURL: nil,
+            description: nil,
+            image: nil,
+            paymentProvider: nil,
+            osmPaymentBitcoin: nil,
+            osmCurrencyXBT: nil,
+            osmPaymentOnchain: nil,
+            osmPaymentLightning: nil,
+            osmPaymentLightningContactless: nil,
+            osmAddrHouseNumber: nil,
+            osmAddrStreet: nil,
+            osmAddrCity: nil,
+            osmAddrState: nil,
+            osmAddrPostcode: nil,
+            osmOperator: nil,
+            osmBrand: nil
+        )
+
+        let element = V4PlaceToElementMapper.placeRecordToElement(record)
+
+        XCTAssertEqual(element.osmJSON?.tags?.shop, "computer")
+        XCTAssertNil(element.osmJSON?.tags?.amenity)
+    }
+
+    func testSymbolResolutionUsesMaterialV4IconAliasWhenTagsMissing() {
+        let element = Element(
+            id: "1",
+            osmJSON: nil,
+            tags: Tags(
+                category: nil,
+                iconAndroid: "lunch_dining",
+                paymentCoinos: nil,
+                paymentPouch: nil,
+                boostExpires: nil,
+                categoryPlural: nil,
+                paymentProvider: nil,
+                paymentURI: nil
+            ),
+            createdAt: "2025-01-01T00:00:00Z",
+            updatedAt: "2025-01-01T00:00:00Z",
+            deletedAt: nil,
+            address: nil,
+            v4Metadata: ElementV4Metadata(
+                icon: "lunch_dining",
+                commentsCount: nil,
+                verifiedAt: nil,
+                boostedUntil: nil,
+                osmID: nil,
+                osmURL: nil,
+                email: nil,
+                twitter: nil,
+                facebook: nil,
+                instagram: nil,
+                telegram: nil,
+                line: nil,
+                requiredAppURL: nil,
+                imageURL: nil,
+                paymentProvider: nil,
+                rawAddress: nil
+            )
+        )
+
+        XCTAssertEqual(ElementCategorySymbols.symbolName(for: element), "fork.knife.circle.fill")
     }
 }

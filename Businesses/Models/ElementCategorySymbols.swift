@@ -265,6 +265,58 @@ struct ElementCategorySymbols {
         "church": "location.circle.fill"
     ]
 
+    // Material-style v4 icon aliases -> OSM-like category keys used by this mapper.
+    private static let categoryIconAliases: [String: String] = [
+        "local_cafe": "cafe",
+        "coffee": "cafe",
+        "restaurant": "restaurant",
+        "lunch_dining": "restaurant",
+        "local_pizza": "pizza",
+        "bakery_dining": "bakery",
+        "local_bar": "bar",
+        "sports_bar": "bar",
+        "wine_bar": "bar",
+        "hotel": "hotel",
+        "chalet": "chalet",
+        "local_atm": "atm",
+        "currency_exchange": "bureau_de_change",
+        "account_balance": "bank",
+        "local_grocery_store": "grocery",
+        "local_mall": "department_store",
+        "storefront": "yes",
+        "computer": "computer",
+        "business": "office",
+        "medical_services": "clinic",
+        "local_pharmacy": "pharmacy",
+        "spa": "spa",
+        "content_cut": "hairdresser",
+        "fitness_center": "fitness",
+        "sports": "sports",
+        "pedal_bike": "cycling",
+        "two_wheeler": "motorcycle",
+        "directions_car": "car",
+        "car_repair": "car_repair",
+        "local_car_wash": "car_wash",
+        "local_gas_station": "fuel",
+        "liquor": "alcohol",
+        "icecream": "ice_cream",
+        "local_florist": "florist",
+        "hardware": "hardware",
+        "pets": "pet",
+        "photo_camera": "photo",
+        "smartphone": "mobile_phone",
+        "chair": "furniture",
+        "card_giftcard": "gift",
+        "palette": "art",
+        "music_note": "music",
+        "school": "school",
+        "group": "community_centre",
+        "tour": "travel_agency",
+        "camping": "camp_site",
+        "grass": "park",
+        "factory": "transport"
+    ]
+
     // MARK: - Internal Lookup
 
     /// Iterates over the components of a semicolon-separated tag value
@@ -280,59 +332,113 @@ struct ElementCategorySymbols {
         return nil
     }
 
-    /// Returns a SwiftUI Image for an Element based on its OSM tags.
-    static func image(for element: Element, renderingMode: Image.TemplateRenderingMode = .original) -> Image {
-        guard let tags = element.osmTagsDict else {
-            return Image(systemName: "location.circle.fill").renderingMode(renderingMode)
+    /// Resolve a BTC Map category/icon slug into an OSM tag key/value pair
+    /// that this symbol mapper can use (for example `("amenity", "cafe")`).
+    static func osmTagAssignment(forCategoryIcon icon: String?) -> (tagKey: String, tagValue: String)? {
+        guard let icon else { return nil }
+        let baseCandidates = icon
+            .lowercased()
+            .components(separatedBy: ";")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        var candidates = baseCandidates
+        for candidate in baseCandidates {
+            if let alias = categoryIconAliases[candidate], !alias.isEmpty {
+                candidates.append(alias)
+            }
         }
 
-        if let cuisineValue = tags["cuisine"],
+        for candidate in candidates {
+            if cuisine[candidate] != nil { return ("cuisine", candidate) }
+            if shop[candidate] != nil { return ("shop", candidate) }
+            if sport[candidate] != nil { return ("sport", candidate) }
+            if tourism[candidate] != nil { return ("tourism", candidate) }
+            if healthcare[candidate] != nil { return ("healthcare", candidate) }
+            if craft[candidate] != nil { return ("craft", candidate) }
+            if amenity[candidate] != nil { return ("amenity", candidate) }
+            if office[candidate] != nil { return ("office", candidate) }
+            if place[candidate] != nil { return ("place", candidate) }
+            if leisure[candidate] != nil { return ("leisure", candidate) }
+            if building[candidate] != nil { return ("building", candidate) }
+            if company[candidate] != nil { return ("company", candidate) }
+        }
+
+        return nil
+    }
+
+    static func symbolName(forCategoryIcon icon: String?) -> String? {
+        guard let assignment = osmTagAssignment(forCategoryIcon: icon) else { return nil }
+        switch assignment.tagKey {
+        case "cuisine": return lookupSymbolName(in: cuisine, forTagValue: assignment.tagValue)
+        case "shop": return lookupSymbolName(in: shop, forTagValue: assignment.tagValue)
+        case "sport": return lookupSymbolName(in: sport, forTagValue: assignment.tagValue)
+        case "tourism": return lookupSymbolName(in: tourism, forTagValue: assignment.tagValue)
+        case "healthcare": return lookupSymbolName(in: healthcare, forTagValue: assignment.tagValue)
+        case "craft": return lookupSymbolName(in: craft, forTagValue: assignment.tagValue)
+        case "amenity": return lookupSymbolName(in: amenity, forTagValue: assignment.tagValue)
+        case "office": return lookupSymbolName(in: office, forTagValue: assignment.tagValue)
+        case "place": return lookupSymbolName(in: place, forTagValue: assignment.tagValue)
+        case "leisure": return lookupSymbolName(in: leisure, forTagValue: assignment.tagValue)
+        case "building": return lookupSymbolName(in: building, forTagValue: assignment.tagValue)
+        case "company": return lookupSymbolName(in: company, forTagValue: assignment.tagValue)
+        default: return nil
+        }
+    }
+
+    /// Returns a SwiftUI Image for an Element based on its OSM tags.
+    static func image(for element: Element, renderingMode: Image.TemplateRenderingMode = .original) -> Image {
+        let tags = element.osmTagsDict
+
+        if let cuisineValue = tags?["cuisine"],
            let symbol = lookupSymbolName(in: cuisine, forTagValue: cuisineValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let shopValue = tags["shop"],
+        if let shopValue = tags?["shop"],
            let symbol = lookupSymbolName(in: shop, forTagValue: shopValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let sportValue = tags["sport"],
+        if let sportValue = tags?["sport"],
            let symbol = lookupSymbolName(in: sport, forTagValue: sportValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let tourismValue = tags["tourism"],
+        if let tourismValue = tags?["tourism"],
            let symbol = lookupSymbolName(in: tourism, forTagValue: tourismValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let healthcareValue = tags["healthcare"],
+        if let healthcareValue = tags?["healthcare"],
            let symbol = lookupSymbolName(in: healthcare, forTagValue: healthcareValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let craftValue = tags["craft"],
+        if let craftValue = tags?["craft"],
            let symbol = lookupSymbolName(in: craft, forTagValue: craftValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let amenityValue = tags["amenity"],
+        if let amenityValue = tags?["amenity"],
            let symbol = lookupSymbolName(in: amenity, forTagValue: amenityValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let officeValue = tags["office"],
+        if let officeValue = tags?["office"],
            let symbol = lookupSymbolName(in: office, forTagValue: officeValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let placeValue = tags["place"],
+        if let placeValue = tags?["place"],
            let symbol = lookupSymbolName(in: place, forTagValue: placeValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let leisureValue = tags["leisure"],
+        if let leisureValue = tags?["leisure"],
            let symbol = lookupSymbolName(in: leisure, forTagValue: leisureValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let buildingValue = tags["building"],
+        if let buildingValue = tags?["building"],
            let symbol = lookupSymbolName(in: building, forTagValue: buildingValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let companyValue = tags["company"],
+        if let companyValue = tags?["company"],
            let symbol = lookupSymbolName(in: company, forTagValue: companyValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
+        }
+        if let iconSymbol = symbolName(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconAndroid) {
+            return Image(systemName: iconSymbol).renderingMode(renderingMode)
         }
 
         // Fallback if nothing matched:
@@ -341,68 +447,69 @@ struct ElementCategorySymbols {
 
     /// Returns the SF Symbol name for an Element by inspecting its OSM tags.
     static func symbolName(for element: Element) -> String {
-        guard let tagsDict = element.osmTagsDict else {
-            return "bitcoinsign.circle.fill"
-        }
+        let tagsDict = element.osmTagsDict
         // 1) cuisine
-        if let cuisineValue = tagsDict["cuisine"],
+        if let cuisineValue = tagsDict?["cuisine"],
            let name = lookupSymbolName(in: cuisine, forTagValue: cuisineValue) {
             return name
         }
         // 2) shop
-        if let shopValue = tagsDict["shop"],
+        if let shopValue = tagsDict?["shop"],
            let name = lookupSymbolName(in: shop, forTagValue: shopValue) {
             return name
         }
         // 3) sport
-        if let sportValue = tagsDict["sport"],
+        if let sportValue = tagsDict?["sport"],
            let name = lookupSymbolName(in: sport, forTagValue: sportValue) {
             return name
         }
         // 4) tourism
-        if let tourismValue = tagsDict["tourism"],
+        if let tourismValue = tagsDict?["tourism"],
            let name = lookupSymbolName(in: tourism, forTagValue: tourismValue) {
             return name
         }
         // 5) healthcare
-        if let healthcareValue = tagsDict["healthcare"],
+        if let healthcareValue = tagsDict?["healthcare"],
            let name = lookupSymbolName(in: healthcare, forTagValue: healthcareValue) {
             return name
         }
         // 6) craft
-        if let craftValue = tagsDict["craft"],
+        if let craftValue = tagsDict?["craft"],
            let name = lookupSymbolName(in: craft, forTagValue: craftValue) {
             return name
         }
         // 7) amenity
-        if let amenityValue = tagsDict["amenity"],
+        if let amenityValue = tagsDict?["amenity"],
            let name = lookupSymbolName(in: amenity, forTagValue: amenityValue) {
             return name
         }
         // 8) office
-        if let officeValue = tagsDict["office"],
+        if let officeValue = tagsDict?["office"],
            let name = lookupSymbolName(in: office, forTagValue: officeValue) {
             return name
         }
         // 9) place
-        if let placeValue = tagsDict["place"],
+        if let placeValue = tagsDict?["place"],
            let name = lookupSymbolName(in: place, forTagValue: placeValue) {
             return name
         }
         // 10) leisure
-        if let leisureValue = tagsDict["leisure"],
+        if let leisureValue = tagsDict?["leisure"],
            let name = lookupSymbolName(in: leisure, forTagValue: leisureValue) {
             return name
         }
         // 11) building
-        if let buildingValue = tagsDict["building"],
+        if let buildingValue = tagsDict?["building"],
            let name = lookupSymbolName(in: building, forTagValue: buildingValue) {
             return name
         }
         // 12) company
-        if let companyValue = tagsDict["company"],
+        if let companyValue = tagsDict?["company"],
            let name = lookupSymbolName(in: company, forTagValue: companyValue) {
             return name
+        }
+        if let iconSymbol = symbolName(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconAndroid) {
+            return iconSymbol
         }
         // Fallback
         return "bitcoinsign.circle.fill"

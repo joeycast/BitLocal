@@ -548,6 +548,7 @@ struct V4PlaceToElementMapper {
             name: placeholderName,
             operatorName: nil,
             brandName: nil,
+            categoryIcon: record.icon,
             description: nil,
             website: nil,
             phone: nil,
@@ -624,6 +625,7 @@ struct V4PlaceToElementMapper {
             name: record.preferredName ?? "BTC Map Place #\(record.id)",
             operatorName: record.osmOperator,
             brandName: record.osmBrand,
+            categoryIcon: record.icon,
             description: record.description,
             website: record.website,
             phone: record.phone,
@@ -725,6 +727,7 @@ struct V4PlaceToElementMapper {
         name: String?,
         operatorName: String?,
         brandName: String?,
+        categoryIcon: String?,
         description: String?,
         website: String?,
         phone: String?,
@@ -740,7 +743,9 @@ struct V4PlaceToElementMapper {
         addrState: String?,
         addrPostcode: String?
     ) -> OsmTags {
-        OsmTags(
+        let categoryAssignment = ElementCategorySymbols.osmTagAssignment(forCategoryIcon: categoryIcon)
+
+        return OsmTags(
             addrCity: addrCity,
             addrHousenumber: addrHousenumber,
             addrPostcode: addrPostcode,
@@ -761,19 +766,27 @@ struct V4PlaceToElementMapper {
             phone: phone,
             contactPhone: nil,
             openingHours: openingHours,
-            cuisine: nil,
-            shop: nil,
-            sport: nil,
-            tourism: nil,
-            healthcare: nil,
-            craft: nil,
-            amenity: nil,
-            place: nil,
-            leisure: nil,
-            office: nil,
-            building: nil,
-            company: nil
+            cuisine: value(forTagKey: "cuisine", assignment: categoryAssignment),
+            shop: value(forTagKey: "shop", assignment: categoryAssignment),
+            sport: value(forTagKey: "sport", assignment: categoryAssignment),
+            tourism: value(forTagKey: "tourism", assignment: categoryAssignment),
+            healthcare: value(forTagKey: "healthcare", assignment: categoryAssignment),
+            craft: value(forTagKey: "craft", assignment: categoryAssignment),
+            amenity: value(forTagKey: "amenity", assignment: categoryAssignment),
+            place: value(forTagKey: "place", assignment: categoryAssignment),
+            leisure: value(forTagKey: "leisure", assignment: categoryAssignment),
+            office: value(forTagKey: "office", assignment: categoryAssignment),
+            building: value(forTagKey: "building", assignment: categoryAssignment),
+            company: value(forTagKey: "company", assignment: categoryAssignment)
         )
+    }
+
+    private static func value(
+        forTagKey key: String,
+        assignment: (tagKey: String, tagValue: String)?
+    ) -> String? {
+        guard assignment?.tagKey == key else { return nil }
+        return assignment?.tagValue
     }
 }
 
