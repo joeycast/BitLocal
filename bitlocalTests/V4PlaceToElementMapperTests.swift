@@ -42,7 +42,8 @@ final class V4PlaceToElementMapperTests: XCTestCase {
             osmAddrState: "TN",
             osmAddrPostcode: "37201",
             osmOperator: "Cafe Bitcoin LLC",
-            osmBrand: nil
+            osmBrand: nil,
+            osmBrandWikidata: "Q7605233"
         )
 
         let element = V4PlaceToElementMapper.placeRecordToElement(record)
@@ -54,6 +55,7 @@ final class V4PlaceToElementMapperTests: XCTestCase {
         XCTAssertEqual(element.osmJSON?.tags?.openingHours, "24/7")
         XCTAssertEqual(element.osmJSON?.tags?.amenity, "cafe")
         XCTAssertEqual(element.osmJSON?.tags?.paymentLightning, "yes")
+        XCTAssertEqual(element.osmJSON?.tags?.brandWikidata, "Q7605233")
         XCTAssertEqual(element.osmJSON?.tags?.addrCity, "Nashville")
         XCTAssertEqual(element.v4Metadata?.commentsCount, 3)
         XCTAssertEqual(element.v4Metadata?.verifiedAt, "2025-01-03T00:00:00Z")
@@ -101,7 +103,8 @@ final class V4PlaceToElementMapperTests: XCTestCase {
             osmAddrState: nil,
             osmAddrPostcode: nil,
             osmOperator: nil,
-            osmBrand: nil
+            osmBrand: nil,
+            osmBrandWikidata: nil
         )
 
         let element = V4PlaceToElementMapper.placeRecordToElement(record)

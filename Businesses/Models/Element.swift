@@ -240,6 +240,7 @@ struct OsmTags: Codable {
     let paymentBitcoin, currencyXBT, paymentOnchain, paymentLightning, paymentLightningContactless: String?
     let name, `operator`: String?
     let brand: String?
+    let brandWikidata: String?
     let description, descriptionEn, website, contactWebsite, phone, contactPhone, openingHours: String?
     let cuisine: String?
     let shop: String?
@@ -268,6 +269,7 @@ struct OsmTags: Codable {
         case name
         case `operator`
         case brand
+        case brandWikidata = "brand:wikidata"
         case description
         case descriptionEn = "description:en"
         case website

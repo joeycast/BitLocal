@@ -49,7 +49,8 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
           "osm:addr:street": "Main St",
           "osm:addr:city": "New York",
           "osm:addr:state": "NY",
-          "osm:addr:postcode": "10001"
+          "osm:addr:postcode": "10001",
+          "osm:brand:wikidata": "Q7605233"
         }]
         """.utf8)
 
@@ -61,5 +62,6 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
         XCTAssertEqual(record.osmPaymentBitcoin, "yes")
         XCTAssertEqual(record.osmPaymentLightning, "yes")
         XCTAssertEqual(record.osmAddrCity, "New York")
+        XCTAssertEqual(record.osmBrandWikidata, "Q7605233")
     }
 }
