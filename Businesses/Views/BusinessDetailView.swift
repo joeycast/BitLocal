@@ -161,8 +161,6 @@ struct BusinessDetailView: View {
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapRequiredAppSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
-            BTCMapPhotoSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapPlaceCommentsSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapVerificationSection(element: element)
@@ -741,47 +739,6 @@ struct BTCMapRequiredAppSection: View {
                     }
                 }
                 .buttonStyle(.plain)
-            }
-        }
-    }
-}
-
-struct BTCMapPhotoSection: View {
-    let element: Element
-
-    private var imageURL: URL? {
-        guard let raw = element.v4Metadata?.imageURL else { return nil }
-        return URL(string: raw)
-    }
-
-    var body: some View {
-        if let imageURL {
-            Section(header: Text("Photo")) {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 180)
-                            .frame(maxWidth: .infinity)
-                            .clipShape(.rect(cornerRadius: 12))
-                    case .failure:
-                        Text("Photo unavailable")
-                            .foregroundStyle(.secondary)
-                    case .empty:
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                            ProgressView()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 120)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             }
         }
     }
