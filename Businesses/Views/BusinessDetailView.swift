@@ -150,15 +150,24 @@ struct BusinessDetailView: View {
         List {
             BusinessDescriptionSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
-            BusinessDetailsSection(element: element, elementCellViewModel: elementCellViewModel)
+            BusinessDetailsSection(
+                element: element,
+                elementCellViewModel: elementCellViewModel
+            )
                 .clearListRowBackground(if: shouldUseGlassyRows)
-            BTCMapV4EnrichmentSection(element: element)
+            BTCMapSocialsSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            PaymentDetailsSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            BTCMapRequiredAppSection(element: element)
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            BTCMapPhotoSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapPlaceCommentsSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
-            BTCMapPaidActionsSection(element: element)
+            BTCMapVerificationSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
-            PaymentDetailsSection(element: element)
+            BTCMapPaidActionsSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessMapSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
@@ -191,6 +200,31 @@ extension BusinessDetailView {
 struct BTCMapPlaceCommentsSection: View {
     let element: Element
 
+    private var expectedCount: Int? { element.v4Metadata?.commentsCount }
+
+    var body: some View {
+        if shouldShowSection {
+            Section(header: Text("Community Reviews")) {
+                NavigationLink {
+                    BTCMapPlaceCommentsListView(element: element)
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(expectedCount ?? 0) review\((expectedCount ?? 0) == 1 ? "" : "s")")
+                            .foregroundStyle(.primary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var shouldShowSection: Bool {
+        (expectedCount ?? 0) > 0
+    }
+}
+
+struct BTCMapPlaceCommentsListView: View {
+    let element: Element
+
     @State private var comments: [V4PlaceCommentRecord] = []
     @State private var isLoading = false
     @State private var errorText: String?
@@ -198,101 +232,84 @@ struct BTCMapPlaceCommentsSection: View {
 
     private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
 
-    private var expectedCount: Int? { element.v4Metadata?.commentsCount }
-
     var body: some View {
-        if shouldShowSection {
-            Section(header: Text("Community Reviews")) {
-                if let expectedCount, expectedCount > 0, !hasLoaded {
-                    Button {
-                        loadComments()
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.down.circle")
-                            Text("Load \(expectedCount) comment\(expectedCount == 1 ? "" : "s")")
-                            Spacer()
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 2)
+        List {
+            if isLoading && comments.isEmpty {
+                HStack {
+                    ProgressView()
+                    Text("Loading comments…")
+                        .foregroundStyle(.secondary)
                 }
-
-                if isLoading {
-                    HStack {
-                        ProgressView()
-                        Text("Loading comments…")
-                            .foregroundColor(.secondary)
-                    }
+            } else if let errorText, !errorText.isEmpty, comments.isEmpty {
+                Label(errorText, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .font(.subheadline)
+                Button("Retry") {
+                    loadComments(force: true)
                 }
-
-                if let errorText, !errorText.isEmpty {
-                    Label(errorText, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.subheadline)
-                }
-
-                if hasLoaded && comments.isEmpty && !isLoading && errorText == nil {
-                    Text("No reviews yet")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 2)
-                }
-
+            } else if comments.isEmpty {
+                Text("No reviews yet")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
                 ForEach(comments) { comment in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline) {
-                            if let author = comment.authorDisplayName {
-                                Text(author)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                            } else {
-                                Text("Anonymous")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            if let createdAt = comment.createdAt, !createdAt.isEmpty {
-                                Text(createdAt.formattedBTCMapDate())
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        if !comment.bodyText.isEmpty {
-                            Text(comment.bodyText)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                        }
-
-                        if let sats = comment.amountSats, sats > 0 {
-                            HStack(spacing: 2) {
-                                Image(systemName: "bolt.fill")
-                                    .font(.caption2)
-                                Text("~\(sats) sats")
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.orange)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
-                }
-            }
-            .task(id: element.id) {
-                // Auto-load only when BTCMap metadata suggests comments exist.
-                if (expectedCount ?? 0) > 0, !hasLoaded, !isLoading {
-                    loadComments()
+                    commentRow(comment)
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Community Reviews")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: element.id) {
+            loadComments()
+        }
     }
 
-    private var shouldShowSection: Bool {
-        (expectedCount ?? 0) > 0 || hasLoaded || isLoading || errorText != nil
+    @ViewBuilder
+    private func commentRow(_ comment: V4PlaceCommentRecord) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                if let author = comment.authorDisplayName {
+                    Text(author)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                } else {
+                    Text("Anonymous")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if let createdAt = comment.createdAt, !createdAt.isEmpty {
+                    Text(createdAt.formattedBTCMapDate())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !comment.bodyText.isEmpty {
+                Text(comment.bodyText)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+            }
+
+            if let sats = comment.amountSats, sats > 0 {
+                HStack(spacing: 2) {
+                    Image(systemName: "bolt.fill")
+                        .font(.caption2)
+                    Text("~\(sats) sats")
+                        .font(.caption)
+                }
+                .foregroundStyle(.orange)
+            }
+        }
+        .padding(.vertical, 4)
+        .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
     }
 
-    private func loadComments() {
+    private func loadComments(force: Bool = false) {
         guard !isLoading else { return }
+        if hasLoaded && !force { return }
+
         isLoading = true
         errorText = nil
 
@@ -306,7 +323,6 @@ struct BTCMapPlaceCommentsSection: View {
                         .filter { !$0.bodyText.isEmpty }
                         .sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
                 case .failure(let error):
-                    self.comments = []
                     errorText = error.localizedDescription
                 }
             }
@@ -631,20 +647,10 @@ struct BTCMapPaidActionsSection: View {
     }
 }
 
-struct BTCMapV4EnrichmentSection: View {
+struct BTCMapSocialsSection: View {
     let element: Element
 
     private var metadata: ElementV4Metadata? { element.v4Metadata }
-
-    private var verifiedDateText: String? {
-        guard let raw = metadata?.verifiedAt else { return nil }
-        return raw.formattedBTCMapDate()
-    }
-
-    private var boostedUntilText: String? {
-        guard let raw = metadata?.boostedUntil else { return nil }
-        return raw.formattedBTCMapDate()
-    }
 
     private var socialLinks: [(label: String, value: String, url: URL?)] {
         guard let metadata else { return [] }
@@ -664,78 +670,7 @@ struct BTCMapV4EnrichmentSection: View {
 
     var body: some View {
         if hasContent {
-            Section(header: Text("Verification & Links")) {
-                if let imageURLString = metadata?.imageURL,
-                   let imageURL = URL(string: imageURLString) {
-                    AsyncImage(url: imageURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(height: 180)
-                                .frame(maxWidth: .infinity)
-                                .clipShape(.rect(cornerRadius: 12))
-                        case .failure:
-                            EmptyView()
-                        case .empty:
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                                ProgressView()
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 120)
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                }
-
-                if let verifiedDateText {
-                    detailRow(icon: "checkmark.seal.fill", tint: .green, label: "Verified", value: verifiedDateText)
-                }
-
-                if let commentsCount = metadata?.commentsCount {
-                    detailRow(icon: "text.bubble.fill", tint: .blue, label: "Comments", value: "\(commentsCount)")
-                }
-
-                if let boostedUntilText {
-                    detailRow(icon: "bolt.badge.clock.fill", tint: .orange, label: "Boosted Until", value: boostedUntilText)
-                }
-
-                if let paymentProvider = metadata?.paymentProvider, !paymentProvider.isEmpty {
-                    detailRow(icon: "creditcard.fill", tint: .accentColor, label: "Payment Provider", value: paymentProvider)
-                }
-
-                if let requiredAppURL = metadata?.requiredAppURL,
-                   let url = URL(string: requiredAppURL) {
-                    Link(destination: url) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Image(systemName: "app.badge.fill")
-                                    .foregroundStyle(.orange)
-                                Text("Required App")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(requiredAppURL)
-                                .font(.footnote)
-                                .foregroundStyle(.accent)
-                                .lineLimit(2)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if let email = metadata?.email, let url = URL(string: "mailto:\(email)") {
-                    Link(destination: url) {
-                        textLinkRow(icon: "envelope.fill", label: "Email", value: email)
-                    }
-                    .buttonStyle(.plain)
-                }
-
+            Section(header: Text("Socials")) {
                 ForEach(socialLinks, id: \.label) { social in
                     if let url = social.url {
                         Link(destination: url) {
@@ -747,12 +682,6 @@ struct BTCMapV4EnrichmentSection: View {
                     }
                 }
 
-                if let osmURLString = metadata?.osmURL, let osmURL = URL(string: osmURLString) {
-                    Link(destination: osmURL) {
-                        textLinkRow(icon: "globe", label: "OpenStreetMap", value: osmURLString)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
         }
     }
@@ -760,34 +689,12 @@ struct BTCMapV4EnrichmentSection: View {
     private var hasContent: Bool {
         guard let metadata else { return false }
         return [
-            metadata.verifiedAt,
-            metadata.boostedUntil,
-            metadata.paymentProvider,
-            metadata.requiredAppURL,
-            metadata.email,
             metadata.twitter,
             metadata.facebook,
             metadata.instagram,
             metadata.telegram,
-            metadata.line,
-            metadata.imageURL,
-            metadata.osmURL
-        ].contains { ($0?.isEmpty == false) } || metadata.commentsCount != nil
-    }
-
-    private func detailRow(icon: String, tint: Color, label: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .foregroundStyle(.primary)
-            }
-        }
+            metadata.line
+        ].contains { ($0?.isEmpty == false) }
     }
 
     private func textLinkRow(icon: String, label: String, value: String) -> some View {
@@ -804,6 +711,118 @@ struct BTCMapV4EnrichmentSection: View {
                     .lineLimit(2)
             }
             Spacer(minLength: 0)
+        }
+    }
+}
+
+struct BTCMapRequiredAppSection: View {
+    let element: Element
+
+    private var requiredAppURL: String? { element.v4Metadata?.requiredAppURL }
+
+    var body: some View {
+        if let requiredAppURL,
+           !requiredAppURL.isEmpty,
+           let url = URL(string: requiredAppURL) {
+            Section(header: Text("Required App")) {
+                Link(destination: url) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "app.badge.fill")
+                                .foregroundStyle(.orange)
+                            Text("Required App")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(requiredAppURL)
+                            .font(.footnote)
+                            .foregroundStyle(.accent)
+                            .lineLimit(2)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+struct BTCMapPhotoSection: View {
+    let element: Element
+
+    private var imageURL: URL? {
+        guard let raw = element.v4Metadata?.imageURL else { return nil }
+        return URL(string: raw)
+    }
+
+    var body: some View {
+        if let imageURL {
+            Section(header: Text("Photo")) {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 180)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(.rect(cornerRadius: 12))
+                    case .failure:
+                        Text("Photo unavailable")
+                            .foregroundStyle(.secondary)
+                    case .empty:
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                            ProgressView()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 120)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            }
+        }
+    }
+}
+
+struct BTCMapVerificationSection: View {
+    let element: Element
+
+    private var metadata: ElementV4Metadata? { element.v4Metadata }
+
+    private var verifiedDateText: String? {
+        guard let raw = metadata?.verifiedAt else { return nil }
+        return raw.formattedBTCMapDate()
+    }
+
+    var body: some View {
+        if hasContent {
+            Section(header: Text("Verification")) {
+                if let verifiedDateText {
+                    detailRow(icon: "checkmark.seal.fill", tint: .green, label: "Verified", value: verifiedDateText)
+                }
+            }
+        }
+    }
+
+    private var hasContent: Bool {
+        verifiedDateText != nil
+    }
+
+    private func detailRow(icon: String, tint: Color, label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .foregroundStyle(.primary)
+            }
         }
     }
 }
@@ -857,17 +876,6 @@ struct BusinessDetailsSection: View {
     
     var body: some View {
         Section(header: Text(NSLocalizedString("business_details_section", comment: "Section header for business details"))) {
-            
-            // TO DO: Determine necessity of this block of code
-            if let distance = BusinessDetailView(element: element, userLocation: nil, contentViewModel: ContentViewModel()).localizedDistanceString() {
-                HStack {
-                    Image(systemName: "location")
-                        .foregroundColor(.blue)
-                    Text(distance)
-                        .font(.subheadline)
-                }
-            }
-            
             // Business Address
             if let coord = element.mapCoordinate {
                 Button(action: {
@@ -942,6 +950,29 @@ struct BusinessDetailsSection: View {
                 } else {
                     let _ = Debug.log("Invalid phone number: '\(phone)'")
                 }
+            }
+
+            // Business Email
+            if let email = element.v4Metadata?.email,
+               !email.isEmpty,
+               let url = URL(string: "mailto:\(email)") {
+                Link(destination: url) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text("Email")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        HStack {
+                            Text(email)
+                                .lineLimit(1)
+                                .foregroundStyle(.accent)
+                            Spacer()
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
             }
             
             // Opening Hours
