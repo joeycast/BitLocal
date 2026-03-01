@@ -117,7 +117,10 @@ struct IPadLayoutView: View {
                 userLocation: viewModel.userLocation,
                 isIPad: true
             )
-            .padding(.trailing, 20),
+            .padding(.trailing, 20)
+            .opacity(showingSettings ? 0 : 1)
+            .allowsHitTesting(!showingSettings)
+            .animation(.easeInOut(duration: 0.2), value: showingSettings),
             alignment: .bottomTrailing
         )
     }

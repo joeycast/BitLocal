@@ -74,7 +74,10 @@ struct IPhoneLayoutView: View {
                     isIPad: false
                 )
                 .padding(.trailing, 18)
-                .padding(.top, max(headerHeight - 28, 62)),
+                .padding(.top, max(headerHeight - 28, 62))
+                .opacity(showingSettings ? 0 : 1)
+                .allowsHitTesting(!showingSettings)
+                .animation(.easeInOut(duration: 0.2), value: showingSettings),
                 alignment: .topTrailing
             )
 //            // Only show bottom sheet after onboarding is complete
