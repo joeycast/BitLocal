@@ -47,10 +47,14 @@ struct BusinessesListView: View {
                 } else if isFilteringMerchants {
                     searchResultsView
                 } else if elements.isEmpty {
-                    Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
-                        .foregroundStyle(.gray)
-                        .font(.title3)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    if shouldShowEmptyState {
+                        Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
+                            .foregroundStyle(.gray)
+                            .font(.title3)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    } else {
+                        Spacer(minLength: 0)
+                    }
                 } else {
                     normalListView
                 }
@@ -377,6 +381,15 @@ struct BusinessesListView: View {
         guard let detent = currentDetent else { return false }
         guard #available(iOS 26.0, *) else { return false }
         return detent != .large
+    }
+
+    private var shouldShowEmptyState: Bool {
+        guard let detent = currentDetent else { return true }
+        return detent != collapsedSheetDetent
+    }
+
+    private var collapsedSheetDetent: PresentationDetent {
+        .fraction(0.11)
     }
 }
 
