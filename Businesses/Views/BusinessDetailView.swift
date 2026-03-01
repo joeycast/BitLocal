@@ -747,28 +747,106 @@ struct BTCMapRequiredAppSection: View {
 struct BTCMapVerificationSection: View {
     let element: Element
 
+    @State private var hydratedVerifiedAt: String?
+    @State private var isLoadingVerifiedAt = false
+    @State private var hasAttemptedHydration = false
+
+    private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
     private var metadata: ElementV4Metadata? { element.v4Metadata }
+    private var effectiveVerifiedAt: String? { hydratedVerifiedAt ?? metadata?.verifiedAt }
 
-    private var verifiedDateText: String? {
-        guard let raw = metadata?.verifiedAt else { return nil }
-        return raw.formattedBTCMapDate()
-    }
+    private enum VerificationStatus {
+        case verified
+        case outdated
 
-    var body: some View {
-        if hasContent {
-            Section(header: Text("Verification")) {
-                if let verifiedDateText {
-                    detailRow(icon: "checkmark.seal.fill", tint: .green, label: "Verified", value: verifiedDateText)
-                }
+        var icon: String {
+            switch self {
+            case .verified:
+                return "checkmark.seal.fill"
+            case .outdated:
+                return "exclamationmark.triangle.fill"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .verified:
+                return .green
+            case .outdated:
+                return .orange
+            }
+        }
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .verified:
+                return "Verified"
+            case .outdated:
+                return "Not Recently Verified"
+            }
+        }
+
+        var explanation: LocalizedStringKey {
+            switch self {
+            case .verified:
+                return "Someone physically confirmed this place accepts bitcoin within the past year."
+            case .outdated:
+                return "It has been more than a year since someone reported that this location accepts bitcoin. It likely still does, but no one has confirmed so recently."
             }
         }
     }
 
-    private var hasContent: Bool {
-        verifiedDateText != nil
+    private var verifiedDate: Date? {
+        guard let raw = effectiveVerifiedAt else { return nil }
+        return raw.parsedBTCMapDate()
     }
 
-    private func detailRow(icon: String, tint: Color, label: String, value: String) -> some View {
+    private var verifiedDateText: String? {
+        guard let verifiedDate else { return nil }
+        return verifiedDate.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    private var status: VerificationStatus? {
+        guard let verifiedDate else { return nil }
+        guard let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) else {
+            return nil
+        }
+        return verifiedDate > oneYearAgo ? .verified : .outdated
+    }
+
+    var body: some View {
+        Section(header: Text("Verification")) {
+            if let status, let verifiedDateText {
+                detailRow(icon: status.icon, tint: status.tint, label: status.title, value: LocalizedStringKey(verifiedDateText))
+                Text(status.explanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if isLoadingVerifiedAt {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading verification status…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                detailRow(
+                    icon: "questionmark.circle.fill",
+                    tint: .secondary,
+                    label: "Not Yet Verified",
+                    value: "No one has confirmed this location yet."
+                )
+                Text("This place was added to BitLocal but hasn't been physically checked by a community member.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear {
+            hydrateVerificationIfNeeded()
+        }
+    }
+
+    private func detailRow(icon: String, tint: Color, label: LocalizedStringKey, value: LocalizedStringKey) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: icon)
                 .foregroundStyle(tint)
@@ -779,6 +857,24 @@ struct BTCMapVerificationSection: View {
                     .foregroundStyle(.secondary)
                 Text(value)
                     .foregroundStyle(.primary)
+            }
+        }
+    }
+
+    private func hydrateVerificationIfNeeded() {
+        guard effectiveVerifiedAt == nil else { return }
+        guard !isLoadingVerifiedAt else { return }
+        guard !hasAttemptedHydration else { return }
+
+        hasAttemptedHydration = true
+        isLoadingVerifiedAt = true
+
+        repository.fetchPlace(id: element.id) { result in
+            DispatchQueue.main.async {
+                if case .success(let record) = result, let verifiedAt = record.verifiedAt, !verifiedAt.isEmpty {
+                    hydratedVerifiedAt = verifiedAt
+                }
+                isLoadingVerifiedAt = false
             }
         }
     }
@@ -795,8 +891,18 @@ private func urlForSocialHandle(_ value: String, base: String) -> URL? {
 }
 
 private extension String {
+    func parsedBTCMapDate() -> Date? {
+        if let fullISO = ISO8601DateFormatter.fullPrecision.date(from: self) {
+            return fullISO
+        }
+        if let basicISO = ISO8601DateFormatter().date(from: self) {
+            return basicISO
+        }
+        return BTCMapDateParsers.dateOnly.date(from: self)
+    }
+
     func formattedBTCMapDate() -> String {
-        if let date = ISO8601DateFormatter.fullPrecision.date(from: self) ?? ISO8601DateFormatter().date(from: self) {
+        if let date = parsedBTCMapDate() {
             return date.formatted(date: .abbreviated, time: .shortened)
         }
         return self
@@ -807,6 +913,17 @@ private extension ISO8601DateFormatter {
     static let fullPrecision: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+}
+
+private enum BTCMapDateParsers {
+    static let dateOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
 }
