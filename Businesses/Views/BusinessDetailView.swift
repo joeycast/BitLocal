@@ -817,7 +817,7 @@ struct BTCMapVerificationSection: View {
     var body: some View {
         Section(header: Text("Verification")) {
             if let status, let verifiedDateText {
-                detailRow(icon: status.icon, tint: status.tint, label: status.title, value: LocalizedStringKey(verifiedDateText))
+                detailRow(icon: status.icon, tint: status.tint, label: status.title, value: LocalizedStringKey("Last verified: \(verifiedDateText)"))
                 Text(status.explanation)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
