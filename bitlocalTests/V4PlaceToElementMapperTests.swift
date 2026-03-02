@@ -154,3 +154,64 @@ final class V4PlaceToElementMapperTests: XCTestCase {
         XCTAssertEqual(ElementCategorySymbols.symbolName(for: element), "fork.knife.circle.fill")
     }
 }
+
+final class OSMOpeningHoursParserTests: XCTestCase {
+    func testParsesWeekdayAndWeekendRanges() {
+        let raw = "Mo-Fr 06:30-15:00; Sa 07:00-14:00; Su 08:00-13:00"
+
+        let schedule = OSMOpeningHoursParser.parseWeekSchedule(raw)
+
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .monday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 390, endMinutes: 900)
+        ])
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .saturday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 420, endMinutes: 840)
+        ])
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .sunday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 480, endMinutes: 780)
+        ])
+    }
+
+    func testParsesMixedDayLists() {
+        let raw = "Tu 10:00-18:00; We, Fr, Sa 09:00-17:00; Th 11:00-19:00; Su 11:00-17:00"
+
+        let schedule = OSMOpeningHoursParser.parseWeekSchedule(raw)
+
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .monday })?.ranges, [])
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .tuesday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 600, endMinutes: 1080)
+        ])
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .wednesday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 540, endMinutes: 1020)
+        ])
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .friday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 540, endMinutes: 1020)
+        ])
+    }
+
+    func testParsesTwentyFourSeven() {
+        let schedule = OSMOpeningHoursParser.parseWeekSchedule("24/7")
+
+        XCTAssertEqual(schedule?.days.count, 7)
+        XCTAssertEqual(schedule?.isTwentyFourSeven, true)
+    }
+
+    func testParsesSingleRangeAcrossMostOfWeek() {
+        let raw = "Mo-Sa 08:00-14:00"
+        let schedule = OSMOpeningHoursParser.parseWeekSchedule(raw)
+
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .monday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 480, endMinutes: 840)
+        ])
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .saturday })?.ranges, [
+            OSMOpeningHoursTimeRange(startMinutes: 480, endMinutes: 840)
+        ])
+        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .sunday })?.ranges, [])
+    }
+
+    func testReturnsNilForUnsupportedOrMalformedInput() {
+        XCTAssertNil(OSMOpeningHoursParser.parseWeekSchedule("Mo-Fr 9am-5pm"))
+        XCTAssertNil(OSMOpeningHoursParser.parseWeekSchedule("PH off"))
+        XCTAssertNil(OSMOpeningHoursParser.parseWeekSchedule("Mo-Fr 09:00-17:00 || \"by appointment\""))
+    }
+}

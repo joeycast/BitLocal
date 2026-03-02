@@ -1055,11 +1055,125 @@ struct BusinessDetailsSection: View {
                     Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    
-                    Text(openingHours)
+
+                    OpeningHoursDisplayView(rawOpeningHours: openingHours)
                 }
             }
         }
+    }
+}
+
+private struct OpeningHoursDisplayView: View {
+    let rawOpeningHours: String
+
+    private var parsedSchedule: OSMOpeningHoursWeekSchedule? {
+        OSMOpeningHoursParser.parseWeekSchedule(rawOpeningHours)
+    }
+
+    private var todayWeekday: WeeklyHours.Weekday {
+        switch Calendar.current.component(.weekday, from: Date()) {
+        case 1: return .sunday
+        case 2: return .monday
+        case 3: return .tuesday
+        case 4: return .wednesday
+        case 5: return .thursday
+        case 6: return .friday
+        case 7: return .saturday
+        default: return .monday
+        }
+    }
+
+    var body: some View {
+        if let parsedSchedule {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                ForEach(parsedSchedule.days, id: \.weekday) { day in
+                    GridRow(alignment: .firstTextBaseline) {
+                        Text(shortWeekdayLabel(for: day.weekday))
+                            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+                            .foregroundStyle(day.weekday == todayWeekday ? .primary : .secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+
+                        Text(displayHours(for: day))
+                            .font(.body.monospacedDigit())
+                            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+                            .foregroundStyle(day.ranges.isEmpty ? .secondary : .primary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        } else {
+            Text(rawOpeningHours)
+        }
+    }
+
+    private func displayHours(for day: OSMOpeningHoursDaySchedule) -> String {
+        guard !day.ranges.isEmpty else {
+            return NSLocalizedString("hours_closed", comment: "Closed label for business hours")
+        }
+
+        if day.ranges.count == 1, day.ranges[0].isAllDay {
+            return "24/7"
+        }
+
+        return day.ranges
+            .map { formattedTime($0.startMinutes) + " - " + formattedTime($0.endMinutes) }
+            .joined(separator: ", ")
+    }
+
+    private func shortWeekdayLabel(for weekday: WeeklyHours.Weekday) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        let symbols = formatter.shortStandaloneWeekdaySymbols ?? formatter.shortWeekdaySymbols ?? []
+
+        guard symbols.count == 7 else {
+            return fallbackWeekdayLabel(for: weekday)
+        }
+
+        let symbolIndex: Int
+        switch weekday {
+        case .sunday: symbolIndex = 0
+        case .monday: symbolIndex = 1
+        case .tuesday: symbolIndex = 2
+        case .wednesday: symbolIndex = 3
+        case .thursday: symbolIndex = 4
+        case .friday: symbolIndex = 5
+        case .saturday: symbolIndex = 6
+        }
+        return symbols[symbolIndex]
+    }
+
+    private func fallbackWeekdayLabel(for weekday: WeeklyHours.Weekday) -> String {
+        switch weekday {
+        case .monday: return "Mon"
+        case .tuesday: return "Tue"
+        case .wednesday: return "Wed"
+        case .thursday: return "Thu"
+        case .friday: return "Fri"
+        case .saturday: return "Sat"
+        case .sunday: return "Sun"
+        }
+    }
+
+    private func formattedTime(_ totalMinutes: Int) -> String {
+        let clampedMinutes = max(0, min(totalMinutes, 24 * 60))
+        let hour = clampedMinutes / 60
+        let minute = clampedMinutes % 60
+
+        var components = DateComponents()
+        components.calendar = Calendar.current
+        components.hour = hour == 24 ? 0 : hour
+        components.minute = minute
+
+        guard let date = Calendar.current.date(from: components) else {
+            return String(format: "%02d:%02d", hour, minute)
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter.string(from: date)
     }
 }
 
