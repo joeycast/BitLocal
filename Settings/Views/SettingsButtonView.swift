@@ -20,7 +20,7 @@ struct SettingsButtonView: View {
             onSettingsSelected?()
         }) {
             Image(systemName: "gearshape.fill")
-                .aboutIconStyle(size: 18)
+                .aboutIconStyle(size: 16)
         }
         .accessibilityLabel(Text("settings_label_accessibility"))
 //        .frame(width: 44, height: 44)

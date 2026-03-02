@@ -74,7 +74,7 @@ struct IPhoneLayoutView: View {
                     isIPad: false
                 )
                 .padding(.trailing, 18)
-                .padding(.top, max(headerHeight - 28, 62))
+                .padding(.top, mapOverlayTopOffset(for: geometry.safeAreaInsets.top))
                 .opacity(showingSettings ? 0 : 1)
                 .allowsHitTesting(!showingSettings)
                 .animation(.easeInOut(duration: 0.2), value: showingSettings),
@@ -151,4 +151,12 @@ struct IPhoneLayoutView: View {
         }
     }
 
+    private func mapOverlayTopOffset(for safeTopInset: CGFloat) -> CGFloat {
+        let isNotch = safeTopInset >= 40
+        if isNotch {
+            return headerHeight - 28   // tune notch devices
+        } else {
+            return headerHeight - 5   // tune legacy/home-button devices
+        }
+    }
 }
