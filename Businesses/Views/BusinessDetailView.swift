@@ -1271,6 +1271,7 @@ struct BusinessDetailsSection: View {
 
                     OpeningHoursDisplayView(rawOpeningHours: openingHours)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -1282,7 +1283,7 @@ private struct OpeningHoursDisplayView: View {
     private var parsedSchedule: OSMOpeningHoursWeekSchedule? {
         OSMOpeningHoursParser.parseWeekSchedule(rawOpeningHours)
     }
-
+    
     private var todayWeekday: WeeklyHours.Weekday {
         switch Calendar.current.component(.weekday, from: Date()) {
         case 1: return .sunday
@@ -1298,22 +1299,19 @@ private struct OpeningHoursDisplayView: View {
 
     var body: some View {
         if let parsedSchedule {
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(parsedSchedule.days, id: \.weekday) { day in
-                    GridRow(alignment: .firstTextBaseline) {
+                    HStack(alignment: .top, spacing: 12) {
                         Text(shortWeekdayLabel(for: day.weekday))
                             .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
                             .foregroundStyle(day.weekday == todayWeekday ? .primary : .secondary)
                             .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(width: 36, alignment: .leading)
 
-                        Text(displayHours(for: day))
-                            .font(.body.monospacedDigit())
-                            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
-                            .foregroundStyle(day.ranges.isEmpty ? .secondary : .primary)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        hoursText(for: day)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         } else {
@@ -1321,18 +1319,34 @@ private struct OpeningHoursDisplayView: View {
         }
     }
 
-    private func displayHours(for day: OSMOpeningHoursDaySchedule) -> String {
-        guard !day.ranges.isEmpty else {
-            return NSLocalizedString("hours_closed", comment: "Closed label for business hours")
+    @ViewBuilder
+    private func hoursText(for day: OSMOpeningHoursDaySchedule) -> some View {
+        if day.ranges.isEmpty {
+            Text(NSLocalizedString("hours_closed", comment: "Closed label for business hours"))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            .font(.body)
+            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+            .foregroundStyle(.secondary)
+        } else if day.ranges.count == 1, day.ranges[0].isAllDay {
+            Text("24/7")
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            .font(.body)
+            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+            .foregroundStyle(.primary)
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(day.ranges.enumerated()), id: \.offset) { _, range in
+                    Text(formattedTime(range.startMinutes) + " \u{2013} " + formattedTime(range.endMinutes))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    .font(.body)
+                    .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+                    .foregroundStyle(.primary)
+                }
+            }
         }
-
-        if day.ranges.count == 1, day.ranges[0].isAllDay {
-            return "24/7"
-        }
-
-        return day.ranges
-            .map { formattedTime($0.startMinutes) + " - " + formattedTime($0.endMinutes) }
-            .joined(separator: ", ")
     }
 
     private func shortWeekdayLabel(for weekday: WeeklyHours.Weekday) -> String {
