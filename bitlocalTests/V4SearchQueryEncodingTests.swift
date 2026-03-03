@@ -24,8 +24,12 @@ final class V4SearchQueryEncodingTests: XCTestCase {
         XCTAssertEqual(items["tag_value"], "yes")
     }
 
-    func testIsEmptyForShortNameWithoutAreaOrTag() {
+    func testShortNameIsStillAValidNameFilter() {
         let query = V4SearchQuery(name: "ab", lat: nil, lon: nil, radiusKM: nil, tagName: nil, tagValue: nil)
-        XCTAssertTrue(query.isEmpty)
+        XCTAssertFalse(query.isEmpty)
+        let items = Dictionary(uniqueKeysWithValues: query.queryItems().compactMap { item in
+            item.value.map { (item.name, $0) }
+        })
+        XCTAssertEqual(items["name"], "ab")
     }
 }

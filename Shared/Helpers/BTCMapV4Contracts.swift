@@ -279,7 +279,7 @@ struct V4SearchQuery: Hashable {
 
     var isEmpty: Bool {
         let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let hasName = trimmedName.count >= 3
+        let hasName = !trimmedName.isEmpty
         let hasRadius = lat != nil && lon != nil && (radiusKM ?? 0) > 0
         let hasTag = !(tagName?.isEmpty ?? true) && !(tagValue?.isEmpty ?? true)
         return !(hasName || hasRadius || hasTag)
@@ -289,7 +289,7 @@ struct V4SearchQuery: Hashable {
         var items: [URLQueryItem] = []
 
         let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if trimmedName.count >= 3 {
+        if !trimmedName.isEmpty {
             items.append(URLQueryItem(name: "name", value: trimmedName))
         }
 

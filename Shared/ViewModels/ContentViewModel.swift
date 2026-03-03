@@ -18,6 +18,86 @@ enum MapDisplayMode: String {
     case communities
 }
 
+enum MerchantSearchScope: String, CaseIterable, Identifiable {
+    case onMap = "On Map"
+    case worldwide = "Worldwide"
+
+    var id: String { rawValue }
+}
+
+enum MerchantSearchSectionKind: String, Identifiable {
+    case primaryResults
+    case freshFromNetwork
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .primaryResults:
+            return "Primary Results"
+        case .freshFromNetwork:
+            return "Fresh from Network"
+        }
+    }
+}
+
+struct MerchantSearchSection: Identifiable {
+    let kind: MerchantSearchSectionKind
+    let localResults: [Element]
+    let remoteResults: [V4PlaceRecord]
+
+    var id: String { kind.id }
+}
+
+enum SearchTextNormalizer {
+    private static let allowedScalars = CharacterSet.alphanumerics.union(.whitespacesAndNewlines)
+
+    static func normalize(_ raw: String) -> String {
+        let folded = raw.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: .current
+        )
+
+        var cleaned = String.UnicodeScalarView()
+        cleaned.reserveCapacity(folded.unicodeScalars.count)
+
+        for scalar in folded.unicodeScalars {
+            if allowedScalars.contains(scalar) {
+                cleaned.append(scalar)
+            } else {
+                cleaned.append(" ")
+            }
+        }
+
+        return String(cleaned)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    static func matches(normalizedQuery: String, normalizedCandidate: String) -> Bool {
+        guard !normalizedQuery.isEmpty, !normalizedCandidate.isEmpty else { return false }
+        if normalizedCandidate.contains(normalizedQuery) { return true }
+
+        let queryTokens = normalizedTokens(from: normalizedQuery)
+        let candidateTokens = normalizedTokens(from: normalizedCandidate)
+        guard !queryTokens.isEmpty, !candidateTokens.isEmpty else { return false }
+
+        return queryTokens.allSatisfy { queryToken in
+            candidateTokens.contains(where: { candidateToken in
+                candidateToken.hasPrefix(queryToken)
+            })
+        }
+    }
+
+    private static func normalizedTokens(from normalizedText: String) -> [String] {
+        normalizedText
+            .split(separator: " ")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+    }
+}
+
 @available(iOS 17.0, *)
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
@@ -39,12 +119,18 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // Unified search state
     @Published var unifiedSearchText = ""
     @Published var isSearchActive = false
-    @Published var localFilteredMerchants: [Element] = []
+    @Published private(set) var localFilteredMerchants: [Element] = []
+    @Published var selectedMerchantSearchScope: MerchantSearchScope = .onMap
+    @Published private(set) var merchantSearchPrimaryResults: [Element] = []
+    @Published private(set) var merchantSearchFreshResults: [V4PlaceRecord] = []
+    @Published private(set) var merchantSearchNormalizedQuery = ""
     @Published var searchMatchingAreas: [V3AreaRecord] = []
     // Remote merchant search
     @Published var merchantSearchResults: [V4PlaceRecord] = []
     @Published var merchantSearchIsLoading = false
+    @Published private(set) var merchantSearchIsWaitingForLocalDebounce = false
     @Published var merchantSearchError: String?
+    @Published var merchantSearchIsOfflineFallback = false
     @Published var merchantSearchRadiusKM: Double = 20
     @Published var merchantSearchProviderFilter = ""
     // Events
@@ -82,7 +168,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
     let geocoder = Geocoder(maxConcurrentRequests: 1)
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
-    private let btcMapRepository: BTCMapRepositoryProtocol = BTCMapRepository.shared
+    private let btcMapRepository: BTCMapRepositoryProtocol
     
     // Startup state tracking
     @Published var isInitialStartup = true
@@ -103,6 +189,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: AnyCancellable?
     private var unifiedSearchDebounceTask: Task<Void, Never>?
+    private var localMerchantSearchTask: Task<Void, Never>?
+    private let unifiedSearchDebounceNanoseconds: UInt64
+    private let unifiedSearchWorldwideDebounceNanoseconds: UInt64
+    private let localSearchWorldwideDebounceNanoseconds: UInt64
     private var latestMerchantSearchRequestID = UUID()
     private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
     private var merchantSearchAnchorQuery = ""
@@ -112,6 +202,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var communityPrefetchWorkItem: DispatchWorkItem?
     private var placeholderNameHydrationInFlight = Set<String>()
     private var placeholderNameHydrationAttempted = Set<String>()
+    private var normalizedMerchantSearchBlobByID: [String: String] = [:]
+    private var normalizedMerchantSearchSignatureByID: [String: String] = [:]
+    private var merchantSearchPreviewHydrationInFlight = Set<String>()
+    private var merchantSearchLoadingTimeoutTask: Task<Void, Never>?
+    private let merchantSearchV2HybridFlagKey = "search_v2_hybrid"
     
     // Use a queue for thread-safe access to mapView
     private let mapViewQueue = DispatchQueue(label: "mapview.queue", qos: .userInitiated)
@@ -137,7 +232,29 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     override init() {
+        self.btcMapRepository = BTCMapRepository.shared
+        self.unifiedSearchDebounceNanoseconds = 400_000_000
+        self.unifiedSearchWorldwideDebounceNanoseconds = 700_000_000
+        self.localSearchWorldwideDebounceNanoseconds = 250_000_000
         super.init()
+        configureBindings()
+    }
+
+    init(
+        btcMapRepository: BTCMapRepositoryProtocol,
+        unifiedSearchDebounceNanoseconds: UInt64 = 400_000_000,
+        unifiedSearchWorldwideDebounceNanoseconds: UInt64 = 700_000_000,
+        localSearchWorldwideDebounceNanoseconds: UInt64 = 250_000_000
+    ) {
+        self.btcMapRepository = btcMapRepository
+        self.unifiedSearchDebounceNanoseconds = unifiedSearchDebounceNanoseconds
+        self.unifiedSearchWorldwideDebounceNanoseconds = unifiedSearchWorldwideDebounceNanoseconds
+        self.localSearchWorldwideDebounceNanoseconds = localSearchWorldwideDebounceNanoseconds
+        super.init()
+        configureBindings()
+    }
+
+    private func configureBindings() {
         loadGeocodingCache()
         locationManager.delegate = self
         setupCenterMapSubscription()
@@ -686,44 +803,95 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func performUnifiedSearch() {
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if merchantSearchV2HybridEnabled {
+            performUnifiedSearchHybrid(query: query)
+        } else {
+            performUnifiedSearchLegacyRemotePrimary(query: query)
+        }
+    }
 
-        // Always filter local merchants instantly
+    private func refreshMerchantSearchFromVisibleElementsIfNeeded() {
+        guard mapDisplayMode == .merchants else { return }
+        guard merchantSearchV2HybridEnabled else { return }
+        guard selectedMerchantSearchScope == .onMap else { return }
+        let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else { return }
+        let normalizedQuery = SearchTextNormalizer.normalize(query)
+        localFilteredMerchants = filteredMerchantElements(
+            in: visibleElements,
+            normalizedQuery: normalizedQuery
+        )
+        merchantSearchPrimaryResults = localFilteredMerchants
+        pruneFreshResultsAgainstPrimary()
+        hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
+    }
+
+    private func filteredMerchantElements(
+        in source: [Element],
+        normalizedQuery: String
+    ) -> [Element] {
+        guard !normalizedQuery.isEmpty else { return [] }
+        let filtered = source.filter { element in
+            let normalizedBlob = normalizedSearchBlob(for: element)
+            return SearchTextNormalizer.matches(
+                normalizedQuery: normalizedQuery,
+                normalizedCandidate: normalizedBlob
+            )
+        }
+        return filtered.sorted(by: merchantElementSearchSortOrder)
+    }
+
+    private func performUnifiedSearchHybrid(query: String) {
+        unifiedSearchDebounceTask?.cancel()
+        localMerchantSearchTask?.cancel()
+
         if query.isEmpty {
             localFilteredMerchants = []
+            merchantSearchPrimaryResults = []
+            merchantSearchFreshResults = []
+            merchantSearchNormalizedQuery = ""
             searchMatchingAreas = []
             clearMerchantSearchResults()
+            merchantSearchIsWaitingForLocalDebounce = false
             merchantSearchAnchorCenter = nil
             merchantSearchAnchorQuery = ""
             return
         }
 
-        // Avoid expensive broad matching/sorting on single-character queries.
         guard query.count >= 2 else {
             localFilteredMerchants = []
+            merchantSearchPrimaryResults = []
+            merchantSearchFreshResults = []
+            merchantSearchNormalizedQuery = ""
             clearMerchantSearchResults()
+            merchantSearchIsWaitingForLocalDebounce = false
             merchantSearchAnchorCenter = nil
             merchantSearchAnchorQuery = ""
             return
         }
 
-        localFilteredMerchants = filteredMerchantElements(in: visibleElements, query: query)
-        hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
-
-        // Unified search in merchants context should only return merchants.
+        let normalizedQuery = SearchTextNormalizer.normalize(query)
+        merchantSearchNormalizedQuery = normalizedQuery
         searchMatchingAreas = []
 
-        // Debounce remote API search for 2+ chars
-        unifiedSearchDebounceTask?.cancel()
-        guard query.count >= 2 else {
-            clearMerchantSearchResults()
-            return
-        }
+        merchantSearchFreshResults = []
+        merchantSearchResults = []
+        merchantSearchError = nil
+        merchantSearchIsOfflineFallback = false
+        merchantSearchIsLoading = query.count >= 3
+        scheduleLocalMerchantSearch(query: query, normalizedQuery: normalizedQuery)
 
         merchantSearchAnchorCenter = region.center
         merchantSearchAnchorQuery = query
 
+        Debug.logAPI(
+            "Merchant search queued (hybrid): query='\(query)', normalized='\(normalizedQuery)', scope=\(selectedMerchantSearchScope.rawValue), local=\(localFilteredMerchants.count)"
+        )
+
+        guard query.count >= 3 else { return }
+
         unifiedSearchDebounceTask = Task {
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            try? await Task.sleep(nanoseconds: effectiveMerchantSearchDebounceNanoseconds())
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 merchantSearchText = query
@@ -732,29 +900,125 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    private func refreshMerchantSearchFromVisibleElementsIfNeeded() {
-        guard mapDisplayMode == .merchants else { return }
-        let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard query.count >= 2 else { return }
-        localFilteredMerchants = filteredMerchantElements(in: visibleElements, query: query)
-        hydratePlaceholderNamesIfNeeded(in: Array(localFilteredMerchants.prefix(20)))
+    private func scheduleLocalMerchantSearch(query: String, normalizedQuery: String) {
+        let source = localMerchantSearchSource(for: selectedMerchantSearchScope)
+        let debounce: UInt64 = selectedMerchantSearchScope == .worldwide
+            ? localSearchWorldwideDebounceNanoseconds
+            : 0
+        merchantSearchIsWaitingForLocalDebounce = debounce > 0
+
+        localMerchantSearchTask = Task { [weak self] in
+            if debounce > 0 {
+                try? await Task.sleep(nanoseconds: debounce)
+            }
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self else { return }
+                guard self.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
+                self.merchantSearchIsWaitingForLocalDebounce = false
+                let filtered = self.filteredMerchantElements(
+                    in: source,
+                    normalizedQuery: normalizedQuery
+                )
+                self.localFilteredMerchants = filtered
+                self.merchantSearchPrimaryResults = filtered
+                self.pruneFreshResultsAgainstPrimary()
+                self.hydratePlaceholderNamesIfNeeded(in: Array(filtered.prefix(20)))
+            }
+        }
     }
 
-    private func filteredMerchantElements(in source: [Element], query: String) -> [Element] {
-        let filtered = source.filter { element in
-            let searchable = [
-                element.osmJSON?.tags?.name,
-                element.osmJSON?.tags?.brand,
-                element.osmJSON?.tags?.operator,
-                element.displayName
-            ]
-            return searchable.compactMap { $0 }.contains { $0.localizedStandardContains(query) }
+    private func performUnifiedSearchLegacyRemotePrimary(query: String) {
+        if query.isEmpty {
+            localFilteredMerchants = []
+            merchantSearchPrimaryResults = []
+            merchantSearchFreshResults = []
+            searchMatchingAreas = []
+            clearMerchantSearchResults()
+            merchantSearchAnchorCenter = nil
+            merchantSearchAnchorQuery = ""
+            return
         }
-        return filtered.sorted(by: merchantElementSearchSortOrder)
+
+        guard query.count >= 2 else {
+            localFilteredMerchants = []
+            merchantSearchPrimaryResults = []
+            merchantSearchFreshResults = []
+            clearMerchantSearchResults()
+            merchantSearchAnchorCenter = nil
+            merchantSearchAnchorQuery = ""
+            return
+        }
+
+        searchMatchingAreas = []
+
+        unifiedSearchDebounceTask?.cancel()
+        merchantSearchResults = []
+        merchantSearchFreshResults = []
+        merchantSearchError = nil
+        merchantSearchIsOfflineFallback = false
+
+        merchantSearchAnchorCenter = region.center
+        merchantSearchAnchorQuery = query
+
+        Debug.logAPI("Merchant search queued (legacy): query='\(query)', center=(\(region.center.latitude), \(region.center.longitude)), radiusKM=\(merchantSearchRadiusKM)")
+
+        unifiedSearchDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: unifiedSearchDebounceNanoseconds)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                merchantSearchText = query
+                performRemoteMerchantSearch()
+            }
+        }
+    }
+
+    private func localMerchantSearchSource(for scope: MerchantSearchScope) -> [Element] {
+        switch scope {
+        case .onMap:
+            return visibleElements
+        case .worldwide:
+            return allElements
+        }
+    }
+
+    private func normalizedSearchBlob(for element: Element) -> String {
+        let rawFields = merchantSearchableTextFields(for: element)
+        let signature = rawFields.joined(separator: "|")
+        if normalizedMerchantSearchSignatureByID[element.id] == signature,
+           let cached = normalizedMerchantSearchBlobByID[element.id] {
+            return cached
+        }
+
+        let normalizedBlob = rawFields
+            .map { SearchTextNormalizer.normalize($0) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        normalizedMerchantSearchSignatureByID[element.id] = signature
+        normalizedMerchantSearchBlobByID[element.id] = normalizedBlob
+        return normalizedBlob
+    }
+
+    private func merchantSearchableTextFields(for element: Element) -> [String] {
+        [
+            element.osmJSON?.tags?.name,
+            element.osmJSON?.tags?.brand,
+            element.osmJSON?.tags?.operator,
+            element.displayName
+        ]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    }
+
+    private func pruneFreshResultsAgainstPrimary() {
+        let primaryIDs = Set(merchantSearchPrimaryResults.map(\.id))
+        merchantSearchFreshResults = merchantSearchFreshResults.filter { !primaryIDs.contains($0.idString) }
     }
 
     func handleMerchantSearchMapRegionChange() {
         guard mapDisplayMode == .merchants else { return }
+        guard selectedMerchantSearchScope == .onMap else { return }
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else { return }
         guard merchantSearchAnchorQuery == query,
@@ -1502,9 +1766,42 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var merchantSearchText: String = ""
 
     func clearMerchantSearchResults() {
+        merchantSearchLoadingTimeoutTask?.cancel()
         merchantSearchResults = []
+        merchantSearchFreshResults = []
         merchantSearchError = nil
         merchantSearchIsLoading = false
+        merchantSearchIsOfflineFallback = false
+    }
+
+    var merchantSearchSections: [MerchantSearchSection] {
+        var sections: [MerchantSearchSection] = []
+        if !merchantSearchPrimaryResults.isEmpty {
+            sections.append(
+                MerchantSearchSection(
+                    kind: .primaryResults,
+                    localResults: merchantSearchPrimaryResults,
+                    remoteResults: []
+                )
+            )
+        }
+        if !merchantSearchFreshResults.isEmpty {
+            sections.append(
+                MerchantSearchSection(
+                    kind: .freshFromNetwork,
+                    localResults: [],
+                    remoteResults: merchantSearchFreshResults
+                )
+            )
+        }
+        return sections
+    }
+
+    private var merchantSearchV2HybridEnabled: Bool {
+        if UserDefaults.standard.object(forKey: merchantSearchV2HybridFlagKey) == nil {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: merchantSearchV2HybridFlagKey)
     }
 
     // MARK: - BTCMap Events (v4)
@@ -1698,6 +1995,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func performRemoteMerchantSearch() {
         let trimmedName = merchantSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedName.count >= 3 else {
+            merchantSearchLoadingTimeoutTask?.cancel()
+            merchantSearchIsLoading = false
+            merchantSearchFreshResults = []
+            merchantSearchResults = []
+            return
+        }
         let trimmedProvider = merchantSearchProviderFilter.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let tagName: String?
@@ -1710,8 +2014,84 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             tagValue = "yes"
         }
 
-        let query = V4SearchQuery(
+        let geometry = remoteSearchGeometry(for: selectedMerchantSearchScope)
+        let namedQuery = V4SearchQuery(
             name: trimmedName.isEmpty ? nil : trimmedName,
+            lat: geometry.lat,
+            lon: geometry.lon,
+            radiusKM: geometry.radiusKM,
+            tagName: tagName,
+            tagValue: tagValue
+        )
+
+        if namedQuery.isEmpty {
+            clearMerchantSearchResults()
+            return
+        }
+
+        let requestID = UUID()
+        latestMerchantSearchRequestID = requestID
+        merchantSearchLoadingTimeoutTask?.cancel()
+        merchantSearchIsLoading = true
+        merchantSearchError = nil
+        merchantSearchIsOfflineFallback = false
+        scheduleMerchantSearchLoadingTimeout(for: requestID)
+
+        Debug.logAPI(
+            "Merchant remote search START: scope=\(selectedMerchantSearchScope.rawValue), name='\(trimmedName)', provider='\(trimmedProvider)', lat=\(geometry.lat?.description ?? "nil"), lon=\(geometry.lon?.description ?? "nil"), radiusKM=\(geometry.radiusKM?.description ?? "nil")"
+        )
+
+        btcMapRepository.searchPlaces(query: namedQuery) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard self.latestMerchantSearchRequestID == requestID else { return }
+                switch result {
+                case .success(let records):
+                    let filteredRecords = self.filterRemoteSearchRecords(
+                        records,
+                        normalizedQuery: self.merchantSearchNormalizedQuery
+                    )
+                    if filteredRecords.isEmpty {
+                        if self.selectedMerchantSearchScope == .onMap {
+                            Debug.logAPI("Merchant remote search named query produced 0 filtered result(s); trying bounded radius enrichment")
+                            self.performSecondaryRemoteMerchantEnrichment(
+                                requestID: requestID,
+                                normalizedQuery: self.merchantSearchNormalizedQuery,
+                                tagName: tagName,
+                                tagValue: tagValue
+                            )
+                        } else {
+                            self.applyRemoteEnrichment(records: [], requestID: requestID, source: "named-worldwide-empty")
+                        }
+                        return
+                    }
+                    self.applyRemoteEnrichment(records: filteredRecords, requestID: requestID, source: "named")
+                case .failure(let error):
+                    self.merchantSearchResults = []
+                    self.merchantSearchFreshResults = []
+                    self.merchantSearchError = error.localizedDescription
+                    self.merchantSearchLoadingTimeoutTask?.cancel()
+                    self.merchantSearchIsLoading = false
+                    self.merchantSearchIsOfflineFallback = true
+                    Debug.logAPI("Merchant remote search FAILURE: \(error.localizedDescription). Local primary results retained: \(self.merchantSearchPrimaryResults.count)")
+                }
+            }
+        }
+    }
+
+    private func performSecondaryRemoteMerchantEnrichment(
+        requestID: UUID,
+        normalizedQuery: String,
+        tagName: String?,
+        tagValue: String?
+    ) {
+        guard selectedMerchantSearchScope == .onMap else {
+            applyRemoteEnrichment(records: [], requestID: requestID, source: "secondary-skipped-scope")
+            return
+        }
+
+        let secondaryQuery = V4SearchQuery(
+            name: nil,
             lat: region.center.latitude,
             lon: region.center.longitude,
             radiusKM: merchantSearchRadiusKM,
@@ -1719,29 +2099,145 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             tagValue: tagValue
         )
 
-        if query.isEmpty {
-            clearMerchantSearchResults()
+        guard !secondaryQuery.isEmpty else {
+            applyRemoteEnrichment(records: [], requestID: requestID, source: "secondary-empty")
             return
         }
 
-        let requestID = UUID()
-        latestMerchantSearchRequestID = requestID
-        merchantSearchIsLoading = true
-        merchantSearchError = nil
-
-        btcMapRepository.searchPlaces(query: query) { [weak self] result in
+        btcMapRepository.searchPlaces(query: secondaryQuery) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 guard self.latestMerchantSearchRequestID == requestID else { return }
-                self.merchantSearchIsLoading = false
+
                 switch result {
                 case .success(let records):
-                    self.merchantSearchResults = records.sorted(by: self.merchantRecordSearchSortOrder)
-                    self.merchantSearchError = nil
+                    let filtered = self.filterRemoteSearchRecords(records, normalizedQuery: normalizedQuery)
+                    self.applyRemoteEnrichment(records: filtered, requestID: requestID, source: "secondary-radius")
                 case .failure(let error):
                     self.merchantSearchResults = []
+                    self.merchantSearchFreshResults = []
                     self.merchantSearchError = error.localizedDescription
+                    self.merchantSearchLoadingTimeoutTask?.cancel()
+                    self.merchantSearchIsLoading = false
+                    self.merchantSearchIsOfflineFallback = true
+                    Debug.logAPI("Merchant secondary enrichment FAILURE: \(error.localizedDescription)")
                 }
+            }
+        }
+    }
+
+    private func filterRemoteSearchRecords(
+        _ records: [V4PlaceRecord],
+        normalizedQuery: String
+    ) -> [V4PlaceRecord] {
+        guard !normalizedQuery.isEmpty else {
+            return records.sorted(by: merchantRecordSearchSortOrder)
+        }
+
+        var deduplicatedByID: [String: V4PlaceRecord] = [:]
+        for record in records where deduplicatedByID[record.idString] == nil {
+            deduplicatedByID[record.idString] = record
+        }
+
+        return deduplicatedByID.values
+            .filter { record in
+                let normalizedBlob = normalizedSearchBlob(for: record)
+                return SearchTextNormalizer.matches(
+                    normalizedQuery: normalizedQuery,
+                    normalizedCandidate: normalizedBlob
+                )
+            }
+            .sorted(by: merchantRecordSearchSortOrder)
+    }
+
+    private func normalizedSearchBlob(for record: V4PlaceRecord) -> String {
+        let rawFields: [String] = [
+            record.displayName,
+            record.osmBrand ?? "",
+            record.osmOperator ?? "",
+            record.address ?? ""
+        ]
+        return rawFields
+            .map { SearchTextNormalizer.normalize($0) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    private func applyRemoteEnrichment(
+        records: [V4PlaceRecord],
+        requestID: UUID,
+        source: String
+    ) {
+        guard latestMerchantSearchRequestID == requestID else { return }
+
+        merchantSearchResults = records
+        let primaryIDs = Set(merchantSearchPrimaryResults.map(\.id))
+        merchantSearchFreshResults = records.filter { !primaryIDs.contains($0.idString) }
+        merchantSearchError = nil
+        merchantSearchLoadingTimeoutTask?.cancel()
+        merchantSearchIsLoading = false
+        merchantSearchIsOfflineFallback = false
+
+        if !merchantSearchPrimaryResults.isEmpty && records.isEmpty {
+            Debug.logAPI("Merchant search diagnostic local_hit_remote_miss: query='\(merchantSearchText)', local=\(merchantSearchPrimaryResults.count), source=\(source)")
+        }
+
+        Debug.logAPI("Merchant remote search SUCCESS (\(source)): remote=\(records.count), fresh=\(merchantSearchFreshResults.count), local=\(merchantSearchPrimaryResults.count)")
+    }
+
+    private func scheduleMerchantSearchLoadingTimeout(for requestID: UUID) {
+        merchantSearchLoadingTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            await MainActor.run {
+                guard let self else { return }
+                guard self.latestMerchantSearchRequestID == requestID else { return }
+                guard self.merchantSearchIsLoading else { return }
+
+                self.merchantSearchIsLoading = false
+                self.merchantSearchError = self.merchantSearchError ?? "Search timed out"
+                self.merchantSearchIsOfflineFallback = true
+                Debug.logAPI("Merchant search timeout: requestID=\(requestID)")
+            }
+        }
+    }
+
+    private func remoteSearchGeometry(for scope: MerchantSearchScope) -> (lat: Double?, lon: Double?, radiusKM: Double?) {
+        switch scope {
+        case .onMap:
+            return (region.center.latitude, region.center.longitude, merchantSearchRadiusKM)
+        case .worldwide:
+            return (nil, nil, nil)
+        }
+    }
+
+    private func effectiveMerchantSearchDebounceNanoseconds() -> UInt64 {
+        switch selectedMerchantSearchScope {
+        case .onMap:
+            return unifiedSearchDebounceNanoseconds
+        case .worldwide:
+            return unifiedSearchWorldwideDebounceNanoseconds
+        }
+    }
+
+    func hydrateMerchantSearchPreviewIfNeeded(_ record: V4PlaceRecord) {
+        let id = record.idString
+        guard shouldHydrateSearchResult(record) else { return }
+        guard !merchantSearchPreviewHydrationInFlight.contains(id) else { return }
+        merchantSearchPreviewHydrationInFlight.insert(id)
+
+        btcMapRepository.fetchPlace(id: id) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.merchantSearchPreviewHydrationInFlight.remove(id)
+                guard case .success(let hydratedRecord) = result else { return }
+
+                if let index = self.merchantSearchFreshResults.firstIndex(where: { $0.idString == id }) {
+                    self.merchantSearchFreshResults[index] = hydratedRecord
+                }
+                if let index = self.merchantSearchResults.firstIndex(where: { $0.idString == id }) {
+                    self.merchantSearchResults[index] = hydratedRecord
+                }
+                self.upsertElementIntoStore(V4PlaceToElementMapper.placeRecordToElement(hydratedRecord))
             }
         }
     }

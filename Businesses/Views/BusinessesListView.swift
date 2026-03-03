@@ -22,12 +22,8 @@ struct BusinessesListView: View {
     @State private var searchResultsLimit = 20
     @FocusState private var isSearchFieldFocused: Bool
 
-    private var sortedElements: [Element] {
-        elements.sorted { (element1, element2) -> Bool in
-            let distance1 = viewModel.distanceFromListFocus(element: element1) ?? .greatestFiniteMagnitude
-            let distance2 = viewModel.distanceFromListFocus(element: element2) ?? .greatestFiniteMagnitude
-            return distance1 < distance2
-        }
+    private var topSortedElements: [Element] {
+        nearestElements(elements, limit: maxListResults)
     }
 
     var body: some View {
@@ -71,6 +67,10 @@ struct BusinessesListView: View {
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             searchResultsLimit = 20
+        }
+        .onChange(of: viewModel.selectedMerchantSearchScope) { _, _ in
+            searchResultsLimit = 20
+            viewModel.performUnifiedSearch()
         }
         .onChange(of: viewModel.region.center.latitude) { _, _ in
             viewModel.handleMerchantSearchMapRegionChange()
@@ -134,7 +134,7 @@ struct BusinessesListView: View {
 
             // Merchant list
             Section {
-                ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
+                ForEach(topSortedElements, id: \.id) { element in
                     let cellVM = cellViewModel(for: element)
                     Button {
                         viewModel.setSelectionSource(.list)
@@ -167,53 +167,75 @@ struct BusinessesListView: View {
         .environment(\.defaultMinListRowHeight, 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            viewModel.requestPlaceholderNameHydration(for: Array(sortedElements.prefix(maxListResults)))
+            viewModel.requestPlaceholderNameHydration(for: topSortedElements)
         }
     }
 
     // MARK: - Search Mode
 
     private var searchResultsView: some View {
-        List {
-            if trimmedSearchQuery.count == 1 {
-                Text("Type at least 2 characters to search")
-                    .foregroundStyle(.secondary)
-            } else if trimmedSearchQuery.count >= 2 {
-                if displayedSearchResults.isEmpty && !viewModel.merchantSearchIsLoading {
-                    Text("No results found")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(displayedSearchResults) { item in
-                        merchantSearchRow(for: item)
-                    }
-                }
+        VStack(spacing: 0) {
+            if !isCollapsedSheet {
+                searchScopePicker
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
+            }
 
-                if hasMoreSearchResults {
-                    Button("Load more results") {
-                        searchResultsLimit += 20
+            List {
+                if trimmedSearchQuery.count == 1 {
+                    Text("Type at least 2 characters to search")
+                        .foregroundStyle(.secondary)
+                } else if trimmedSearchQuery.count >= 2 {
+                    if let statusText = searchStatusText {
+                        Text(statusText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: .infinity)
-                    .foregroundStyle(.accent)
+
+                    if displayedPrimaryResults.isEmpty &&
+                        displayedFreshResults.isEmpty &&
+                        !viewModel.merchantSearchIsLoading {
+                        Text(noResultsText)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        if !displayedPrimaryResults.isEmpty {
+                            ForEach(displayedPrimaryResults, id: \.id) { element in
+                                merchantSearchRow(for: element)
+                            }
+                        }
+
+                        if !displayedFreshResults.isEmpty {
+                            Section("More Results") {
+                                ForEach(displayedFreshResults) { record in
+                                    freshMerchantSearchRow(for: record)
+                                }
+                            }
+                        }
+                    }
+
+                    if hasMoreSearchResults {
+                        Button("Load more results") {
+                            searchResultsLimit += 20
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(.accent)
+                    }
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+            .contentMargins(.top, 0, for: .scrollContent)
+            .background(Color.clear)
+            .environment(\.defaultMinListRowHeight, 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
-        .background(Color.clear)
-        .environment(\.defaultMinListRowHeight, 0)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            viewModel.requestPlaceholderNameHydration(for: Array(viewModel.localFilteredMerchants.prefix(20)))
+            viewModel.requestPlaceholderNameHydration(for: Array(viewModel.merchantSearchPrimaryResults.prefix(20)))
         }
     }
 
     // MARK: - Helpers
-
-    private var searchReferenceLocation: CLLocation? {
-        if let userLocation = viewModel.userLocation { return userLocation }
-        let center = viewModel.region.center
-        return CLLocation(latitude: center.latitude, longitude: center.longitude)
-    }
 
     private var trimmedSearchQuery: String {
         viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -223,85 +245,86 @@ struct BusinessesListView: View {
         !trimmedSearchQuery.isEmpty
     }
 
-    private var unifiedSearchResults: [MerchantSearchItem] {
-        let localItems: [MerchantSearchItem] = viewModel.localFilteredMerchants.map { .local($0) }
-        let localIDs = Set(viewModel.localFilteredMerchants.map(\.id))
-        let remoteItems: [MerchantSearchItem] = viewModel.merchantSearchResults
-            .filter { !localIDs.contains($0.idString) }
-            .map { .remote($0) }
-        let combined = localItems + remoteItems
-        return combined.sorted(by: merchantSearchResultSortOrder)
+    private var searchScopePicker: some View {
+        Picker("Search Scope", selection: $viewModel.selectedMerchantSearchScope) {
+            ForEach(MerchantSearchScope.allCases) { scope in
+                Text(scope.rawValue).tag(scope)
+            }
+        }
+        .pickerStyle(.segmented)
     }
 
-    private var displayedSearchResults: [MerchantSearchItem] {
-        Array(unifiedSearchResults.prefix(searchResultsLimit))
+    private var searchStatusText: String? {
+        if viewModel.selectedMerchantSearchScope == .worldwide &&
+            viewModel.merchantSearchIsWaitingForLocalDebounce {
+            return "Searching…"
+        }
+        if viewModel.merchantSearchIsOfflineFallback {
+            return "Offline/local results"
+        }
+        if !viewModel.merchantSearchFreshResults.isEmpty {
+            return "Showing local results with fresh network matches"
+        }
+        return nil
+    }
+
+    private var noResultsText: String {
+        "No locations match your search"
+    }
+
+    private var displayedPrimaryResults: [Element] {
+        let limit = min(searchResultsLimit, viewModel.merchantSearchPrimaryResults.count)
+        return Array(viewModel.merchantSearchPrimaryResults.prefix(limit))
+    }
+
+    private var displayedFreshResults: [V4PlaceRecord] {
+        let remaining = max(0, searchResultsLimit - displayedPrimaryResults.count)
+        return Array(viewModel.merchantSearchFreshResults.prefix(remaining))
     }
 
     private var hasMoreSearchResults: Bool {
-        unifiedSearchResults.count > searchResultsLimit
+        let totalCount = viewModel.merchantSearchPrimaryResults.count + viewModel.merchantSearchFreshResults.count
+        return totalCount > searchResultsLimit
     }
 
-    private func merchantSearchResultSortOrder(_ lhs: MerchantSearchItem, _ rhs: MerchantSearchItem) -> Bool {
-        let lhsDistance = merchantResultDistance(lhs)
-        let rhsDistance = merchantResultDistance(rhs)
-        if lhsDistance != rhsDistance {
-            return lhsDistance < rhsDistance
-        }
-
-        let lhsName = lhs.title.localizedLowercase
-        let rhsName = rhs.title.localizedLowercase
-        if lhsName != rhsName {
-            return lhsName < rhsName
-        }
-
-        return lhs.id < rhs.id
-    }
-
-    private func merchantResultDistance(_ item: MerchantSearchItem) -> CLLocationDistance {
-        guard let reference = searchReferenceLocation else { return .greatestFiniteMagnitude }
-        guard let coordinate = item.coordinate else { return .greatestFiniteMagnitude }
-        let target = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        return reference.distance(from: target)
-    }
-
-    @ViewBuilder
-    private func merchantSearchRow(for item: MerchantSearchItem) -> some View {
-        switch item {
-        case .local(let element):
-            let cellVM = cellViewModel(for: element)
-            Button {
-                viewModel.setSelectionSource(.list)
-                viewModel.selectAnnotation(for: element, animated: true)
-                viewModel.path = [element]
-            } label: {
-                ZStack(alignment: .trailing) {
-                    ElementCell(viewModel: cellVM)
-                        .padding(.trailing, 18)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.gray.opacity(0.6))
-                }
-            }
-            .buttonStyle(.plain)
-            .onAppear {
-                viewModel.requestPlaceholderNameHydration(for: [element])
-            }
-        case .remote(let result):
-            Button {
-                viewModel.selectMerchantSearchResult(result)
-            } label: {
-                ZStack(alignment: .trailing) {
-                    MerchantSearchResultRow(
-                        result: result,
-                        referenceLocation: searchReferenceLocation
-                    )
+    private func merchantSearchRow(for element: Element) -> some View {
+        let cellVM = cellViewModel(for: element)
+        return Button {
+            viewModel.setSelectionSource(.list)
+            viewModel.selectAnnotation(for: element, animated: true)
+            viewModel.path = [element]
+        } label: {
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM)
                     .padding(.trailing, 18)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.gray.opacity(0.6))
-                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
             }
-            .buttonStyle(.plain)
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: [element])
+        }
+    }
+
+    private func freshMerchantSearchRow(for result: V4PlaceRecord) -> some View {
+        let remoteElement = V4PlaceToElementMapper.placeRecordToElement(result)
+        let cellVM = cellViewModel(for: remoteElement)
+        return Button {
+            viewModel.selectMerchantSearchResult(result)
+        } label: {
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            viewModel.hydrateMerchantSearchPreviewIfNeeded(result)
         }
     }
 
@@ -350,26 +373,58 @@ struct BusinessesListView: View {
 
     private var footerView: some View {
         Group {
-            if sortedElements.count > maxListResults {
+            if elements.count > maxListResults {
                 Text(
                     String(
                         format: NSLocalizedString("locations_returned_footer", comment: "Footer: N locations returned, top M displayed"),
-                        sortedElements.count,
-                        min(sortedElements.count, maxListResults)
+                        elements.count,
+                        min(elements.count, maxListResults)
                     )
                 )
             } else {
                 Text(
                     String(
                         format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
-                        sortedElements.count,
-                        sortedElements.count
+                        elements.count,
+                        elements.count
                     )
                 )
             }
         }
         .font(.footnote)
         .foregroundStyle(.secondary)
+    }
+
+    private func nearestElements(_ source: [Element], limit: Int) -> [Element] {
+        guard limit > 0, !source.isEmpty else { return [] }
+
+        var top: [(element: Element, distance: CLLocationDistance)] = []
+        top.reserveCapacity(min(limit, source.count))
+
+        for element in source {
+            let distance = viewModel.distanceFromListFocus(element: element) ?? .greatestFiniteMagnitude
+
+            if top.count < limit {
+                top.append((element, distance))
+                top.sort { $0.distance > $1.distance }
+                continue
+            }
+
+            guard let farthest = top.first, distance < farthest.distance else { continue }
+            top[0] = (element, distance)
+            top.sort { $0.distance > $1.distance }
+        }
+
+        return top
+            .sorted { lhs, rhs in
+                if lhs.distance == rhs.distance {
+                    let lhsName = lhs.element.displayName ?? ""
+                    let rhsName = rhs.element.displayName ?? ""
+                    return lhsName.localizedStandardCompare(rhsName) == .orderedAscending
+                }
+                return lhs.distance < rhs.distance
+            }
+            .map(\.element)
     }
 
     private var shouldHideSheetBackground: Bool {
@@ -388,42 +443,13 @@ struct BusinessesListView: View {
         return detent != collapsedSheetDetent
     }
 
+    private var isCollapsedSheet: Bool {
+        guard let detent = currentDetent else { return false }
+        return detent == collapsedSheetDetent
+    }
+
     private var collapsedSheetDetent: PresentationDetent {
         .fraction(0.11)
-    }
-}
-
-@available(iOS 17.0, *)
-private enum MerchantSearchItem: Identifiable {
-    case local(Element)
-    case remote(V4PlaceRecord)
-
-    var id: String {
-        switch self {
-        case .local(let element):
-            return "local-\(element.id)"
-        case .remote(let record):
-            return "remote-\(record.idString)"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .local(let element):
-            return element.displayName ?? ""
-        case .remote(let record):
-            return record.displayName
-        }
-    }
-
-    var coordinate: CLLocationCoordinate2D? {
-        switch self {
-        case .local(let element):
-            return element.mapCoordinate
-        case .remote(let record):
-            guard let lat = record.lat, let lon = record.lon else { return nil }
-            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
-        }
     }
 }
 

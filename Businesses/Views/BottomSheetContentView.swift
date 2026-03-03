@@ -57,7 +57,9 @@ struct BottomSheetContentView: View {
                 }
                 .onChange(of: viewModel.isSearchActive) { _, isActive in
                     guard viewModel.mapDisplayMode != .communities else { return }
-                    if !isActive {
+                    if isActive {
+                        promoteSheetToLargeIfNeeded()
+                    } else {
                         viewModel.unifiedSearchText = ""
                         viewModel.performUnifiedSearch()
                     }
