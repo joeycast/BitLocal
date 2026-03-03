@@ -289,9 +289,13 @@ struct BTCMapPlaceCommentsListView: View {
             }
 
             if !comment.bodyText.isEmpty {
-                Text(comment.bodyText)
-                    .font(.body)
-                    .foregroundStyle(.primary)
+                if #available(iOS 18.0, *) {
+                    TranslatableReviewBodyTextView(text: comment.bodyText)
+                } else {
+                    Text(comment.bodyText)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                }
             }
 
             if let sats = comment.amountSats, sats > 0 {
@@ -329,6 +333,110 @@ struct BTCMapPlaceCommentsListView: View {
                 }
             }
         }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct TranslatableReviewBodyTextView: View {
+    let text: String
+
+    @State private var translatedText: String?
+    @State private var translationConfiguration: TranslationSession.Configuration?
+    @State private var translationError: String?
+
+    private var hasSuccessfulTranslation: Bool {
+        guard let translatedText else { return false }
+        return !translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var detectedLanguageCode: String? {
+        guard text.count >= 20 else { return nil }
+        return NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+    }
+
+    private var preferredLanguageCode: String? {
+        guard let preferredIdentifier = Locale.preferredLanguages.first else { return nil }
+        return normalizedLanguageCode(preferredIdentifier)
+    }
+
+    private var sourceLanguage: Locale.Language? {
+        guard let detectedLanguageCode else { return nil }
+        return Locale.Language(identifier: detectedLanguageCode)
+    }
+
+    private var targetLanguage: Locale.Language? {
+        guard let preferredLanguageCode else { return nil }
+        return Locale.Language(identifier: preferredLanguageCode)
+    }
+
+    private var shouldOfferTranslation: Bool {
+        guard let detectedLanguageCode, let preferredLanguageCode else { return false }
+        return normalizedLanguageCode(detectedLanguageCode) != preferredLanguageCode
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(text)
+                .font(.body)
+                .foregroundStyle(.primary)
+
+            if let translatedText, !translatedText.isEmpty {
+                Text(translatedText)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+
+            if shouldOfferTranslation && !hasSuccessfulTranslation {
+                Button(action: startTranslation) {
+                    Label("Translate", systemImage: "translate")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if hasSuccessfulTranslation {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Translated on device with Apple Translate")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.footnote)
+            }
+
+            if let translationError, !translationError.isEmpty {
+                Text(translationError)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .translationTask(translationConfiguration) { session in
+            do {
+                let response = try await session.translate(text)
+                await MainActor.run {
+                    translatedText = response.targetText
+                    translationError = nil
+                }
+            } catch {
+                await MainActor.run {
+                    translationError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func startTranslation() {
+        guard let sourceLanguage, let targetLanguage else { return }
+        translationError = nil
+        translationConfiguration = TranslationSession.Configuration(
+            source: sourceLanguage,
+            target: targetLanguage
+        )
+    }
+
+    private func normalizedLanguageCode(_ identifier: String) -> String {
+        let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
+        return normalized.split(separator: "-", maxSplits: 1).first.map(String.init) ?? normalized
     }
 }
 
