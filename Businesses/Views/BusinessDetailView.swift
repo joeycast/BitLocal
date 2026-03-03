@@ -1350,37 +1350,29 @@ private struct OpeningHoursDisplayView: View {
     }
 
     private func shortWeekdayLabel(for weekday: WeeklyHours.Weekday) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        let symbols = formatter.shortStandaloneWeekdaySymbols ?? formatter.shortWeekdaySymbols ?? []
-
-        guard symbols.count == 7 else {
-            return fallbackWeekdayLabel(for: weekday)
-        }
-
-        let symbolIndex: Int
+        let localizedWeekday: String
         switch weekday {
-        case .sunday: symbolIndex = 0
-        case .monday: symbolIndex = 1
-        case .tuesday: symbolIndex = 2
-        case .wednesday: symbolIndex = 3
-        case .thursday: symbolIndex = 4
-        case .friday: symbolIndex = 5
-        case .saturday: symbolIndex = 6
+        case .monday:
+            localizedWeekday = NSLocalizedString("weekday_mo", comment: "Monday abbreviation for business hours")
+        case .tuesday:
+            localizedWeekday = NSLocalizedString("weekday_tu", comment: "Tuesday abbreviation for business hours")
+        case .wednesday:
+            localizedWeekday = NSLocalizedString("weekday_we", comment: "Wednesday abbreviation for business hours")
+        case .thursday:
+            localizedWeekday = NSLocalizedString("weekday_th", comment: "Thursday abbreviation for business hours")
+        case .friday:
+            localizedWeekday = NSLocalizedString("weekday_fr", comment: "Friday abbreviation for business hours")
+        case .saturday:
+            localizedWeekday = NSLocalizedString("weekday_sa", comment: "Saturday abbreviation for business hours")
+        case .sunday:
+            localizedWeekday = NSLocalizedString("weekday_su", comment: "Sunday abbreviation for business hours")
         }
-        return symbols[symbolIndex]
-    }
-
-    private func fallbackWeekdayLabel(for weekday: WeeklyHours.Weekday) -> String {
-        switch weekday {
-        case .monday: return "Mon"
-        case .tuesday: return "Tue"
-        case .wednesday: return "Wed"
-        case .thursday: return "Thu"
-        case .friday: return "Fri"
-        case .saturday: return "Sat"
-        case .sunday: return "Sun"
+        
+        let trimmed = localizedWeekday.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count <= 3 {
+            return trimmed
         }
+        return String(trimmed.prefix(3))
     }
 
     private func formattedTime(_ totalMinutes: Int) -> String {
