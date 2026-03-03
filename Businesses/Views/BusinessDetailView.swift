@@ -650,19 +650,19 @@ struct BTCMapSocialsSection: View {
 
     private var metadata: ElementV4Metadata? { element.v4Metadata }
 
-    private var socialLinks: [(label: String, value: String, url: URL?)] {
+    private var socialLinks: [(label: String, icon: String, url: URL?)] {
         guard let metadata else { return [] }
         return [
-            ("Twitter", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
-            ("Facebook", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
-            ("Instagram", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
-            ("Telegram", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
-            ("LINE", metadata.line, metadata.line.flatMap(URL.init(string:)))
+            ("X", "xmark.circle.fill", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
+            ("Facebook", "f.cursive.circle.fill", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
+            ("Instagram", "camera.circle.fill", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
+            ("Telegram", "paperplane.circle.fill", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
+            ("LINE", "message.circle.fill", metadata.line, metadata.line.flatMap(URL.init(string:)))
         ].compactMap { item in
-            guard let value = item.1?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            guard let value = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
                 return nil
             }
-            return (item.0, value, item.2)
+            return (item.0, item.1, item.3)
         }
     }
 
@@ -672,11 +672,11 @@ struct BTCMapSocialsSection: View {
                 ForEach(socialLinks, id: \.label) { social in
                     if let url = social.url {
                         Link(destination: url) {
-                            textLinkRow(icon: "link", label: social.label, value: social.value)
+                            platformLinkRow(icon: social.icon, label: social.label)
                         }
                         .buttonStyle(.plain)
                     } else {
-                        textLinkRow(icon: "link", label: social.label, value: social.value)
+                        platformLinkRow(icon: social.icon, label: social.label)
                     }
                 }
 
@@ -695,21 +695,17 @@ struct BTCMapSocialsSection: View {
         ].contains { ($0?.isEmpty == false) }
     }
 
-    private func textLinkRow(icon: String, label: String, value: String) -> some View {
+    private func platformLinkRow(icon: String, label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Image(systemName: icon)
                     .foregroundColor(.accentColor)
                 .frame(width: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .foregroundColor(.accentColor)
-                    .lineLimit(2)
-            }
+            Text(label)
+                .foregroundColor(.accentColor)
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
