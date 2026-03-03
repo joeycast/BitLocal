@@ -6,6 +6,10 @@ import MapKit
 import Contacts
 import Foundation
 import UIKit
+import NaturalLanguage
+#if canImport(Translation)
+import Translation
+#endif
 
 // Helper function to open location in Maps with full details
 func openLocationInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?) {
@@ -931,10 +935,115 @@ struct BusinessDescriptionSection: View {
     var body: some View {
         if let description = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn {
             Section(header: Text(NSLocalizedString("business_description_section", comment: "Section header for business description"))) {
-                Text(description)
+                if #available(iOS 18.0, *) {
+                    TranslatableBusinessDescriptionView(description: description)
+                } else {
+                    Text(description)
+                }
             }
         } else {
         }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct TranslatableBusinessDescriptionView: View {
+    let description: String
+
+    @State private var translatedDescription: String?
+    @State private var translationConfiguration: TranslationSession.Configuration?
+    @State private var translationError: String?
+    
+    private var hasSuccessfulTranslation: Bool {
+        guard let translatedDescription else { return false }
+        return !translatedDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var detectedLanguageCode: String? {
+        guard description.count >= 20 else { return nil }
+        return NLLanguageRecognizer.dominantLanguage(for: description)?.rawValue
+    }
+
+    private var preferredLanguageCode: String? {
+        guard let preferredIdentifier = Locale.preferredLanguages.first else { return nil }
+        return normalizedLanguageCode(preferredIdentifier)
+    }
+
+    private var sourceLanguage: Locale.Language? {
+        guard let detectedLanguageCode else { return nil }
+        return Locale.Language(identifier: detectedLanguageCode)
+    }
+
+    private var targetLanguage: Locale.Language? {
+        guard let preferredLanguageCode else { return nil }
+        return Locale.Language(identifier: preferredLanguageCode)
+    }
+
+    private var shouldOfferTranslation: Bool {
+        guard let detectedLanguageCode, let preferredLanguageCode else { return false }
+        return normalizedLanguageCode(detectedLanguageCode) != preferredLanguageCode
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(description)
+
+            if let translatedDescription, !translatedDescription.isEmpty {
+                Text(translatedDescription)
+                    .foregroundStyle(.secondary)
+            }
+
+            if shouldOfferTranslation && !hasSuccessfulTranslation {
+                Button(action: startTranslation) {
+                    Label("Translate", systemImage: "translate")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+            }
+            
+            if hasSuccessfulTranslation {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Translated on device with Apple Translate")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.footnote)
+            }
+
+            if let translationError, !translationError.isEmpty {
+                Text(translationError)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .translationTask(translationConfiguration) { session in
+            do {
+                let response = try await session.translate(description)
+                await MainActor.run {
+                    translatedDescription = response.targetText
+                    translationError = nil
+                }
+            } catch {
+                await MainActor.run {
+                    translationError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func startTranslation() {
+        guard let sourceLanguage, let targetLanguage else { return }
+        translationError = nil
+        translationConfiguration = TranslationSession.Configuration(
+            source: sourceLanguage,
+            target: targetLanguage
+        )
+    }
+
+    private func normalizedLanguageCode(_ identifier: String) -> String {
+        let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
+        return normalized.split(separator: "-", maxSplits: 1).first.map(String.init) ?? normalized
     }
 }
 
