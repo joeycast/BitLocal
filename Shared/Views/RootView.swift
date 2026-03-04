@@ -46,6 +46,7 @@ struct RootView: View {
                 // Delay slightly to ensure view hierarchy is stable
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     contentViewModel.fetchElements()
+                    contentViewModel.resolvePendingDeepLinkIfNeeded()
                 }
             }
         }
@@ -74,9 +75,67 @@ struct RootView: View {
                 // Small delay to ensure map is ready
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     contentViewModel.fetchElements()
+                    contentViewModel.resolvePendingDeepLinkIfNeeded()
                 }
             }
         }
+        .onOpenURL { url in
+            contentViewModel.handleIncomingURL(url)
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            contentViewModel.handleIncomingUserActivity(activity)
+        }
+        .sheet(item: $contentViewModel.deepLinkUnavailableState) { state in
+            DeepLinkUnavailableView(state: state)
+                .environmentObject(contentViewModel)
+        }
         .animation(.easeInOut(duration: 0.3), value: didCompleteOnboarding)
+    }
+}
+
+@available(iOS 17.0, *)
+private struct DeepLinkUnavailableView: View {
+    let state: DeepLinkUnavailableState
+    @EnvironmentObject private var contentViewModel: ContentViewModel
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Image(systemName: "mappin.slash.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(.secondary)
+
+                Text(state.title)
+                    .font(.title2.weight(.semibold))
+
+                Text(state.message)
+                    .foregroundStyle(.secondary)
+
+                Text("Place ID: \(state.placeID)")
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 12)
+
+                Button("Retry") {
+                    contentViewModel.retryDeepLinkUnavailablePlaceLookup()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Search Nearby") {
+                    contentViewModel.searchNearbyFromDeepLinkUnavailable()
+                }
+                .buttonStyle(.bordered)
+
+                Button("Open Map") {
+                    contentViewModel.openMapHomeFromDeepLinkUnavailable()
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .navigationTitle("Place unavailable")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 }

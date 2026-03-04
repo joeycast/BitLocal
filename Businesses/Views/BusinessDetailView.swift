@@ -107,6 +107,7 @@ private func openCoordinateInMaps(coordinate: CLLocationCoordinate2D, name: Stri
 struct BusinessDetailView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State private var region = MKCoordinateRegion()
+    @State private var showingShareErrorAlert = false
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
     
@@ -183,10 +184,45 @@ struct BusinessDetailView: View {
         .listStyle(InsetGroupedListStyle()) // Consistent list style
         .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
         .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                shareToolbarItem
+            }
+        }
+        .alert("Unable to share this place", isPresented: $showingShareErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The place link could not be created.")
+        }
     }
 }
 
 extension BusinessDetailView {
+    @ViewBuilder
+    private var shareToolbarItem: some View {
+        if FeatureFlags.isSharePlaceLinksEnabled {
+            if let shareURL = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
+                ShareLink(
+                    item: shareURL,
+                    subject: Text("BitLocal Place"),
+                    message: Text("Check out \(element.displayName ?? "this place") on BitLocal")
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel("Share place")
+            } else {
+                Button {
+                    Debug.log("Share link generation failed for place id: \(element.id)")
+                    showingShareErrorAlert = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel("Share place")
+            }
+        }
+    }
+
     private var shouldHideSheetBackground: Bool {
         guard let detent = currentDetent else { return false }
         return detent != .large

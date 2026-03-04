@@ -98,6 +98,13 @@ enum SearchTextNormalizer {
     }
 }
 
+struct DeepLinkUnavailableState: Identifiable {
+    let id = UUID()
+    let placeID: String
+    let title: String
+    let message: String
+}
+
 @available(iOS 17.0, *)
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
@@ -107,6 +114,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var geocodingCache = LRUCache<String, Address>(maxSize: 100)
     @Published var path: [Element] = []
     @Published var selectedElement: Element?
+    @Published var deepLinkUnavailableState: DeepLinkUnavailableState?
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
     @Published private(set) var allElements: [Element] = []
     @Published var visibleElements: [Element] = []
@@ -194,6 +202,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private let unifiedSearchWorldwideDebounceNanoseconds: UInt64
     private let localSearchWorldwideDebounceNanoseconds: UInt64
     private var latestMerchantSearchRequestID = UUID()
+    private var pendingDeepLink: AppDeepLink?
     private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
     private var merchantSearchAnchorQuery = ""
     private let merchantSearchRequeryDistanceMeters: CLLocationDistance = 5_000
@@ -321,6 +330,55 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         selectionSource = .unknown
         return source
     }
+
+    func handleIncomingURL(_ url: URL) {
+        guard FeatureFlags.isSharePlaceLinksEnabled else { return }
+        guard let deepLink = DeepLinkParser.parse(url: url) else {
+            Debug.log("Ignored URL: \(url.absoluteString)")
+            return
+        }
+        handleDeepLink(deepLink)
+    }
+
+    func handleIncomingUserActivity(_ activity: NSUserActivity) {
+        guard activity.activityType == NSUserActivityTypeBrowsingWeb,
+              let webpageURL = activity.webpageURL else {
+            return
+        }
+        handleIncomingURL(webpageURL)
+    }
+
+    func retryDeepLinkUnavailablePlaceLookup() {
+        guard let state = deepLinkUnavailableState else { return }
+        deepLinkUnavailableState = nil
+        handleDeepLink(.place(id: state.placeID))
+    }
+
+    func openMapHomeFromDeepLinkUnavailable() {
+        deepLinkUnavailableState = nil
+        mapDisplayMode = .merchants
+        path = []
+        selectedElement = nil
+    }
+
+    func searchNearbyFromDeepLinkUnavailable() {
+        deepLinkUnavailableState = nil
+        mapDisplayMode = .merchants
+        path = []
+        selectedElement = nil
+        isSearchActive = true
+        unifiedSearchText = ""
+        performUnifiedSearch()
+        if let userLocation {
+            centerMap(to: userLocation.coordinate, force: true)
+        }
+    }
+
+    func resolvePendingDeepLinkIfNeeded() {
+        guard appState == .active, let pendingDeepLink else { return }
+        self.pendingDeepLink = nil
+        handleDeepLink(pendingDeepLink, allowQueue: false)
+    }
     
     func handleAppBecameActive() {
         Debug.log("App became active - previous state: \(appState)")
@@ -332,6 +390,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             
             self.appState = .active
             self.hasBeenInactive = false
+            self.resolvePendingDeepLinkIfNeeded()
             
             // Only fetch if we were previously inactive/background and don't have data
             if wasInactive && (self.allElements.isEmpty || self.shouldRefreshAfterInactive()) {
@@ -360,6 +419,72 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.hasBeenInactive = true
             self.saveGeocodingCache()
         }
+    }
+
+    private func handleDeepLink(_ deepLink: AppDeepLink, allowQueue: Bool = true) {
+        guard FeatureFlags.isSharePlaceLinksEnabled else { return }
+
+        guard appState == .active else {
+            if allowQueue {
+                pendingDeepLink = deepLink
+                Debug.log("Queued deep link until app is active")
+            }
+            return
+        }
+
+        switch deepLink {
+        case .place(let placeID):
+            handlePlaceDeepLink(placeID: placeID)
+        }
+    }
+
+    private func handlePlaceDeepLink(placeID: String) {
+        guard PlaceShareLinkBuilder.isValidPlaceID(placeID) else {
+            presentDeepLinkUnavailable(placeID: placeID, reason: "Invalid place identifier.")
+            return
+        }
+
+        mapDisplayMode = .merchants
+        isSearchActive = false
+
+        btcMapRepository.fetchPlace(id: placeID) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+
+                switch result {
+                case .success(let record):
+                    if let deletedAt = record.deletedAt, !deletedAt.isEmpty {
+                        self.presentDeepLinkUnavailable(
+                            placeID: placeID,
+                            reason: "This place is no longer available."
+                        )
+                        return
+                    }
+
+                    let element = V4PlaceToElementMapper.placeRecordToElement(record)
+                    self.upsertElementIntoStore(element)
+                    if let coordinate = element.mapCoordinate {
+                        self.centerMap(to: coordinate, force: true)
+                    }
+                    self.setSelectionSource(.unknown)
+                    self.selectedElement = element
+                    self.path = [element]
+                    self.deepLinkUnavailableState = nil
+
+                case .failure(let error):
+                    self.presentDeepLinkUnavailable(placeID: placeID, reason: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func presentDeepLinkUnavailable(placeID: String, reason: String) {
+        Debug.log("Deep link place unavailable: id=\(placeID), reason=\(reason)")
+        deepLinkUnavailableState = DeepLinkUnavailableState(
+            placeID: placeID,
+            title: "Place unavailable",
+            message: "We could not open this BitLocal place. It may have been removed or is temporarily unavailable."
+        )
     }
 
     func scheduleGeocodingCacheSave() {

@@ -283,3 +283,73 @@ extension String {
         return cleaned
     }
 }
+
+enum FeatureFlags {
+    static let sharePlaceLinksKey = "share_place_links_enabled"
+
+    static var isSharePlaceLinksEnabled: Bool {
+        if UserDefaults.standard.object(forKey: sharePlaceLinksKey) == nil {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: sharePlaceLinksKey)
+    }
+}
+
+enum AppDeepLink: Equatable {
+    case place(id: String)
+}
+
+enum PlaceShareLinkBuilder {
+    static let canonicalHost = "www.bitlocal.app"
+    private static let allowedIDCharacters = CharacterSet.decimalDigits
+
+    static func makeShareURL(forPlaceID placeID: String) -> URL? {
+        let trimmedID = placeID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isValidPlaceID(trimmedID) else { return nil }
+
+        guard let encodedID = trimmedID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            return nil
+        }
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = canonicalHost
+        components.path = "/place/\(encodedID)"
+        return components.url
+    }
+
+    static func isValidPlaceID(_ placeID: String) -> Bool {
+        guard !placeID.isEmpty, placeID.count <= 64 else { return false }
+        return placeID.unicodeScalars.allSatisfy { allowedIDCharacters.contains($0) }
+    }
+}
+
+enum DeepLinkParser {
+    private static let allowedHosts: Set<String> = ["bitlocal.app", "www.bitlocal.app"]
+
+    static func parse(url: URL) -> AppDeepLink? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "https",
+              let host = components.host?.lowercased(),
+              allowedHosts.contains(host) else {
+            return nil
+        }
+
+        let pathComponents = components.path
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
+
+        guard pathComponents.count == 2,
+              pathComponents[0].lowercased() == "place" else {
+            return nil
+        }
+
+        let placeID = pathComponents[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PlaceShareLinkBuilder.isValidPlaceID(placeID) else {
+            return nil
+        }
+
+        return .place(id: placeID)
+    }
+}
