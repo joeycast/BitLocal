@@ -138,9 +138,6 @@ struct BusinessesListView: View {
                     let cellVM = cellViewModel(for: element)
                     Button {
                         viewModel.setSelectionSource(.list)
-                        if let coordinate = element.mapCoordinate {
-                            viewModel.centerMapWithoutZoom(to: coordinate, animated: true)
-                        }
                         viewModel.selectAnnotationForListSelection(element, animated: true)
                         viewModel.path = [element]
                     } label: {
@@ -294,9 +291,6 @@ struct BusinessesListView: View {
         let cellVM = cellViewModel(for: element)
         return Button {
             viewModel.setSelectionSource(.list)
-            if let coordinate = element.mapCoordinate {
-                viewModel.centerMapWithoutZoom(to: coordinate, animated: true)
-            }
             viewModel.selectAnnotationForListSelection(element, animated: true)
             viewModel.path = [element]
         } label: {

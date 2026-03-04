@@ -329,9 +329,6 @@ struct CommunityDetailView: View {
                             )
                             .onAppear {
                                 viewModel.setSelectionSource(.list)
-                                if let coordinate = element.mapCoordinate {
-                                    viewModel.centerMapWithoutZoom(to: coordinate, animated: true)
-                                }
                                 viewModel.selectAnnotationForListSelection(element, animated: true)
                                 viewModel.selectedElement = element
                             }

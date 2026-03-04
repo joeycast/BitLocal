@@ -588,7 +588,7 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             // Update the view model's region to match the map's region
             if viewModel.initialRegionSet {
-                self.viewModel.updateMapRegion(center: mapView.region.center, span: mapView.region.span)
+                self.viewModel.syncRegionFromMap(center: mapView.region.center, span: mapView.region.span)
             }
             
             // Debounce the call to update annotations
