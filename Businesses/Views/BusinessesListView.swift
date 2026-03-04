@@ -138,7 +138,7 @@ struct BusinessesListView: View {
                     let cellVM = cellViewModel(for: element)
                     Button {
                         viewModel.setSelectionSource(.list)
-                        viewModel.selectAnnotation(for: element, animated: true)
+                        viewModel.selectAnnotationForListSelection(element, animated: true)
                         viewModel.path = [element]
                     } label: {
                         ZStack(alignment: .trailing) {
@@ -291,7 +291,7 @@ struct BusinessesListView: View {
         let cellVM = cellViewModel(for: element)
         return Button {
             viewModel.setSelectionSource(.list)
-            viewModel.selectAnnotation(for: element, animated: true)
+            viewModel.selectAnnotationForListSelection(element, animated: true)
             viewModel.path = [element]
         } label: {
             ZStack(alignment: .trailing) {

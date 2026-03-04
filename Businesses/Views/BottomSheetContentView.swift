@@ -89,11 +89,9 @@ struct BottomSheetContentView: View {
             }
             .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")
-                if let selectedElement = newPath.last {
-                    if viewModel.consumeSelectionSource() == .mapAnnotation {
-                        viewModel.zoomToElement(selectedElement)
-                    }
-                    viewModel.selectedElement = selectedElement
+                if newPath.last != nil {
+                    _ = viewModel.consumeSelectionSource()
+                    viewModel.selectedElement = newPath.last
                 } else {
                     viewModel.deselectAnnotation()
                 }
@@ -331,7 +329,7 @@ struct CommunityDetailView: View {
                             )
                             .onAppear {
                                 viewModel.setSelectionSource(.list)
-                                viewModel.selectAnnotation(for: element, animated: true)
+                                viewModel.selectAnnotationForListSelection(element, animated: true)
                                 viewModel.selectedElement = element
                             }
                         } label: {
