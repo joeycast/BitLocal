@@ -689,8 +689,21 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func mapListViewportInsets(for mapView: MKMapView) -> UIEdgeInsets {
         let topInset = max(topPadding, 0)
-        // Keep ordering stable by always assuming the smallest iPhone sheet detent.
-        let bottomInset = mapView.bounds.height * 0.30
+        let bottomInset: CGFloat
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // Use live bottom-sheet height so viewport/focus follows current detent.
+            let defaultInset = mapView.bounds.height * 0.30
+            let liveInset = max(bottomPadding, defaultInset)
+            let largeDetentThreshold = mapView.bounds.height * 0.70
+            // If the sheet is effectively full-height (.large), keep centering as if default detent.
+            if liveInset >= largeDetentThreshold {
+                bottomInset = defaultInset
+            } else {
+                bottomInset = min(liveInset, mapView.bounds.height - 1)
+            }
+        } else {
+            bottomInset = 0
+        }
         return UIEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
     }
 
@@ -730,39 +743,72 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         Debug.log("Zooming to element: \(element.id)")
 
-        let targetCamera = MKMapCamera(
-            lookingAtCenter: targetCoordinate,
-            fromDistance: 500,
-            pitch: 0,
-            heading: 0
-        )
+        DispatchQueue.main.async {
+            self.setDetentAwareCenterKeepingCurrentZoom(
+                center: targetCoordinate,
+                mapView: mapView,
+                animated: true
+            )
+            self.selectElementAfterClusterZoom(
+                element,
+                mapView: mapView,
+                remainingAttempts: 7
+            )
+        }
+    }
 
-        let inCluster = mapView.annotations
+    private func selectElementAfterClusterZoom(
+        _ element: Element,
+        mapView: MKMapView,
+        remainingAttempts: Int
+    ) {
+        if let annotation = mapView.annotations.first(where: {
+            ($0 as? Annotation)?.element?.id == element.id
+        }) {
+            mapView.selectAnnotation(annotation, animated: true)
+            return
+        }
+
+        let containingCluster = mapView.annotations
             .compactMap { $0 as? MKClusterAnnotation }
-            .contains { cluster in
+            .first { cluster in
                 cluster.memberAnnotations.contains { member in
                     (member as? Annotation)?.element?.id == element.id
                 }
             }
 
-        let duration: TimeInterval = 0.5
-        let selectionDelay: TimeInterval = inCluster ? 0.8 : 0.1
+        guard remainingAttempts > 0 else {
+            if let containingCluster {
+                mapView.selectAnnotation(containingCluster, animated: true)
+            }
+            return
+        }
 
-        DispatchQueue.main.async {
-            UIView.animate(
-                withDuration: duration,
-                animations: {
-                    mapView.setCamera(targetCamera, animated: false)
-                },
-                completion: { _ in
-                    DispatchQueue.main.asyncAfter(deadline: .now() + selectionDelay) {
-                        if let annotation = mapView.annotations.first(where: {
-                            ($0 as? Annotation)?.element?.id == element.id
-                        }) {
-                            mapView.selectAnnotation(annotation, animated: true)
-                        }
-                    }
-                }
+        if containingCluster != nil, let coordinate = element.mapCoordinate {
+            setDetentAwareCenterKeepingCurrentZoom(
+                center: coordinate,
+                mapView: mapView,
+                animated: false
+            )
+            let dynamicDistance = dynamicClusterRevealDistanceMeters(
+                for: element,
+                containingCluster: containingCluster,
+                mapView: mapView,
+                remainingAttempts: remainingAttempts
+            )
+            setDetentAwareZoom(
+                center: coordinate,
+                distanceMeters: dynamicDistance,
+                mapView: mapView,
+                animated: true
+            )
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.selectElementAfterClusterZoom(
+                element,
+                mapView: mapView,
+                remainingAttempts: remainingAttempts - 1
             )
         }
     }
@@ -784,6 +830,146 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }) {
             mapView.selectAnnotation(annotation, animated: animated)
         }
+    }
+
+    func centerMapWithoutZoom(to coordinate: CLLocationCoordinate2D, animated: Bool = true) {
+        guard let mapView = mapView else {
+            updateMapRegion(center: coordinate, span: region.span, animated: animated)
+            return
+        }
+
+        let currentSpan = mapView.region.span
+        let adjustedCenterCoordinate = viewportAdjustedCenterCoordinate(
+            for: coordinate,
+            on: mapView
+        )
+        updateMapRegion(center: adjustedCenterCoordinate, span: currentSpan, animated: animated)
+    }
+
+    func selectAnnotationForListSelection(_ element: Element, animated: Bool = true) {
+        guard let mapView = mapView else { return }
+        if elementIsInCluster(element, on: mapView) {
+            zoomToElement(element)
+            return
+        }
+        selectAnnotation(for: element, animated: animated)
+    }
+
+    private func elementIsInCluster(_ element: Element, on mapView: MKMapView) -> Bool {
+        mapView.annotations
+            .compactMap { $0 as? MKClusterAnnotation }
+            .contains { cluster in
+                cluster.memberAnnotations.contains { member in
+                    (member as? Annotation)?.element?.id == element.id
+                }
+            }
+    }
+
+    private func viewportAdjustedCenterCoordinate(
+        for targetCoordinate: CLLocationCoordinate2D,
+        on mapView: MKMapView
+    ) -> CLLocationCoordinate2D {
+        let viewportRect = mapListViewportRect(for: mapView)
+        let desiredPoint = CGPoint(x: viewportRect.midX, y: viewportRect.midY)
+        let currentPoint = mapView.convert(targetCoordinate, toPointTo: mapView)
+        let offsetX = currentPoint.x - desiredPoint.x
+        let offsetY = currentPoint.y - desiredPoint.y
+        let adjustedCenterPoint = CGPoint(
+            x: mapView.bounds.midX + offsetX,
+            y: mapView.bounds.midY + offsetY
+        )
+        return mapView.convert(adjustedCenterPoint, toCoordinateFrom: mapView)
+    }
+
+    private func setDetentAwareRegion(
+        center: CLLocationCoordinate2D,
+        span: MKCoordinateSpan,
+        mapView: MKMapView,
+        animated: Bool
+    ) {
+        let region = MKCoordinateRegion(center: center, span: span)
+        let edgePadding = mapListViewportInsets(for: mapView)
+        mapView.setVisibleMapRect(region.mapRect, edgePadding: edgePadding, animated: animated)
+    }
+
+    private func setDetentAwareZoom(
+        center: CLLocationCoordinate2D,
+        distanceMeters: CLLocationDistance,
+        mapView: MKMapView,
+        animated: Bool
+    ) {
+        let metersPerPoint = MKMapPointsPerMeterAtLatitude(center.latitude)
+        let size = max(distanceMeters, 40) * metersPerPoint
+        let mapPoint = MKMapPoint(center)
+        let rect = MKMapRect(
+            x: mapPoint.x - (size / 2),
+            y: mapPoint.y - (size / 2),
+            width: size,
+            height: size
+        )
+        let edgePadding = mapListViewportInsets(for: mapView)
+        mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: animated)
+    }
+
+    private func setDetentAwareCenterKeepingCurrentZoom(
+        center: CLLocationCoordinate2D,
+        mapView: MKMapView,
+        animated: Bool
+    ) {
+        let adjustedCenter = viewportAdjustedCenterCoordinate(for: center, on: mapView)
+        mapView.setRegion(
+            MKCoordinateRegion(center: adjustedCenter, span: mapView.region.span),
+            animated: animated
+        )
+    }
+
+    private func dynamicClusterRevealDistanceMeters(
+        for element: Element,
+        containingCluster: MKClusterAnnotation?,
+        mapView: MKMapView,
+        remainingAttempts: Int
+    ) -> CLLocationDistance {
+        guard let coordinate = element.mapCoordinate else { return 120 }
+
+        let mapPointsPerMeter = MKMapPointsPerMeterAtLatitude(coordinate.latitude)
+        let currentVisibleWidthMeters = max(mapView.visibleMapRect.width / mapPointsPerMeter, 20)
+        let viewportWidthPoints = max(mapListViewportRect(for: mapView).width, 1)
+
+        var nearestNeighborMeters: CLLocationDistance?
+        if let containingCluster {
+            let targetLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            for member in containingCluster.memberAnnotations {
+                let memberCoordinate = member.coordinate
+                let sameTarget =
+                    abs(memberCoordinate.latitude - coordinate.latitude) < 0.0000001 &&
+                    abs(memberCoordinate.longitude - coordinate.longitude) < 0.0000001
+                if sameTarget { continue }
+
+                let memberLocation = CLLocation(
+                    latitude: memberCoordinate.latitude,
+                    longitude: memberCoordinate.longitude
+                )
+                let distance = targetLocation.distance(from: memberLocation)
+                if distance <= 0.1 { continue }
+                nearestNeighborMeters = min(nearestNeighborMeters ?? distance, distance)
+            }
+        }
+
+        // Increase required point separation across retries for progressively stronger zoom-in.
+        let attemptIndex = max(0, 7 - remainingAttempts)
+        let targetPointSeparation = max(28.0, 44.0 - (Double(attemptIndex) * 4.0))
+
+        let desiredWidthMeters: CLLocationDistance
+        if let nearestNeighborMeters {
+            let metersPerPointNeeded = nearestNeighborMeters / targetPointSeparation
+            desiredWidthMeters = metersPerPointNeeded * viewportWidthPoints
+        } else {
+            desiredWidthMeters = currentVisibleWidthMeters * 0.45
+        }
+
+        // Always zoom in from current state; clamp to safe/usable bounds.
+        let zoomInWidthMeters = min(desiredWidthMeters, currentVisibleWidthMeters * 0.72)
+        return min(max(zoomInWidthMeters, 18), 1800)
     }
     
     private func setupCenterMapSubscription() {
@@ -2401,10 +2587,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         upsertElementIntoStore(element)
 
         if let coordinate = element.mapCoordinate {
-            centerMap(to: coordinate, force: true)
+            centerMapWithoutZoom(to: coordinate, animated: true)
         }
 
-        setSelectionSource(.unknown)
+        setSelectionSource(.list)
+        selectAnnotationForListSelection(element, animated: true)
         selectedElement = element
         path = [element]
     }

@@ -161,10 +161,8 @@ struct IPadLayoutView: View {
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
         .onChange(of: viewModel.path) { _, newPath in
-            if let selectedElement = newPath.last {
-                if viewModel.consumeSelectionSource() == .mapAnnotation {
-                    viewModel.zoomToElement(selectedElement)
-                }
+            if newPath.last != nil {
+                _ = viewModel.consumeSelectionSource()
             } else {
                 viewModel.deselectAnnotation()
             }
