@@ -74,15 +74,6 @@ struct BottomSheetContentView: View {
                 }
             }
             .ignoresSafeArea(edges: .bottom)
-            .onAppear {
-                DispatchQueue.main.async {
-                    let bottomSheetHeight = geometry.size.height
-                    if viewModel.bottomPadding != bottomSheetHeight {
-                        viewModel.bottomPadding = bottomSheetHeight
-                        Debug.log("Accurate Bottom Sheet Height: \(bottomSheetHeight)")
-                    }
-                }
-            }
             .onChange(of: geometry.size.height) { _, newHeight in
                 viewModel.bottomPadding = newHeight
                 Debug.log("BottomSheetContentView height updated: \(newHeight)")
