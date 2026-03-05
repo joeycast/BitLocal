@@ -138,7 +138,11 @@ struct BusinessesListView: View {
                     let cellVM = cellViewModel(for: element)
                     Button {
                         viewModel.setSelectionSource(.list)
-                        viewModel.selectAnnotationForListSelection(element, animated: true)
+                        viewModel.selectAnnotationForListSelection(
+                            element,
+                            animated: true,
+                            allowCameraMovement: !isLargeSheet
+                        )
                         viewModel.path = [element]
                     } label: {
                         ZStack(alignment: .trailing) {
@@ -291,7 +295,11 @@ struct BusinessesListView: View {
         let cellVM = cellViewModel(for: element)
         return Button {
             viewModel.setSelectionSource(.list)
-            viewModel.selectAnnotationForListSelection(element, animated: true)
+            viewModel.selectAnnotationForListSelection(
+                element,
+                animated: true,
+                allowCameraMovement: !isLargeSheet
+            )
             viewModel.path = [element]
         } label: {
             ZStack(alignment: .trailing) {
@@ -312,7 +320,10 @@ struct BusinessesListView: View {
         let remoteElement = V4PlaceToElementMapper.placeRecordToElement(result)
         let cellVM = cellViewModel(for: remoteElement)
         return Button {
-            viewModel.selectMerchantSearchResult(result)
+            viewModel.selectMerchantSearchResult(
+                result,
+                allowCameraMovement: !isLargeSheet
+            )
         } label: {
             ZStack(alignment: .trailing) {
                 ElementCell(viewModel: cellVM)
@@ -448,8 +459,17 @@ struct BusinessesListView: View {
         return detent == collapsedSheetDetent
     }
 
+    private var isLargeSheet: Bool {
+        guard let detent = currentDetent else { return false }
+        return detentIdentifier(detent).contains("large")
+    }
+
     private var collapsedSheetDetent: PresentationDetent {
         .fraction(0.11)
+    }
+
+    private func detentIdentifier(_ detent: PresentationDetent) -> String {
+        String(describing: detent).lowercased()
     }
 }
 

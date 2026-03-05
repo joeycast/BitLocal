@@ -337,7 +337,11 @@ struct CommunityDetailView: View {
                             )
                             .onAppear {
                                 viewModel.setSelectionSource(.list)
-                                viewModel.selectAnnotationForListSelection(element, animated: true)
+                                viewModel.selectAnnotationForListSelection(
+                                    element,
+                                    animated: true,
+                                    allowCameraMovement: !isLargeSheet
+                                )
                                 viewModel.selectedElement = element
                             }
                         } label: {
@@ -418,6 +422,11 @@ struct CommunityDetailView: View {
     private var shouldShowCollapsedHeaderOnly: Bool {
         guard let detent = currentDetent else { return false }
         return detentIdentifier(detent).contains("fraction 0.11")
+    }
+
+    private var isLargeSheet: Bool {
+        guard let detent = currentDetent else { return false }
+        return detentIdentifier(detent).contains("large")
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {

@@ -841,7 +841,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    func selectAnnotationForListSelection(_ element: Element, animated: Bool = true) {
+    func selectAnnotationForListSelection(
+        _ element: Element,
+        animated: Bool = true,
+        allowCameraMovement: Bool = true
+    ) {
         guard let mapView = mapView else { return }
 
         if let coordinate = element.mapCoordinate,
@@ -851,10 +855,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             let isClustered = isAnnotationClustered(annotation, on: mapView)
             let hasDirectView = mapView.view(for: annotation) != nil
             if !isClustered && hasDirectView {
-                centerMapWithoutZoom(to: coordinate, animated: animated)
+                if allowCameraMovement {
+                    centerMapWithoutZoom(to: coordinate, animated: animated)
+                }
                 mapView.selectAnnotation(annotation, animated: animated)
                 return
             }
+        }
+
+        if !allowCameraMovement {
+            return
         }
 
         // If the specific annotation is not currently selectable (typically clustered),
@@ -2579,10 +2589,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    func selectMerchantSearchResult(_ record: V4PlaceRecord) {
+    func selectMerchantSearchResult(_ record: V4PlaceRecord, allowCameraMovement: Bool = true) {
         let fallbackElement = V4PlaceToElementMapper.placeRecordToElement(record)
         if let existing = allElements.first(where: { $0.id == fallbackElement.id }) {
-            presentMerchantSearchSelection(existing)
+            presentMerchantSearchSelection(existing, allowCameraMovement: allowCameraMovement)
             return
         }
 
@@ -2593,14 +2603,20 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     switch result {
                     case .success(let fullRecord):
                         let fullElement = V4PlaceToElementMapper.placeRecordToElement(fullRecord)
-                        self.presentMerchantSearchSelection(fullElement)
+                        self.presentMerchantSearchSelection(
+                            fullElement,
+                            allowCameraMovement: allowCameraMovement
+                        )
                     case .failure:
-                        self.presentMerchantSearchSelection(fallbackElement)
+                        self.presentMerchantSearchSelection(
+                            fallbackElement,
+                            allowCameraMovement: allowCameraMovement
+                        )
                     }
                 }
             }
         } else {
-            presentMerchantSearchSelection(fallbackElement)
+            presentMerchantSearchSelection(fallbackElement, allowCameraMovement: allowCameraMovement)
         }
     }
 
@@ -2609,11 +2625,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         (record.description == nil && record.openingHours == nil) || (record.phone == nil && record.website == nil)
     }
 
-    private func presentMerchantSearchSelection(_ element: Element) {
+    private func presentMerchantSearchSelection(_ element: Element, allowCameraMovement: Bool) {
         upsertElementIntoStore(element)
 
         setSelectionSource(.list)
-        selectAnnotationForListSelection(element, animated: true)
+        selectAnnotationForListSelection(
+            element,
+            animated: true,
+            allowCameraMovement: allowCameraMovement
+        )
         selectedElement = element
         path = [element]
     }
