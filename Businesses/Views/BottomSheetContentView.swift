@@ -257,26 +257,12 @@ struct CommunityDetailView: View {
 
     var body: some View {
         List {
-            // MARK: Header
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(area.displayName)
-                        .font(.title2.weight(.bold))
-
-                    if let description = area.tags?["description"], !description.isEmpty {
-                        Text(description)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Label(
-                        "\(memberElements.count) merchants",
-                        systemImage: "storefront"
-                    )
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.accent)
+            if let description = area.tags?["description"], !description.isEmpty {
+                Section("Description") {
+                    Text(description)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
             }
 
             // MARK: About
@@ -285,35 +271,26 @@ struct CommunityDetailView: View {
                     if let org = area.tags?["organization"], !org.isEmpty {
                         detailRow(icon: "building.2", text: org)
                     }
-                    if let continent = area.tags?["continent"], !continent.isEmpty {
-                        detailRow(icon: "globe", text: continent)
-                    }
-                    if let language = area.tags?["language"], !language.isEmpty {
-                        detailRow(icon: "character.book.closed", text: language)
-                    }
-                    if let website = area.tags?["contact:website"], !website.isEmpty,
-                       let url = URL(string: website.hasPrefix("http") ? website : "https://\(website)") {
-                        Link(destination: url) {
-                            detailRow(icon: "link", text: cleanedURL(website))
-                        }
-                    }
-                    if let telegram = area.tags?["contact:telegram"], !telegram.isEmpty,
-                       let url = URL(string: "https://t.me/\(telegram.replacingOccurrences(of: "@", with: ""))") {
-                        Link(destination: url) {
-                            detailRow(icon: "paperplane", text: telegram)
-                        }
-                    }
-                    if let twitter = area.tags?["contact:twitter"], !twitter.isEmpty,
-                       let url = URL(string: "https://x.com/\(twitter.replacingOccurrences(of: "@", with: ""))") {
-                        Link(destination: url) {
-                            detailRow(icon: "at", text: twitter)
+                }
+            }
+
+            if !communitySocialLinks.isEmpty {
+                Section("Socials") {
+                    ForEach(communitySocialLinks) { social in
+                        if let url = social.url {
+                            Link(destination: url) {
+                                platformLinkRow(icon: social.icon, label: social.label)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            platformLinkRow(icon: social.icon, label: social.label)
                         }
                     }
                 }
             }
 
             // MARK: Merchants
-            Section("Merchants") {
+            Section {
                 if viewModel.communityMembersIsLoading && sameSelectedCommunity {
                     HStack {
                         ProgressView()
@@ -349,13 +326,24 @@ struct CommunityDetailView: View {
                         }
                     }
                 }
+            } header: {
+                HStack {
+                    Text("Merchants")
+                    Spacer()
+                    Text("\(memberElements.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(.secondary.opacity(0.12), in: Capsule())
+                }
             }
         }
         .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
         .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
         .accessibilityHidden(shouldShowCollapsedHeaderOnly)
         .listStyle(.insetGrouped)
-        .navigationTitle("Community")
+        .navigationTitle(area.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: area.id) {
             if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
@@ -369,26 +357,102 @@ struct CommunityDetailView: View {
     private func detailRow(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .foregroundColor(.accentColor)
+                .foregroundStyle(.accent)
                 .frame(width: 22)
             Text(text)
                 .font(.body)
         }
     }
 
-    private func cleanedURL(_ raw: String) -> String {
-        raw.replacingOccurrences(of: "https://", with: "")
-           .replacingOccurrences(of: "http://", with: "")
-           .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    private func platformLinkRow(icon: String, label: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(.accent)
+                .frame(width: 18)
+            Text(label)
+                .foregroundStyle(.accent)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
     }
 
     private var hasAboutData: Bool {
         let tags = area.tags ?? [:]
-        let keys = ["organization", "continent", "language", "contact:website", "contact:telegram", "contact:twitter"]
+        let keys = ["organization"]
         return keys.contains { key in
             if let val = tags[key], !val.isEmpty { return true }
             return false
         }
+    }
+
+    private var communitySocialLinks: [CommunitySocialLink] {
+        let tags = area.tags ?? [:]
+        let candidates: [(label: String, icon: String, keys: [String], base: String?)] = [
+            ("Website", "globe", ["contact:website", "website"], nil),
+            ("X", "xmark.circle.fill", ["contact:x", "contact:twitter", "twitter"], "https://x.com/"),
+            ("Facebook", "f.cursive.circle.fill", ["contact:facebook", "facebook"], "https://facebook.com/"),
+            ("Instagram", "camera.circle.fill", ["contact:instagram", "instagram"], "https://instagram.com/"),
+            ("Telegram", "paperplane.circle.fill", ["contact:telegram", "telegram"], "https://t.me/")
+        ]
+
+        return candidates.compactMap { candidate in
+            guard let rawValue = firstTagValue(for: candidate.keys, in: tags) else { return nil }
+            let url: URL?
+            if let base = candidate.base {
+                url = socialURL(for: rawValue, base: base)
+            } else {
+                url = websiteURL(from: rawValue)
+            }
+            let displayLabel: String
+            if candidate.label == "Website" {
+                displayLabel = cleanedWebsiteLabel(from: rawValue)
+            } else {
+                displayLabel = candidate.label
+            }
+            return CommunitySocialLink(label: displayLabel, icon: candidate.icon, url: url)
+        }
+    }
+
+    private func firstTagValue(for keys: [String], in tags: [String: String]) -> String? {
+        keys.compactMap { key in
+            tags[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        .first(where: { !$0.isEmpty })
+    }
+
+    private func websiteURL(from value: String) -> URL? {
+        let normalized = value.lowercased()
+        if normalized.hasPrefix("http://") || normalized.hasPrefix("https://") {
+            return URL(string: value)
+        }
+        return URL(string: "https://\(value)")
+    }
+
+    private func socialURL(for value: String, base: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let normalized = trimmed.lowercased()
+        if normalized.hasPrefix("http://") || normalized.hasPrefix("https://") {
+            return URL(string: trimmed)
+        }
+        let handle = trimmed.replacingOccurrences(of: "@", with: "")
+        return URL(string: base + handle)
+    }
+
+    private func cleanedWebsiteLabel(from value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Website" }
+
+        let candidateURL = websiteURL(from: trimmed)
+        if let host = candidateURL?.host, !host.isEmpty {
+            return host.replacingOccurrences(of: "www.", with: "")
+        }
+
+        return trimmed
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
     private var sameSelectedCommunity: Bool {
@@ -432,4 +496,13 @@ struct CommunityDetailView: View {
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
         String(describing: detent).lowercased()
     }
+}
+
+@available(iOS 17.0, *)
+private struct CommunitySocialLink: Identifiable {
+    let label: String
+    let icon: String
+    let url: URL?
+
+    var id: String { label }
 }
