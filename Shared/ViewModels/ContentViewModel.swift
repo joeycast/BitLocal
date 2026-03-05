@@ -687,20 +687,22 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return mapView.convert(centerPoint, toCoordinateFrom: mapView)
     }
 
+    func effectiveIPhoneViewportBottomInset(mapHeight: CGFloat, enforceDefaultFloor: Bool = true) -> CGFloat {
+        let defaultInset = mapHeight * 0.30
+        let liveInset = enforceDefaultFloor ? max(bottomPadding, defaultInset) : max(bottomPadding, 0)
+        let largeDetentThreshold = mapHeight * 0.70
+        // Match map centering behavior: treat large detent as default viewport inset.
+        if liveInset >= largeDetentThreshold {
+            return defaultInset
+        }
+        return min(liveInset, mapHeight - 1)
+    }
+
     func mapListViewportInsets(for mapView: MKMapView) -> UIEdgeInsets {
         let topInset = max(topPadding, 0)
         let bottomInset: CGFloat
         if UIDevice.current.userInterfaceIdiom == .phone {
-            // Use live bottom-sheet height so viewport/focus follows current detent.
-            let defaultInset = mapView.bounds.height * 0.30
-            let liveInset = max(bottomPadding, defaultInset)
-            let largeDetentThreshold = mapView.bounds.height * 0.70
-            // If the sheet is effectively full-height (.large), keep centering as if default detent.
-            if liveInset >= largeDetentThreshold {
-                bottomInset = defaultInset
-            } else {
-                bottomInset = min(liveInset, mapView.bounds.height - 1)
-            }
+            bottomInset = effectiveIPhoneViewportBottomInset(mapHeight: mapView.bounds.height)
         } else {
             bottomInset = 0
         }
