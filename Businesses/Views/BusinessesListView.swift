@@ -503,6 +503,11 @@ struct ElementCell: View {
             }
         }
         .contentShape(Rectangle())
+        .onAppear {
+            guard !appeared else { return }
+            appeared = true
+            viewModel.onCellAppear()
+        }
         // REMOVED: Redundant onChange that was causing excessive logging
         // .onChange(of: viewModel.viewModel.userLocation) { _, _ in
         //     viewModel.onCellAppear()
@@ -627,7 +632,7 @@ class ElementCellViewModel: ObservableObject {
     }
     
     func onCellAppear() {
-        if address == nil {
+        if address == nil || shouldEnrichMissingState(address) {
             updateAddress()
         }
     }
@@ -660,12 +665,12 @@ class ElementCellViewModel: ObservableObject {
         if let cachedAddress = getCachedAddress() {
             let merged = mergedAddress(preferred: element.address, fallback: cachedAddress)
             self.address = merged
-            if isAddressComplete(merged) {
+            if isAddressComplete(merged) && !shouldEnrichMissingState(merged) {
                 return
             }
         } else if let preferred = element.address {
             self.address = preferred
-            if isAddressComplete(preferred) {
+            if isAddressComplete(preferred) && !shouldEnrichMissingState(preferred) {
                 setCachedAddress(preferred)
                 viewModel.scheduleGeocodingCacheSave()
                 return
@@ -713,6 +718,11 @@ class ElementCellViewModel: ObservableObject {
         return normalized(address.streetNumber) != nil &&
             normalized(address.streetName) != nil &&
             normalized(address.cityOrTownName) != nil
+    }
+
+    private func shouldEnrichMissingState(_ address: Address?) -> Bool {
+        guard let address = address else { return false }
+        return normalized(address.regionOrStateName) == nil
     }
 
     private func mergedAddress(preferred: Address?, fallback: Address?) -> Address? {
