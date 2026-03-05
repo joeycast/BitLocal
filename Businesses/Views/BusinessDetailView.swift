@@ -810,7 +810,7 @@ struct BTCMapSocialsSection: View {
 
     private var metadata: ElementV4Metadata? { element.v4Metadata }
 
-    private var socialLinks: [(label: String, icon: String, url: URL?)] {
+    private var socialLinks: [(label: String, icon: String, value: String, url: URL?)] {
         guard let metadata else { return [] }
         return [
             ("X", "xmark.circle.fill", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
@@ -822,7 +822,7 @@ struct BTCMapSocialsSection: View {
             guard let value = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
                 return nil
             }
-            return (item.0, item.1, item.3)
+            return (item.0, item.1, value, item.3)
         }
     }
 
@@ -832,11 +832,11 @@ struct BTCMapSocialsSection: View {
                 ForEach(socialLinks, id: \.label) { social in
                     if let url = social.url {
                         Link(destination: url) {
-                            platformLinkRow(icon: social.icon, label: social.label)
+                            businessLinkValueRow(icon: social.icon, label: social.label, value: social.value)
                         }
                         .buttonStyle(.plain)
                     } else {
-                        platformLinkRow(icon: social.icon, label: social.label)
+                        businessLinkValueRow(icon: social.icon, label: social.label, value: social.value)
                     }
                 }
 
@@ -855,18 +855,6 @@ struct BTCMapSocialsSection: View {
         ].contains { ($0?.isEmpty == false) }
     }
 
-    private func platformLinkRow(icon: String, label: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Image(systemName: icon)
-                    .foregroundColor(.accentColor)
-                .frame(width: 18)
-            Text(label)
-                .foregroundColor(.accentColor)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-    }
 }
 
 struct BTCMapRequiredAppSection: View {
@@ -1216,21 +1204,12 @@ struct BusinessDetailsSection: View {
                 Button(action: {
                     openLocationInMaps(coordinate: coord, name: element.displayName, address: elementCellViewModel.address)
                 }) {
-                    VStack (alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text(NSLocalizedString("address_label", comment: "Label for address"))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-
-                        HStack {
-                            Text("\(elementCellViewModel.address?.streetNumber != nil && !elementCellViewModel.address!.streetNumber!.isEmpty ? elementCellViewModel.address!.streetNumber! + " " : "")\(elementCellViewModel.address?.streetName ?? "")\n\(elementCellViewModel.address?.cityOrTownName ?? "")\(elementCellViewModel.address?.cityOrTownName != nil && elementCellViewModel.address?.cityOrTownName != "" ? ", " : "")\(elementCellViewModel.address?.regionOrStateName ?? "") \(elementCellViewModel.address?.postalCode ?? "")")
-                                .multilineTextAlignment(.leading)
-                                .foregroundColor(.accentColor)
-
-                            Spacer()
-                        }
-                    }
+                    businessLinkValueRow(
+                        icon: "map",
+                        label: NSLocalizedString("address_label", comment: "Label for address"),
+                        value: addressDisplayText,
+                        valueLineLimit: 3
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -1240,21 +1219,11 @@ struct BusinessDetailsSection: View {
                let validURL = website.cleanedWebsiteURL() {
 
                 Link(destination: validURL) {
-                    VStack (alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text(NSLocalizedString("website_label", comment: "Label for website"))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-
-                        HStack {
-                            Text(website.cleanedForDisplay())
-                                .lineLimit(1)
-                                .foregroundColor(.accentColor)
-
-                            Spacer()
-                        }
-                    }
+                    businessLinkValueRow(
+                        icon: "globe",
+                        label: NSLocalizedString("website_label", comment: "Label for website"),
+                        value: website.cleanedForDisplay()
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -1265,21 +1234,11 @@ struct BusinessDetailsSection: View {
 
                 if isValid, let url = URL(string: "tel:\(cleanPhone)") {
                     Link(destination: url) {
-                        VStack (alignment: .leading, spacing: 3) {
-                            HStack {
-                                Text(NSLocalizedString("phone_label", comment: "Label for phone"))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            HStack {
-                                Text(phone.displayablePhoneNumber()) // Show original with minimal cleanup
-                                    .lineLimit(1)
-                                    .foregroundColor(.accentColor)
-
-                                Spacer()
-                            }
-                        }
+                        businessLinkValueRow(
+                            icon: "phone.fill",
+                            label: NSLocalizedString("phone_label", comment: "Label for phone"),
+                            value: phone.displayablePhoneNumber()
+                        )
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -1292,36 +1251,81 @@ struct BusinessDetailsSection: View {
                !email.isEmpty,
                let url = URL(string: "mailto:\(email)") {
                 Link(destination: url) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Email")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        HStack {
-                            Text(email)
-                                .lineLimit(1)
-                                .foregroundStyle(.accent)
-                            Spacer()
-                        }
-                    }
+                    businessLinkValueRow(
+                        icon: "envelope.fill",
+                        label: "Email",
+                        value: email
+                    )
                 }
                 .buttonStyle(.plain)
             }
             
             // Opening Hours
             if let openingHours = element.osmJSON?.tags?.openingHours {
-                VStack (alignment: .leading, spacing: 3) {
-                    Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    OpeningHoursDisplayView(rawOpeningHours: openingHours)
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(.accent)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
+                            .foregroundStyle(.accent)
+                        OpeningHoursDisplayView(rawOpeningHours: openingHours)
+                    }
+                    Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+}
+
+private func businessLinkValueRow(
+    icon: String,
+    label: String,
+    value: String,
+    valueLineLimit: Int = 2
+) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+        Image(systemName: icon)
+            .foregroundStyle(.accent)
+            .frame(width: 18)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .foregroundStyle(.accent)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(valueLineLimit)
+                .multilineTextAlignment(.leading)
+        }
+        Spacer(minLength: 0)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(.rect)
+}
+
+private extension BusinessDetailsSection {
+    var addressDisplayText: String {
+        let streetNumber = elementCellViewModel.address?.streetNumber?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let streetName = elementCellViewModel.address?.streetName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let streetLine = [streetNumber, streetName]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        let city = elementCellViewModel.address?.cityOrTownName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let region = elementCellViewModel.address?.regionOrStateName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let postalCode = elementCellViewModel.address?.postalCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        let localityParts = [city, region]
+            .filter { !$0.isEmpty }
+        let locality = localityParts.joined(separator: ", ")
+        let secondLine = [locality, postalCode]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        return [streetLine, secondLine]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 }
 
@@ -1364,6 +1368,9 @@ private struct OpeningHoursDisplayView: View {
             }
         } else {
             Text(rawOpeningHours)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.leading)
         }
     }
 
