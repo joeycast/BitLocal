@@ -17,9 +17,22 @@
 	<key>CFBundleShortVersionString</key>
 	<string>3.0</string>
 	<key>CFBundleVersion</key>
-	<string>47</string>
+	<string>48</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>cashapp</string>
+		<string>squarecash</string>
+		<string>strike</string>
+		<string>bluewallet</string>
+		<string>phoenix</string>
+		<string>zeusln</string>
+		<string>muun</string>
+		<string>walletofsatoshi</string>
+		<string>breez</string>
+		<string>aqua</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
