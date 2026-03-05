@@ -274,6 +274,7 @@ struct CommunityDetailView: View {
     @AppStorage("community.lastLightningWalletID") private var lastLightningWalletID: String = ""
     @State private var showLightningAlert = false
     @State private var showWalletAlert = false
+    @State private var showTipsDisclaimerAlert = false
     @State private var shareItem: ShareTextItem?
     @State private var lightningErrorMessage: String?
 
@@ -326,17 +327,25 @@ struct CommunityDetailView: View {
 
                 if hasTipsData {
                     Section("Tips") {
-                        if payableLightningPayload != nil {
-                            Button {
-                                showLightningAlert = true
-                            } label: {
-                                platformLinkRow(
-                                    icon: "bolt.fill",
-                                    label: "Tip This Community",
-                                    value: "Support this community by sending a tip over Lightning"
-                                )
+                        if let payload = payableLightningPayload {
+                            HStack(alignment: .top, spacing: 10) {
+                                Button {
+                                    showLightningAlert = true
+                                } label: {
+                                    tipActionRow(payload: payload)
+                                }
+                                .buttonStyle(.plain)
+                                .copyValueContextMenu(payload, title: "Copy Lightning Address")
+
+                                Button {
+                                    showTipsDisclaimerAlert = true
+                                } label: {
+                                    Image(systemName: "info.circle")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Tipping disclaimer")
                             }
-                            .buttonStyle(.plain)
                         } else if let tipFallbackURL {
                             linkableValueRow(
                                 .init(
@@ -431,32 +440,27 @@ struct CommunityDetailView: View {
                 }
             }
         }
-        .alert("Pay with Lightning", isPresented: $showLightningAlert) {
+        .alert("Tip This Community", isPresented: $showLightningAlert) {
             if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
                let payload = payableLightningPayload {
-                Button("Open in \(lastWallet.name)") {
+                Button("Copy and Open \(lastWallet.name)") {
                     openWallet(lastWallet, payload: payload)
                 }
             }
-            if let payload = payableLightningPayload, lightningURL(from: payload) != nil {
-                Button("Open Compatible Wallet") {
-                    openCompatibleLightningURL(payload: payload)
-                }
-            }
-            Button("Choose Wallet…") {
+            Button("Choose Wallet") {
                 showWalletAlert = true
             }
             if let payload = payableLightningPayload {
-                Button("Copy Lightning") {
+                Button("Copy Lightning Address") {
                     UIPasteboard.general.string = payload
                 }
-                Button("Share…") {
+                Button("Share") {
                     shareItem = ShareTextItem(text: payload)
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Select how you want to open or share this lightning payment.")
+            Text("Choose a wallet or copy the Lightning address to tip this community.")
         }
         .alert("Choose Wallet", isPresented: $showWalletAlert) {
             if let payload = payableLightningPayload {
@@ -468,7 +472,12 @@ struct CommunityDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Pick a wallet app to open. The lightning value will be copied first.")
+            Text("Choose your Lightning wallet. BitLocal will copy the Lightning address, then open the wallet.")
+        }
+        .alert("Tipping Disclaimer", isPresented: $showTipsDisclaimerAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("BitLocal does not process, custody, or guarantee tip transactions. We only open your selected wallet or link and help copy/share the Lightning address.")
         }
         .sheet(item: $shareItem) { item in
             ActivityView(items: [item.text])
@@ -544,6 +553,30 @@ struct CommunityDetailView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+    }
+
+    private func tipActionRow(payload: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "bolt.fill")
+                .foregroundStyle(.accent)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Tip This Community")
+                    .foregroundStyle(.accent)
+                Text("Support this community over Lightning")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(payload)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .lineLimit(3)
+                    .padding(.top, 2)
             }
             Spacer(minLength: 0)
         }
@@ -792,11 +825,6 @@ struct CommunityDetailView: View {
         return CommunityBTCMapDateParsers.dateOnly.date(from: raw)
     }
 
-    private func lightningURL(from payload: String) -> URL? {
-        let encoded = payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? payload
-        return URL(string: "lightning:\(encoded)")
-    }
-
     private func normalizedPayableLightningPayload(from raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -856,19 +884,6 @@ struct CommunityDetailView: View {
         guard !local.isEmpty, !domain.isEmpty else { return false }
         guard !local.contains(" "), !domain.contains(" ") else { return false }
         return domain.contains(".")
-    }
-
-
-    private func openCompatibleLightningURL(payload: String) {
-        guard let url = lightningURL(from: payload) else {
-            lightningErrorMessage = "The lightning value is not valid."
-            return
-        }
-        UIApplication.shared.open(url, options: [:]) { success in
-            if !success {
-                lightningErrorMessage = "No compatible wallet app was available to open this lightning link."
-            }
-        }
     }
 
     private func openWallet(_ wallet: LightningWalletOption, payload: String) {
@@ -1084,12 +1099,12 @@ private enum CommunityBTCMapDateParsers {
 }
 
 private extension View {
-    func copyValueContextMenu(_ value: String) -> some View {
+    func copyValueContextMenu(_ value: String, title: String = "Copy") -> some View {
         contextMenu {
             Button {
                 UIPasteboard.general.string = value
             } label: {
-                Label("Copy", systemImage: "doc.on.doc")
+                Label(title, systemImage: "doc.on.doc")
             }
         }
     }
