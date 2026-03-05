@@ -203,7 +203,7 @@ struct CommunitiesListView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 12)
         .background(Color(.tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 18.5))
+        .clipShape(RoundedRectangle(cornerRadius: 40))
         .padding(.horizontal, 16)
     }
 
