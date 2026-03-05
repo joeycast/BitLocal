@@ -66,11 +66,11 @@ struct BottomSheetContentView: View {
                 }
                 .onChange(of: viewModel.selectedCommunityArea?.id) { _, selectedID in
                     guard selectedID != nil else { return }
-                    promoteSheetToLargeIfNeeded()
+                    setSheetToDefaultDetent()
                 }
                 .onChange(of: viewModel.presentedCommunityArea?.id) { _, presentedID in
                     guard presentedID != nil else { return }
-                    promoteSheetToLargeIfNeeded()
+                    setSheetToDefaultDetent()
                 }
             }
             .ignoresSafeArea(edges: .bottom)
@@ -105,6 +105,14 @@ struct BottomSheetContentView: View {
         guard currentDetent != .large else { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             currentDetent = .large
+        }
+    }
+
+    private func setSheetToDefaultDetent() {
+        let defaultDetent: PresentationDetent = .fraction(0.3)
+        guard currentDetent != defaultDetent else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            currentDetent = defaultDetent
         }
     }
 }
