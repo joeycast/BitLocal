@@ -326,45 +326,24 @@ struct CommunityDetailView: View {
 
                 if hasTipsData {
                     Section("Tips") {
-                        if lightningPayload != nil {
+                        if payableLightningPayload != nil {
                             Button {
                                 showLightningAlert = true
                             } label: {
                                 platformLinkRow(
                                     icon: "bolt.fill",
-                                    label: "Pay with Lightning",
-                                    value: "Choose wallet, copy, or share"
+                                    label: "Tip This Community",
+                                    value: "Support this community by sending a tip over Lightning"
                                 )
                             }
                             .buttonStyle(.plain)
-                        }
-                        if let lightningAddress = area.tags?["ln_address"], !lightningAddress.isEmpty {
+                        } else if let tipFallbackURL {
                             linkableValueRow(
                                 .init(
-                                    label: "Lightning Address",
-                                    value: lightningAddress,
-                                    icon: "bolt.horizontal.circle.fill",
-                                    url: nil
-                                )
-                            )
-                        }
-                        if let tipAddress = area.tags?["tips:lightning_address"], !tipAddress.isEmpty {
-                            linkableValueRow(
-                                .init(
-                                    label: "Tips Lightning",
-                                    value: tipAddress,
-                                    icon: "bolt.fill",
-                                    url: nil
-                                )
-                            )
-                        }
-                        if let tipsURLRaw = area.tags?["tips:url"], !tipsURLRaw.isEmpty {
-                            linkableValueRow(
-                                .init(
-                                    label: "Tips Website",
-                                    value: cleanedWebsiteLabel(from: tipsURLRaw),
+                                    label: "Support This Community",
+                                    value: tipFallbackURL.host?.replacingOccurrences(of: "www.", with: "") ?? tipFallbackURL.absoluteString,
                                     icon: "heart.text.square.fill",
-                                    url: websiteURL(from: tipsURLRaw)
+                                    url: tipFallbackURL
                                 )
                             )
                         }
@@ -454,12 +433,12 @@ struct CommunityDetailView: View {
         }
         .alert("Pay with Lightning", isPresented: $showLightningAlert) {
             if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
-               let payload = lightningPayload {
+               let payload = payableLightningPayload {
                 Button("Open in \(lastWallet.name)") {
                     openWallet(lastWallet, payload: payload)
                 }
             }
-            if let payload = lightningPayload, lightningURL(from: payload) != nil {
+            if let payload = payableLightningPayload, lightningURL(from: payload) != nil {
                 Button("Open Compatible Wallet") {
                     openCompatibleLightningURL(payload: payload)
                 }
@@ -467,7 +446,7 @@ struct CommunityDetailView: View {
             Button("Choose Wallet…") {
                 showWalletAlert = true
             }
-            if let payload = lightningPayload {
+            if let payload = payableLightningPayload {
                 Button("Copy Lightning") {
                     UIPasteboard.general.string = payload
                 }
@@ -480,7 +459,7 @@ struct CommunityDetailView: View {
             Text("Select how you want to open or share this lightning payment.")
         }
         .alert("Choose Wallet", isPresented: $showWalletAlert) {
-            if let payload = lightningPayload {
+            if let payload = payableLightningPayload {
                 ForEach(walletsForPicker) { wallet in
                     Button(wallet.name) {
                         openWallet(wallet, payload: payload)
@@ -639,20 +618,32 @@ struct CommunityDetailView: View {
     }
 
     private var hasTipsData: Bool {
+        !tipValuesInPriority.isEmpty
+    }
+
+    private var tipValuesInPriority: [String] {
         let tags = area.tags ?? [:]
-        return ["ln_address", "tips:url", "tips:lightning_address"].contains {
-            if let value = tags[$0], !value.isEmpty { return true }
-            return false
+        let orderedKeys = ["tips:lightning_address", "tips:url", "ln_address"]
+        var seen = Set<String>()
+        return orderedKeys.compactMap { key in
+            guard let raw = tags[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty else { return nil }
+            guard !seen.contains(raw) else { return nil }
+            seen.insert(raw)
+            return raw
         }
     }
 
-    private var lightningPayload: String? {
-        let tags = area.tags ?? [:]
-        if let tips = tags["tips:lightning_address"]?.trimmingCharacters(in: .whitespacesAndNewlines), !tips.isEmpty {
-            return tips
-        }
-        if let address = tags["ln_address"]?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty {
-            return address
+    private var payableLightningPayload: String? {
+        tipValuesInPriority.compactMap(normalizedPayableLightningPayload).first
+    }
+
+    private var tipFallbackURL: URL? {
+        for value in tipValuesInPriority {
+            if normalizedPayableLightningPayload(from: value) != nil { continue }
+            if let fallback = nonPayableTipURL(from: value) {
+                return fallback
+            }
         }
         return nil
     }
@@ -805,6 +796,68 @@ struct CommunityDetailView: View {
         let encoded = payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? payload
         return URL(string: "lightning:\(encoded)")
     }
+
+    private func normalizedPayableLightningPayload(from raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lower = trimmed.lowercased()
+
+        // Support `lightning:<payload>` URIs only when payload looks wallet-payable.
+        if lower.hasPrefix("lightning:") {
+            let payload = String(trimmed.dropFirst("lightning:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            return looksPayableLightningPayload(payload) ? payload : nil
+        }
+
+        return looksPayableLightningPayload(trimmed) ? trimmed : nil
+    }
+
+    private func looksPayableLightningPayload(_ value: String) -> Bool {
+        let lower = value.lowercased()
+        if lower.hasPrefix("lnbc") || lower.hasPrefix("lntb") || lower.hasPrefix("lnbcrt") {
+            return true // BOLT11 invoices
+        }
+        if lower.hasPrefix("lno1") || lower.hasPrefix("lnr1") || lower.hasPrefix("lni1") {
+            return true // BOLT12 offer / invoice request / invoice
+        }
+        if lower.hasPrefix("lnurl1") {
+            return true // Bech32 LNURL
+        }
+        if isLightningAddress(value) {
+            return true // LUD-16 identifier (name@domain)
+        }
+        return false
+    }
+
+    private func nonPayableTipURL(from raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lower = trimmed.lowercased()
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") {
+            return URL(string: trimmed)
+        }
+        if isLightningAddress(trimmed) {
+            let parts = trimmed.split(separator: "@", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return nil }
+            let name = parts[0]
+            let domain = parts[1]
+            return URL(string: "https://\(domain)/\(name)")
+        }
+        return websiteURL(from: trimmed)
+    }
+
+    private func isLightningAddress(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: "@", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return false }
+        let local = parts[0]
+        let domain = parts[1]
+        guard !local.isEmpty, !domain.isEmpty else { return false }
+        guard !local.contains(" "), !domain.contains(" ") else { return false }
+        return domain.contains(".")
+    }
+
 
     private func openCompatibleLightningURL(payload: String) {
         guard let url = lightningURL(from: payload) else {
