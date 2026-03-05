@@ -822,7 +822,7 @@ struct BTCMapSocialsSection: View {
             guard let value = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
                 return nil
             }
-            return (item.0, item.1, value, item.3)
+            return (item.0, item.1, value.cleanedForDisplay(), item.3)
         }
     }
 

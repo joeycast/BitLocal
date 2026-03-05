@@ -611,7 +611,7 @@ struct CommunityDetailView: View {
             } else {
                 url = websiteURL(from: rawValue)
             }
-            return CommunitySocialLink(label: candidate.label, value: trimmedValue(rawValue), icon: candidate.icon, url: url)
+            return CommunitySocialLink(label: candidate.label, value: rawValue.cleanedForDisplay(), icon: candidate.icon, url: url)
         }
     }
 
@@ -637,7 +637,7 @@ struct CommunityDetailView: View {
         var seen = Set<String>()
         return candidates.compactMap { item -> CommunitySocialLink? in
             guard let rawValue = firstTagValue(for: [item.key], in: tags) else { return nil }
-            let displayValue = item.label == "Website" ? cleanedWebsiteLabel(from: rawValue) : trimmedValue(rawValue)
+            let displayValue = rawValue.cleanedForDisplay()
             let dedupeKey = "\(item.label)|\(displayValue)"
             guard !seen.contains(dedupeKey) else { return nil }
             seen.insert(dedupeKey)
@@ -785,28 +785,6 @@ struct CommunityDetailView: View {
         default:
             return websiteURL(from: trimmed)
         }
-    }
-
-    private func cleanedWebsiteLabel(from value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "Website" }
-
-        let candidateURL = websiteURL(from: trimmed)
-        if let host = candidateURL?.host, !host.isEmpty {
-            return host.replacingOccurrences(of: "www.", with: "")
-        }
-
-        return trimmed
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    }
-
-    private func trimmedValue(_ raw: String) -> String {
-        raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
     private var communityIconURL: URL? {

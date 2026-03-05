@@ -215,11 +215,22 @@ extension String {
     }
     
     func cleanedForDisplay() -> String {
-        return self
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-            .replacingOccurrences(of: "www.", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutScheme = trimmed.replacingOccurrences(
+            of: #"^https?://"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let withoutWWW = withoutScheme.replacingOccurrences(
+            of: #"^www\."#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        return withoutWWW.replacingOccurrences(
+            of: #"/+$"#,
+            with: "",
+            options: .regularExpression
+        )
     }
 }
 
