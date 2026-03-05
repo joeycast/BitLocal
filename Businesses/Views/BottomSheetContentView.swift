@@ -268,6 +268,7 @@ private struct CommunityRow: View {
 
 @available(iOS 17.0, *)
 struct CommunityDetailView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var viewModel: ContentViewModel
     let area: V2AreaRecord
     var currentDetent: PresentationDetent? = nil
@@ -276,6 +277,7 @@ struct CommunityDetailView: View {
     @State private var showWalletAlert = false
     @State private var showTipsDisclaimerAlert = false
     @State private var shareItem: ShareTextItem?
+    @State private var linkOpenErrorItem: CommunityLinkOpenError?
     @State private var lightningErrorMessage: String?
 
     var body: some View {
@@ -352,7 +354,7 @@ struct CommunityDetailView: View {
                                     label: "Support This Community",
                                     value: tipFallbackURL.host?.replacingOccurrences(of: "www.", with: "") ?? tipFallbackURL.absoluteString,
                                     icon: "heart.text.square.fill",
-                                    url: tipFallbackURL
+                                    linkTarget: .web(tipFallbackURL)
                                 )
                             )
                         }
@@ -492,6 +494,21 @@ struct CommunityDetailView: View {
         } message: {
             Text(lightningErrorMessage ?? "")
         }
+        .alert("Unable to Open", isPresented: Binding(
+            get: { linkOpenErrorItem != nil },
+            set: { newValue in
+                if !newValue { linkOpenErrorItem = nil }
+            })
+        ) {
+            if let copyValue = linkOpenErrorItem?.copyValue {
+                Button("Copy npub") {
+                    UIPasteboard.general.string = copyValue
+                }
+            }
+            Button("OK") {}
+        } message: {
+            Text(linkOpenErrorItem?.message ?? "")
+        }
         .background(Color(uiColor: .systemGroupedBackground))
         .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
         .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
@@ -527,8 +544,10 @@ struct CommunityDetailView: View {
 
     private func linkableValueRow(_ item: CommunitySocialLink) -> some View {
         Group {
-            if let url = item.url {
-                Link(destination: url) {
+            if item.isInteractive {
+                Button {
+                    openCommunityLink(item)
+                } label: {
                     platformLinkRow(icon: item.icon, label: item.label, value: item.value)
                 }
                 .buttonStyle(.plain)
@@ -605,13 +624,20 @@ struct CommunityDetailView: View {
 
         return candidates.compactMap { candidate in
             guard let rawValue = firstTagValue(for: candidate.keys, in: tags) else { return nil }
-            let url: URL?
-            if let base = candidate.base {
-                url = socialURL(for: rawValue, base: base)
+            let linkTarget: CommunityLinkTarget?
+            if candidate.label == "Nostr" {
+                linkTarget = nostrLinkTarget(for: rawValue)
+            } else if let base = candidate.base {
+                linkTarget = socialURL(for: rawValue, base: base).map { .web($0) }
             } else {
-                url = websiteURL(from: rawValue)
+                linkTarget = websiteURL(from: rawValue).map { .web($0) }
             }
-            return CommunitySocialLink(label: candidate.label, value: rawValue.cleanedForDisplay(), icon: candidate.icon, url: url)
+            return CommunitySocialLink(
+                label: candidate.label,
+                value: rawValue.cleanedForDisplay(),
+                icon: candidate.icon,
+                linkTarget: linkTarget
+            )
         }
     }
 
@@ -645,7 +671,7 @@ struct CommunityDetailView: View {
                 label: item.label,
                 value: displayValue,
                 icon: item.icon,
-                url: resolvedContactURL(forKey: item.key, value: rawValue)
+                linkTarget: resolvedContactURL(forKey: item.key, value: rawValue).map { .web($0) }
             )
         }
     }
@@ -880,6 +906,40 @@ struct CommunityDetailView: View {
         }
     }
 
+    private func openCommunityLink(_ item: CommunitySocialLink) {
+        guard let linkTarget = item.linkTarget else { return }
+
+        switch linkTarget {
+        case .web(let url):
+            openURL(url)
+        case .appPreferred(let appURL):
+            openURL(appURL) { accepted in
+                guard !accepted else { return }
+                linkOpenErrorItem = .nostr(copyValue: item.value)
+            }
+        }
+    }
+
+    private func nostrLinkTarget(for value: String) -> CommunityLinkTarget? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lowered = trimmed.lowercased()
+        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
+            return URL(string: trimmed).map { .web($0) }
+        }
+
+        let identifier: String
+        if lowered.hasPrefix("nostr:") {
+            identifier = String(trimmed.dropFirst("nostr:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            identifier = trimmed
+        }
+
+        guard !identifier.isEmpty else { return nil }
+        return URL(string: "nostr:\(identifier)").map { .appPreferred(appURL: $0) }
+    }
+
     private var sameSelectedCommunity: Bool {
         viewModel.selectedCommunityArea?.id == area.id
     }
@@ -932,9 +992,29 @@ private struct CommunitySocialLink: Identifiable {
     let label: String
     let value: String
     let icon: String
-    let url: URL?
+    let linkTarget: CommunityLinkTarget?
 
     var id: String { "\(label)|\(value)" }
+    var isInteractive: Bool { linkTarget != nil }
+}
+
+@available(iOS 17.0, *)
+private enum CommunityLinkTarget {
+    case web(URL)
+    case appPreferred(appURL: URL)
+}
+
+@available(iOS 17.0, *)
+private struct CommunityLinkOpenError {
+    let message: String
+    let copyValue: String?
+
+    static func nostr(copyValue: String) -> Self {
+        Self(
+            message: "It doesn't look like you have a Nostr app installed.",
+            copyValue: copyValue
+        )
+    }
 }
 
 @available(iOS 17.0, *)
