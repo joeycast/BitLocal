@@ -8,6 +8,8 @@
 
 import SwiftUI
 import Foundation // for Debug logging
+import UIKit
+import CryptoKit
 
 @available(iOS 17.0, *)
 struct BottomSheetContentView: View {
@@ -225,9 +227,7 @@ private struct CommunityRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "person.3.fill")
-                .foregroundStyle(.accent)
-                .frame(width: 22)
+            communityIcon
             VStack(alignment: .leading, spacing: 2) {
                 Text(area.displayName)
                     .font(.headline)
@@ -247,7 +247,24 @@ private struct CommunityRow: View {
         }
         .contentShape(.rect)
     }
+
+    private var communityIcon: some View {
+        CommunityIconImage(url: iconURL, placeholderSystemName: "person.3.fill", scaleToFill: true)
+        .frame(width: 28, height: 28)
+        .background(.secondary.opacity(0.12), in: .circle)
+        .clipShape(.circle)
+    }
+
+    private var iconURL: URL? {
+        guard let raw = area.tags?["icon:square"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        if raw.lowercased().hasPrefix("http://") || raw.lowercased().hasPrefix("https://") {
+            return URL(string: raw)
+        }
+        return URL(string: "https://\(raw)")
+    }
 }
+
 
 @available(iOS 17.0, *)
 struct CommunityDetailView: View {
@@ -256,100 +273,172 @@ struct CommunityDetailView: View {
     var currentDetent: PresentationDetent? = nil
 
     var body: some View {
-        List {
-            if let description = area.tags?["description"], !description.isEmpty {
-                Section("Description") {
-                    Text(description)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
+        VStack(spacing: 0) {
+            if let communityIconURL {
+                CommunityIconImage(url: communityIconURL, placeholderSystemName: nil, scaleToFill: false)
+                    .frame(width: 72, height: 72)
+                    .clipShape(.rect(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(.secondary.opacity(0.2), lineWidth: 1)
+                    )
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
             }
 
-            // MARK: About
-            if hasAboutData {
-                Section("About") {
-                    if let org = area.tags?["organization"], !org.isEmpty {
-                        detailRow(icon: "building.2", text: org)
-                    }
-                }
-            }
-
-            if !communitySocialLinks.isEmpty {
-                Section("Socials") {
-                    ForEach(communitySocialLinks) { social in
-                        if let url = social.url {
-                            Link(destination: url) {
-                                platformLinkRow(icon: social.icon, label: social.label)
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            platformLinkRow(icon: social.icon, label: social.label)
-                        }
-                    }
-                }
-            }
-
-            // MARK: Merchants
-            Section {
-                if viewModel.communityMembersIsLoading && sameSelectedCommunity {
-                    HStack {
-                        ProgressView()
-                        Text("Loading merchants…")
+            List {
+                if let description = area.tags?["description"], !description.isEmpty {
+                    Section("Description") {
+                        Text(description)
+                            .font(.body)
                             .foregroundStyle(.secondary)
                     }
-                } else if let error = viewModel.communityMembersError, !error.isEmpty, sameSelectedCommunity {
-                    Text(error)
-                        .foregroundStyle(.red)
-                } else if memberElements.isEmpty {
-                    Text("No merchants found for this community")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(memberElements, id: \.id) { element in
-                        NavigationLink {
-                            BusinessDetailView(
-                                element: element,
-                                userLocation: viewModel.userLocation,
-                                contentViewModel: viewModel,
-                                currentDetent: currentDetent
-                            )
-                            .onAppear {
-                                viewModel.setSelectionSource(.list)
-                                viewModel.selectAnnotationForListSelection(
-                                    element,
-                                    animated: true,
-                                    allowCameraMovement: !isLargeSheet
-                                )
-                                viewModel.selectedElement = element
-                            }
-                        } label: {
-                            ElementCell(viewModel: cellViewModel(for: element))
+                }
+
+                if hasAboutData {
+                    Section("About") {
+                        if let org = area.tags?["organization"], !org.isEmpty {
+                            detailRow(icon: "building.2", text: org)
                         }
                     }
                 }
-            } header: {
-                HStack {
-                    Text("Merchants")
-                    Spacer()
-                    Text("\(memberElements.count)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(.secondary.opacity(0.12), in: Capsule())
+
+                if !contactInformationLinks.isEmpty {
+                    Section("Contact Information") {
+                        ForEach(contactInformationLinks) { item in
+                            linkableValueRow(item)
+                        }
+                    }
+                }
+
+                if !socialLinks.isEmpty {
+                    Section("Socials") {
+                        ForEach(socialLinks) { social in
+                            linkableValueRow(social)
+                        }
+                    }
+                }
+
+                if hasTipsData {
+                    Section("Tips") {
+                        if let lightningAddress = area.tags?["ln_address"], !lightningAddress.isEmpty {
+                            linkableValueRow(
+                                .init(
+                                    label: "Lightning Address",
+                                    value: lightningAddress,
+                                    icon: "bolt.horizontal.circle.fill",
+                                    url: nil
+                                )
+                            )
+                        }
+                        if let tipAddress = area.tags?["tips:lightning_address"], !tipAddress.isEmpty {
+                            linkableValueRow(
+                                .init(
+                                    label: "Tips Lightning",
+                                    value: tipAddress,
+                                    icon: "bolt.fill",
+                                    url: nil
+                                )
+                            )
+                        }
+                        if let tipsURLRaw = area.tags?["tips:url"], !tipsURLRaw.isEmpty {
+                            linkableValueRow(
+                                .init(
+                                    label: "Tips Website",
+                                    value: cleanedWebsiteLabel(from: tipsURLRaw),
+                                    icon: "heart.text.square.fill",
+                                    url: websiteURL(from: tipsURLRaw)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Section("Verification") {
+                    if let verificationStatus {
+                        detailRow(
+                            icon: verificationStatus.icon,
+                            tint: verificationStatus.tint,
+                            label: verificationStatus.title,
+                            value: verificationStatus.statusText
+                        )
+                        Text(verificationStatus.explanation)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        detailRow(
+                            icon: "questionmark.circle.fill",
+                            tint: .secondary,
+                            label: "Not Yet Verified",
+                            value: "No verification date is available for this community."
+                        )
+                    }
+                }
+
+                // MARK: Merchants
+                Section {
+                    if viewModel.communityMembersIsLoading && sameSelectedCommunity {
+                        HStack {
+                            ProgressView()
+                            Text("Loading merchants…")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if let error = viewModel.communityMembersError, !error.isEmpty, sameSelectedCommunity {
+                        Text(error)
+                            .foregroundStyle(.red)
+                    } else if memberElements.isEmpty {
+                        Text("No merchants found for this community")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(memberElements, id: \.id) { element in
+                            NavigationLink {
+                                BusinessDetailView(
+                                    element: element,
+                                    userLocation: viewModel.userLocation,
+                                    contentViewModel: viewModel,
+                                    currentDetent: currentDetent
+                                )
+                                .onAppear {
+                                    viewModel.setSelectionSource(.list)
+                                    viewModel.selectAnnotationForListSelection(
+                                        element,
+                                        animated: true,
+                                        allowCameraMovement: !isLargeSheet
+                                    )
+                                    viewModel.selectedElement = element
+                                }
+                            } label: {
+                                ElementCell(viewModel: cellViewModel(for: element))
+                            }
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("Merchants")
+                        Spacer()
+                        Text("\(memberElements.count)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(.secondary.opacity(0.12), in: Capsule())
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .navigationTitle(area.displayName)
+            .navigationBarTitleDisplayMode(.inline)
+            .task(id: area.id) {
+                if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
+                    viewModel.selectCommunity(area, presentDetail: false)
                 }
             }
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
         .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
         .accessibilityHidden(shouldShowCollapsedHeaderOnly)
-        .listStyle(.insetGrouped)
-        .navigationTitle(area.displayName)
-        .navigationBarTitleDisplayMode(.inline)
-        .task(id: area.id) {
-            if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
-                viewModel.selectCommunity(area, presentDetail: false)
-            }
-        }
     }
 
     // MARK: - Helpers
@@ -364,13 +453,50 @@ struct CommunityDetailView: View {
         }
     }
 
-    private func platformLinkRow(icon: String, label: String) -> some View {
+    private func detailRow(icon: String, tint: Color, label: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .foregroundStyle(.primary)
+            }
+        }
+    }
+
+    private func linkableValueRow(_ item: CommunitySocialLink) -> some View {
+        Group {
+            if let url = item.url {
+                Link(destination: url) {
+                    platformLinkRow(icon: item.icon, label: item.label, value: item.value)
+                }
+                .buttonStyle(.plain)
+            } else {
+                platformLinkRow(icon: item.icon, label: item.label, value: item.value)
+            }
+        }
+        .copyValueContextMenu(item.value)
+    }
+
+    private func platformLinkRow(icon: String, label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .foregroundStyle(.accent)
                 .frame(width: 18)
-            Text(label)
-                .foregroundStyle(.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .foregroundStyle(.accent)
+                if !value.isEmpty, value != label {
+                    Text(value)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -378,22 +504,22 @@ struct CommunityDetailView: View {
     }
 
     private var hasAboutData: Bool {
-        let tags = area.tags ?? [:]
-        let keys = ["organization"]
-        return keys.contains { key in
-            if let val = tags[key], !val.isEmpty { return true }
-            return false
-        }
+        if let val = area.tags?["organization"], !val.isEmpty { return true }
+        return false
     }
 
-    private var communitySocialLinks: [CommunitySocialLink] {
+    private var socialLinks: [CommunitySocialLink] {
         let tags = area.tags ?? [:]
         let candidates: [(label: String, icon: String, keys: [String], base: String?)] = [
-            ("Website", "globe", ["contact:website", "website"], nil),
             ("X", "xmark.circle.fill", ["contact:x", "contact:twitter", "twitter"], "https://x.com/"),
             ("Facebook", "f.cursive.circle.fill", ["contact:facebook", "facebook"], "https://facebook.com/"),
             ("Instagram", "camera.circle.fill", ["contact:instagram", "instagram"], "https://instagram.com/"),
-            ("Telegram", "paperplane.circle.fill", ["contact:telegram", "telegram"], "https://t.me/")
+            ("Telegram", "paperplane.circle.fill", ["contact:telegram", "telegram"], "https://t.me/"),
+            ("GitHub", "chevron.left.forwardslash.chevron.right", ["contact:github"], "https://github.com/"),
+            ("LinkedIn", "briefcase.circle.fill", ["contact:linkedin"], "https://linkedin.com/in/"),
+            ("YouTube", "play.rectangle.fill", ["contact:youtube"], "https://youtube.com/"),
+            ("Reddit", "bubble.left.and.bubble.right.fill", ["contact:reddit"], "https://reddit.com/"),
+            ("Nostr", "dot.radiowaves.left.and.right", ["contact:nostr"], nil)
         ]
 
         return candidates.compactMap { candidate in
@@ -404,14 +530,76 @@ struct CommunityDetailView: View {
             } else {
                 url = websiteURL(from: rawValue)
             }
-            let displayLabel: String
-            if candidate.label == "Website" {
-                displayLabel = cleanedWebsiteLabel(from: rawValue)
-            } else {
-                displayLabel = candidate.label
-            }
-            return CommunitySocialLink(label: displayLabel, icon: candidate.icon, url: url)
+            return CommunitySocialLink(label: candidate.label, value: trimmedValue(rawValue), icon: candidate.icon, url: url)
         }
+    }
+
+    private var contactInformationLinks: [CommunitySocialLink] {
+        let tags = area.tags ?? [:]
+        let candidates: [(label: String, icon: String, key: String)] = [
+            ("Website", "globe", "contact:website"),
+            ("Website", "globe", "website"),
+            ("Email", "envelope.fill", "contact:email"),
+            ("Phone", "phone.fill", "contact:phone"),
+            ("Discord", "message.circle.fill", "contact:discord"),
+            ("Eventbrite", "ticket.fill", "contact:eventbrite"),
+            ("Geyser", "bolt.circle.fill", "contact:geyser"),
+            ("Matrix", "square.grid.3x3.fill", "contact:matrix"),
+            ("Meetup", "person.3.fill", "contact:meetup"),
+            ("RSS", "dot.radiowaves.right", "contact:rss"),
+            ("Satlantis", "sparkles.square.filled.on.square", "contact:satlantis"),
+            ("Signal", "message.badge.filled.fill", "contact:signal"),
+            ("SimpleX", "ellipsis.bubble.fill", "contact:simplex"),
+            ("WhatsApp", "phone.circle.fill", "contact:whatsapp")
+        ]
+
+        var seen = Set<String>()
+        return candidates.compactMap { item -> CommunitySocialLink? in
+            guard let rawValue = firstTagValue(for: [item.key], in: tags) else { return nil }
+            let displayValue = item.label == "Website" ? cleanedWebsiteLabel(from: rawValue) : trimmedValue(rawValue)
+            let dedupeKey = "\(item.label)|\(displayValue)"
+            guard !seen.contains(dedupeKey) else { return nil }
+            seen.insert(dedupeKey)
+            return CommunitySocialLink(
+                label: item.label,
+                value: displayValue,
+                icon: item.icon,
+                url: resolvedContactURL(forKey: item.key, value: rawValue)
+            )
+        }
+    }
+
+    private var hasTipsData: Bool {
+        let tags = area.tags ?? [:]
+        return ["ln_address", "tips:url", "tips:lightning_address"].contains {
+            if let value = tags[$0], !value.isEmpty { return true }
+            return false
+        }
+    }
+
+    private var verificationStatus: CommunityVerificationStatus? {
+        guard let raw = area.tags?["verified:date"],
+              let verifiedDate = parsedBTCMapDate(raw),
+              let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) else {
+            return nil
+        }
+        let formattedDate = verifiedDate.formatted(date: .abbreviated, time: .omitted)
+        if verifiedDate > oneYearAgo {
+            return .init(
+                icon: "checkmark.seal.fill",
+                tint: .green,
+                title: "Verified",
+                statusText: "Last verified: \(formattedDate)",
+                explanation: "Someone physically confirmed this community within the past year."
+            )
+        }
+        return .init(
+            icon: "exclamationmark.triangle.fill",
+            tint: .orange,
+            title: "Not Recently Verified",
+            statusText: "Last verified: \(formattedDate)",
+            explanation: "It has been more than a year since this community was verified."
+        )
     }
 
     private func firstTagValue(for keys: [String], in tags: [String: String]) -> String? {
@@ -440,6 +628,37 @@ struct CommunityDetailView: View {
         return URL(string: base + handle)
     }
 
+    private func resolvedContactURL(forKey key: String, value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lowered = trimmed.lowercased()
+        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
+            return URL(string: trimmed)
+        }
+
+        switch key {
+        case "contact:website", "website":
+            return websiteURL(from: trimmed)
+        case "contact:email":
+            return URL(string: "mailto:\(trimmed)")
+        case "contact:phone":
+            return URL(string: "tel:\(trimmed)")
+        case "contact:github":
+            return socialURL(for: trimmed, base: "https://github.com/")
+        case "contact:linkedin":
+            return socialURL(for: trimmed, base: "https://linkedin.com/in/")
+        case "contact:discord":
+            return socialURL(for: trimmed, base: "https://discord.gg/")
+        case "contact:whatsapp":
+            return socialURL(for: trimmed, base: "https://wa.me/")
+        case "contact:matrix":
+            return URL(string: "https://matrix.to/#/\(trimmed)")
+        default:
+            return websiteURL(from: trimmed)
+        }
+    }
+
     private func cleanedWebsiteLabel(from value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Website" }
@@ -453,6 +672,29 @@ struct CommunityDetailView: View {
             .replacingOccurrences(of: "https://", with: "")
             .replacingOccurrences(of: "http://", with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private func trimmedValue(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private var communityIconURL: URL? {
+        guard let raw = area.tags?["icon:square"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        return websiteURL(from: raw)
+    }
+
+    private func parsedBTCMapDate(_ raw: String) -> Date? {
+        if let fullISO = ISO8601DateFormatter.communityFullPrecision.date(from: raw) {
+            return fullISO
+        }
+        if let basicISO = ISO8601DateFormatter().date(from: raw) {
+            return basicISO
+        }
+        return CommunityBTCMapDateParsers.dateOnly.date(from: raw)
     }
 
     private var sameSelectedCommunity: Bool {
@@ -501,8 +743,147 @@ struct CommunityDetailView: View {
 @available(iOS 17.0, *)
 private struct CommunitySocialLink: Identifiable {
     let label: String
+    let value: String
     let icon: String
     let url: URL?
 
-    var id: String { label }
+    var id: String { "\(label)|\(value)" }
+}
+
+@available(iOS 17.0, *)
+private struct CommunityVerificationStatus {
+    let icon: String
+    let tint: Color
+    let title: String
+    let statusText: String
+    let explanation: String
+}
+
+@MainActor
+private struct CommunityIconImage: View {
+    let url: URL?
+    let placeholderSystemName: String?
+    let scaleToFill: Bool
+
+    @State private var uiImage: UIImage?
+
+    var body: some View {
+        Group {
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .if(scaleToFill) { view in
+                        view.scaledToFill()
+                    }
+                    .if(!scaleToFill) { view in
+                        view.scaledToFit()
+                    }
+            } else if let placeholderSystemName {
+                Image(systemName: placeholderSystemName)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(6)
+                    .foregroundStyle(.accent)
+            } else {
+                Color.clear
+            }
+        }
+        .task(id: url?.absoluteString) {
+            guard let url else {
+                uiImage = nil
+                return
+            }
+            uiImage = await CommunityIconCache.shared.image(for: url)
+        }
+    }
+}
+
+actor CommunityIconCache {
+    static let shared = CommunityIconCache()
+
+    private let memoryCache = NSCache<NSURL, UIImage>()
+    private let directoryURL: URL
+
+    private init() {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        directoryURL = base.appendingPathComponent("CommunityIconCache", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    }
+
+    func image(for url: URL) async -> UIImage? {
+        let cacheKey = url as NSURL
+        if let cached = memoryCache.object(forKey: cacheKey) {
+            return cached
+        }
+
+        let fileURL = directoryURL.appendingPathComponent(fileName(for: url))
+        if let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) {
+            memoryCache.setObject(image, forKey: cacheKey)
+            return image
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.cachePolicy = .returnCacheDataElseLoad
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                return nil
+            }
+            guard let image = UIImage(data: data) else { return nil }
+            memoryCache.setObject(image, forKey: cacheKey)
+            try? data.write(to: fileURL, options: .atomic)
+            return image
+        } catch {
+            return nil
+        }
+    }
+
+    private func fileName(for url: URL) -> String {
+        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let hash = digest.map { String(format: "%02x", $0) }.joined()
+        return "\(hash).img"
+    }
+}
+
+private extension ISO8601DateFormatter {
+    static let communityFullPrecision: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+}
+
+private enum CommunityBTCMapDateParsers {
+    static let dateOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+}
+
+private extension View {
+    func copyValueContextMenu(_ value: String) -> some View {
+        contextMenu {
+            Button {
+                UIPasteboard.general.string = value
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
 }
