@@ -271,6 +271,11 @@ struct CommunityDetailView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     let area: V2AreaRecord
     var currentDetent: PresentationDetent? = nil
+    @AppStorage("community.lastLightningWalletID") private var lastLightningWalletID: String = ""
+    @State private var showLightningAlert = false
+    @State private var showWalletAlert = false
+    @State private var shareItem: ShareTextItem?
+    @State private var lightningErrorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -321,6 +326,18 @@ struct CommunityDetailView: View {
 
                 if hasTipsData {
                     Section("Tips") {
+                        if lightningPayload != nil {
+                            Button {
+                                showLightningAlert = true
+                            } label: {
+                                platformLinkRow(
+                                    icon: "bolt.fill",
+                                    label: "Pay with Lightning",
+                                    value: "Choose wallet, copy, or share"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                         if let lightningAddress = area.tags?["ln_address"], !lightningAddress.isEmpty {
                             linkableValueRow(
                                 .init(
@@ -434,6 +451,58 @@ struct CommunityDetailView: View {
                     viewModel.selectCommunity(area, presentDetail: false)
                 }
             }
+        }
+        .alert("Pay with Lightning", isPresented: $showLightningAlert) {
+            if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
+               let payload = lightningPayload {
+                Button("Open in \(lastWallet.name)") {
+                    openWallet(lastWallet, payload: payload)
+                }
+            }
+            if let payload = lightningPayload, lightningURL(from: payload) != nil {
+                Button("Open Compatible Wallet") {
+                    openCompatibleLightningURL(payload: payload)
+                }
+            }
+            Button("Choose Wallet…") {
+                showWalletAlert = true
+            }
+            if let payload = lightningPayload {
+                Button("Copy Lightning") {
+                    UIPasteboard.general.string = payload
+                }
+                Button("Share…") {
+                    shareItem = ShareTextItem(text: payload)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Select how you want to open or share this lightning payment.")
+        }
+        .alert("Choose Wallet", isPresented: $showWalletAlert) {
+            if let payload = lightningPayload {
+                ForEach(walletsForPicker) { wallet in
+                    Button(wallet.name) {
+                        openWallet(wallet, payload: payload)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Pick a wallet app to open. The lightning value will be copied first.")
+        }
+        .sheet(item: $shareItem) { item in
+            ActivityView(items: [item.text])
+        }
+        .alert("Unable to Open Wallet", isPresented: Binding(
+            get: { lightningErrorMessage != nil },
+            set: { newValue in
+                if !newValue { lightningErrorMessage = nil }
+            })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(lightningErrorMessage ?? "")
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
@@ -577,6 +646,41 @@ struct CommunityDetailView: View {
         }
     }
 
+    private var lightningPayload: String? {
+        let tags = area.tags ?? [:]
+        if let tips = tags["tips:lightning_address"]?.trimmingCharacters(in: .whitespacesAndNewlines), !tips.isEmpty {
+            return tips
+        }
+        if let address = tags["ln_address"]?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty {
+            return address
+        }
+        return nil
+    }
+
+    private var knownWallets: [LightningWalletOption] {
+        [
+            .init(id: "cashapp", name: "Cash App", appURLs: urls(["cashapp://", "squarecash://"])),
+            .init(id: "strike", name: "Strike", appURLs: urls(["strike://"])),
+            .init(id: "bluewallet", name: "BlueWallet", appURLs: urls(["bluewallet://"])),
+            .init(id: "phoenix", name: "Phoenix", appURLs: urls(["phoenix://"])),
+            .init(id: "zeus", name: "Zeus", appURLs: urls(["zeusln://"])),
+            .init(id: "muun", name: "Muun", appURLs: urls(["muun://"])),
+            .init(id: "wos", name: "Wallet of Satoshi", appURLs: urls(["walletofsatoshi://"])),
+            .init(id: "breez", name: "Breez", appURLs: urls(["breez://"])),
+            .init(id: "aqua", name: "Aqua", appURLs: urls(["aqua://"]))
+        ]
+    }
+
+    private var installedWallets: [LightningWalletOption] {
+        knownWallets.filter { wallet in
+            wallet.appURLs.contains { UIApplication.shared.canOpenURL($0) }
+        }
+    }
+
+    private var walletsForPicker: [LightningWalletOption] {
+        installedWallets.isEmpty ? knownWallets : installedWallets
+    }
+
     private var verificationStatus: CommunityVerificationStatus? {
         guard let raw = area.tags?["verified:date"],
               let verifiedDate = parsedBTCMapDate(raw),
@@ -697,6 +801,39 @@ struct CommunityDetailView: View {
         return CommunityBTCMapDateParsers.dateOnly.date(from: raw)
     }
 
+    private func lightningURL(from payload: String) -> URL? {
+        let encoded = payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? payload
+        return URL(string: "lightning:\(encoded)")
+    }
+
+    private func openCompatibleLightningURL(payload: String) {
+        guard let url = lightningURL(from: payload) else {
+            lightningErrorMessage = "The lightning value is not valid."
+            return
+        }
+        UIApplication.shared.open(url, options: [:]) { success in
+            if !success {
+                lightningErrorMessage = "No compatible wallet app was available to open this lightning link."
+            }
+        }
+    }
+
+    private func openWallet(_ wallet: LightningWalletOption, payload: String) {
+        let appURL = wallet.appURLs.first(where: { UIApplication.shared.canOpenURL($0) }) ?? wallet.appURLs.first
+        guard let appURL else {
+            lightningErrorMessage = "The selected wallet could not be opened."
+            return
+        }
+        UIPasteboard.general.string = payload
+        UIApplication.shared.open(appURL, options: [:]) { success in
+            if success {
+                lastLightningWalletID = wallet.id
+            } else {
+                lightningErrorMessage = "Could not open \(wallet.name). The lightning value has been copied so you can paste it manually."
+            }
+        }
+    }
+
     private var sameSelectedCommunity: Bool {
         viewModel.selectedCommunityArea?.id == area.id
     }
@@ -738,6 +875,10 @@ struct CommunityDetailView: View {
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
         String(describing: detent).lowercased()
     }
+
+    private func urls(_ values: [String]) -> [URL] {
+        values.compactMap(URL.init(string:))
+    }
 }
 
 @available(iOS 17.0, *)
@@ -757,6 +898,30 @@ private struct CommunityVerificationStatus {
     let title: String
     let statusText: String
     let explanation: String
+}
+
+@available(iOS 17.0, *)
+private struct LightningWalletOption: Identifiable {
+    let id: String
+    let name: String
+    let appURLs: [URL]
+}
+
+@available(iOS 17.0, *)
+private struct ShareTextItem: Identifiable {
+    let id = UUID()
+    let text: String
+}
+
+@available(iOS 17.0, *)
+private struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 @MainActor
