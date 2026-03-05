@@ -175,6 +175,9 @@ struct BusinessDetailView: View {
             BusinessMapSection(element: element)
                 .clearListRowBackground(if: shouldUseGlassyRows)
         }
+        .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
+        .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
+        .accessibilityHidden(shouldShowCollapsedHeaderOnly)
         .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
@@ -232,6 +235,15 @@ extension BusinessDetailView {
         guard let detent = currentDetent else { return false }
         guard #available(iOS 26.0, *) else { return false }
         return detent != .large
+    }
+
+    private var shouldShowCollapsedHeaderOnly: Bool {
+        guard let detent = currentDetent else { return false }
+        return detentIdentifier(detent).contains("fraction 0.11")
+    }
+
+    private func detentIdentifier(_ detent: PresentationDetent) -> String {
+        String(describing: detent).lowercased()
     }
 }
 

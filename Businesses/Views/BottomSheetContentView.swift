@@ -21,7 +21,7 @@ struct BottomSheetContentView: View {
                 NavigationStack(path: $viewModel.path) {
                     Group {
                         if viewModel.mapDisplayMode == .communities {
-                            CommunitiesListView()
+                            CommunitiesListView(currentDetent: currentDetent)
                                 .environmentObject(viewModel)
                         } else {
                             BusinessesListView(
@@ -44,7 +44,10 @@ struct BottomSheetContentView: View {
                     }
                     .navigationDestination(isPresented: communityDetailBindingIsPresented) {
                         if let area = viewModel.presentedCommunityArea {
-                            CommunityDetailView(area: area)
+                            CommunityDetailView(
+                                area: area,
+                                currentDetent: currentDetent
+                            )
                                 .environmentObject(viewModel)
                                 .clearNavigationContainerBackgroundIfAvailable()
                         }
@@ -120,6 +123,7 @@ struct BottomSheetContentView: View {
 @available(iOS 17.0, *)
 struct CommunitiesListView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
+    var currentDetent: PresentationDetent? = nil
     @State private var filterText = ""
     @FocusState private var isSearchFieldFocused: Bool
 
@@ -150,7 +154,10 @@ struct CommunitiesListView: View {
                     } else {
                         ForEach(filteredCommunities) { area in
                             NavigationLink {
-                                CommunityDetailView(area: area)
+                                CommunityDetailView(
+                                    area: area,
+                                    currentDetent: currentDetent
+                                )
                                     .environmentObject(viewModel)
                                     .onAppear {
                                         viewModel.selectCommunity(area, presentDetail: false)
@@ -246,6 +253,7 @@ private struct CommunityRow: View {
 struct CommunityDetailView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     let area: V2AreaRecord
+    var currentDetent: PresentationDetent? = nil
 
     var body: some View {
         List {
@@ -324,7 +332,8 @@ struct CommunityDetailView: View {
                             BusinessDetailView(
                                 element: element,
                                 userLocation: viewModel.userLocation,
-                                contentViewModel: viewModel
+                                contentViewModel: viewModel,
+                                currentDetent: currentDetent
                             )
                             .onAppear {
                                 viewModel.setSelectionSource(.list)
@@ -338,6 +347,9 @@ struct CommunityDetailView: View {
                 }
             }
         }
+        .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
+        .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
+        .accessibilityHidden(shouldShowCollapsedHeaderOnly)
         .listStyle(.insetGrouped)
         .navigationTitle("Community")
         .navigationBarTitleDisplayMode(.inline)
@@ -401,5 +413,14 @@ struct CommunityDetailView: View {
             viewModel.cellViewModels[element.id] = newVM
         }
         return newVM
+    }
+
+    private var shouldShowCollapsedHeaderOnly: Bool {
+        guard let detent = currentDetent else { return false }
+        return detentIdentifier(detent).contains("fraction 0.11")
+    }
+
+    private func detentIdentifier(_ detent: PresentationDetent) -> String {
+        String(describing: detent).lowercased()
     }
 }
