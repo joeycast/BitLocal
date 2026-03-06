@@ -269,167 +269,171 @@ struct CommunityDetailView: View {
     @State private var lightningErrorMessage: String?
 
     var body: some View {
-        VStack(spacing: 0) {
+        List {
             if let communityIconURL {
-                CommunityIconImage(url: communityIconURL, placeholderSystemName: nil, scaleToFill: false)
-                    .frame(width: 72, height: 72)
-                    .clipShape(.rect(cornerRadius: 14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(.secondary.opacity(0.2), lineWidth: 1)
-                    )
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
+                HStack {
+                    Spacer()
+                    CommunityIconImage(url: communityIconURL, placeholderSystemName: nil, scaleToFill: false)
+                        .frame(width: 72, height: 72)
+                        .clipShape(.rect(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                    Spacer()
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 6, trailing: 0))
+                .listRowSeparator(.hidden)
             }
 
-            List {
-                if let description = area.tags?["description"], !description.isEmpty {
-                    Section("Description") {
-                        Text(description)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+            if let description = area.tags?["description"], !description.isEmpty {
+                Section("Description") {
+                    Text(description)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if hasAboutData {
+                Section("About") {
+                    if let org = area.tags?["organization"], !org.isEmpty {
+                        detailRow(icon: "building.2", text: org)
                     }
                 }
+            }
 
-                if hasAboutData {
-                    Section("About") {
-                        if let org = area.tags?["organization"], !org.isEmpty {
-                            detailRow(icon: "building.2", text: org)
-                        }
+            if !contactInformationLinks.isEmpty {
+                Section("Contact Information") {
+                    ForEach(contactInformationLinks) { item in
+                        linkableValueRow(item)
                     }
                 }
+            }
 
-                if !contactInformationLinks.isEmpty {
-                    Section("Contact Information") {
-                        ForEach(contactInformationLinks) { item in
-                            linkableValueRow(item)
-                        }
+            if !socialLinks.isEmpty {
+                Section("Socials") {
+                    ForEach(socialLinks) { social in
+                        linkableValueRow(social)
                     }
                 }
+            }
 
-                if !socialLinks.isEmpty {
-                    Section("Socials") {
-                        ForEach(socialLinks) { social in
-                            linkableValueRow(social)
-                        }
-                    }
-                }
-
-                if hasTipsData {
-                    Section("Tips") {
-                        if let payload = payableLightningPayload {
-                            HStack(alignment: .top, spacing: 10) {
-                                Button {
-                                    showLightningAlert = true
-                                } label: {
-                                    tipActionRow(payload: payload)
-                                }
-                                .buttonStyle(.plain)
-                                .copyValueContextMenu(payload, title: "Copy Lightning Address")
-
-                                Button {
-                                    showTipsDisclaimerAlert = true
-                                } label: {
-                                    Image(systemName: "info.circle")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Tipping disclaimer")
-                            }
-                        } else if let tipFallbackURL {
-                            linkableValueRow(
-                                .init(
-                                    label: "Support This Community",
-                                    value: tipFallbackURL.host?.replacingOccurrences(of: "www.", with: "") ?? tipFallbackURL.absoluteString,
-                                    icon: "heart.text.square.fill",
-                                    linkTarget: .web(tipFallbackURL)
-                                )
-                            )
-                        }
-                    }
-                }
-
-                Section("Verification") {
-                    if let verificationStatus {
-                        detailRow(
-                            icon: verificationStatus.icon,
-                            tint: verificationStatus.tint,
-                            label: verificationStatus.title,
-                            value: verificationStatus.statusText
-                        )
-                        Text(verificationStatus.explanation)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        detailRow(
-                            icon: "questionmark.circle.fill",
-                            tint: .secondary,
-                            label: "Not Yet Verified",
-                            value: "No verification date is available for this community."
-                        )
-                    }
-                }
-
-                // MARK: Merchants
-                Section {
-                    if viewModel.communityMembersIsLoading && sameSelectedCommunity {
-                        HStack {
-                            ProgressView()
-                            Text("Loading merchants…")
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if let error = viewModel.communityMembersError, !error.isEmpty, sameSelectedCommunity {
-                        Text(error)
-                            .foregroundStyle(.red)
-                    } else if memberElements.isEmpty {
-                        Text("No merchants found for this community")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(memberElements, id: \.id) { element in
-                            NavigationLink {
-                                BusinessDetailView(
-                                    element: element,
-                                    userLocation: viewModel.userLocation,
-                                    contentViewModel: viewModel,
-                                    currentDetent: currentDetent
-                                )
-                                .onAppear {
-                                    viewModel.setSelectionSource(.list)
-                                    viewModel.selectAnnotationForListSelection(
-                                        element,
-                                        animated: true,
-                                        allowCameraMovement: !isLargeSheet
-                                    )
-                                    viewModel.selectedElement = element
-                                }
+            if hasTipsData {
+                Section("Tips") {
+                    if let payload = payableLightningPayload {
+                        HStack(alignment: .top, spacing: 10) {
+                            Button {
+                                showLightningAlert = true
                             } label: {
-                                ElementCell(viewModel: cellViewModel(for: element))
+                                tipActionRow(payload: payload)
                             }
+                            .buttonStyle(.plain)
+                            .copyValueContextMenu(payload, title: "Copy Lightning Address")
+
+                            Button {
+                                showTipsDisclaimerAlert = true
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Tipping disclaimer")
                         }
-                    }
-                } header: {
-                    HStack {
-                        Text("Merchants")
-                        Spacer()
-                        Text("\(memberElements.count)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(.secondary.opacity(0.12), in: Capsule())
+                    } else if let tipFallbackURL {
+                        linkableValueRow(
+                            .init(
+                                label: "Support This Community",
+                                value: tipFallbackURL.host?.replacingOccurrences(of: "www.", with: "") ?? tipFallbackURL.absoluteString,
+                                icon: "heart.text.square.fill",
+                                linkTarget: .web(tipFallbackURL)
+                            )
+                        )
                     }
                 }
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .navigationTitle(area.displayName)
-            .navigationBarTitleDisplayMode(.inline)
+
+            Section("Verification") {
+                if let verificationStatus {
+                    detailRow(
+                        icon: verificationStatus.icon,
+                        tint: verificationStatus.tint,
+                        label: verificationStatus.title,
+                        value: verificationStatus.statusText
+                    )
+                    Text(verificationStatus.explanation)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    detailRow(
+                        icon: "questionmark.circle.fill",
+                        tint: .secondary,
+                        label: "Not Yet Verified",
+                        value: "No verification date is available for this community."
+                    )
+                }
+            }
+
+            // MARK: Merchants
+            Section {
+                if viewModel.communityMembersIsLoading && sameSelectedCommunity {
+                    HStack {
+                        ProgressView()
+                        Text("Loading merchants…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let error = viewModel.communityMembersError, !error.isEmpty, sameSelectedCommunity {
+                    Text(error)
+                        .foregroundStyle(.red)
+                } else if memberElements.isEmpty {
+                    Text("No merchants found for this community")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(memberElements, id: \.id) { element in
+                        NavigationLink {
+                            BusinessDetailView(
+                                element: element,
+                                userLocation: viewModel.userLocation,
+                                contentViewModel: viewModel,
+                                currentDetent: currentDetent
+                            )
+                            .onAppear {
+                                viewModel.setSelectionSource(.list)
+                                viewModel.selectAnnotationForListSelection(
+                                    element,
+                                    animated: true,
+                                    allowCameraMovement: !isLargeSheet
+                                )
+                                viewModel.selectedElement = element
+                            }
+                        } label: {
+                            ElementCell(viewModel: cellViewModel(for: element))
+                        }
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Merchants")
+                    Spacer()
+                    Text("\(memberElements.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(.secondary.opacity(0.12), in: Capsule())
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .scrollContentBackground(.hidden)
+        .navigationTitle(area.displayName)
+        .navigationBarTitleDisplayMode(.inline)
             .task(id: area.id) {
                 if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
                     viewModel.selectCommunity(area, presentDetail: false)
                 }
             }
-        }
         .alert("Tip This Community", isPresented: $showLightningAlert) {
             if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
                let payload = payableLightningPayload {
