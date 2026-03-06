@@ -677,6 +677,40 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return mapCenter.distance(from: target)
     }
 
+    func distanceForMerchantBrowseOrder(element: Element) -> CLLocationDistance? {
+        guard let coordinate = element.mapCoordinate else { return nil }
+        let target = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+
+        if let userLocation {
+            return userLocation.distance(from: target)
+        }
+
+        let mapCenter = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+        return mapCenter.distance(from: target)
+    }
+
+    func merchantBrowseSortOrder(_ lhs: Element, _ rhs: Element) -> Bool {
+        let lhsBoosted = lhs.isCurrentlyBoosted()
+        let rhsBoosted = rhs.isCurrentlyBoosted()
+        if lhsBoosted != rhsBoosted {
+            return lhsBoosted && !rhsBoosted
+        }
+
+        let lhsDistance = distanceForMerchantBrowseOrder(element: lhs) ?? .greatestFiniteMagnitude
+        let rhsDistance = distanceForMerchantBrowseOrder(element: rhs) ?? .greatestFiniteMagnitude
+        if lhsDistance != rhsDistance {
+            return lhsDistance < rhsDistance
+        }
+
+        let lhsName = normalizedMerchantName(lhs.displayName ?? "")
+        let rhsName = normalizedMerchantName(rhs.displayName ?? "")
+        if lhsName != rhsName {
+            return lhsName < rhsName
+        }
+
+        return lhs.id < rhs.id
+    }
+
     private func listFocusCoordinate() -> CLLocationCoordinate2D? {
         guard UIDevice.current.userInterfaceIdiom == .phone,
               let mapView = mapView else { return nil }
@@ -2646,6 +2680,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func merchantElementSearchSortOrder(_ lhs: Element, _ rhs: Element) -> Bool {
+        let lhsBoosted = lhs.isCurrentlyBoosted()
+        let rhsBoosted = rhs.isCurrentlyBoosted()
+        if lhsBoosted != rhsBoosted {
+            return lhsBoosted && !rhsBoosted
+        }
+
         let lhsDistance = merchantSearchDistance(for: lhs)
         let rhsDistance = merchantSearchDistance(for: rhs)
 
@@ -2663,6 +2703,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func merchantRecordSearchSortOrder(_ lhs: V4PlaceRecord, _ rhs: V4PlaceRecord) -> Bool {
+        let lhsBoosted = lhs.isCurrentlyBoosted()
+        let rhsBoosted = rhs.isCurrentlyBoosted()
+        if lhsBoosted != rhsBoosted {
+            return lhsBoosted && !rhsBoosted
+        }
+
         let lhsDistance = merchantSearchDistance(for: lhs)
         let rhsDistance = merchantSearchDistance(for: rhs)
 

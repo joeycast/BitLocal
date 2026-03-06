@@ -47,6 +47,61 @@ final class PlaceShareLinkBuilderTests: XCTestCase {
     }
 }
 
+final class BTCMapMerchantURLBuilderTests: XCTestCase {
+    func testCreatesMerchantURLFromPlaceID() {
+        let element = Self.makeElement(
+            id: "34515",
+            lat: 12.34,
+            lon: 56.78
+        )
+
+        let url = BTCMapMerchantURLBuilder.makeURL(for: element)
+
+        XCTAssertEqual(url?.absoluteString, "https://btcmap.org/merchant/34515")
+    }
+
+    func testFallsBackToMapURLWhenPlaceIDIsInvalid() {
+        let element = Self.makeElement(
+            id: "invalid/id",
+            lat: 12.34,
+            lon: 56.78
+        )
+
+        let url = BTCMapMerchantURLBuilder.makeURL(for: element)
+
+        XCTAssertEqual(url?.absoluteString, "https://btcmap.org/map?lat=12.34&long=56.78")
+    }
+
+    func testReturnsNilWithoutValidIDOrCoordinates() {
+        let element = Self.makeElement(
+            id: "invalid/id",
+            lat: nil,
+            lon: nil
+        )
+
+        XCTAssertNil(BTCMapMerchantURLBuilder.makeURL(for: element))
+    }
+
+    private static func makeElement(id: String, lat: Double?, lon: Double?) -> Element {
+        Element(
+            id: id,
+            osmJSON: makeOsmJSON(lat: lat, lon: lon),
+            tags: nil,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: nil,
+            deletedAt: nil,
+            address: nil,
+            v4Metadata: nil
+        )
+    }
+
+    private static func makeOsmJSON(lat: Double?, lon: Double?) -> OsmJSON? {
+        guard let lat, let lon else { return nil }
+        let data = Data(#"{"lat":\#(lat),"lon":\#(lon)}"#.utf8)
+        return try? JSONDecoder().decode(OsmJSON.self, from: data)
+    }
+}
+
 final class DeepLinkParserTests: XCTestCase {
     func testParsesAllowedPlaceLink() {
         let url = URL(string: "https://www.bitlocal.app/place/9876")!

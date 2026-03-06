@@ -169,50 +169,6 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         }.resume()
     }
 
-    func fetchPlaceCommentQuote(completion: @escaping (Result<V4PlaceCommentQuote, Error>) -> Void) {
-        performJSONRequest(path: "place-comments/quote", body: [:], completion: completion)
-    }
-
-    func createPlaceComment(placeID: String, comment: String, completion: @escaping (Result<V4InvoiceOrderResponse, Error>) -> Void) {
-        performJSONRequest(path: "place-comments", body: ["place_id": placeID, "comment": comment], completion: completion)
-    }
-
-    func fetchPlaceBoostQuote(completion: @escaping (Result<V4PlaceBoostQuote, Error>) -> Void) {
-        performJSONRequest(path: "place-boosts/quote", body: [:], completion: completion)
-    }
-
-    func createPlaceBoost(placeID: String, days: Int, completion: @escaping (Result<V4InvoiceOrderResponse, Error>) -> Void) {
-        performJSONRequest(path: "place-boosts", body: ["place_id": placeID, "days": days], completion: completion)
-    }
-
-    func fetchInvoice(id: String, completion: @escaping (Result<V4InvoiceRecord, Error>) -> Void) {
-        guard let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-              let url = URL(string: "https://api.btcmap.org/v4/invoices/\(encodedID)") else {
-            completion(.failure(BTCMapV4Error.invalidURL))
-            return
-        }
-        session.dataTask(with: url) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            do {
-                completion(.success(try self.decoder.decode(V4InvoiceRecord.self, from: data)))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
-    }
-
     private func performRequest(url: URL?, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
         guard let url else {
             completion(.failure(BTCMapV4Error.invalidURL))
@@ -284,6 +240,37 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             completion(.failure(BTCMapV4Error.invalidBody))
             return
         }
+
+        session.dataTask(with: request) { data, response, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+            guard let data, let http = response as? HTTPURLResponse else {
+                completion(.failure(BTCMapV4Error.invalidResponse))
+                return
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let message = String(data: data.prefix(500), encoding: .utf8)
+                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
+                return
+            }
+            do {
+                completion(.success(try self.decoder.decode(T.self, from: data)))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+
+    private func performGETJSONRequest<T: Decodable>(path: String, completion: @escaping (Result<T, Error>) -> Void) {
+        guard let url = URL(string: "https://api.btcmap.org/v4/\(path)") else {
+            completion(.failure(BTCMapV4Error.invalidURL))
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         session.dataTask(with: request) { data, response, error in
             if let error {
@@ -886,31 +873,6 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
 
     func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         v4Client.fetchPlaceComments(placeID: placeID, completion: completion)
-    }
-
-    func fetchPlaceCommentQuote(completion: @escaping (Result<V4PlaceCommentQuote, Error>) -> Void) {
-        (v4Client as? BTCMapV4Client)?.fetchPlaceCommentQuote(completion: completion)
-            ?? completion(.failure(BTCMapV4Error.invalidResponse))
-    }
-
-    func createPlaceComment(placeID: String, comment: String, completion: @escaping (Result<V4InvoiceOrderResponse, Error>) -> Void) {
-        (v4Client as? BTCMapV4Client)?.createPlaceComment(placeID: placeID, comment: comment, completion: completion)
-            ?? completion(.failure(BTCMapV4Error.invalidResponse))
-    }
-
-    func fetchPlaceBoostQuote(completion: @escaping (Result<V4PlaceBoostQuote, Error>) -> Void) {
-        (v4Client as? BTCMapV4Client)?.fetchPlaceBoostQuote(completion: completion)
-            ?? completion(.failure(BTCMapV4Error.invalidResponse))
-    }
-
-    func createPlaceBoost(placeID: String, days: Int, completion: @escaping (Result<V4InvoiceOrderResponse, Error>) -> Void) {
-        (v4Client as? BTCMapV4Client)?.createPlaceBoost(placeID: placeID, days: days, completion: completion)
-            ?? completion(.failure(BTCMapV4Error.invalidResponse))
-    }
-
-    func fetchInvoice(id: String, completion: @escaping (Result<V4InvoiceRecord, Error>) -> Void) {
-        (v4Client as? BTCMapV4Client)?.fetchInvoice(id: id, completion: completion)
-            ?? completion(.failure(BTCMapV4Error.invalidResponse))
     }
 
     private var dataSourceMode: BTCMapDataSourceMode {

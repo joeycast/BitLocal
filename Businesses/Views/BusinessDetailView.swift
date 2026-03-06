@@ -154,10 +154,12 @@ struct BusinessDetailView: View {
     var body: some View {
         List {
             BusinessDescriptionSection(element: element)
+                .featuredHeader(isFeatured: element.isCurrentlyBoosted())
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessDetailsSection(
                 element: element,
-                elementCellViewModel: elementCellViewModel
+                elementCellViewModel: elementCellViewModel,
+                isFirstVisibleSection: element.isCurrentlyBoosted() && !element.hasBusinessDescription
             )
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapSocialsSection(element: element)
@@ -490,316 +492,36 @@ private struct TranslatableReviewBodyTextView: View {
 
 struct BTCMapPaidActionsSection: View {
     let element: Element
-
-    @State private var commentQuoteSat: Int?
-    @State private var boostQuote: V4PlaceBoostQuote?
-    @State private var commentDraft = ""
-    @State private var isLoadingQuotes = false
-    @State private var isSubmitting = false
-    @State private var actionError: String?
-    @State private var invoice: V4InvoiceOrderResponse?
-    @State private var invoiceStatus: String?
-    @State private var pollTask: Task<Void, Never>?
-
-    private let repository = BTCMapRepository.shared
+    
+    private var btcMapMerchantURL: URL? {
+        BTCMapMerchantURLBuilder.makeURL(for: element)
+    }
 
     var body: some View {
-        Section(header: Text("Boost This Listing")) {
-            DisclosureGroup("Boost or comment on this listing") {
-                if let invoice {
-                    invoiceStatusBlock(invoice)
-                }
+        if let btcMapMerchantURL {
+            Section(
+                header: Text("Feature This Merchant"),
+                footer: Text("Opening the link above will direct you to btcmap.org where you can boost this merchant. Boosted merchants are featured on BitLocal.")
+            ) {
+                Link(destination: btcMapMerchantURL) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "star.circle.fill")
+                            .foregroundStyle(.orange)
+                            .frame(width: 18)
 
-                if isLoadingQuotes {
-                    HStack {
-                        ProgressView()
-                        Text("Loading pricing…")
-                            .foregroundColor(.secondary)
+                        Text("Boost on BTC Map")
+                            .foregroundStyle(.primary)
+
+                        Spacer(minLength: 0)
+
+                        Image(systemName: "arrow.up.forward")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
                     }
-                } else {
-                    if commentQuoteSat != nil || boostQuote != nil {
-                        commentPurchaseBlock
-                        boostPurchaseBlock
-                    } else {
-                        Button {
-                            loadQuotes()
-                        } label: {
-                            Label("Load pricing", systemImage: "bolt.fill")
-                        }
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
                 }
-
-                if let actionError, !actionError.isEmpty {
-                    Label(actionError, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.subheadline)
-                }
-            }
-        }
-        .onDisappear {
-            pollTask?.cancel()
-        }
-    }
-
-    @ViewBuilder
-    private var commentPurchaseBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Leave a Review")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                if let commentQuoteSat {
-                    HStack(spacing: 2) {
-                        Image(systemName: "bolt.fill")
-                            .font(.caption2)
-                        Text("~\(commentQuoteSat) sats")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.orange)
-                }
-            }
-
-            TextField("Write a review…", text: $commentDraft, axis: .vertical)
-                .lineLimit(2...4)
-                .textInputAutocapitalization(.sentences)
-                .padding(10)
-                .background(Color(uiColor: .secondarySystemGroupedBackground))
-                .clipShape(.rect(cornerRadius: 10))
-
-            Button {
-                submitPaidComment()
-            } label: {
-                Label("Submit Review", systemImage: "bolt.fill")
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isSubmitting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-        .padding(.vertical, 4)
-    }
-
-    @ViewBuilder
-    private var boostPurchaseBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Boost Listing")
-                .font(.subheadline.weight(.semibold))
-
-            HStack(spacing: 8) {
-                boostButton(days: 30, label: "30 days", sats: boostQuote?.quote30dSat)
-                boostButton(days: 90, label: "90 days", sats: boostQuote?.quote90dSat)
-                boostButton(days: 365, label: "1 year", sats: boostQuote?.quote365dSat)
-            }
-        }
-    }
-
-    private func boostButton(days: Int, label: String, sats: Int?) -> some View {
-        Button {
-            submitBoost(days: days)
-        } label: {
-            VStack(spacing: 2) {
-                Text(label)
-                    .font(.caption.weight(.semibold))
-                if let sats {
-                    HStack(spacing: 1) {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 8))
-                        Text("~\(sats)")
-                            .font(.caption2)
-                    }
-                } else {
-                    Text("—")
-                        .font(.caption2)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background((sats == nil ? Color.gray : Color.orange).opacity(0.1))
-            .clipShape(.rect(cornerRadius: 10))
-        }
-        .buttonStyle(.plain)
-        .disabled(isSubmitting || sats == nil)
-        .opacity((isSubmitting || sats == nil) ? 0.6 : 1.0)
-    }
-
-    @ViewBuilder
-    private func invoiceStatusBlock(_ invoice: V4InvoiceOrderResponse) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "bolt.fill")
-                    .foregroundColor(.orange)
-                Text("Invoice")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(invoiceStatus ?? "pending")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(statusColor.opacity(0.12))
-                    .foregroundColor(statusColor)
-                    .clipShape(Capsule())
-            }
-
-            HStack {
-                Text(String(invoice.invoice.prefix(24)) + "…")
-                    .font(.caption.monospaced())
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                Spacer()
-                Button {
-                    UIPasteboard.general.string = invoice.invoice
-                } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-            .padding(10)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .clipShape(.rect(cornerRadius: 10))
-
-            Button("Refresh Status") {
-                refreshInvoiceStatus()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(isSubmitting)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var statusColor: Color {
-        let normalized = (invoiceStatus ?? "").lowercased()
-        if normalized.contains("paid") || normalized.contains("settled") || normalized.contains("complete") {
-            return .green
-        }
-        if normalized.contains("expired") || normalized.contains("failed") || normalized.contains("cancel") {
-            return .red
-        }
-        return .orange
-    }
-
-    private func loadQuotes() {
-        guard !isLoadingQuotes else { return }
-        isLoadingQuotes = true
-        actionError = nil
-
-        let group = DispatchGroup()
-        var loadedCommentQuote: Int?
-        var loadedBoostQuote: V4PlaceBoostQuote?
-        var firstError: Error?
-
-        group.enter()
-        repository.fetchPlaceCommentQuote { result in
-            if case .success(let quote) = result {
-                loadedCommentQuote = quote.quoteSat
-            } else if case .failure(let error) = result, firstError == nil {
-                firstError = error
-            }
-            group.leave()
-        }
-
-        group.enter()
-        repository.fetchPlaceBoostQuote { result in
-            if case .success(let quote) = result {
-                loadedBoostQuote = quote
-            } else if case .failure(let error) = result, firstError == nil {
-                firstError = error
-            }
-            group.leave()
-        }
-
-        group.notify(queue: .main) {
-            isLoadingQuotes = false
-            commentQuoteSat = loadedCommentQuote
-            boostQuote = loadedBoostQuote
-            if let firstError {
-                actionError = firstError.localizedDescription
-            }
-        }
-    }
-
-    private func submitPaidComment() {
-        let trimmed = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        isSubmitting = true
-        actionError = nil
-        repository.createPlaceComment(placeID: element.id, comment: trimmed) { result in
-            DispatchQueue.main.async {
-                isSubmitting = false
-                switch result {
-                case .success(let invoiceResponse):
-                    invoice = invoiceResponse
-                    invoiceStatus = "pending"
-                    startInvoicePolling(invoiceID: invoiceResponse.invoiceID)
-                case .failure(let error):
-                    actionError = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func submitBoost(days: Int) {
-        isSubmitting = true
-        actionError = nil
-        repository.createPlaceBoost(placeID: element.id, days: days) { result in
-            DispatchQueue.main.async {
-                isSubmitting = false
-                switch result {
-                case .success(let invoiceResponse):
-                    invoice = invoiceResponse
-                    invoiceStatus = "pending"
-                    startInvoicePolling(invoiceID: invoiceResponse.invoiceID)
-                case .failure(let error):
-                    actionError = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func refreshInvoiceStatus() {
-        guard let invoiceID = invoice?.invoiceID else { return }
-        repository.fetchInvoice(id: invoiceID) { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let record):
-                    invoiceStatus = record.status
-                case .failure(let error):
-                    actionError = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func startInvoicePolling(invoiceID: String) {
-        pollTask?.cancel()
-        pollTask = Task {
-            for _ in 0..<40 {
-                if Task.isCancelled { return }
-                await withCheckedContinuation { continuation in
-                    repository.fetchInvoice(id: invoiceID) { result in
-                        DispatchQueue.main.async {
-                            switch result {
-                            case .success(let record):
-                                invoiceStatus = record.status
-                                let normalized = record.status.lowercased()
-                                if normalized.contains("paid") || normalized.contains("settled") || normalized.contains("complete") || normalized.contains("expired") || normalized.contains("failed") || normalized.contains("cancel") {
-                                    continuation.resume()
-                                    return
-                                }
-                            case .failure(let error):
-                                actionError = error.localizedDescription
-                            }
-                            continuation.resume()
-                        }
-                    }
-                }
-
-                let status = (invoiceStatus ?? "").lowercased()
-                if status.contains("paid") || status.contains("settled") || status.contains("complete") || status.contains("expired") || status.contains("failed") || status.contains("cancel") {
-                    break
-                }
-
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                .buttonStyle(.plain)
             }
         }
     }
@@ -1036,13 +758,7 @@ private func urlForSocialHandle(_ value: String, base: String) -> URL? {
 
 private extension String {
     func parsedBTCMapDate() -> Date? {
-        if let fullISO = ISO8601DateFormatter.fullPrecision.date(from: self) {
-            return fullISO
-        }
-        if let basicISO = ISO8601DateFormatter().date(from: self) {
-            return basicISO
-        }
-        return BTCMapDateParsers.dateOnly.date(from: self)
+        BTCMapDateParser.parse(self)
     }
 
     func formattedBTCMapDate() -> String {
@@ -1053,32 +769,15 @@ private extension String {
     }
 }
 
-private extension ISO8601DateFormatter {
-    static let fullPrecision: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-}
-
-private enum BTCMapDateParsers {
-    static let dateOnly: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-}
-
 // BusinessDescriptionSection
 struct BusinessDescriptionSection: View {
     var element: Element
     
     var body: some View {
         if let description = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn {
-            Section(header: Text(NSLocalizedString("business_description_section", comment: "Section header for business description"))) {
+            Section(header: businessSectionHeader(
+                NSLocalizedString("business_description_section", comment: "Section header for business description")
+            )) {
                 if #available(iOS 18.0, *) {
                     TranslatableBusinessDescriptionView(description: description)
                 } else {
@@ -1196,9 +895,13 @@ private struct TranslatableBusinessDescriptionView: View {
 struct BusinessDetailsSection: View {
     var element: Element
     @ObservedObject var elementCellViewModel: ElementCellViewModel
+    var isFirstVisibleSection = false
     
     var body: some View {
-        Section(header: Text(NSLocalizedString("business_details_section", comment: "Section header for business details"))) {
+        Section(header: businessSectionHeader(
+            NSLocalizedString("business_details_section", comment: "Section header for business details"),
+            includesFeaturedBadge: isFirstVisibleSection
+        )) {
             // Business Address
             if let coord = element.mapCoordinate {
                 Button(action: {
@@ -1275,6 +978,7 @@ struct BusinessDetailsSection: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+
         }
     }
 }
@@ -1327,6 +1031,72 @@ private extension BusinessDetailsSection {
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
     }
+}
+
+private extension View {
+    @ViewBuilder
+    func featuredHeader(isFeatured: Bool) -> some View {
+        self
+            .environment(\.businessSectionShowsFeaturedBadge, isFeatured)
+    }
+}
+
+private extension Element {
+    var hasBusinessDescription: Bool {
+        let description = osmJSON?.tags?.description ?? osmJSON?.tags?.descriptionEn
+        guard let description else { return false }
+        return !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+private struct BusinessSectionShowsFeaturedBadgeKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private extension EnvironmentValues {
+    var businessSectionShowsFeaturedBadge: Bool {
+        get { self[BusinessSectionShowsFeaturedBadgeKey.self] }
+        set { self[BusinessSectionShowsFeaturedBadgeKey.self] = newValue }
+    }
+}
+
+private struct BusinessSectionHeader: View {
+    let title: String
+    var includesFeaturedBadge = false
+
+    @Environment(\.businessSectionShowsFeaturedBadge) private var showsFeaturedBadge
+
+    private var shouldShowBadge: Bool {
+        includesFeaturedBadge || showsFeaturedBadge
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: shouldShowBadge ? 10 : 0) {
+            if shouldShowBadge {
+                HStack {
+                    Spacer(minLength: 0)
+                    Label("Featured Merchant", systemImage: "star.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color(red: 0.71, green: 0.49, blue: 0.08))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color(red: 0.96, green: 0.93, blue: 0.84))
+                        )
+                    Spacer(minLength: 0)
+                }
+                .padding(.bottom, -2)
+            }
+
+            Text(title)
+        }
+        .padding(.top, shouldShowBadge ? -4 : 0)
+    }
+}
+
+private func businessSectionHeader(_ title: String, includesFeaturedBadge: Bool = false) -> some View {
+    BusinessSectionHeader(title: title, includesFeaturedBadge: includesFeaturedBadge)
 }
 
 private struct OpeningHoursDisplayView: View {
@@ -1576,13 +1346,15 @@ struct BusinessMiniMapView: UIViewRepresentable {
             if let annotation = annotation as? Annotation {
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.canShowCallout = true
-                view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
                 if let element = annotation.element {
+                    view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
                     let symbolName = ElementCategorySymbols.symbolName(for: element)
                     Debug.logMap("MiniMap: Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
                     view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                } else {
+                    view?.markerTintColor = UIColor(named: "MarkerColor")
                 }
                 view?.displayPriority = .required
             }

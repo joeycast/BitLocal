@@ -1,4 +1,6 @@
 import XCTest
+import CoreLocation
+import MapKit
 @testable import bitlocal
 
 @MainActor
@@ -119,11 +121,106 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertNil(query?.radiusKM)
     }
 
-    private static func placeRecord(id: Int, name: String) -> V4PlaceRecord {
+    func testBoostedLocalMerchantSortsAheadOfNonBoostedLocalMerchant() async {
+        let repo = MockBTCMapRepository()
+        let viewModel = ContentViewModel(
+            btcMapRepository: repo,
+            unifiedSearchDebounceNanoseconds: 0
+        )
+        viewModel.selectedMerchantSearchScope = .onMap
+        viewModel.visibleElements = [
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 1, name: "Coffee House", boostedUntil: nil)),
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 2, name: "Coffee Roasters", boostedUntil: "2099-01-01T00:00:00Z"))
+        ]
+
+        viewModel.unifiedSearchText = "coffee"
+        viewModel.performUnifiedSearch()
+        await waitForPrimaryResultCount(2, on: viewModel)
+
+        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["2", "1"])
+    }
+
+    func testExpiredBoostDoesNotAffectLocalMerchantOrdering() async {
+        let repo = MockBTCMapRepository()
+        let viewModel = ContentViewModel(
+            btcMapRepository: repo,
+            unifiedSearchDebounceNanoseconds: 0
+        )
+        viewModel.selectedMerchantSearchScope = .onMap
+        viewModel.visibleElements = [
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 10, name: "Coffee House", boostedUntil: nil)),
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 11, name: "Coffee Roasters", boostedUntil: "2024-01-01T00:00:00Z"))
+        ]
+
+        viewModel.unifiedSearchText = "coffee"
+        viewModel.performUnifiedSearch()
+        await waitForPrimaryResultCount(2, on: viewModel)
+
+        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["10", "11"])
+    }
+
+    func testBrowseOrderingShowsBoostedVisibleMerchantsFirstThenDistance() {
+        let repo = MockBTCMapRepository()
+        let viewModel = ContentViewModel(
+            btcMapRepository: repo,
+            unifiedSearchDebounceNanoseconds: 0
+        )
+        viewModel.userLocation = CLLocation(latitude: 36.17, longitude: -86.78)
+
+        let nonBoostedNear = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 100, name: "Near", lat: 36.171, lon: -86.78, boostedUntil: nil)
+        )
+        let boostedFarther = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 101, name: "Boosted Farther", lat: 36.175, lon: -86.78, boostedUntil: "2099-01-01T00:00:00Z")
+        )
+        let boostedNearest = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 102, name: "Boosted Nearest", lat: 36.1705, lon: -86.78, boostedUntil: "2099-01-01T00:00:00Z")
+        )
+        let nonBoostedFar = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 103, name: "Far", lat: 36.19, lon: -86.78, boostedUntil: nil)
+        )
+
+        let ordered = [nonBoostedNear, boostedFarther, boostedNearest, nonBoostedFar]
+            .sorted(by: viewModel.merchantBrowseSortOrder)
+
+        XCTAssertEqual(ordered.map(\.id), ["102", "101", "100", "103"])
+    }
+
+    func testBrowseOrderingFallsBackToMapCenterAndIgnoresExpiredBoosts() {
+        let repo = MockBTCMapRepository()
+        let viewModel = ContentViewModel(
+            btcMapRepository: repo,
+            unifiedSearchDebounceNanoseconds: 0
+        )
+        viewModel.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 36.17, longitude: -86.78),
+            span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+        )
+
+        let expiredCloser = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 200, name: "Expired", lat: 36.1705, lon: -86.78, boostedUntil: "2024-01-01T00:00:00Z")
+        )
+        let regularFarther = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 201, name: "Regular", lat: 36.1715, lon: -86.78, boostedUntil: nil)
+        )
+
+        let ordered = [regularFarther, expiredCloser]
+            .sorted(by: viewModel.merchantBrowseSortOrder)
+
+        XCTAssertEqual(ordered.map(\.id), ["200", "201"])
+    }
+
+    private static func placeRecord(
+        id: Int,
+        name: String,
+        lat: Double = 36.17,
+        lon: Double = -86.78,
+        boostedUntil: String? = nil
+    ) -> V4PlaceRecord {
         V4PlaceRecord(
             id: id,
-            lat: 36.17,
-            lon: -86.78,
+            lat: lat,
+            lon: lon,
             icon: nil,
             name: name,
             address: nil,
@@ -143,7 +240,7 @@ final class MerchantSearchBehaviorTests: XCTestCase {
             line: nil,
             telegram: nil,
             email: nil,
-            boostedUntil: nil,
+            boostedUntil: boostedUntil,
             requiredAppURL: nil,
             description: nil,
             image: nil,

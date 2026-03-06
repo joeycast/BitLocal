@@ -64,4 +64,71 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
         XCTAssertEqual(record.osmAddrCity, "New York")
         XCTAssertEqual(record.osmBrandWikidata, "Q7605233")
     }
+
+    func testBoostHelpersUseFuturePastAndInvalidDatesCorrectly() {
+        let referenceDate = Date(timeIntervalSince1970: 1_735_689_600) // 2025-01-01T00:00:00Z
+
+        let boostedRecord = Self.makePlaceRecord(id: 1, boostedUntil: "2025-02-01T00:00:00Z")
+        let expiredRecord = Self.makePlaceRecord(id: 2, boostedUntil: "2024-12-01T00:00:00Z")
+        let invalidRecord = Self.makePlaceRecord(id: 3, boostedUntil: "not-a-date")
+        let noBoostRecord = Self.makePlaceRecord(id: 4, boostedUntil: nil)
+
+        XCTAssertTrue(boostedRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertFalse(expiredRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertFalse(invalidRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertFalse(noBoostRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+    }
+
+    func testElementAndPlaceRecordAgreeOnBoostState() {
+        let referenceDate = Date(timeIntervalSince1970: 1_735_689_600) // 2025-01-01T00:00:00Z
+        let record = Self.makePlaceRecord(id: 5, boostedUntil: "2025-03-01T12:00:00Z")
+        let element = V4PlaceToElementMapper.placeRecordToElement(record)
+
+        XCTAssertEqual(record.isCurrentlyBoosted(referenceDate: referenceDate), element.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertEqual(record.boostExpirationDate, element.boostExpirationDate)
+    }
+    private static func makePlaceRecord(id: Int, boostedUntil: String?) -> V4PlaceRecord {
+        V4PlaceRecord(
+            id: id,
+            lat: 1.23,
+            lon: 4.56,
+            icon: "cafe",
+            name: "Merchant \(id)",
+            address: nil,
+            openingHours: nil,
+            comments: nil,
+            createdAt: "2025-01-01T00:00:00Z",
+            updatedAt: "2025-01-01T00:00:00Z",
+            deletedAt: nil,
+            verifiedAt: nil,
+            osmID: nil,
+            osmURL: nil,
+            phone: nil,
+            website: nil,
+            twitter: nil,
+            facebook: nil,
+            instagram: nil,
+            line: nil,
+            telegram: nil,
+            email: nil,
+            boostedUntil: boostedUntil,
+            requiredAppURL: nil,
+            description: nil,
+            image: nil,
+            paymentProvider: nil,
+            osmPaymentBitcoin: nil,
+            osmCurrencyXBT: nil,
+            osmPaymentOnchain: nil,
+            osmPaymentLightning: nil,
+            osmPaymentLightningContactless: nil,
+            osmAddrHouseNumber: nil,
+            osmAddrStreet: nil,
+            osmAddrCity: nil,
+            osmAddrState: nil,
+            osmAddrPostcode: nil,
+            osmOperator: nil,
+            osmBrand: nil,
+            osmBrandWikidata: nil
+        )
+    }
 }

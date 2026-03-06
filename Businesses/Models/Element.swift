@@ -166,6 +166,15 @@ struct Element: Codable, Identifiable, Hashable {
     static func isPlaceholderName(_ value: String) -> Bool {
         value.hasPrefix("BTC Map Place #")
     }
+
+    var boostExpirationDate: Date? {
+        BTCMapDateParser.parse(v4Metadata?.boostedUntil) ?? BTCMapDateParser.parse(tags?.boostExpires)
+    }
+
+    func isCurrentlyBoosted(referenceDate: Date = Date()) -> Bool {
+        guard let boostExpirationDate else { return false }
+        return boostExpirationDate > referenceDate
+    }
 }
 
 // MARK: - Address

@@ -25,6 +25,47 @@ struct ElementV4Metadata: Codable, Hashable {
     let rawAddress: String?
 }
 
+enum BTCMapDateParser {
+    static func parse(_ raw: String?) -> Date? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+        if let fullISO = ISO8601DateFormatter.fullPrecision.date(from: raw) {
+            return fullISO
+        }
+        if let basicISO = ISO8601DateFormatter.basic.date(from: raw) {
+            return basicISO
+        }
+        return BTCMapDateParsers.dateOnly.date(from: raw)
+    }
+}
+
+private extension ISO8601DateFormatter {
+    static let fullPrecision: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static let basic: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+}
+
+private enum BTCMapDateParsers {
+    static let dateOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+}
+
 struct V4PlaceSnapshotRecord: Codable, Hashable {
     let id: Int
     let lat: Double?
@@ -138,6 +179,12 @@ struct V4PlaceRecord: Codable, Hashable, Identifiable {
     }
 
     var displayName: String { preferredName ?? "BTC Map Place #\(id)" }
+    var boostExpirationDate: Date? { BTCMapDateParser.parse(boostedUntil) }
+
+    func isCurrentlyBoosted(referenceDate: Date = Date()) -> Bool {
+        guard let boostExpirationDate else { return false }
+        return boostExpirationDate > referenceDate
+    }
 }
 
 struct V4SyncState: Codable, Hashable {
@@ -232,41 +279,6 @@ struct V4PlaceCommentRecord: Codable, Hashable, Identifiable {
         }
         return nil
     }
-}
-
-struct V4PlaceCommentQuote: Codable, Hashable {
-    let quoteSat: Int
-
-    enum CodingKeys: String, CodingKey {
-        case quoteSat = "quote_sat"
-    }
-}
-
-struct V4PlaceBoostQuote: Codable, Hashable {
-    let quote30dSat: Int?
-    let quote90dSat: Int?
-    let quote365dSat: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case quote30dSat = "quote_30d_sat"
-        case quote90dSat = "quote_90d_sat"
-        case quote365dSat = "quote_365d_sat"
-    }
-}
-
-struct V4InvoiceOrderResponse: Codable, Hashable {
-    let invoiceID: String
-    let invoice: String
-
-    enum CodingKeys: String, CodingKey {
-        case invoiceID = "invoice_id"
-        case invoice
-    }
-}
-
-struct V4InvoiceRecord: Codable, Hashable {
-    let id: String
-    let status: String
 }
 
 struct V4SearchQuery: Hashable {

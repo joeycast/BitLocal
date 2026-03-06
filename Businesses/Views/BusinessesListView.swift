@@ -26,6 +26,14 @@ struct BusinessesListView: View {
         nearestElements(elements, limit: maxListResults)
     }
 
+    private var featuredTopSortedElements: [Element] {
+        topSortedElements.filter { $0.isCurrentlyBoosted() }
+    }
+
+    private var regularTopSortedElements: [Element] {
+        topSortedElements.filter { !$0.isCurrentlyBoosted() }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Always-visible search bar
@@ -132,40 +140,47 @@ struct BusinessesListView: View {
                 .listRowSeparator(.hidden)
                 .clearListRowBackground(if: shouldUseGlassyRows)
 
-            // Merchant list
-            Section {
-                ForEach(topSortedElements, id: \.id) { element in
-                    let cellVM = cellViewModel(for: element)
-                    Button {
-                        viewModel.setSelectionSource(.list)
-                        viewModel.selectAnnotationForListSelection(
-                            element,
-                            animated: true,
-                            allowCameraMovement: !isLargeSheet
-                        )
-                        viewModel.path = [element]
-                    } label: {
-                        ZStack(alignment: .trailing) {
-                            ElementCell(viewModel: cellVM)
-                                .padding(.trailing, 18)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.gray.opacity(0.6))
-                        }
+            if !featuredTopSortedElements.isEmpty {
+                Section {
+                    ForEach(featuredTopSortedElements, id: \.id) { element in
+                        merchantRow(for: element)
                     }
-                    .buttonStyle(.plain)
-                    .onAppear {
-                        viewModel.requestPlaceholderNameHydration(for: [element])
-                    }
-                    .clearListRowBackground(if: shouldUseGlassyRows)
+                } header: {
+                    merchantSectionHeader(
+                        title: "Featured Nearby",
+                        systemImage: "star.fill",
+                        tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                        topPadding: -4,
+                        bottomPadding: -6
+                    )
                 }
-
-                footerView
-                    .clearListRowBackground(if: shouldUseGlassyRows)
+                .clearListRowBackground(if: shouldUseGlassyRows)
             }
-            .clearListRowBackground(if: shouldUseGlassyRows)
+
+            if !regularTopSortedElements.isEmpty || featuredTopSortedElements.isEmpty {
+                Section {
+                    ForEach(regularTopSortedElements, id: \.id) { element in
+                        merchantRow(for: element)
+                    }
+
+                    footerView
+                        .clearListRowBackground(if: shouldUseGlassyRows)
+                } header: {
+                    if !featuredTopSortedElements.isEmpty {
+                        merchantSectionHeader(
+                            title: "More Nearby",
+                            systemImage: "location.fill",
+                            tint: .secondary,
+                            topPadding: 4,
+                            bottomPadding: -14
+                        )
+                    }
+                }
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            }
         }
         .listStyle(.plain)
+        .listSectionSpacing(0)
         .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
         .background(Color.clear)
         .environment(\.defaultMinListRowHeight, 0)
@@ -316,6 +331,32 @@ struct BusinessesListView: View {
         }
     }
 
+    private func merchantRow(for element: Element) -> some View {
+        let cellVM = cellViewModel(for: element)
+        return Button {
+            viewModel.setSelectionSource(.list)
+            viewModel.selectAnnotationForListSelection(
+                element,
+                animated: true,
+                allowCameraMovement: !isLargeSheet
+            )
+            viewModel.path = [element]
+        } label: {
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: [element])
+        }
+        .clearListRowBackground(if: shouldUseGlassyRows)
+    }
+
     private func freshMerchantSearchRow(for result: V4PlaceRecord) -> some View {
         let remoteElement = V4PlaceToElementMapper.placeRecordToElement(result)
         let cellVM = cellViewModel(for: remoteElement)
@@ -406,36 +447,32 @@ struct BusinessesListView: View {
         .foregroundStyle(.secondary)
     }
 
+    private func merchantSectionHeader(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        topPadding: CGFloat,
+        bottomPadding: CGFloat
+    ) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+        }
+        .textCase(nil)
+        .padding(.top, topPadding)
+        .padding(.bottom, bottomPadding)
+    }
+
     private func nearestElements(_ source: [Element], limit: Int) -> [Element] {
         guard limit > 0, !source.isEmpty else { return [] }
-
-        var top: [(element: Element, distance: CLLocationDistance)] = []
-        top.reserveCapacity(min(limit, source.count))
-
-        for element in source {
-            let distance = viewModel.distanceFromListFocus(element: element) ?? .greatestFiniteMagnitude
-
-            if top.count < limit {
-                top.append((element, distance))
-                top.sort { $0.distance > $1.distance }
-                continue
-            }
-
-            guard let farthest = top.first, distance < farthest.distance else { continue }
-            top[0] = (element, distance)
-            top.sort { $0.distance > $1.distance }
-        }
-
-        return top
-            .sorted { lhs, rhs in
-                if lhs.distance == rhs.distance {
-                    let lhsName = lhs.element.displayName ?? ""
-                    let rhsName = rhs.element.displayName ?? ""
-                    return lhsName.localizedStandardCompare(rhsName) == .orderedAscending
-                }
-                return lhs.distance < rhs.distance
-            }
-            .map(\.element)
+        return source
+            .sorted(by: viewModel.merchantBrowseSortOrder)
+            .prefix(limit)
+            .map { $0 }
     }
 
     private var shouldHideSheetBackground: Bool {
@@ -484,7 +521,6 @@ struct ElementCell: View {
         VStack(alignment: .leading, spacing: 2) {
             
             HStack {
-                // Business Name
                 Text(
                     viewModel.element.displayName ??
                     NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
@@ -498,18 +534,24 @@ struct ElementCell: View {
                 
                 // Distance from location
                 distanceText
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.medium))
             }
             
-            // Street number and name
-            if let streetNumber = viewModel.address?.streetNumber {
-                Text("\(streetNumber) \(viewModel.address?.streetName ?? "")".trimmingCharacters(in: .whitespaces))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else {
-                Text("\(viewModel.address?.streetName ?? "")")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            HStack(alignment: .center, spacing: 8) {
+                // Street number and name
+                if let streetNumber = viewModel.address?.streetNumber {
+                    Text("\(streetNumber) \(viewModel.address?.streetName ?? "")".trimmingCharacters(in: .whitespaces))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Text("\(viewModel.address?.streetName ?? "")")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
             }
             
             HStack {
@@ -769,7 +811,7 @@ struct PaymentIcons: View {
     let element: Element
     
     var body: some View {
-        HStack {
+        HStack(spacing: 6) {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
                     .foregroundColor(.accentColor)
@@ -785,6 +827,7 @@ struct PaymentIcons: View {
                     .foregroundColor(.accentColor)
             }
         }
+        .font(.subheadline)
     }
 }
 
