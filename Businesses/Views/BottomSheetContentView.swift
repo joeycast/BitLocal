@@ -135,7 +135,7 @@ struct CommunitiesListView: View {
 
                 Section("Communities") {
                     if filteredCommunities.isEmpty {
-                        Text("No communities in current map view")
+                        Text(emptyStateMessage)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(filteredCommunities) { area in
@@ -194,14 +194,18 @@ struct CommunitiesListView: View {
     }
 
     private var filteredCommunities: [V2AreaRecord] {
-        let baseAreas = viewModel.visibleCommunityListAreas
         let q = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return baseAreas }
-        return baseAreas.filter { area in
+        guard !q.isEmpty else { return viewModel.visibleCommunityListAreas }
+        return viewModel.communityListAreas.filter { area in
             area.displayName.localizedStandardContains(q) ||
             (area.tags?["organization"]?.localizedStandardContains(q) ?? false) ||
             (area.tags?["continent"]?.localizedStandardContains(q) ?? false)
         }
+    }
+
+    private var emptyStateMessage: String {
+        let q = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return q.isEmpty ? "No communities in current map view" : "No communities found"
     }
 }
 
