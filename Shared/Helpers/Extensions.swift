@@ -364,3 +364,30 @@ enum DeepLinkParser {
         return .place(id: placeID)
     }
 }
+
+enum BTCMapMerchantURLBuilder {
+    static func makeURL(for element: Element) -> URL? {
+        if let merchantURL = merchantURL(forPlaceID: element.id) {
+            return merchantURL
+        }
+
+        guard let coordinate = element.mapCoordinate else {
+            return nil
+        }
+
+        var components = URLComponents(string: "https://btcmap.org/map")
+        components?.queryItems = [
+            URLQueryItem(name: "lat", value: String(coordinate.latitude)),
+            URLQueryItem(name: "long", value: String(coordinate.longitude))
+        ]
+        return components?.url
+    }
+
+    private static func merchantURL(forPlaceID placeID: String) -> URL? {
+        let trimmedID = placeID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PlaceShareLinkBuilder.isValidPlaceID(trimmedID) else {
+            return nil
+        }
+        return URL(string: "https://btcmap.org/merchant/\(trimmedID)")
+    }
+}

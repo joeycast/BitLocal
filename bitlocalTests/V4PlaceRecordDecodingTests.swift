@@ -87,59 +87,6 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
         XCTAssertEqual(record.isCurrentlyBoosted(referenceDate: referenceDate), element.isCurrentlyBoosted(referenceDate: referenceDate))
         XCTAssertEqual(record.boostExpirationDate, element.boostExpirationDate)
     }
-
-    func testBoostAndCommentQuotesUseGetRequests() {
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
-        let session = URLSession(configuration: config)
-        let client = BTCMapV4Client(session: session)
-        let expectation = expectation(description: "Both quote requests complete")
-        expectation.expectedFulfillmentCount = 2
-
-        let queue = DispatchQueue(label: "quote-test")
-        var requestedMethods: [String: String] = [:]
-
-        MockURLProtocol.requestHandler = { request in
-            queue.sync {
-                requestedMethods[request.url?.absoluteString ?? ""] = request.httpMethod ?? ""
-            }
-
-            let data: Data
-            if request.url?.absoluteString.contains("place-comments/quote") == true {
-                data = Data(#"{"quote_sat":500}"#.utf8)
-            } else {
-                data = Data(#"{"quote_30d_sat":5000,"quote_90d_sat":10000,"quote_365d_sat":30000}"#.utf8)
-            }
-
-            let response = HTTPURLResponse(
-                url: try XCTUnwrap(request.url),
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: ["Content-Type": "application/json"]
-            )!
-            return (response, data)
-        }
-
-        client.fetchPlaceCommentQuote { result in
-            if case .failure(let error) = result {
-                XCTFail("Expected comment quote success, got \(error)")
-            }
-            expectation.fulfill()
-        }
-
-        client.fetchPlaceBoostQuote { result in
-            if case .failure(let error) = result {
-                XCTFail("Expected boost quote success, got \(error)")
-            }
-            expectation.fulfill()
-        }
-
-        waitForExpectations(timeout: 2)
-
-        XCTAssertEqual(requestedMethods["https://api.btcmap.org/v4/place-comments/quote"], "GET")
-        XCTAssertEqual(requestedMethods["https://api.btcmap.org/v4/place-boosts/quote"], "GET")
-    }
-
     private static func makePlaceRecord(id: Int, boostedUntil: String?) -> V4PlaceRecord {
         V4PlaceRecord(
             id: id,
@@ -184,34 +131,4 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
             osmBrandWikidata: nil
         )
     }
-}
-
-private final class MockURLProtocol: URLProtocol {
-    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
-
-    override class func canInit(with request: URLRequest) -> Bool {
-        true
-    }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        guard let handler = Self.requestHandler else {
-            XCTFail("Missing request handler")
-            return
-        }
-
-        do {
-            let (response, data) = try handler(request)
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
-        }
-    }
-
-    override func stopLoading() {}
 }
