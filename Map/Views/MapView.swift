@@ -318,8 +318,7 @@ struct MapView: UIViewRepresentable {
         @objc private func handleCommunityOverlayTap(_ recognizer: UITapGestureRecognizer) {
             guard recognizer.state == .ended,
                   let mapView = recognizer.view as? MKMapView,
-                  viewModel.mapDisplayMode == .communities,
-                  !viewModel.isShowingCommunityMembersOnMap else { return }
+                  viewModel.mapDisplayMode == .communities else { return }
 
             let tapPoint = recognizer.location(in: mapView)
             let coordinate = mapView.convert(tapPoint, toCoordinateFrom: mapView)
