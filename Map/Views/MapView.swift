@@ -518,13 +518,15 @@ struct MapView: UIViewRepresentable {
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                 view?.canShowCallout = true
-                view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
                 if let element = annotation.element {
+                    view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
                     let symbolName = ElementCategorySymbols.symbolName(for: element)
                     Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
                     view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                } else {
+                    view?.markerTintColor = UIColor(named: "MarkerColor")
                 }
                 view?.displayPriority = .required
             }

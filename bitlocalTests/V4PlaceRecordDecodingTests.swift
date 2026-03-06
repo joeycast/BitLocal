@@ -64,4 +64,154 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
         XCTAssertEqual(record.osmAddrCity, "New York")
         XCTAssertEqual(record.osmBrandWikidata, "Q7605233")
     }
+
+    func testBoostHelpersUseFuturePastAndInvalidDatesCorrectly() {
+        let referenceDate = Date(timeIntervalSince1970: 1_735_689_600) // 2025-01-01T00:00:00Z
+
+        let boostedRecord = Self.makePlaceRecord(id: 1, boostedUntil: "2025-02-01T00:00:00Z")
+        let expiredRecord = Self.makePlaceRecord(id: 2, boostedUntil: "2024-12-01T00:00:00Z")
+        let invalidRecord = Self.makePlaceRecord(id: 3, boostedUntil: "not-a-date")
+        let noBoostRecord = Self.makePlaceRecord(id: 4, boostedUntil: nil)
+
+        XCTAssertTrue(boostedRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertFalse(expiredRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertFalse(invalidRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertFalse(noBoostRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+    }
+
+    func testElementAndPlaceRecordAgreeOnBoostState() {
+        let referenceDate = Date(timeIntervalSince1970: 1_735_689_600) // 2025-01-01T00:00:00Z
+        let record = Self.makePlaceRecord(id: 5, boostedUntil: "2025-03-01T12:00:00Z")
+        let element = V4PlaceToElementMapper.placeRecordToElement(record)
+
+        XCTAssertEqual(record.isCurrentlyBoosted(referenceDate: referenceDate), element.isCurrentlyBoosted(referenceDate: referenceDate))
+        XCTAssertEqual(record.boostExpirationDate, element.boostExpirationDate)
+    }
+
+    func testBoostAndCommentQuotesUseGetRequests() {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: config)
+        let client = BTCMapV4Client(session: session)
+        let expectation = expectation(description: "Both quote requests complete")
+        expectation.expectedFulfillmentCount = 2
+
+        let queue = DispatchQueue(label: "quote-test")
+        var requestedMethods: [String: String] = [:]
+
+        MockURLProtocol.requestHandler = { request in
+            queue.sync {
+                requestedMethods[request.url?.absoluteString ?? ""] = request.httpMethod ?? ""
+            }
+
+            let data: Data
+            if request.url?.absoluteString.contains("place-comments/quote") == true {
+                data = Data(#"{"quote_sat":500}"#.utf8)
+            } else {
+                data = Data(#"{"quote_30d_sat":5000,"quote_90d_sat":10000,"quote_365d_sat":30000}"#.utf8)
+            }
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, data)
+        }
+
+        client.fetchPlaceCommentQuote { result in
+            if case .failure(let error) = result {
+                XCTFail("Expected comment quote success, got \(error)")
+            }
+            expectation.fulfill()
+        }
+
+        client.fetchPlaceBoostQuote { result in
+            if case .failure(let error) = result {
+                XCTFail("Expected boost quote success, got \(error)")
+            }
+            expectation.fulfill()
+        }
+
+        waitForExpectations(timeout: 2)
+
+        XCTAssertEqual(requestedMethods["https://api.btcmap.org/v4/place-comments/quote"], "GET")
+        XCTAssertEqual(requestedMethods["https://api.btcmap.org/v4/place-boosts/quote"], "GET")
+    }
+
+    private static func makePlaceRecord(id: Int, boostedUntil: String?) -> V4PlaceRecord {
+        V4PlaceRecord(
+            id: id,
+            lat: 1.23,
+            lon: 4.56,
+            icon: "cafe",
+            name: "Merchant \(id)",
+            address: nil,
+            openingHours: nil,
+            comments: nil,
+            createdAt: "2025-01-01T00:00:00Z",
+            updatedAt: "2025-01-01T00:00:00Z",
+            deletedAt: nil,
+            verifiedAt: nil,
+            osmID: nil,
+            osmURL: nil,
+            phone: nil,
+            website: nil,
+            twitter: nil,
+            facebook: nil,
+            instagram: nil,
+            line: nil,
+            telegram: nil,
+            email: nil,
+            boostedUntil: boostedUntil,
+            requiredAppURL: nil,
+            description: nil,
+            image: nil,
+            paymentProvider: nil,
+            osmPaymentBitcoin: nil,
+            osmCurrencyXBT: nil,
+            osmPaymentOnchain: nil,
+            osmPaymentLightning: nil,
+            osmPaymentLightningContactless: nil,
+            osmAddrHouseNumber: nil,
+            osmAddrStreet: nil,
+            osmAddrCity: nil,
+            osmAddrState: nil,
+            osmAddrPostcode: nil,
+            osmOperator: nil,
+            osmBrand: nil,
+            osmBrandWikidata: nil
+        )
+    }
+}
+
+private final class MockURLProtocol: URLProtocol {
+    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let handler = Self.requestHandler else {
+            XCTFail("Missing request handler")
+            return
+        }
+
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }

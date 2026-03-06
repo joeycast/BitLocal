@@ -408,34 +408,10 @@ struct BusinessesListView: View {
 
     private func nearestElements(_ source: [Element], limit: Int) -> [Element] {
         guard limit > 0, !source.isEmpty else { return [] }
-
-        var top: [(element: Element, distance: CLLocationDistance)] = []
-        top.reserveCapacity(min(limit, source.count))
-
-        for element in source {
-            let distance = viewModel.distanceFromListFocus(element: element) ?? .greatestFiniteMagnitude
-
-            if top.count < limit {
-                top.append((element, distance))
-                top.sort { $0.distance > $1.distance }
-                continue
-            }
-
-            guard let farthest = top.first, distance < farthest.distance else { continue }
-            top[0] = (element, distance)
-            top.sort { $0.distance > $1.distance }
-        }
-
-        return top
-            .sorted { lhs, rhs in
-                if lhs.distance == rhs.distance {
-                    let lhsName = lhs.element.displayName ?? ""
-                    let rhsName = rhs.element.displayName ?? ""
-                    return lhsName.localizedStandardCompare(rhsName) == .orderedAscending
-                }
-                return lhs.distance < rhs.distance
-            }
-            .map(\.element)
+        return source
+            .sorted(by: viewModel.merchantBrowseSortOrder)
+            .prefix(limit)
+            .map { $0 }
     }
 
     private var shouldHideSheetBackground: Bool {
@@ -484,17 +460,23 @@ struct ElementCell: View {
         VStack(alignment: .leading, spacing: 2) {
             
             HStack {
-                // Business Name
-                Text(
-                    viewModel.element.displayName ??
-                    NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
-                )
-                    .foregroundColor(.primary)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                    .minimumScaleFactor(1)
-                    .padding(.vertical, 5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        viewModel.element.displayName ??
+                        NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
+                    )
+                        .foregroundColor(.primary)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if viewModel.element.isCurrentlyBoosted() {
+                        BoostedMerchantBadge()
+                    }
+                }
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 
                 // Distance from location
                 distanceText
@@ -583,6 +565,17 @@ struct ElementCell: View {
                 return String(format: "%.1f mi", miles)
             }
         }
+    }
+}
+
+private struct BoostedMerchantBadge: View {
+    var body: some View {
+        Label("Boosted", systemImage: "bolt.fill")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.orange.opacity(0.12), in: Capsule())
     }
 }
 

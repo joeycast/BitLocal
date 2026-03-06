@@ -1036,13 +1036,7 @@ private func urlForSocialHandle(_ value: String, base: String) -> URL? {
 
 private extension String {
     func parsedBTCMapDate() -> Date? {
-        if let fullISO = ISO8601DateFormatter.fullPrecision.date(from: self) {
-            return fullISO
-        }
-        if let basicISO = ISO8601DateFormatter().date(from: self) {
-            return basicISO
-        }
-        return BTCMapDateParsers.dateOnly.date(from: self)
+        BTCMapDateParser.parse(self)
     }
 
     func formattedBTCMapDate() -> String {
@@ -1051,25 +1045,6 @@ private extension String {
         }
         return self
     }
-}
-
-private extension ISO8601DateFormatter {
-    static let fullPrecision: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-}
-
-private enum BTCMapDateParsers {
-    static let dateOnly: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
 }
 
 // BusinessDescriptionSection
@@ -1270,6 +1245,24 @@ struct BusinessDetailsSection: View {
                         Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
                             .foregroundStyle(.accent)
                         OpeningHoursDisplayView(rawOpeningHours: openingHours)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let boostExpirationDate = element.boostExpirationDate,
+               element.isCurrentlyBoosted() {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "bolt.fill")
+                        .foregroundStyle(.orange)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("BTC Map Boost")
+                            .foregroundStyle(.orange)
+                        Text("Boosted until \(boostExpirationDate.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                 }
@@ -1576,13 +1569,15 @@ struct BusinessMiniMapView: UIViewRepresentable {
             if let annotation = annotation as? Annotation {
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.canShowCallout = true
-                view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
                 if let element = annotation.element {
+                    view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
                     let symbolName = ElementCategorySymbols.symbolName(for: element)
                     Debug.logMap("MiniMap: Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
                     view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                } else {
+                    view?.markerTintColor = UIColor(named: "MarkerColor")
                 }
                 view?.displayPriority = .required
             }
