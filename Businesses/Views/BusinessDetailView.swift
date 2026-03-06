@@ -154,10 +154,12 @@ struct BusinessDetailView: View {
     var body: some View {
         List {
             BusinessDescriptionSection(element: element)
+                .featuredHeader(isFeatured: element.isCurrentlyBoosted())
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BusinessDetailsSection(
                 element: element,
-                elementCellViewModel: elementCellViewModel
+                elementCellViewModel: elementCellViewModel,
+                isFirstVisibleSection: element.isCurrentlyBoosted() && !element.hasBusinessDescription
             )
                 .clearListRowBackground(if: shouldUseGlassyRows)
             BTCMapSocialsSection(element: element)
@@ -202,6 +204,18 @@ struct BusinessDetailView: View {
 }
 
 extension BusinessDetailView {
+    private var featuredMerchantBadge: some View {
+        Label("Featured Merchant", systemImage: "star.fill")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color(red: 0.71, green: 0.49, blue: 0.08))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color(red: 0.96, green: 0.93, blue: 0.84))
+            )
+    }
+
     @ViewBuilder
     private var shareToolbarItem: some View {
         if FeatureFlags.isSharePlaceLinksEnabled {
@@ -503,9 +517,13 @@ struct BTCMapPaidActionsSection: View {
 
     private let repository = BTCMapRepository.shared
 
+    private var hasActiveFeature: Bool {
+        element.isCurrentlyBoosted()
+    }
+
     var body: some View {
-        Section(header: Text("Boost This Listing")) {
-            DisclosureGroup("Boost or comment on this listing") {
+        Section(header: Text(hasActiveFeature ? "Support This Listing" : "Boost This Listing")) {
+            DisclosureGroup(hasActiveFeature ? "Add a review or extend this listing's featured placement" : "Boost or comment on this listing") {
                 if let invoice {
                     invoiceStatusBlock(invoice)
                 }
@@ -580,8 +598,14 @@ struct BTCMapPaidActionsSection: View {
     @ViewBuilder
     private var boostPurchaseBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Boost Listing")
+            Text(hasActiveFeature ? "Extend Featured Placement" : "Feature on BTC Map")
                 .font(.subheadline.weight(.semibold))
+
+            if hasActiveFeature {
+                Text("Choose how long this listing should stay featured.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
             HStack(spacing: 8) {
                 boostButton(days: 30, label: "30 days", sats: boostQuote?.quote30dSat)
@@ -1053,7 +1077,9 @@ struct BusinessDescriptionSection: View {
     
     var body: some View {
         if let description = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn {
-            Section(header: Text(NSLocalizedString("business_description_section", comment: "Section header for business description"))) {
+            Section(header: businessSectionHeader(
+                NSLocalizedString("business_description_section", comment: "Section header for business description")
+            )) {
                 if #available(iOS 18.0, *) {
                     TranslatableBusinessDescriptionView(description: description)
                 } else {
@@ -1171,9 +1197,13 @@ private struct TranslatableBusinessDescriptionView: View {
 struct BusinessDetailsSection: View {
     var element: Element
     @ObservedObject var elementCellViewModel: ElementCellViewModel
+    var isFirstVisibleSection = false
     
     var body: some View {
-        Section(header: Text(NSLocalizedString("business_details_section", comment: "Section header for business details"))) {
+        Section(header: businessSectionHeader(
+            NSLocalizedString("business_details_section", comment: "Section header for business details"),
+            includesFeaturedBadge: isFirstVisibleSection
+        )) {
             // Business Address
             if let coord = element.mapCoordinate {
                 Button(action: {
@@ -1251,23 +1281,6 @@ struct BusinessDetailsSection: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if let boostExpirationDate = element.boostExpirationDate,
-               element.isCurrentlyBoosted() {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "bolt.fill")
-                        .foregroundStyle(.orange)
-                        .frame(width: 18)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("BTC Map Boost")
-                            .foregroundStyle(.orange)
-                        Text("Boosted until \(boostExpirationDate.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
     }
 }
@@ -1320,6 +1333,72 @@ private extension BusinessDetailsSection {
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
     }
+}
+
+private extension View {
+    @ViewBuilder
+    func featuredHeader(isFeatured: Bool) -> some View {
+        self
+            .environment(\.businessSectionShowsFeaturedBadge, isFeatured)
+    }
+}
+
+private extension Element {
+    var hasBusinessDescription: Bool {
+        let description = osmJSON?.tags?.description ?? osmJSON?.tags?.descriptionEn
+        guard let description else { return false }
+        return !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+private struct BusinessSectionShowsFeaturedBadgeKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private extension EnvironmentValues {
+    var businessSectionShowsFeaturedBadge: Bool {
+        get { self[BusinessSectionShowsFeaturedBadgeKey.self] }
+        set { self[BusinessSectionShowsFeaturedBadgeKey.self] = newValue }
+    }
+}
+
+private struct BusinessSectionHeader: View {
+    let title: String
+    var includesFeaturedBadge = false
+
+    @Environment(\.businessSectionShowsFeaturedBadge) private var showsFeaturedBadge
+
+    private var shouldShowBadge: Bool {
+        includesFeaturedBadge || showsFeaturedBadge
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: shouldShowBadge ? 10 : 0) {
+            if shouldShowBadge {
+                HStack {
+                    Spacer(minLength: 0)
+                    Label("Featured Merchant", systemImage: "star.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color(red: 0.71, green: 0.49, blue: 0.08))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color(red: 0.96, green: 0.93, blue: 0.84))
+                        )
+                    Spacer(minLength: 0)
+                }
+                .padding(.bottom, -2)
+            }
+
+            Text(title)
+        }
+        .padding(.top, shouldShowBadge ? -4 : 0)
+    }
+}
+
+private func businessSectionHeader(_ title: String, includesFeaturedBadge: Bool = false) -> some View {
+    BusinessSectionHeader(title: title, includesFeaturedBadge: includesFeaturedBadge)
 }
 
 private struct OpeningHoursDisplayView: View {
