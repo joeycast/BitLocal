@@ -69,14 +69,6 @@ struct BottomSheetContentView: View {
                         viewModel.performUnifiedSearch()
                     }
                 }
-                .onChange(of: viewModel.selectedCommunityArea?.id) { _, selectedID in
-                    guard selectedID != nil else { return }
-                    setSheetToDefaultDetent()
-                }
-                .onChange(of: viewModel.presentedCommunityArea?.id) { _, presentedID in
-                    guard presentedID != nil else { return }
-                    setSheetToDefaultDetent()
-                }
             }
             .ignoresSafeArea(edges: .bottom)
             .onChange(of: geometry.size.height) { _, newHeight in
@@ -110,14 +102,6 @@ struct BottomSheetContentView: View {
         guard currentDetent != .large else { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             currentDetent = .large
-        }
-    }
-
-    private func setSheetToDefaultDetent() {
-        let defaultDetent: PresentationDetent = .fraction(0.3)
-        guard currentDetent != defaultDetent else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            currentDetent = defaultDetent
         }
     }
 }
