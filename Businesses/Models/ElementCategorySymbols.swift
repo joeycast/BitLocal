@@ -10,6 +10,65 @@
 
 import SwiftUI
 
+struct MerchantCategoryTagFilter: Hashable {
+    let tagKey: String
+    let tagValue: String
+}
+
+enum MerchantCategoryGroup: String, CaseIterable, Identifiable {
+    case coffee
+    case food
+    case bars
+    case groceries
+    case shopping
+    case finance
+    case hotels
+    case beauty
+    case health
+    case auto
+    case services
+    case recreation
+
+    var id: String { rawValue }
+
+    var localizedLabel: String {
+        switch self {
+        case .coffee: String(localized: "Coffee")
+        case .food: String(localized: "Food")
+        case .bars: String(localized: "Bars")
+        case .groceries: String(localized: "Groceries")
+        case .shopping: String(localized: "Shopping")
+        case .finance: String(localized: "Finance")
+        case .hotels: String(localized: "Hotels")
+        case .beauty: String(localized: "Beauty")
+        case .health: String(localized: "Health")
+        case .auto: String(localized: "Auto")
+        case .services: String(localized: "Services")
+        case .recreation: String(localized: "Recreation")
+        }
+    }
+}
+
+struct MerchantCategoryDescriptor {
+    let group: MerchantCategoryGroup
+    let chipSymbolName: String
+    let priority: Int
+    let searchAliases: [String]
+    let matchingTagValues: [String]
+    let remoteTagFilters: [MerchantCategoryTagFilter]
+    let iconOverrides: [String]
+    let querySpecificTagFilters: [String: [MerchantCategoryTagFilter]]
+}
+
+struct MerchantCategoryChip: Identifiable, Hashable {
+    let group: MerchantCategoryGroup
+    let count: Int
+    let symbolName: String
+
+    var id: String { group.id }
+    var localizedLabel: String { group.localizedLabel }
+}
+
 /// A helper that returns a SwiftUI Image (SF Symbol) for a given Element’s OSM tags,
 /// falling back to a generic location/bitcoin symbol if nothing else matches.
 struct ElementCategorySymbols {
@@ -317,7 +376,283 @@ struct ElementCategorySymbols {
         "factory": "transport"
     ]
 
+    private static let merchantCategoryDescriptors: [MerchantCategoryGroup: MerchantCategoryDescriptor] = [
+        .coffee: MerchantCategoryDescriptor(
+            group: .coffee,
+            chipSymbolName: "cup.and.saucer.fill",
+            priority: 0,
+            searchAliases: ["cafe", "cafes", "coffee shop", "coffeehouse"],
+            matchingTagValues: ["cafe", "coffee", "coffee_shop"],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "cafe"),
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "coffee")
+            ],
+            iconOverrides: [],
+            querySpecificTagFilters: [:]
+        ),
+        .food: MerchantCategoryDescriptor(
+            group: .food,
+            chipSymbolName: "fork.knife.circle.fill",
+            priority: 1,
+            searchAliases: [
+                "restaurant", "restaurants", "pizza", "bakery", "bakeries",
+                "pastry", "dessert", "desserts", "ice cream", "ice_cream",
+                "fast food", "fast_food", "breakfast", "tapas", "cooking"
+            ],
+            matchingTagValues: [
+                "restaurant", "pizza", "bakery", "pastry", "dessert", "ice_cream",
+                "fast_food", "breakfast", "steak_house", "steak", "donut", "doughnut",
+                "bagel", "bagel_shop", "sandwich", "burger", "hot_dog", "snacks",
+                "cupcake", "tapas", "cooking", "seafood", "juice", "chocolate"
+            ],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "restaurant"),
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "bakery"),
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "ice_cream"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "fast_food")
+            ],
+            iconOverrides: ["emoji_food_beverage"],
+            querySpecificTagFilters: [
+                "dessert": [
+                    MerchantCategoryTagFilter(tagKey: "shop", tagValue: "ice_cream"),
+                    MerchantCategoryTagFilter(tagKey: "shop", tagValue: "bakery")
+                ],
+                "desserts": [
+                    MerchantCategoryTagFilter(tagKey: "shop", tagValue: "ice_cream"),
+                    MerchantCategoryTagFilter(tagKey: "shop", tagValue: "bakery")
+                ],
+                "ice cream": [
+                    MerchantCategoryTagFilter(tagKey: "shop", tagValue: "ice_cream")
+                ],
+                "ice_cream": [
+                    MerchantCategoryTagFilter(tagKey: "shop", tagValue: "ice_cream")
+                ],
+                "bakery": [
+                    MerchantCategoryTagFilter(tagKey: "shop", tagValue: "bakery")
+                ],
+                "pizza": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "restaurant")
+                ],
+                "tapas": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "restaurant")
+                ]
+            ]
+        ),
+        .bars: MerchantCategoryDescriptor(
+            group: .bars,
+            chipSymbolName: "wineglass",
+            priority: 2,
+            searchAliases: ["bar", "pub", "wine bar", "nightlife", "night club", "nightclub"],
+            matchingTagValues: ["bar", "pub", "nightclub", "stripclub", "wine", "alcohol"],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "bar"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "pub")
+            ],
+            iconOverrides: ["nightlife"],
+            querySpecificTagFilters: [:]
+        ),
+        .groceries: MerchantCategoryDescriptor(
+            group: .groceries,
+            chipSymbolName: "cart.circle.fill",
+            priority: 3,
+            searchAliases: ["grocery", "grocery store", "supermarket", "convenience"],
+            matchingTagValues: ["supermarket", "grocery", "convenience", "farm"],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "supermarket"),
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "convenience")
+            ],
+            iconOverrides: ["shopping_cart"],
+            querySpecificTagFilters: [:]
+        ),
+        .shopping: MerchantCategoryDescriptor(
+            group: .shopping,
+            chipSymbolName: "bag.circle",
+            priority: 4,
+            searchAliases: [
+                "store", "stores", "retail", "mall", "gift", "jewelry",
+                "pet", "pets", "diamond", "vape", "vaping", "smoking"
+            ],
+            matchingTagValues: [
+                "yes", "department_store", "clothes", "gift", "jewelry", "computer",
+                "electronics", "furniture", "mobile_phone", "photo", "books", "shoes",
+                "hardware", "toys", "pet", "kiosk", "tobacco", "e-cigarette"
+            ],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "yes"),
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "department_store")
+            ],
+            iconOverrides: ["diamond", "smoking_rooms", "vaping_rooms", "watch", "checkroom"],
+            querySpecificTagFilters: [:]
+        ),
+        .finance: MerchantCategoryDescriptor(
+            group: .finance,
+            chipSymbolName: "bitcoinsign.circle.fill",
+            priority: 5,
+            searchAliases: ["atm", "atms", "bank", "banks", "exchange", "money", "cash"],
+            matchingTagValues: ["atm", "bank", "bureau_de_change", "money_transfer", "payment_terminal", "bitcoin_office", "casino"],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "atm"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "bank"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "bureau_de_change")
+            ],
+            iconOverrides: ["attach_money", "balance"],
+            querySpecificTagFilters: [
+                "exchange": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "bureau_de_change")
+                ],
+                "cash": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "atm")
+                ]
+            ]
+        ),
+        .hotels: MerchantCategoryDescriptor(
+            group: .hotels,
+            chipSymbolName: "bed.double.circle.fill",
+            priority: 6,
+            searchAliases: ["hotel", "hotels", "hostel", "guest house", "guesthouse", "motel", "camping"],
+            matchingTagValues: ["hotel", "apartment", "apartments", "chalet", "camp_site", "motel", "guest_house", "hostel"],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "tourism", tagValue: "hotel"),
+                MerchantCategoryTagFilter(tagKey: "tourism", tagValue: "hostel")
+            ],
+            iconOverrides: ["luggage", "castle"],
+            querySpecificTagFilters: [:]
+        ),
+        .beauty: MerchantCategoryDescriptor(
+            group: .beauty,
+            chipSymbolName: "scissors.circle.fill",
+            priority: 7,
+            searchAliases: ["beauty", "salon", "spa", "hair", "hairdresser", "cosmetics"],
+            matchingTagValues: ["hairdresser", "beauty", "spa", "massage", "cosmetics", "cosmetic_surgery"],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "hairdresser"),
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "beauty"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "spa")
+            ],
+            iconOverrides: ["colorize"],
+            querySpecificTagFilters: [:]
+        ),
+        .health: MerchantCategoryDescriptor(
+            group: .health,
+            chipSymbolName: "cross.circle.fill",
+            priority: 8,
+            searchAliases: ["health", "clinic", "doctor", "dentist", "pharmacy", "hospital", "medical"],
+            matchingTagValues: [
+                "pharmacy", "clinic", "hospital", "doctor", "doctors",
+                "dentist", "alternative", "physiotherapist", "therapist",
+                "psychotherapist", "optometrist", "sample_collection"
+            ],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "pharmacy"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "clinic"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "hospital"),
+                MerchantCategoryTagFilter(tagKey: "healthcare", tagValue: "dentist")
+            ],
+            iconOverrides: ["dentistry"],
+            querySpecificTagFilters: [
+                "dentist": [
+                    MerchantCategoryTagFilter(tagKey: "healthcare", tagValue: "dentist")
+                ],
+                "dentistry": [
+                    MerchantCategoryTagFilter(tagKey: "healthcare", tagValue: "dentist")
+                ],
+                "pharmacy": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "pharmacy")
+                ]
+            ]
+        ),
+        .auto: MerchantCategoryDescriptor(
+            group: .auto,
+            chipSymbolName: "car.circle.fill",
+            priority: 9,
+            searchAliases: ["gas", "gas station", "fuel", "car repair", "charging", "car wash", "auto"],
+            matchingTagValues: ["fuel", "car_repair", "car", "car_wash", "car_rental", "charging_station", "motorcycle", "motorcycle_rental", "boat_rental", "taxi"],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "fuel"),
+                MerchantCategoryTagFilter(tagKey: "shop", tagValue: "car_repair"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "charging_station")
+            ],
+            iconOverrides: ["minor_crash"],
+            querySpecificTagFilters: [
+                "gas": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "fuel")
+                ],
+                "gas station": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "fuel")
+                ],
+                "charging": [
+                    MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "charging_station")
+                ]
+            ]
+        ),
+        .services: MerchantCategoryDescriptor(
+            group: .services,
+            chipSymbolName: "wrench.adjustable.fill",
+            priority: 10,
+            searchAliases: ["services", "service", "printing", "cleaning", "home services", "repair", "construction"],
+            matchingTagValues: [
+                "office", "coworking", "transport", "plumber", "electrician",
+                "carpenter", "photographer", "electronics_repair", "painter"
+            ],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "office", tagValue: "coworking")
+            ],
+            iconOverrides: ["build", "cleaning_services", "engineering", "home", "local_printshop", "plumbing", "construction", "electrical_services", "roofing", "window", "hvac", "architecture", "design_services", "dns", "warehouse", "cell_tower", "lock", "mail", "edit"],
+            querySpecificTagFilters: [:]
+        ),
+        .recreation: MerchantCategoryDescriptor(
+            group: .recreation,
+            chipSymbolName: "figure.run.circle.fill",
+            priority: 11,
+            searchAliases: ["park", "sports", "music", "art", "attractions", "museum", "games", "cinema", "recreation"],
+            matchingTagValues: [
+                "park", "sports", "fitness", "cycling", "golf", "tennis", "soccer",
+                "art", "music", "gallery", "attraction", "cinema", "theatre"
+            ],
+            remoteTagFilters: [
+                MerchantCategoryTagFilter(tagKey: "leisure", tagValue: "park"),
+                MerchantCategoryTagFilter(tagKey: "tourism", tagValue: "attraction"),
+                MerchantCategoryTagFilter(tagKey: "amenity", tagValue: "cinema")
+            ],
+            iconOverrides: ["attractions", "games", "mic", "museum", "local_movies", "golf_course", "sports_martial_arts", "sports_score", "piano", "beach_access", "pool", "sauna", "sailing", "directions_boat", "directions_walk", "volunteer_activism", "public", "science", "imagesearch_roller", "hive", "church", "celebration", "adult_content", "outdoor_grill"],
+            querySpecificTagFilters: [:]
+        )
+    ]
+
     // MARK: - Internal Lookup
+
+    private static func normalizedSearchTerm(_ raw: String) -> String {
+        let folded = raw.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: .current
+        )
+        let allowedScalars = CharacterSet.alphanumerics.union(.whitespacesAndNewlines)
+        var cleaned = String.UnicodeScalarView()
+        cleaned.reserveCapacity(folded.unicodeScalars.count)
+
+        for scalar in folded.unicodeScalars {
+            if allowedScalars.contains(scalar) {
+                cleaned.append(scalar)
+            } else {
+                cleaned.append(" ")
+            }
+        }
+
+        return String(cleaned)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private static func normalizedSearchTerms(_ values: [String]) -> Set<String> {
+        Set(values.map(normalizedSearchTerm).filter { !$0.isEmpty })
+    }
+
+    private static func splitComponents(_ raw: String) -> [String] {
+        raw.components(separatedBy: ";")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
 
     /// Iterates over the components of a semicolon-separated tag value
     /// and returns the first matching Image found in `map`.
@@ -383,6 +718,144 @@ struct ElementCategorySymbols {
         case "company": return lookupSymbolName(in: company, forTagValue: assignment.tagValue)
         default: return nil
         }
+    }
+
+    static func merchantCategoryDescriptor(for group: MerchantCategoryGroup) -> MerchantCategoryDescriptor {
+        merchantCategoryDescriptors[group]!
+    }
+
+    static func merchantCategoryGroups(for element: Element) -> [MerchantCategoryGroup] {
+        let iconCandidates = Set(
+            [element.v4Metadata?.icon, element.tags?.iconAndroid]
+                .compactMap { $0?.lowercased() }
+        )
+
+        var termCandidates = Set<String>()
+        if let tags = element.osmTagsDict {
+            for value in tags.values {
+                splitComponents(value).forEach { component in
+                    termCandidates.insert(normalizedSearchTerm(component))
+                }
+            }
+        }
+
+        for icon in iconCandidates {
+            if let assignment = osmTagAssignment(forCategoryIcon: icon) {
+                termCandidates.insert(normalizedSearchTerm(assignment.tagValue))
+            }
+            termCandidates.insert(normalizedSearchTerm(icon))
+        }
+
+        return MerchantCategoryGroup.allCases.filter { group in
+            let descriptor = merchantCategoryDescriptor(for: group)
+            if !Set(descriptor.iconOverrides.map { $0.lowercased() }).isDisjoint(with: iconCandidates) {
+                return true
+            }
+
+            let descriptorTerms = normalizedSearchTerms(descriptor.matchingTagValues)
+            return !descriptorTerms.isDisjoint(with: termCandidates)
+        }
+        .sorted { lhs, rhs in
+            merchantCategoryDescriptor(for: lhs).priority < merchantCategoryDescriptor(for: rhs).priority
+        }
+    }
+
+    static func merchantCategoryGroups(forCategoryIcon icon: String?) -> [MerchantCategoryGroup] {
+        guard let icon else { return [] }
+        let element = Element(
+            id: UUID().uuidString,
+            osmJSON: nil,
+            tags: Tags(
+                category: nil,
+                iconAndroid: icon,
+                paymentCoinos: nil,
+                paymentPouch: nil,
+                boostExpires: nil,
+                categoryPlural: nil,
+                paymentProvider: nil,
+                paymentURI: nil
+            ),
+            createdAt: "",
+            updatedAt: nil,
+            deletedAt: nil,
+            address: nil,
+            v4Metadata: ElementV4Metadata(
+                icon: icon,
+                commentsCount: nil,
+                verifiedAt: nil,
+                boostedUntil: nil,
+                osmID: nil,
+                osmURL: nil,
+                email: nil,
+                twitter: nil,
+                facebook: nil,
+                instagram: nil,
+                telegram: nil,
+                line: nil,
+                requiredAppURL: nil,
+                imageURL: nil,
+                paymentProvider: nil,
+                rawAddress: nil
+            )
+        )
+        return merchantCategoryGroups(for: element)
+    }
+
+    static func merchantCategoryChips(for elements: [Element], limit: Int = 6) -> [MerchantCategoryChip] {
+        var counts: [MerchantCategoryGroup: Int] = [:]
+        for element in elements {
+            for group in merchantCategoryGroups(for: element) {
+                counts[group, default: 0] += 1
+            }
+        }
+
+        return counts
+            .filter { $0.value > 0 }
+            .sorted { lhs, rhs in
+                if lhs.value != rhs.value {
+                    return lhs.value > rhs.value
+                }
+                return merchantCategoryDescriptor(for: lhs.key).priority < merchantCategoryDescriptor(for: rhs.key).priority
+            }
+            .prefix(limit)
+            .map {
+                MerchantCategoryChip(
+                    group: $0.key,
+                    count: $0.value,
+                    symbolName: merchantCategoryDescriptor(for: $0.key).chipSymbolName
+                )
+            }
+    }
+
+    static func searchTerms(for group: MerchantCategoryGroup) -> [String] {
+        let descriptor = merchantCategoryDescriptor(for: group)
+        return [group.localizedLabel] + descriptor.searchAliases + descriptor.matchingTagValues
+    }
+
+    static func resolvedCategoryGroup(forNormalizedQuery normalizedQuery: String) -> MerchantCategoryGroup? {
+        guard !normalizedQuery.isEmpty else { return nil }
+        let matchingGroups = MerchantCategoryGroup.allCases.filter { group in
+            normalizedSearchTerms(searchTerms(for: group)).contains(normalizedQuery)
+        }
+        return matchingGroups.count == 1 ? matchingGroups.first : nil
+    }
+
+    static func preferredRemoteTagFilters(
+        for group: MerchantCategoryGroup,
+        matchingNormalizedQuery normalizedQuery: String?,
+        limit: Int
+    ) -> [MerchantCategoryTagFilter] {
+        guard limit > 0 else { return [] }
+        let descriptor = merchantCategoryDescriptor(for: group)
+
+        if let normalizedQuery,
+           let overrides = descriptor.querySpecificTagFilters.first(where: {
+               normalizedSearchTerm($0.key) == normalizedQuery
+           })?.value {
+            return Array(overrides.prefix(limit))
+        }
+
+        return Array(descriptor.remoteTagFilters.prefix(limit))
     }
 
     /// Returns a SwiftUI Image for an Element based on its OSM tags.

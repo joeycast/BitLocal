@@ -41,6 +41,11 @@ struct BusinessesListView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 2)
 
+            if !visibleCategoryChips.isEmpty {
+                categoryChipsView
+                    .padding(.bottom, 4)
+            }
+
             Group {
                 if viewModel.isLoading {
                     VStack {
@@ -264,6 +269,12 @@ struct BusinessesListView: View {
         !trimmedSearchQuery.isEmpty
     }
 
+    private var visibleCategoryChips: [MerchantCategoryChip] {
+        guard trimmedSearchQuery.isEmpty else { return [] }
+        guard viewModel.selectedMerchantSearchScope == .onMap else { return [] }
+        return ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
+    }
+
     private var searchScopePicker: some View {
         Picker("Search Scope", selection: $viewModel.selectedMerchantSearchScope) {
             ForEach(MerchantSearchScope.allCases) { scope in
@@ -304,6 +315,39 @@ struct BusinessesListView: View {
     private var hasMoreSearchResults: Bool {
         let totalCount = viewModel.merchantSearchPrimaryResults.count + viewModel.merchantSearchFreshResults.count
         return totalCount > searchResultsLimit
+    }
+
+    private var categoryChipsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(visibleCategoryChips) { chip in
+                    Button {
+                        applyCategoryChip(chip)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: chip.symbolName)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(chip.localizedLabel)
+                                .font(.footnote.weight(.medium))
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color(.secondarySystemFill), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(chip.localizedLabel))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+        }
+    }
+
+    private func applyCategoryChip(_ chip: MerchantCategoryChip) {
+        viewModel.selectedMerchantSearchScope = .onMap
+        viewModel.isSearchActive = true
+        viewModel.unifiedSearchText = chip.localizedLabel
     }
 
     private func merchantSearchRow(for element: Element) -> some View {

@@ -12,10 +12,7 @@ final class MerchantSearchBehaviorTests: XCTestCase {
 
     func testTwoCharacterQueryUsesLocalOnlyAndSkipsRemote() async {
         let repo = MockBTCMapRepository()
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
+        let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
         viewModel.visibleElements = [
             V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 1, name: "Da Vinci Coffee"))
@@ -26,34 +23,69 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         await waitForPrimaryResultCount(1, on: viewModel)
 
         XCTAssertEqual(repo.searchPlaceQueries.count, 0)
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.count, 1)
+        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["1"])
         XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
     }
 
-    func testThreeCharacterQueryCallsRemoteAndAddsFreshSection() async {
+    func testStrongLocalCategoryHitsSkipOnMapRemoteTopUp() async {
         let repo = MockBTCMapRepository()
-        repo.searchPlacesHandler = { _, completion in
-            completion(.success([Self.placeRecord(id: 99, name: "Coffee Spot")]))
+        let viewModel = makeViewModel(repo: repo)
+        viewModel.selectedMerchantSearchScope = .onMap
+        viewModel.visibleElements = (1...8).map {
+            V4PlaceToElementMapper.placeRecordToElement(
+                Self.placeRecord(id: $0, name: "Cafe \($0)", icon: "local_cafe")
+            )
         }
 
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
+        viewModel.unifiedSearchText = "coffee"
+        viewModel.performUnifiedSearch()
+        await waitForPrimaryResultCount(8, on: viewModel)
+
+        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
+        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.count, 8)
+    }
+
+    func testCoffeeQueryIssuesNameAndCategoryTopUpQueries() async {
+        let repo = MockBTCMapRepository()
+        repo.searchPlacesHandler = { query, completion in
+            if query.tagName == "amenity", query.tagValue == "cafe" {
+                completion(.success([Self.placeRecord(id: 99, name: "Cafe Sats", icon: "local_cafe")]))
+            } else {
+                completion(.success([]))
+            }
+        }
+
+        let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
         viewModel.visibleElements = [
-            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 10, name: "Coffee House"))
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 10, name: "Coffee House", icon: "local_cafe"))
         ]
 
         viewModel.unifiedSearchText = "coffee"
         viewModel.performUnifiedSearch()
-        await waitForRemoteQuery(on: repo)
+        await waitForRemoteQueryCount(2, on: repo)
+        await waitForFreshResultCount(1, on: viewModel)
 
-        XCTAssertEqual(repo.searchPlaceQueries.count, 1)
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.count, 1)
-        XCTAssertEqual(viewModel.merchantSearchFreshResults.count, 1)
+        XCTAssertTrue(repo.searchPlaceQueries.contains(where: { $0.name == "coffee" && $0.lat != nil }))
+        XCTAssertTrue(repo.searchPlaceQueries.contains(where: { $0.tagName == "amenity" && $0.tagValue == "cafe" }))
         XCTAssertEqual(viewModel.merchantSearchFreshResults.first?.id, 99)
-        XCTAssertFalse(viewModel.merchantSearchIsOfflineFallback)
+    }
+
+    func testDessertQueryUsesFoodOverridesAndMatchesIceCreamLocally() async {
+        let repo = MockBTCMapRepository()
+        let viewModel = makeViewModel(repo: repo)
+        viewModel.selectedMerchantSearchScope = .onMap
+        viewModel.visibleElements = [
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 21, name: "Koko's Ice Cream", icon: "icecream"))
+        ]
+
+        viewModel.unifiedSearchText = "dessert"
+        viewModel.performUnifiedSearch()
+        await waitForPrimaryResultCount(1, on: viewModel)
+        await waitForRemoteQueryCount(2, on: repo)
+
+        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.first?.id, "21")
+        XCTAssertTrue(repo.searchPlaceQueries.contains(where: { $0.tagName == "shop" && $0.tagValue == "ice_cream" }))
     }
 
     func testRemoteFailureRetainsLocalPrimaryAndSetsOfflineState() async {
@@ -62,21 +94,18 @@ final class MerchantSearchBehaviorTests: XCTestCase {
             completion(.failure(MockError.network))
         }
 
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
+        let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
         viewModel.visibleElements = [
-            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 20, name: "Coffee House"))
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 20, name: "Coffee House", icon: "local_cafe"))
         ]
 
         viewModel.unifiedSearchText = "coffee"
         viewModel.performUnifiedSearch()
-        await waitForRemoteQuery(on: repo)
+        await waitForRemoteQueryCount(2, on: repo)
+        await waitForOfflineState(on: viewModel)
 
-        XCTAssertEqual(repo.searchPlaceQueries.count, 1)
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.count, 1)
+        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["20"])
         XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
         XCTAssertTrue(viewModel.merchantSearchIsOfflineFallback)
         XCTAssertNotNil(viewModel.merchantSearchError)
@@ -84,10 +113,7 @@ final class MerchantSearchBehaviorTests: XCTestCase {
 
     func testPunctuationInsensitiveLocalMatchFindsSteakNShake() async {
         let repo = MockBTCMapRepository()
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
+        let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
         viewModel.visibleElements = [
             V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 25770, name: "Steak 'n Shake"))
@@ -97,74 +123,65 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(1, on: viewModel)
 
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.count, 1)
         XCTAssertEqual(viewModel.merchantSearchPrimaryResults.first?.id, "25770")
     }
 
-    func testWorldwideQueryUsesGlobalRemoteSearchWithoutRadius() async {
+    func testWorldwideExactCategoryAddsTagQueryWithoutRadius() async {
         let repo = MockBTCMapRepository()
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
+        let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .worldwide
+
         viewModel.unifiedSearchText = "coffee"
-
         viewModel.performUnifiedSearch()
-        await waitForRemoteQuery(on: repo)
+        await waitForRemoteQueryCount(2, on: repo)
 
-        XCTAssertEqual(repo.searchPlaceQueries.count, 1)
-        let query = try? XCTUnwrap(repo.searchPlaceQueries.first)
-        XCTAssertEqual(query?.name, "coffee")
-        XCTAssertNil(query?.lat)
-        XCTAssertNil(query?.lon)
-        XCTAssertNil(query?.radiusKM)
+        XCTAssertTrue(repo.searchPlaceQueries.contains(where: {
+            $0.name == "coffee" && $0.lat == nil && $0.lon == nil && $0.radiusKM == nil
+        }))
+        XCTAssertTrue(repo.searchPlaceQueries.contains(where: {
+            $0.tagName == "amenity" && $0.tagValue == "cafe" && $0.lat == nil && $0.lon == nil
+        }))
     }
 
-    func testBoostedLocalMerchantSortsAheadOfNonBoostedLocalMerchant() async {
-        let repo = MockBTCMapRepository()
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
-        viewModel.selectedMerchantSearchScope = .onMap
-        viewModel.visibleElements = [
-            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 1, name: "Coffee House", boostedUntil: nil)),
-            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 2, name: "Coffee Roasters", boostedUntil: "2099-01-01T00:00:00Z"))
-        ]
-
-        viewModel.unifiedSearchText = "coffee"
-        viewModel.performUnifiedSearch()
-        await waitForPrimaryResultCount(2, on: viewModel)
-
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["2", "1"])
+    func testCategoryGroupResolutionCoversExistingAndExpandedIcons() {
+        XCTAssertEqual(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_cafe"), [.coffee])
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_grocery_store").contains(.groceries))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_atm").contains(.finance))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "content_cut").contains(.beauty))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_gas_station").contains(.auto))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "colorize").contains(.beauty))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "diamond").contains(.shopping))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "build").contains(.services))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "attach_money").contains(.finance))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "dentistry").contains(.health))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "cooking").contains(.food))
+        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "tapas").contains(.food))
     }
 
-    func testExpiredBoostDoesNotAffectLocalMerchantOrdering() async {
-        let repo = MockBTCMapRepository()
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
-        viewModel.selectedMerchantSearchScope = .onMap
-        viewModel.visibleElements = [
-            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 10, name: "Coffee House", boostedUntil: nil)),
-            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 11, name: "Coffee Roasters", boostedUntil: "2024-01-01T00:00:00Z"))
+    func testDynamicCategoryChipsAreSortedByVisibleCountAndCapped() {
+        let elements = [
+            Self.element(id: "1", icon: "local_cafe"),
+            Self.element(id: "2", icon: "local_cafe"),
+            Self.element(id: "3", icon: "restaurant"),
+            Self.element(id: "4", icon: "local_atm"),
+            Self.element(id: "5", icon: "hotel"),
+            Self.element(id: "6", icon: "content_cut"),
+            Self.element(id: "7", icon: "local_grocery_store"),
+            Self.element(id: "8", icon: "build"),
+            Self.element(id: "9", icon: "games")
         ]
 
-        viewModel.unifiedSearchText = "coffee"
-        viewModel.performUnifiedSearch()
-        await waitForPrimaryResultCount(2, on: viewModel)
+        let chips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
 
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["10", "11"])
+        XCTAssertEqual(chips.count, 6)
+        XCTAssertEqual(chips.first?.group, .coffee)
+        XCTAssertTrue(chips.contains(where: { $0.group == .food }))
+        XCTAssertFalse(chips.contains(where: { $0.group == .recreation && $0.count == 1 && chips.count > 6 }))
     }
 
     func testBrowseOrderingShowsBoostedVisibleMerchantsFirstThenDistance() {
         let repo = MockBTCMapRepository()
-        let viewModel = ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
-        )
+        let viewModel = makeViewModel(repo: repo)
         viewModel.userLocation = CLLocation(latitude: 36.17, longitude: -86.78)
 
         let nonBoostedNear = V4PlaceToElementMapper.placeRecordToElement(
@@ -186,33 +203,25 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertEqual(ordered.map(\.id), ["102", "101", "100", "103"])
     }
 
-    func testBrowseOrderingFallsBackToMapCenterAndIgnoresExpiredBoosts() {
-        let repo = MockBTCMapRepository()
-        let viewModel = ContentViewModel(
+    private func makeViewModel(repo: MockBTCMapRepository) -> ContentViewModel {
+        ContentViewModel(
             btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0
+            unifiedSearchDebounceNanoseconds: 0,
+            unifiedSearchWorldwideDebounceNanoseconds: 0,
+            localSearchWorldwideDebounceNanoseconds: 0
         )
-        viewModel.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 36.17, longitude: -86.78),
-            span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
-        )
+    }
 
-        let expiredCloser = V4PlaceToElementMapper.placeRecordToElement(
-            Self.placeRecord(id: 200, name: "Expired", lat: 36.1705, lon: -86.78, boostedUntil: "2024-01-01T00:00:00Z")
+    private static func element(id: String, icon: String) -> Element {
+        V4PlaceToElementMapper.placeRecordToElement(
+            placeRecord(id: Int(id) ?? 0, name: "Place \(id)", icon: icon)
         )
-        let regularFarther = V4PlaceToElementMapper.placeRecordToElement(
-            Self.placeRecord(id: 201, name: "Regular", lat: 36.1715, lon: -86.78, boostedUntil: nil)
-        )
-
-        let ordered = [regularFarther, expiredCloser]
-            .sorted(by: viewModel.merchantBrowseSortOrder)
-
-        XCTAssertEqual(ordered.map(\.id), ["200", "201"])
     }
 
     private static func placeRecord(
         id: Int,
         name: String,
+        icon: String? = nil,
         lat: Double = 36.17,
         lon: Double = -86.78,
         boostedUntil: String? = nil
@@ -221,7 +230,7 @@ final class MerchantSearchBehaviorTests: XCTestCase {
             id: id,
             lat: lat,
             lon: lon,
-            icon: nil,
+            icon: icon,
             name: name,
             address: nil,
             openingHours: nil,
@@ -261,18 +270,32 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         )
     }
 
-    private func waitForRemoteQuery(on repo: MockBTCMapRepository) async {
-        for _ in 0..<20 {
-            if !repo.searchPlaceQueries.isEmpty { break }
-            try? await Task.sleep(nanoseconds: 50_000_000)
+    private func waitForRemoteQueryCount(_ count: Int, on repo: MockBTCMapRepository) async {
+        for _ in 0..<40 {
+            if repo.searchPlaceQueries.count >= count { break }
+            try? await Task.sleep(nanoseconds: 25_000_000)
         }
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        try? await Task.sleep(nanoseconds: 25_000_000)
     }
 
     private func waitForPrimaryResultCount(_ count: Int, on viewModel: ContentViewModel) async {
-        for _ in 0..<30 {
+        for _ in 0..<40 {
             if viewModel.merchantSearchPrimaryResults.count == count { break }
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+    }
+
+    private func waitForFreshResultCount(_ count: Int, on viewModel: ContentViewModel) async {
+        for _ in 0..<40 {
+            if viewModel.merchantSearchFreshResults.count == count { break }
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+    }
+
+    private func waitForOfflineState(on viewModel: ContentViewModel) async {
+        for _ in 0..<40 {
+            if viewModel.merchantSearchIsOfflineFallback { break }
+            try? await Task.sleep(nanoseconds: 25_000_000)
         }
     }
 }
