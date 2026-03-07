@@ -117,23 +117,6 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertEqual(viewModel.merchantSearchPrimaryResults.first?.id, "25770")
     }
 
-    func testWorldwideExactCategoryAddsTagQueryWithoutRadius() async {
-        let repo = MockBTCMapRepository()
-        let viewModel = makeViewModel(repo: repo)
-        viewModel.selectedMerchantSearchScope = .worldwide
-
-        viewModel.unifiedSearchText = "coffee"
-        viewModel.performUnifiedSearch()
-        await waitForRemoteQueryCount(2, on: repo)
-
-        XCTAssertTrue(repo.searchPlaceQueries.contains(where: {
-            $0.name == "coffee" && $0.lat == nil && $0.lon == nil && $0.radiusKM == nil
-        }))
-        XCTAssertTrue(repo.searchPlaceQueries.contains(where: {
-            $0.tagName == "amenity" && $0.tagValue == "cafe" && $0.lat == nil && $0.lon == nil
-        }))
-    }
-
     func testCategoryGroupResolutionCoversExistingAndExpandedIcons() {
         XCTAssertEqual(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_cafe"), [.coffee])
         XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_grocery_store").contains(.groceries))
@@ -195,12 +178,7 @@ final class MerchantSearchBehaviorTests: XCTestCase {
     }
 
     private func makeViewModel(repo: MockBTCMapRepository) -> ContentViewModel {
-        ContentViewModel(
-            btcMapRepository: repo,
-            unifiedSearchDebounceNanoseconds: 0,
-            unifiedSearchWorldwideDebounceNanoseconds: 0,
-            localSearchWorldwideDebounceNanoseconds: 0
-        )
+        ContentViewModel(btcMapRepository: repo)
     }
 
     private static func element(id: String, icon: String) -> Element {

@@ -1200,7 +1200,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private func refreshMerchantSearchFromVisibleElementsIfNeeded() {
         guard mapDisplayMode == .merchants else { return }
         guard merchantSearchV2HybridEnabled else { return }
-        guard selectedMerchantSearchScope == .onMap else { return }
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else { return }
         let normalizedQuery = SearchTextNormalizer.normalize(query)
@@ -1247,18 +1246,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func performUnifiedSearchHybrid(query: String) {
-        unifiedSearchDebounceTask?.cancel()
         localMerchantSearchTask?.cancel()
 
         if query.isEmpty {
             localFilteredMerchants = []
             merchantSearchPrimaryResults = []
-            merchantSearchFreshResults = []
             merchantSearchNormalizedQuery = ""
             merchantSearchLocalMatchScoreByID = [:]
             merchantSearchStrongLocalHitCount = 0
             searchMatchingAreas = []
-            clearMerchantSearchResults()
             merchantSearchIsWaitingForLocalDebounce = false
             merchantSearchAnchorCenter = nil
             merchantSearchAnchorQuery = ""
@@ -1269,11 +1265,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         guard query.count >= 2 else {
             localFilteredMerchants = []
             merchantSearchPrimaryResults = []
-            merchantSearchFreshResults = []
             merchantSearchNormalizedQuery = ""
             merchantSearchLocalMatchScoreByID = [:]
             merchantSearchStrongLocalHitCount = 0
-            clearMerchantSearchResults()
             merchantSearchIsWaitingForLocalDebounce = false
             merchantSearchAnchorCenter = nil
             merchantSearchAnchorQuery = ""
@@ -1284,54 +1278,21 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let normalizedQuery = SearchTextNormalizer.normalize(query)
         merchantSearchNormalizedQuery = normalizedQuery
         searchMatchingAreas = []
-
-        merchantSearchFreshResults = []
-        merchantSearchResults = []
-        merchantSearchError = nil
-        merchantSearchIsOfflineFallback = false
-        merchantSearchIsLoading = query.count >= 3
         scheduleLocalMerchantSearch(query: query, normalizedQuery: normalizedQuery)
 
         merchantSearchAnchorCenter = region.center
         merchantSearchAnchorQuery = query
 
         Debug.logAPI(
-            "Merchant search queued (hybrid): query='\(query)', normalized='\(normalizedQuery)', scope=\(selectedMerchantSearchScope.rawValue), local=\(localFilteredMerchants.count)"
+            "Merchant search queued (hybrid): query='\(query)', normalized='\(normalizedQuery)', scope=Nearby, local=\(localFilteredMerchants.count)"
         )
-
-        guard selectedMerchantSearchScope == .worldwide else {
-            merchantSearchLoadingTimeoutTask?.cancel()
-            merchantSearchIsLoading = false
-            merchantSearchFreshResults = []
-            merchantSearchResults = []
-            merchantSearchError = nil
-            merchantSearchIsOfflineFallback = false
-            return
-        }
-
-        guard query.count >= 3 else { return }
-
-        unifiedSearchDebounceTask = Task {
-            try? await Task.sleep(nanoseconds: effectiveMerchantSearchDebounceNanoseconds())
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                merchantSearchText = query
-                performRemoteMerchantSearch()
-            }
-        }
     }
 
     private func scheduleLocalMerchantSearch(query: String, normalizedQuery: String) {
-        let source = localMerchantSearchSource(for: selectedMerchantSearchScope)
-        let debounce: UInt64 = selectedMerchantSearchScope == .worldwide
-            ? localSearchWorldwideDebounceNanoseconds
-            : 0
+        let source = visibleElements
         merchantSearchIsWaitingForLocalDebounce = true
 
         localMerchantSearchTask = Task { [weak self] in
-            if debounce > 0 {
-                try? await Task.sleep(nanoseconds: debounce)
-            }
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self else { return }
@@ -1343,7 +1304,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 )
                 self.localFilteredMerchants = filtered
                 self.merchantSearchPrimaryResults = filtered
-                self.pruneFreshResultsAgainstPrimary()
                 self.hydratePlaceholderNamesIfNeeded(in: Array(filtered.prefix(20)))
                 self.pruneTransientMerchantCachesIfNeeded()
             }
@@ -1404,7 +1364,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         case .onMap:
             return visibleElements
         case .worldwide:
-            return allElements
+            return []
         }
     }
 
@@ -1706,7 +1666,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func handleMerchantSearchMapRegionChange() {
         guard mapDisplayMode == .merchants else { return }
-        guard selectedMerchantSearchScope == .onMap else { return }
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else { return }
         guard merchantSearchAnchorQuery == query,

@@ -84,10 +84,6 @@ struct BusinessesListView: View {
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             searchResultsLimit = 20
         }
-        .onChange(of: viewModel.selectedMerchantSearchScope) { _, _ in
-            searchResultsLimit = 20
-            viewModel.performUnifiedSearch()
-        }
         .onChange(of: viewModel.region.center.latitude) { _, _ in
             viewModel.handleMerchantSearchMapRegionChange()
         }
@@ -206,13 +202,6 @@ struct BusinessesListView: View {
 
     private var searchResultsView: some View {
         VStack(spacing: 0) {
-            if !isCollapsedSheet {
-                searchScopePicker
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 2)
-            }
-
             List {
                 if trimmedSearchQuery.count == 1 {
                     Text("Type at least 2 characters to search")
@@ -225,57 +214,46 @@ struct BusinessesListView: View {
                     }
 
                     if displayedPrimaryResults.isEmpty &&
-                        displayedFreshResults.isEmpty &&
                         !viewModel.merchantSearchIsWaitingForLocalDebounce &&
                         !viewModel.merchantSearchIsLoading {
                         Text(noResultsText)
                             .foregroundStyle(.secondary)
                     } else {
-                        if viewModel.selectedMerchantSearchScope == .onMap {
-                            if !displayedFeaturedPrimaryResults.isEmpty {
-                                Section {
-                                    ForEach(displayedFeaturedPrimaryResults, id: \.id) { element in
-                                        merchantSearchRow(for: element)
-                                    }
-                                } header: {
-                                    merchantSectionHeader(
-                                        title: "Featured Nearby",
-                                        systemImage: "star.fill",
-                                        tint: Color(red: 0.71, green: 0.50, blue: 0.12),
-                                        topPadding: 4,
-                                        bottomPadding: -10
-                                    )
+                        if !displayedFeaturedPrimaryResults.isEmpty {
+                            Section {
+                                ForEach(displayedFeaturedPrimaryResults, id: \.id) { element in
+                                    merchantSearchRow(for: element)
                                 }
+                            } header: {
+                                merchantSectionHeader(
+                                    title: "Featured Nearby",
+                                    systemImage: "star.fill",
+                                    tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                                    topPadding: 4,
+                                    bottomPadding: -10
+                                )
                             }
+                        }
 
-                            if !displayedRegularPrimaryResults.isEmpty || displayedFeaturedPrimaryResults.isEmpty {
-                                Section {
-                                    ForEach(displayedRegularPrimaryResults, id: \.id) { element in
-                                        merchantSearchRow(for: element)
-                                    }
-                                } header: {
-                                    if !displayedFeaturedPrimaryResults.isEmpty {
-                                        merchantSectionHeader(
-                                            title: "More Nearby",
-                                            systemImage: "location.fill",
-                                            tint: .secondary,
-                                            topPadding: 4,
-                                            bottomPadding: -14
-                                        )
-                                    }
+                        if !displayedRegularPrimaryResults.isEmpty || displayedFeaturedPrimaryResults.isEmpty {
+                            Section {
+                                ForEach(displayedRegularPrimaryResults, id: \.id) { element in
+                                    merchantSearchRow(for: element)
+                                }
+                            } header: {
+                                if !displayedFeaturedPrimaryResults.isEmpty {
+                                    merchantSectionHeader(
+                                        title: "More Nearby",
+                                        systemImage: "location.fill",
+                                        tint: .secondary,
+                                        topPadding: 4,
+                                        bottomPadding: -14
+                                    )
                                 }
                             }
                         } else if !displayedPrimaryResults.isEmpty {
                             ForEach(displayedPrimaryResults, id: \.id) { element in
                                 merchantSearchRow(for: element)
-                            }
-                        }
-
-                        if !displayedFreshResults.isEmpty {
-                            Section("More Results") {
-                                ForEach(displayedFreshResults) { record in
-                                    freshMerchantSearchRow(for: record)
-                                }
                             }
                         }
                     }
@@ -313,31 +291,12 @@ struct BusinessesListView: View {
 
     private var visibleCategoryChips: [MerchantCategoryChip] {
         guard trimmedSearchQuery.isEmpty else { return [] }
-        guard viewModel.selectedMerchantSearchScope == .onMap else { return [] }
         return cachedVisibleCategoryChips
     }
 
-    private var searchScopePicker: some View {
-        Picker("Search Scope", selection: $viewModel.selectedMerchantSearchScope) {
-            ForEach(MerchantSearchScope.allCases) { scope in
-                Text(scope.rawValue).tag(scope)
-            }
-        }
-        .pickerStyle(.segmented)
-    }
-
     private var searchStatusText: String? {
-        if viewModel.selectedMerchantSearchScope == .onMap &&
-            viewModel.merchantSearchIsWaitingForLocalDebounce {
+        if viewModel.merchantSearchIsWaitingForLocalDebounce {
             return "Searching nearby…"
-        }
-        if viewModel.selectedMerchantSearchScope == .worldwide &&
-            viewModel.merchantSearchIsWaitingForLocalDebounce {
-            return "Searching…"
-        }
-        if viewModel.selectedMerchantSearchScope == .worldwide &&
-            viewModel.merchantSearchIsOfflineFallback {
-            return "Offline/local results"
         }
         return nil
     }
@@ -359,13 +318,8 @@ struct BusinessesListView: View {
         displayedPrimaryResults.filter { !$0.isCurrentlyBoosted() }
     }
 
-    private var displayedFreshResults: [V4PlaceRecord] {
-        let remaining = max(0, searchResultsLimit - displayedPrimaryResults.count)
-        return Array(viewModel.merchantSearchFreshResults.prefix(remaining))
-    }
-
     private var hasMoreSearchResults: Bool {
-        let totalCount = viewModel.merchantSearchPrimaryResults.count + viewModel.merchantSearchFreshResults.count
+        let totalCount = viewModel.merchantSearchPrimaryResults.count
         return totalCount > searchResultsLimit
     }
 
@@ -397,7 +351,6 @@ struct BusinessesListView: View {
     }
 
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {
-        viewModel.selectedMerchantSearchScope = .onMap
         viewModel.isSearchActive = true
         viewModel.unifiedSearchText = chip.localizedLabel
     }
