@@ -49,6 +49,8 @@ struct BusinessesListView: View {
             if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
                 categoryChipsView
                     .padding(.bottom, 6)
+                    .opacity(contentRevealProgress)
+                    .offset(y: (1 - contentRevealProgress) * -8)
             }
 
             Group {
@@ -75,6 +77,8 @@ struct BusinessesListView: View {
                     normalListView
                 }
             }
+            .opacity(contentRevealProgress)
+            .offset(y: (1 - contentRevealProgress) * 10)
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
         .onChange(of: viewModel.userLocation) { _, newLocation in
@@ -343,6 +347,16 @@ struct BusinessesListView: View {
 
     private var collapsedContentRevealHeight: CGFloat {
         140
+    }
+
+    private var contentRevealProgress: CGFloat {
+        if !isCollapsedSheet || showFocusedSearchCategoryChips {
+            return 1
+        }
+
+        let revealRange: CGFloat = 36
+        let rawProgress = (liveSheetHeight - collapsedContentRevealHeight) / revealRange
+        return min(max(rawProgress, 0), 1)
     }
 
     private var searchStatusText: String? {
