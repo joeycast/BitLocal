@@ -102,6 +102,34 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertEqual(repo.searchPlaceQueries.count, 0)
     }
 
+    func testMapElementsFollowDisplayedSearchResultsWhenSearching() {
+        let repo = MockBTCMapRepository()
+        let viewModel = makeViewModel(repo: repo)
+        let cafe = Self.element(id: "1", icon: "local_cafe")
+        let diner = Self.element(id: "2", icon: "restaurant")
+
+        viewModel.mapDisplayMode = .merchants
+        viewModel.unifiedSearchText = "coffee"
+        viewModel.setAllElementsForTesting([cafe, diner])
+        viewModel.setMerchantSearchMapResults([cafe])
+
+        XCTAssertEqual(viewModel.mapElementsForCurrentDisplay.map(\.id), ["1"])
+    }
+
+    func testMapElementsShowAllMerchantsWhenSearchIsTooShort() {
+        let repo = MockBTCMapRepository()
+        let viewModel = makeViewModel(repo: repo)
+        let cafe = Self.element(id: "1", icon: "local_cafe")
+        let diner = Self.element(id: "2", icon: "restaurant")
+
+        viewModel.mapDisplayMode = .merchants
+        viewModel.unifiedSearchText = "c"
+        viewModel.setAllElementsForTesting([cafe, diner])
+        viewModel.setMerchantSearchMapResults([cafe])
+
+        XCTAssertEqual(viewModel.mapElementsForCurrentDisplay.map(\.id), ["1", "2"])
+    }
+
     func testPunctuationInsensitiveLocalMatchFindsSteakNShake() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)

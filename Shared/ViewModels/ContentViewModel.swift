@@ -131,6 +131,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var localFilteredMerchants: [Element] = []
     @Published var selectedMerchantSearchScope: MerchantSearchScope = .onMap
     @Published private(set) var merchantSearchPrimaryResults: [Element] = []
+    @Published private(set) var merchantSearchMapResults: [Element] = []
     @Published private(set) var merchantSearchFreshResults: [V4PlaceRecord] = []
     @Published private(set) var merchantSearchNormalizedQuery = ""
     @Published var searchMatchingAreas: [V3AreaRecord] = []
@@ -1713,11 +1714,33 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     var mapElementsForCurrentDisplay: [Element] {
         switch mapDisplayMode {
         case .merchants:
+            let trimmedQuery = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedQuery.count >= 2 {
+                return merchantSearchMapResults
+            }
             return allElements
         case .communities:
             return selectedCommunityArea == nil ? [] : communityMemberElements
         }
     }
+
+    func setMerchantSearchMapResults(_ results: [Element]) {
+        let currentIDs = merchantSearchMapResults.map(\.id)
+        let newIDs = results.map(\.id)
+        guard currentIDs != newIDs else { return }
+        merchantSearchMapResults = results
+    }
+
+    func clearMerchantSearchMapResults() {
+        guard !merchantSearchMapResults.isEmpty else { return }
+        merchantSearchMapResults = []
+    }
+
+#if DEBUG
+    func setAllElementsForTesting(_ elements: [Element]) {
+        allElements = elements
+    }
+#endif
 
     var isShowingCommunityMembersOnMap: Bool {
         mapDisplayMode == .communities && selectedCommunityArea != nil

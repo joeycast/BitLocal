@@ -83,6 +83,13 @@ struct BusinessesListView: View {
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             searchResultsLimit = 20
+            clearSearchDrivenMapResults()
+        }
+        .onChange(of: displayedPrimaryResults.map(\.id)) { _, _ in
+            syncDisplayedSearchResultsToMap()
+        }
+        .onChange(of: searchResultsLimit) { _, _ in
+            syncDisplayedSearchResultsToMap()
         }
         .onChange(of: viewModel.region.center.latitude) { _, _ in
             viewModel.handleMerchantSearchMapRegionChange()
@@ -97,6 +104,7 @@ struct BusinessesListView: View {
             viewModel.ensureEventsLoaded()
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
             refreshDiscoveryCache()
+            syncDisplayedSearchResultsToMap()
         }
     }
 
@@ -365,6 +373,18 @@ struct BusinessesListView: View {
     private func refreshDiscoveryCache() {
         cachedTopSortedElements = nearestElements(elements, limit: maxListResults)
         cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
+    }
+
+    private func syncDisplayedSearchResultsToMap() {
+        guard trimmedSearchQuery.count >= 2 else {
+            viewModel.clearMerchantSearchMapResults()
+            return
+        }
+        viewModel.setMerchantSearchMapResults(displayedPrimaryResults)
+    }
+
+    private func clearSearchDrivenMapResults() {
+        viewModel.clearMerchantSearchMapResults()
     }
 
     private func merchantSearchRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
