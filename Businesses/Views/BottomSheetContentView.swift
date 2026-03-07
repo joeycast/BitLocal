@@ -13,6 +13,8 @@ import CryptoKit
 
 @available(iOS 17.0, *)
 struct BottomSheetContentView: View {
+    private static let sheetHeightPublishThreshold: CGFloat = 8
+
     @EnvironmentObject var viewModel: ContentViewModel
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
@@ -72,8 +74,10 @@ struct BottomSheetContentView: View {
             }
             .ignoresSafeArea(edges: .bottom)
             .onChange(of: geometry.size.height) { _, newHeight in
+                guard abs(viewModel.bottomPadding - newHeight) >= Self.sheetHeightPublishThreshold else {
+                    return
+                }
                 viewModel.bottomPadding = newHeight
-                Debug.log("BottomSheetContentView height updated: \(newHeight)")
             }
             .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")

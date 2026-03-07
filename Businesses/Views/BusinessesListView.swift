@@ -20,10 +20,12 @@ struct BusinessesListView: View {
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
     @State private var searchResultsLimit = 20
+    @State private var cachedTopSortedElements: [Element] = []
+    @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
     @FocusState private var isSearchFieldFocused: Bool
 
     private var topSortedElements: [Element] {
-        nearestElements(elements, limit: maxListResults)
+        cachedTopSortedElements
     }
 
     private var featuredTopSortedElements: [Element] {
@@ -72,6 +74,7 @@ struct BusinessesListView: View {
         .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
+            refreshDiscoveryCache()
         }
         .onChange(of: isSearchFieldFocused) { _, focused in
             if focused && !viewModel.isSearchActive {
@@ -91,9 +94,13 @@ struct BusinessesListView: View {
         .onChange(of: viewModel.region.center.longitude) { _, _ in
             viewModel.handleMerchantSearchMapRegionChange()
         }
+        .onChange(of: elements.map(\.id)) { _, _ in
+            refreshDiscoveryCache()
+        }
         .onAppear {
             viewModel.ensureEventsLoaded()
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
+            refreshDiscoveryCache()
         }
     }
 
@@ -272,7 +279,7 @@ struct BusinessesListView: View {
     private var visibleCategoryChips: [MerchantCategoryChip] {
         guard trimmedSearchQuery.isEmpty else { return [] }
         guard viewModel.selectedMerchantSearchScope == .onMap else { return [] }
-        return ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
+        return cachedVisibleCategoryChips
     }
 
     private var searchScopePicker: some View {
@@ -348,6 +355,11 @@ struct BusinessesListView: View {
         viewModel.selectedMerchantSearchScope = .onMap
         viewModel.isSearchActive = true
         viewModel.unifiedSearchText = chip.localizedLabel
+    }
+
+    private func refreshDiscoveryCache() {
+        cachedTopSortedElements = nearestElements(elements, limit: maxListResults)
+        cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
     }
 
     private func merchantSearchRow(for element: Element) -> some View {

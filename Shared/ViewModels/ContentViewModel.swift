@@ -243,6 +243,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var merchantSearchPreviewHydrationInFlight = Set<String>()
     private var merchantSearchLoadingTimeoutTask: Task<Void, Never>?
     private let merchantSearchV2HybridFlagKey = "search_v2_hybrid"
+    private let cellViewModelCacheLimit = 250
+    private let merchantSearchDocumentCacheLimit = 1_200
     
     // Use a queue for thread-safe access to mapView
     private let mapViewQueue = DispatchQueue(label: "mapview.queue", qos: .userInitiated)
@@ -300,6 +302,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self?.visibleElements = elements
                 self?.hydratePlaceholderNamesIfNeeded(in: elements)
                 self?.refreshMerchantSearchFromVisibleElementsIfNeeded()
+                self?.pruneTransientMerchantCachesIfNeeded()
             }
             .store(in: &cancellables)
     }
@@ -1283,6 +1286,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             merchantSearchIsWaitingForLocalDebounce = false
             merchantSearchAnchorCenter = nil
             merchantSearchAnchorQuery = ""
+            pruneTransientMerchantCachesIfNeeded(force: true)
             return
         }
 
@@ -1297,6 +1301,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             merchantSearchIsWaitingForLocalDebounce = false
             merchantSearchAnchorCenter = nil
             merchantSearchAnchorQuery = ""
+            pruneTransientMerchantCachesIfNeeded(force: true)
             return
         }
 
@@ -1354,6 +1359,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self.merchantSearchPrimaryResults = filtered
                 self.pruneFreshResultsAgainstPrimary()
                 self.hydratePlaceholderNamesIfNeeded(in: Array(filtered.prefix(20)))
+                self.pruneTransientMerchantCachesIfNeeded()
             }
         }
     }
@@ -1459,6 +1465,44 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         merchantSearchDocumentSignatureByID[element.id] = signature
         merchantSearchDocumentByID[element.id] = document
         return document
+    }
+
+    private func pruneTransientMerchantCachesIfNeeded(force: Bool = false) {
+        let shouldPruneCellViewModels = force || cellViewModels.count > cellViewModelCacheLimit
+        let shouldPruneSearchDocuments = force || merchantSearchDocumentByID.count > merchantSearchDocumentCacheLimit
+
+        guard shouldPruneCellViewModels || shouldPruneSearchDocuments else { return }
+
+        var retainedIDs: [String] = []
+        retainedIDs.reserveCapacity(
+            visibleElements.count +
+            merchantSearchPrimaryResults.count +
+            path.count +
+            communityMemberElements.count + 1
+        )
+
+        func appendUnique(id: String?) {
+            guard let id, !id.isEmpty, !retainedIDs.contains(id) else { return }
+            retainedIDs.append(id)
+        }
+
+        visibleElements.forEach { appendUnique(id: $0.id) }
+        merchantSearchPrimaryResults.forEach { appendUnique(id: $0.id) }
+        path.forEach { appendUnique(id: $0.id) }
+        communityMemberElements.prefix(100).forEach { appendUnique(id: $0.id) }
+        appendUnique(id: selectedElement?.id)
+
+        if shouldPruneCellViewModels {
+            let keepIDs = Set(retainedIDs.prefix(cellViewModelCacheLimit))
+            cellViewModels = cellViewModels.filter { keepIDs.contains($0.key) }
+        }
+
+        if shouldPruneSearchDocuments {
+            let keepIDs = Set(retainedIDs.prefix(merchantSearchDocumentCacheLimit))
+            merchantSearchDocumentByID = merchantSearchDocumentByID.filter { keepIDs.contains($0.key) }
+            merchantSearchDocumentSignatureByID = merchantSearchDocumentSignatureByID.filter { keepIDs.contains($0.key) }
+            merchantSearchLocalMatchScoreByID = merchantSearchLocalMatchScoreByID.filter { keepIDs.contains($0.key) }
+        }
     }
 
     private func merchantSearchableTextFields(for element: Element) -> [String] {
