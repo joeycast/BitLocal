@@ -5,6 +5,7 @@ import MapKit
 import CoreLocation
 import Combine
 import Foundation
+import UIKit
 
 @available(iOS 17.0, *)
 struct BusinessesListView: View {
@@ -16,14 +17,18 @@ struct BusinessesListView: View {
     var elements: [Element]
     var userLocation: CLLocation?
     var currentDetent: PresentationDetent? = nil
+    var liveSheetHeight: CGFloat = 0
 
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
     @State private var searchResultsLimit = 20
+    @State private var cachedTopSortedElements: [Element] = []
+    @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
+    @State private var showFocusedSearchCategoryChips = false
     @FocusState private var isSearchFieldFocused: Bool
 
     private var topSortedElements: [Element] {
-        nearestElements(elements, limit: maxListResults)
+        cachedTopSortedElements
     }
 
     private var featuredTopSortedElements: [Element] {
@@ -41,6 +46,13 @@ struct BusinessesListView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 2)
 
+            if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
+                categoryChipsView
+                    .padding(.bottom, 6)
+                    .opacity(contentRevealProgress)
+                    .offset(y: (1 - contentRevealProgress) * -8)
+            }
+
             Group {
                 if viewModel.isLoading {
                     VStack {
@@ -48,6 +60,8 @@ struct BusinessesListView: View {
                         LoadingScreenView()
                         Spacer()
                     }
+                } else if shouldHideCollapsedSheetContent {
+                    Spacer(minLength: 0)
                 } else if isFilteringMerchants {
                     searchResultsView
                 } else if elements.isEmpty {
@@ -63,22 +77,30 @@ struct BusinessesListView: View {
                     normalListView
                 }
             }
+            .opacity(contentRevealProgress)
+            .offset(y: (1 - contentRevealProgress) * 10)
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
+            refreshDiscoveryCache()
         }
         .onChange(of: isSearchFieldFocused) { _, focused in
             if focused && !viewModel.isSearchActive {
                 viewModel.isSearchActive = true
+            } else if !focused {
+                showFocusedSearchCategoryChips = false
             }
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             searchResultsLimit = 20
+            clearSearchDrivenMapResults()
         }
-        .onChange(of: viewModel.selectedMerchantSearchScope) { _, _ in
-            searchResultsLimit = 20
-            viewModel.performUnifiedSearch()
+        .onChange(of: displayedPrimaryResults.map(\.id)) { _, _ in
+            syncDisplayedSearchResultsToMap()
+        }
+        .onChange(of: searchResultsLimit) { _, _ in
+            syncDisplayedSearchResultsToMap()
         }
         .onChange(of: viewModel.region.center.latitude) { _, _ in
             viewModel.handleMerchantSearchMapRegionChange()
@@ -86,9 +108,25 @@ struct BusinessesListView: View {
         .onChange(of: viewModel.region.center.longitude) { _, _ in
             viewModel.handleMerchantSearchMapRegionChange()
         }
+        .onChange(of: elements.map(\.id)) { _, _ in
+            refreshDiscoveryCache()
+        }
         .onAppear {
             viewModel.ensureEventsLoaded()
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
+            refreshDiscoveryCache()
+            syncDisplayedSearchResultsToMap()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+            guard isSearchFieldFocused else { return }
+            withAnimation(keyboardAnimation(for: notification)) {
+                showFocusedSearchCategoryChips = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+            withAnimation(keyboardAnimation(for: notification)) {
+                showFocusedSearchCategoryChips = false
+            }
         }
     }
 
@@ -134,24 +172,29 @@ struct BusinessesListView: View {
     private var normalListView: some View {
         List {
             // Events carousel (only renders if events exist)
-            EventsDiscoverySection()
-                .environmentObject(viewModel)
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+            Section {
+                EventsDiscoverySection()
+                    .environmentObject(viewModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .clearListRowBackground(if: shouldUseGlassyRows)
+            }
 
             if !featuredTopSortedElements.isEmpty {
                 Section {
-                    ForEach(featuredTopSortedElements, id: \.id) { element in
-                        merchantRow(for: element)
+                    ForEach(Array(featuredTopSortedElements.enumerated()), id: \.element.id) { index, element in
+                        merchantRow(
+                            for: element,
+                            showsBottomDivider: index == featuredTopSortedElements.count - 1
+                        )
                     }
                 } header: {
                     merchantSectionHeader(
                         title: "Featured Nearby",
                         systemImage: "star.fill",
                         tint: Color(red: 0.71, green: 0.50, blue: 0.12),
-                        topPadding: -4,
-                        bottomPadding: -6
+                        topPadding: -3,
+                        bottomPadding: -14
                     )
                 }
                 .clearListRowBackground(if: shouldUseGlassyRows)
@@ -182,6 +225,7 @@ struct BusinessesListView: View {
         .listStyle(.plain)
         .listSectionSpacing(0)
         .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .contentMargins(.top, 0, for: .scrollContent)
         .background(Color.clear)
         .environment(\.defaultMinListRowHeight, 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -194,13 +238,6 @@ struct BusinessesListView: View {
 
     private var searchResultsView: some View {
         VStack(spacing: 0) {
-            if !isCollapsedSheet {
-                searchScopePicker
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 2)
-            }
-
             List {
                 if trimmedSearchQuery.count == 1 {
                     Text("Type at least 2 characters to search")
@@ -213,22 +250,49 @@ struct BusinessesListView: View {
                     }
 
                     if displayedPrimaryResults.isEmpty &&
-                        displayedFreshResults.isEmpty &&
+                        !viewModel.merchantSearchIsWaitingForLocalDebounce &&
                         !viewModel.merchantSearchIsLoading {
                         Text(noResultsText)
                             .foregroundStyle(.secondary)
                     } else {
-                        if !displayedPrimaryResults.isEmpty {
-                            ForEach(displayedPrimaryResults, id: \.id) { element in
-                                merchantSearchRow(for: element)
+                        if !displayedFeaturedPrimaryResults.isEmpty {
+                            Section {
+                                ForEach(Array(displayedFeaturedPrimaryResults.enumerated()), id: \.element.id) { index, element in
+                                    merchantSearchRow(
+                                        for: element,
+                                        showsBottomDivider: index == displayedFeaturedPrimaryResults.count - 1
+                                    )
+                                }
+                            } header: {
+                                merchantSectionHeader(
+                                    title: "Featured Nearby",
+                                    systemImage: "star.fill",
+                                    tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                                    topPadding: 3,
+                                    bottomPadding: -10
+                                )
                             }
                         }
 
-                        if !displayedFreshResults.isEmpty {
-                            Section("More Results") {
-                                ForEach(displayedFreshResults) { record in
-                                    freshMerchantSearchRow(for: record)
+                        if !displayedRegularPrimaryResults.isEmpty || displayedFeaturedPrimaryResults.isEmpty {
+                            Section {
+                                ForEach(displayedRegularPrimaryResults, id: \.id) { element in
+                                    merchantSearchRow(for: element)
                                 }
+                            } header: {
+                                if !displayedFeaturedPrimaryResults.isEmpty {
+                                    merchantSectionHeader(
+                                        title: "More Nearby",
+                                        systemImage: "location.fill",
+                                        tint: .secondary,
+                                        topPadding: 4,
+                                        bottomPadding: -14
+                                    )
+                                }
+                            }
+                        } else if !displayedPrimaryResults.isEmpty {
+                            ForEach(displayedPrimaryResults, id: \.id) { element in
+                                merchantSearchRow(for: element)
                             }
                         }
                     }
@@ -243,6 +307,7 @@ struct BusinessesListView: View {
                 }
             }
             .listStyle(.plain)
+            .listSectionSpacing(0)
             .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
             .contentMargins(.top, 0, for: .scrollContent)
             .background(Color.clear)
@@ -264,25 +329,39 @@ struct BusinessesListView: View {
         !trimmedSearchQuery.isEmpty
     }
 
-    private var searchScopePicker: some View {
-        Picker("Search Scope", selection: $viewModel.selectedMerchantSearchScope) {
-            ForEach(MerchantSearchScope.allCases) { scope in
-                Text(scope.rawValue).tag(scope)
-            }
+    private var visibleCategoryChips: [MerchantCategoryChip] {
+        guard trimmedSearchQuery.isEmpty else { return [] }
+        return cachedVisibleCategoryChips
+    }
+
+    private var shouldShowCategoryChips: Bool {
+        !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
+    }
+
+    private var shouldHideCollapsedSheetContent: Bool {
+        isCollapsedSheet &&
+        !isFilteringMerchants &&
+        !showFocusedSearchCategoryChips &&
+        liveSheetHeight <= collapsedContentRevealHeight
+    }
+
+    private var collapsedContentRevealHeight: CGFloat {
+        140
+    }
+
+    private var contentRevealProgress: CGFloat {
+        if !isCollapsedSheet || showFocusedSearchCategoryChips {
+            return 1
         }
-        .pickerStyle(.segmented)
+
+        let revealRange: CGFloat = 36
+        let rawProgress = (liveSheetHeight - collapsedContentRevealHeight) / revealRange
+        return min(max(rawProgress, 0), 1)
     }
 
     private var searchStatusText: String? {
-        if viewModel.selectedMerchantSearchScope == .worldwide &&
-            viewModel.merchantSearchIsWaitingForLocalDebounce {
-            return "Searching…"
-        }
-        if viewModel.merchantSearchIsOfflineFallback {
-            return "Offline/local results"
-        }
-        if !viewModel.merchantSearchFreshResults.isEmpty {
-            return "Showing local results with fresh network matches"
+        if viewModel.merchantSearchIsWaitingForLocalDebounce {
+            return "Searching nearby…"
         }
         return nil
     }
@@ -296,17 +375,75 @@ struct BusinessesListView: View {
         return Array(viewModel.merchantSearchPrimaryResults.prefix(limit))
     }
 
-    private var displayedFreshResults: [V4PlaceRecord] {
-        let remaining = max(0, searchResultsLimit - displayedPrimaryResults.count)
-        return Array(viewModel.merchantSearchFreshResults.prefix(remaining))
+    private var displayedFeaturedPrimaryResults: [Element] {
+        displayedPrimaryResults.filter { $0.isCurrentlyBoosted() }
+    }
+
+    private var displayedRegularPrimaryResults: [Element] {
+        displayedPrimaryResults.filter { !$0.isCurrentlyBoosted() }
     }
 
     private var hasMoreSearchResults: Bool {
-        let totalCount = viewModel.merchantSearchPrimaryResults.count + viewModel.merchantSearchFreshResults.count
+        let totalCount = viewModel.merchantSearchPrimaryResults.count
         return totalCount > searchResultsLimit
     }
 
-    private func merchantSearchRow(for element: Element) -> some View {
+    private var categoryChipsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(visibleCategoryChips) { chip in
+                    Button {
+                        applyCategoryChip(chip)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: chip.symbolName)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(chip.localizedLabel)
+                                .font(.footnote.weight(.medium))
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color(.secondarySystemFill), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(chip.localizedLabel))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+        }
+    }
+
+    private func applyCategoryChip(_ chip: MerchantCategoryChip) {
+        viewModel.isSearchActive = true
+        viewModel.unifiedSearchText = chip.localizedLabel
+    }
+
+    private func refreshDiscoveryCache() {
+        cachedTopSortedElements = nearestElements(elements, limit: maxListResults)
+        cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
+    }
+
+    private func syncDisplayedSearchResultsToMap() {
+        guard trimmedSearchQuery.count >= 2 else {
+            viewModel.clearMerchantSearchMapResults()
+            return
+        }
+        viewModel.setMerchantSearchMapResults(displayedPrimaryResults)
+    }
+
+    private func clearSearchDrivenMapResults() {
+        viewModel.clearMerchantSearchMapResults()
+    }
+
+    private func keyboardAnimation(for notification: Notification) -> Animation {
+        let userInfo = notification.userInfo ?? [:]
+        let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue ?? 0.25
+        return .easeInOut(duration: duration)
+    }
+
+    private func merchantSearchRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
         let cellVM = cellViewModel(for: element)
         return Button {
             viewModel.setSelectionSource(.list)
@@ -318,7 +455,7 @@ struct BusinessesListView: View {
             viewModel.path = [element]
         } label: {
             ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM)
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
                     .padding(.trailing, 18)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .bold))
@@ -331,7 +468,7 @@ struct BusinessesListView: View {
         }
     }
 
-    private func merchantRow(for element: Element) -> some View {
+    private func merchantRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
         let cellVM = cellViewModel(for: element)
         return Button {
             viewModel.setSelectionSource(.list)
@@ -343,7 +480,7 @@ struct BusinessesListView: View {
             viewModel.path = [element]
         } label: {
             ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM)
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
                     .padding(.trailing, 18)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .bold))
@@ -514,6 +651,7 @@ struct BusinessesListView: View {
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
+    var showsBottomDivider = false
     @State private var appeared = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     
@@ -562,6 +700,14 @@ struct ElementCell: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 PaymentIcons(element: viewModel.element)
+            }
+
+            if showsBottomDivider {
+                Rectangle()
+                    .fill(Color(.separator))
+                    .frame(height: 1)
+                    .padding(.top, 10)
+                    .padding(.trailing, -18)
             }
         }
         .contentShape(Rectangle())

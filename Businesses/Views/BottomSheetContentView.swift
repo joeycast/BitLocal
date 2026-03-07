@@ -13,6 +13,8 @@ import CryptoKit
 
 @available(iOS 17.0, *)
 struct BottomSheetContentView: View {
+    private static let sheetHeightPublishThreshold: CGFloat = 8
+
     @EnvironmentObject var viewModel: ContentViewModel
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
@@ -28,7 +30,8 @@ struct BottomSheetContentView: View {
                         } else {
                             BusinessesListView(
                                 elements: visibleElements,
-                                currentDetent: currentDetent
+                                currentDetent: currentDetent,
+                                liveSheetHeight: geometry.size.height
                             )
                             .environmentObject(viewModel)
                         }
@@ -62,9 +65,7 @@ struct BottomSheetContentView: View {
                 }
                 .onChange(of: viewModel.isSearchActive) { _, isActive in
                     guard viewModel.mapDisplayMode != .communities else { return }
-                    if isActive {
-                        promoteSheetToLargeIfNeeded()
-                    } else {
+                    if !isActive {
                         viewModel.unifiedSearchText = ""
                         viewModel.performUnifiedSearch()
                     }
@@ -72,8 +73,10 @@ struct BottomSheetContentView: View {
             }
             .ignoresSafeArea(edges: .bottom)
             .onChange(of: geometry.size.height) { _, newHeight in
+                guard abs(viewModel.bottomPadding - newHeight) >= Self.sheetHeightPublishThreshold else {
+                    return
+                }
                 viewModel.bottomPadding = newHeight
-                Debug.log("BottomSheetContentView height updated: \(newHeight)")
             }
             .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")
@@ -96,13 +99,6 @@ struct BottomSheetContentView: View {
                 }
             }
         )
-    }
-
-    private func promoteSheetToLargeIfNeeded() {
-        guard currentDetent != .large else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            currentDetent = .large
-        }
     }
 }
 
