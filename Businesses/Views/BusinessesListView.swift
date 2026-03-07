@@ -47,7 +47,7 @@ struct BusinessesListView: View {
 
             if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
                 categoryChipsView
-                    .padding(.bottom, 4)
+                    .padding(.bottom, 6)
             }
 
             Group {
@@ -57,6 +57,8 @@ struct BusinessesListView: View {
                         LoadingScreenView()
                         Spacer()
                     }
+                } else if shouldHideCollapsedSheetContent {
+                    Spacer(minLength: 0)
                 } else if isFilteringMerchants {
                     searchResultsView
                 } else if elements.isEmpty {
@@ -165,11 +167,13 @@ struct BusinessesListView: View {
     private var normalListView: some View {
         List {
             // Events carousel (only renders if events exist)
-            EventsDiscoverySection()
-                .environmentObject(viewModel)
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+            Section {
+                EventsDiscoverySection()
+                    .environmentObject(viewModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .clearListRowBackground(if: shouldUseGlassyRows)
+            }
 
             if !featuredTopSortedElements.isEmpty {
                 Section {
@@ -184,8 +188,8 @@ struct BusinessesListView: View {
                         title: "Featured Nearby",
                         systemImage: "star.fill",
                         tint: Color(red: 0.71, green: 0.50, blue: 0.12),
-                        topPadding: -4,
-                        bottomPadding: -6
+                        topPadding: -3,
+                        bottomPadding: -14
                     )
                 }
                 .clearListRowBackground(if: shouldUseGlassyRows)
@@ -216,6 +220,7 @@ struct BusinessesListView: View {
         .listStyle(.plain)
         .listSectionSpacing(0)
         .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .contentMargins(.top, 0, for: .scrollContent)
         .background(Color.clear)
         .environment(\.defaultMinListRowHeight, 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -258,7 +263,7 @@ struct BusinessesListView: View {
                                     title: "Featured Nearby",
                                     systemImage: "star.fill",
                                     tint: Color(red: 0.71, green: 0.50, blue: 0.12),
-                                    topPadding: 4,
+                                    topPadding: 3,
                                     bottomPadding: -10
                                 )
                             }
@@ -326,6 +331,10 @@ struct BusinessesListView: View {
 
     private var shouldShowCategoryChips: Bool {
         !isCollapsedSheet || showFocusedSearchCategoryChips
+    }
+
+    private var shouldHideCollapsedSheetContent: Bool {
+        isCollapsedSheet && !isFilteringMerchants && !showFocusedSearchCategoryChips
     }
 
     private var searchStatusText: String? {
