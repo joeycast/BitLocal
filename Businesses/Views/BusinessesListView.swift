@@ -43,7 +43,7 @@ struct BusinessesListView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 2)
 
-            if !visibleCategoryChips.isEmpty {
+            if !isCollapsedSheet && !visibleCategoryChips.isEmpty {
                 categoryChipsView
                     .padding(.bottom, 4)
             }
