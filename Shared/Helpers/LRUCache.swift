@@ -166,7 +166,7 @@ final class Geocoder {
     private var nextAllowedRequestDate = Date.distantPast
     private var consecutiveFailureCount = 0
 
-    init(successSpacing: TimeInterval = 0.35, maxBackoff: TimeInterval = 60) {
+    init(successSpacing: TimeInterval = 1.35, maxBackoff: TimeInterval = 60) {
         self.successSpacing = successSpacing
         self.maxBackoff = maxBackoff
     }
@@ -238,7 +238,10 @@ final class Geocoder {
 
         if let error {
             consecutiveFailureCount = min(consecutiveFailureCount + 1, 6)
-            let backoff = min(pow(2.0, Double(consecutiveFailureCount)), maxBackoff)
+            let backoff = min(
+                throttledRetryDelay(for: error) ?? pow(2.0, Double(consecutiveFailureCount)),
+                maxBackoff
+            )
             let retryAfter = now.addingTimeInterval(backoff)
             nextAllowedRequestDate = retryAfter
             return ReverseGeocodeResponse(placemark: placemark, error: error, retryAfter: retryAfter)
@@ -247,5 +250,34 @@ final class Geocoder {
         consecutiveFailureCount = 0
         nextAllowedRequestDate = now.addingTimeInterval(successSpacing)
         return ReverseGeocodeResponse(placemark: placemark, error: nil, retryAfter: nil)
+    }
+
+    private func throttledRetryDelay(for error: Error) -> TimeInterval? {
+        let nsError = error as NSError
+
+        if let delay = timeInterval(from: nsError.userInfo["timeUntilReset"]) {
+            return delay + successSpacing
+        }
+
+        if let details = nsError.userInfo["details"] as? [[String: Any]] {
+            for detail in details {
+                if let delay = timeInterval(from: detail["timeUntilReset"]) {
+                    return delay + successSpacing
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func timeInterval(from value: Any?) -> TimeInterval? {
+        switch value {
+        case let number as NSNumber:
+            return number.doubleValue
+        case let string as String:
+            return TimeInterval(string)
+        default:
+            return nil
+        }
     }
 }
