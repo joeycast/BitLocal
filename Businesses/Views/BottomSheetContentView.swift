@@ -30,7 +30,8 @@ struct BottomSheetContentView: View {
                         } else {
                             BusinessesListView(
                                 elements: visibleElements,
-                                currentDetent: currentDetent
+                                currentDetent: currentDetent,
+                                liveSheetHeight: geometry.size.height
                             )
                             .environmentObject(viewModel)
                         }

@@ -17,6 +17,7 @@ struct BusinessesListView: View {
     var elements: [Element]
     var userLocation: CLLocation?
     var currentDetent: PresentationDetent? = nil
+    var liveSheetHeight: CGFloat = 0
 
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
@@ -330,11 +331,18 @@ struct BusinessesListView: View {
     }
 
     private var shouldShowCategoryChips: Bool {
-        !isCollapsedSheet || showFocusedSearchCategoryChips
+        !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
     }
 
     private var shouldHideCollapsedSheetContent: Bool {
-        isCollapsedSheet && !isFilteringMerchants && !showFocusedSearchCategoryChips
+        isCollapsedSheet &&
+        !isFilteringMerchants &&
+        !showFocusedSearchCategoryChips &&
+        liveSheetHeight <= collapsedContentRevealHeight
+    }
+
+    private var collapsedContentRevealHeight: CGFloat {
+        140
     }
 
     private var searchStatusText: String? {
