@@ -230,7 +230,41 @@ struct BusinessesListView: View {
                         Text(noResultsText)
                             .foregroundStyle(.secondary)
                     } else {
-                        if !displayedPrimaryResults.isEmpty {
+                        if viewModel.selectedMerchantSearchScope == .onMap {
+                            if !displayedFeaturedPrimaryResults.isEmpty {
+                                Section {
+                                    ForEach(displayedFeaturedPrimaryResults, id: \.id) { element in
+                                        merchantSearchRow(for: element)
+                                    }
+                                } header: {
+                                    merchantSectionHeader(
+                                        title: "Featured Nearby",
+                                        systemImage: "star.fill",
+                                        tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                                        topPadding: 4,
+                                        bottomPadding: -10
+                                    )
+                                }
+                            }
+
+                            if !displayedRegularPrimaryResults.isEmpty || displayedFeaturedPrimaryResults.isEmpty {
+                                Section {
+                                    ForEach(displayedRegularPrimaryResults, id: \.id) { element in
+                                        merchantSearchRow(for: element)
+                                    }
+                                } header: {
+                                    if !displayedFeaturedPrimaryResults.isEmpty {
+                                        merchantSectionHeader(
+                                            title: "More Nearby",
+                                            systemImage: "location.fill",
+                                            tint: .secondary,
+                                            topPadding: 4,
+                                            bottomPadding: -14
+                                        )
+                                    }
+                                }
+                            }
+                        } else if !displayedPrimaryResults.isEmpty {
                             ForEach(displayedPrimaryResults, id: \.id) { element in
                                 merchantSearchRow(for: element)
                             }
@@ -296,11 +330,9 @@ struct BusinessesListView: View {
             viewModel.merchantSearchIsWaitingForLocalDebounce {
             return "Searching…"
         }
-        if viewModel.merchantSearchIsOfflineFallback {
+        if viewModel.selectedMerchantSearchScope == .worldwide &&
+            viewModel.merchantSearchIsOfflineFallback {
             return "Offline/local results"
-        }
-        if !viewModel.merchantSearchFreshResults.isEmpty {
-            return "Showing local results with fresh network matches"
         }
         return nil
     }
@@ -312,6 +344,14 @@ struct BusinessesListView: View {
     private var displayedPrimaryResults: [Element] {
         let limit = min(searchResultsLimit, viewModel.merchantSearchPrimaryResults.count)
         return Array(viewModel.merchantSearchPrimaryResults.prefix(limit))
+    }
+
+    private var displayedFeaturedPrimaryResults: [Element] {
+        displayedPrimaryResults.filter { $0.isCurrentlyBoosted() }
+    }
+
+    private var displayedRegularPrimaryResults: [Element] {
+        displayedPrimaryResults.filter { !$0.isCurrentlyBoosted() }
     }
 
     private var displayedFreshResults: [V4PlaceRecord] {

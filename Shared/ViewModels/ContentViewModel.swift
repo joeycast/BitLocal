@@ -19,34 +19,10 @@ enum MapDisplayMode: String {
 }
 
 enum MerchantSearchScope: String, CaseIterable, Identifiable {
-    case onMap = "On Map"
+    case onMap = "Nearby"
     case worldwide = "Worldwide"
 
     var id: String { rawValue }
-}
-
-enum MerchantSearchSectionKind: String, Identifiable {
-    case primaryResults
-    case freshFromNetwork
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .primaryResults:
-            return "Primary Results"
-        case .freshFromNetwork:
-            return "Fresh from Network"
-        }
-    }
-}
-
-struct MerchantSearchSection: Identifiable {
-    let kind: MerchantSearchSectionKind
-    let localResults: [Element]
-    let remoteResults: [V4PlaceRecord]
-
-    var id: String { kind.id }
 }
 
 enum SearchTextNormalizer {
@@ -1323,6 +1299,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             "Merchant search queued (hybrid): query='\(query)', normalized='\(normalizedQuery)', scope=\(selectedMerchantSearchScope.rawValue), local=\(localFilteredMerchants.count)"
         )
 
+        guard selectedMerchantSearchScope == .worldwide else {
+            merchantSearchLoadingTimeoutTask?.cancel()
+            merchantSearchIsLoading = false
+            merchantSearchFreshResults = []
+            merchantSearchResults = []
+            merchantSearchError = nil
+            merchantSearchIsOfflineFallback = false
+            return
+        }
+
         guard query.count >= 3 else { return }
 
         unifiedSearchDebounceTask = Task {
@@ -2476,29 +2462,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         merchantSearchIsOfflineFallback = false
     }
 
-    var merchantSearchSections: [MerchantSearchSection] {
-        var sections: [MerchantSearchSection] = []
-        if !merchantSearchPrimaryResults.isEmpty {
-            sections.append(
-                MerchantSearchSection(
-                    kind: .primaryResults,
-                    localResults: merchantSearchPrimaryResults,
-                    remoteResults: []
-                )
-            )
-        }
-        if !merchantSearchFreshResults.isEmpty {
-            sections.append(
-                MerchantSearchSection(
-                    kind: .freshFromNetwork,
-                    localResults: [],
-                    remoteResults: merchantSearchFreshResults
-                )
-            )
-        }
-        return sections
-    }
-
     private var merchantSearchV2HybridEnabled: Bool {
         if UserDefaults.standard.object(forKey: merchantSearchV2HybridFlagKey) == nil {
             return true
@@ -2801,7 +2764,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return trimmedProvider.contains(":") ? trimmedProvider : "payment:\(trimmedProvider)"
         }()
 
-        let geometry = remoteSearchGeometry(for: selectedMerchantSearchScope)
         var plans: [MerchantRemoteSearchPlan] = []
         var seenQueries = Set<V4SearchQuery>()
 
@@ -2813,41 +2775,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         switch selectedMerchantSearchScope {
         case .onMap:
-            guard merchantSearchStrongLocalHitCount < 8 else { return [] }
-            appendPlan(
-                V4SearchQuery(
-                    name: query,
-                    lat: geometry.lat,
-                    lon: geometry.lon,
-                    radiusKM: geometry.radiusKM,
-                    tagName: providerTagName,
-                    tagValue: providerTagName == nil ? nil : "yes"
-                ),
-                source: "name"
-            )
-
-            guard providerTagName == nil,
-                  let resolvedGroup = ElementCategorySymbols.resolvedCategoryGroup(forNormalizedQuery: normalizedQuery) else {
-                return plans
-            }
-
-            for filter in ElementCategorySymbols.preferredRemoteTagFilters(
-                for: resolvedGroup,
-                matchingNormalizedQuery: normalizedQuery,
-                limit: 2
-            ) {
-                appendPlan(
-                    V4SearchQuery(
-                        name: nil,
-                        lat: geometry.lat,
-                        lon: geometry.lon,
-                        radiusKM: geometry.radiusKM,
-                        tagName: filter.tagKey,
-                        tagValue: filter.tagValue
-                    ),
-                    source: "\(resolvedGroup.rawValue)-\(filter.tagKey)=\(filter.tagValue)"
-                )
-            }
+            return []
 
         case .worldwide:
             appendPlan(

@@ -27,7 +27,7 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
     }
 
-    func testStrongLocalCategoryHitsSkipOnMapRemoteTopUp() async {
+    func testNearbySearchUsesLocalOnlyAndSkipsRemoteTopUp() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -45,33 +45,25 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertEqual(viewModel.merchantSearchPrimaryResults.count, 8)
     }
 
-    func testCoffeeQueryIssuesNameAndCategoryTopUpQueries() async {
+    func testCoffeeQueryMatchesNearbyCategoryLocallyWithoutRemote() async {
         let repo = MockBTCMapRepository()
-        repo.searchPlacesHandler = { query, completion in
-            if query.tagName == "amenity", query.tagValue == "cafe" {
-                completion(.success([Self.placeRecord(id: 99, name: "Cafe Sats", icon: "local_cafe")]))
-            } else {
-                completion(.success([]))
-            }
-        }
-
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
         viewModel.visibleElements = [
-            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 10, name: "Coffee House", icon: "local_cafe"))
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 10, name: "Coffee House", icon: "local_cafe")),
+            V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 11, name: "Cafe Sats", icon: "local_cafe"))
         ]
 
         viewModel.unifiedSearchText = "coffee"
         viewModel.performUnifiedSearch()
-        await waitForRemoteQueryCount(2, on: repo)
-        await waitForFreshResultCount(1, on: viewModel)
+        await waitForPrimaryResultCount(2, on: viewModel)
 
-        XCTAssertTrue(repo.searchPlaceQueries.contains(where: { $0.name == "coffee" && $0.lat != nil }))
-        XCTAssertTrue(repo.searchPlaceQueries.contains(where: { $0.tagName == "amenity" && $0.tagValue == "cafe" }))
-        XCTAssertEqual(viewModel.merchantSearchFreshResults.first?.id, 99)
+        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
+        XCTAssertEqual(Set(viewModel.merchantSearchPrimaryResults.map(\.id)), ["10", "11"])
+        XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
     }
 
-    func testDessertQueryUsesFoodOverridesAndMatchesIceCreamLocally() async {
+    func testDessertQueryMatchesIceCreamLocallyWithoutRemote() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -82,13 +74,12 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.unifiedSearchText = "dessert"
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(1, on: viewModel)
-        await waitForRemoteQueryCount(2, on: repo)
 
         XCTAssertEqual(viewModel.merchantSearchPrimaryResults.first?.id, "21")
-        XCTAssertTrue(repo.searchPlaceQueries.contains(where: { $0.tagName == "shop" && $0.tagValue == "ice_cream" }))
+        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
     }
 
-    func testRemoteFailureRetainsLocalPrimaryAndSetsOfflineState() async {
+    func testNearbySearchRemoteFailureStateIsNotUsed() async {
         let repo = MockBTCMapRepository()
         repo.searchPlacesHandler = { _, completion in
             completion(.failure(MockError.network))
@@ -102,13 +93,13 @@ final class MerchantSearchBehaviorTests: XCTestCase {
 
         viewModel.unifiedSearchText = "coffee"
         viewModel.performUnifiedSearch()
-        await waitForRemoteQueryCount(2, on: repo)
-        await waitForOfflineState(on: viewModel)
+        await waitForPrimaryResultCount(1, on: viewModel)
 
         XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["20"])
         XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
-        XCTAssertTrue(viewModel.merchantSearchIsOfflineFallback)
-        XCTAssertNotNil(viewModel.merchantSearchError)
+        XCTAssertFalse(viewModel.merchantSearchIsOfflineFallback)
+        XCTAssertNil(viewModel.merchantSearchError)
+        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
     }
 
     func testPunctuationInsensitiveLocalMatchFindsSteakNShake() async {
