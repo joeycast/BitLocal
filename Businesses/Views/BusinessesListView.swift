@@ -5,6 +5,7 @@ import MapKit
 import CoreLocation
 import Combine
 import Foundation
+import UIKit
 
 @available(iOS 17.0, *)
 struct BusinessesListView: View {
@@ -22,6 +23,7 @@ struct BusinessesListView: View {
     @State private var searchResultsLimit = 20
     @State private var cachedTopSortedElements: [Element] = []
     @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
+    @State private var showFocusedSearchCategoryChips = false
     @FocusState private var isSearchFieldFocused: Bool
 
     private var topSortedElements: [Element] {
@@ -43,7 +45,7 @@ struct BusinessesListView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 2)
 
-            if !isCollapsedSheet && !visibleCategoryChips.isEmpty {
+            if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
                 categoryChipsView
                     .padding(.bottom, 4)
             }
@@ -79,6 +81,8 @@ struct BusinessesListView: View {
         .onChange(of: isSearchFieldFocused) { _, focused in
             if focused && !viewModel.isSearchActive {
                 viewModel.isSearchActive = true
+            } else if !focused {
+                showFocusedSearchCategoryChips = false
             }
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
@@ -105,6 +109,17 @@ struct BusinessesListView: View {
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
             refreshDiscoveryCache()
             syncDisplayedSearchResultsToMap()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+            guard isSearchFieldFocused else { return }
+            withAnimation(keyboardAnimation(for: notification)) {
+                showFocusedSearchCategoryChips = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+            withAnimation(keyboardAnimation(for: notification)) {
+                showFocusedSearchCategoryChips = false
+            }
         }
     }
 
@@ -309,6 +324,10 @@ struct BusinessesListView: View {
         return cachedVisibleCategoryChips
     }
 
+    private var shouldShowCategoryChips: Bool {
+        !isCollapsedSheet || showFocusedSearchCategoryChips
+    }
+
     private var searchStatusText: String? {
         if viewModel.merchantSearchIsWaitingForLocalDebounce {
             return "Searching nearby…"
@@ -385,6 +404,12 @@ struct BusinessesListView: View {
 
     private func clearSearchDrivenMapResults() {
         viewModel.clearMerchantSearchMapResults()
+    }
+
+    private func keyboardAnimation(for notification: Notification) -> Animation {
+        let userInfo = notification.userInfo ?? [:]
+        let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue ?? 0.25
+        return .easeInOut(duration: duration)
     }
 
     private func merchantSearchRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
