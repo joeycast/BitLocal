@@ -786,6 +786,7 @@ class ElementCellViewModel: ObservableObject {
     
     private var userLocationCancellable: AnyCancellable?
     private var lastLocationUpdate: CLLocationCoordinate2D?
+    private var isAddressLookupInFlight = false
     
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
@@ -806,16 +807,17 @@ class ElementCellViewModel: ObservableObject {
             }
         
         // Attempt to retrieve cached address, but prefer OSM-tagged fields when present
-        if let cachedAddress = getCachedAddress() {
-            self.address = mergedAddress(preferred: element.address, fallback: cachedAddress)
+        if let cachedEntry = getCachedAddressEntry() {
+            self.address = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
         } else {
             self.address = element.address
         }
-        // Start geocoding only if we don't already have a complete address
-        if !isAddressComplete(self.address) {
-            self.updateAddress()
-        } else if let address = self.address {
-            setCachedAddress(address)
+
+        if let address = self.address,
+           address.hasAnyGeocodingFields,
+           !needsSeedAddressEnrichment(address),
+           shouldPersistInitialAddress(address) {
+            setCachedAddressEntry(.forAddress(address))
             viewModel.scheduleGeocodingCacheSave()
         }
     }
@@ -840,7 +842,7 @@ class ElementCellViewModel: ObservableObject {
     }
     
     func onCellAppear() {
-        if address == nil || shouldEnrichMissingState(address) {
+        if shouldAttemptReverseGeocode() {
             updateAddress()
         }
     }
@@ -849,67 +851,86 @@ class ElementCellViewModel: ObservableObject {
         guard let coord = element.mapCoordinate else {
             return ""
         }
-        return "\(coord.latitude),\(coord.longitude)"
+        return ReverseGeocodingSpatialKey.key(for: coord)
     }
 
-    private func getCachedAddress() -> Address? {
-        guard let coord = element.mapCoordinate else {
-            return nil
-        }
-        let cacheKey = "\(coord.latitude),\(coord.longitude)"
-        return viewModel.geocodingCache.getValue(forKey: cacheKey)
+    private func getCachedAddressEntry() -> ReverseGeocodingCacheEntry? {
+        guard !addressCacheKey.isEmpty else { return nil }
+        return viewModel.geocodingCache.getValue(forKey: addressCacheKey)
     }
 
-    private func setCachedAddress(_ address: Address) {
-        guard let coord = element.mapCoordinate else {
-            return
-        }
-        let cacheKey = "\(coord.latitude),\(coord.longitude)"
-        viewModel.geocodingCache.setValue(address, forKey: cacheKey)
+    private func setCachedAddressEntry(_ entry: ReverseGeocodingCacheEntry) {
+        guard !addressCacheKey.isEmpty else { return }
+        viewModel.geocodingCache.setValue(entry, forKey: addressCacheKey)
     }
 
     func updateAddress() {
-        // Check if the address is already cached
-        if let cachedAddress = getCachedAddress() {
-            let merged = mergedAddress(preferred: element.address, fallback: cachedAddress)
+        if let cachedEntry = getCachedAddressEntry() {
+            let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
             self.address = merged
-            if isAddressComplete(merged) && !shouldEnrichMissingState(merged) {
+            if cachedEntry.status == .resolved || cachedEntry.status == .partial {
+                return
+            }
+            if !cachedEntry.shouldRetry() {
                 return
             }
         } else if let preferred = element.address {
             self.address = preferred
-            if isAddressComplete(preferred) && !shouldEnrichMissingState(preferred) {
-                setCachedAddress(preferred)
+            if preferred.hasAnyGeocodingFields && !needsSeedAddressEnrichment(preferred) {
+                setCachedAddressEntry(.forAddress(preferred))
                 viewModel.scheduleGeocodingCacheSave()
                 return
             }
         }
 
+        guard !isAddressLookupInFlight else { return }
         guard let coord = element.mapCoordinate else { return }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let cacheKey = addressCacheKey
+        let staleFallback = getCachedAddressEntry()?.address
+
+        isAddressLookupInFlight = true
 
         // Perform geocoding
-        viewModel.geocoder.reverseGeocode(location: location) { [weak self] placemark in
-            guard let self = self, let placemark = placemark else { return }
-            let address = Address(
-                streetNumber: self.normalized(placemark.subThoroughfare),
-                streetName: self.normalized(placemark.thoroughfare),
-                cityOrTownName: self.normalized(placemark.locality),
-                postalCode: Address.normalizedPostalCode(
-                    self.normalized(placemark.postalCode),
+        viewModel.geocoder.reverseGeocode(location: location, requestKey: cacheKey) { [weak self] response in
+            guard let self else { return }
+
+            self.isAddressLookupInFlight = false
+
+            if let placemark = response.placemark {
+                let geocodedAddress = Address(
+                    streetNumber: self.normalized(placemark.subThoroughfare),
+                    streetName: self.normalized(placemark.thoroughfare),
+                    cityOrTownName: self.normalized(placemark.locality),
+                    postalCode: Address.normalizedPostalCode(
+                        self.normalized(placemark.postalCode),
+                        countryName: self.normalized(placemark.country)
+                    ),
+                    regionOrStateName: self.normalized(placemark.administrativeArea),
                     countryName: self.normalized(placemark.country)
-                ),
-                regionOrStateName: self.normalized(placemark.administrativeArea),
-                countryName: self.normalized(placemark.country)
-            )
-            DispatchQueue.main.async {
-                let merged = self.mergedAddress(preferred: self.element.address, fallback: address)
+                )
+                let merged = self.mergedAddress(preferred: self.element.address, fallback: geocodedAddress)
                 self.address = merged
-                if let merged = merged {
-                    self.setCachedAddress(merged)
-                    self.viewModel.scheduleGeocodingCacheSave()
+
+                if let merged, merged.hasAnyGeocodingFields {
+                    self.setCachedAddressEntry(.forAddress(merged))
+                } else {
+                    self.setCachedAddressEntry(
+                        .noResult(retryAfter: Date().addingTimeInterval(24 * 60 * 60))
+                    )
                 }
+            } else if let staleFallback, staleFallback.hasAnyGeocodingFields {
+                self.address = self.mergedAddress(preferred: self.element.address, fallback: staleFallback)
+                self.setCachedAddressEntry(.forAddress(staleFallback))
+            } else if let retryAfter = response.retryAfter {
+                self.setCachedAddressEntry(.failed(retryAfter: retryAfter))
+            } else {
+                self.setCachedAddressEntry(
+                    .noResult(retryAfter: Date().addingTimeInterval(24 * 60 * 60))
+                )
             }
+
+            self.viewModel.scheduleGeocodingCacheSave()
         }
     }
 
@@ -921,16 +942,81 @@ class ElementCellViewModel: ObservableObject {
         return value
     }
 
+    private func shouldAttemptReverseGeocode() -> Bool {
+        if isAddressLookupInFlight {
+            return false
+        }
+
+        if let cachedEntry = getCachedAddressEntry() {
+            switch cachedEntry.status {
+            case .resolved:
+                let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+                return isLikelyMalformedStreetLine(merged)
+            case .partial:
+                let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+                return isLikelyMalformedStreetLine(merged)
+            case .noResult, .failed:
+                return cachedEntry.shouldRetry()
+            }
+        }
+
+        guard let currentAddress = address else {
+            return true
+        }
+
+        return needsSeedAddressEnrichment(currentAddress)
+    }
+
+    private func shouldPersistInitialAddress(_ address: Address) -> Bool {
+        guard let cachedEntry = getCachedAddressEntry() else {
+            return true
+        }
+
+        let mergedCurrent = mergedAddress(preferred: element.address, fallback: address)
+        let mergedCached = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+        let currentStatus = ReverseGeocodingCacheEntry.forAddress(address).status
+        return !addressesMatch(mergedCurrent, mergedCached) || cachedEntry.status != currentStatus
+    }
+
+    private func needsSeedAddressEnrichment(_ address: Address?) -> Bool {
+        guard let address else { return true }
+        return !isAddressComplete(address) || shouldEnrichMissingState(address) || isLikelyMalformedStreetLine(address)
+    }
+
+    private func addressesMatch(_ lhs: Address?, _ rhs: Address?) -> Bool {
+        normalized(lhs?.streetNumber) == normalized(rhs?.streetNumber) &&
+        normalized(lhs?.streetName) == normalized(rhs?.streetName) &&
+        normalized(lhs?.cityOrTownName) == normalized(rhs?.cityOrTownName) &&
+        normalized(lhs?.postalCode) == normalized(rhs?.postalCode) &&
+        normalized(lhs?.regionOrStateName) == normalized(rhs?.regionOrStateName) &&
+        normalized(lhs?.countryName) == normalized(rhs?.countryName)
+    }
+
     private func isAddressComplete(_ address: Address?) -> Bool {
-        guard let address = address else { return false }
+        guard let address else { return false }
         return normalized(address.streetNumber) != nil &&
             normalized(address.streetName) != nil &&
             normalized(address.cityOrTownName) != nil
     }
 
     private func shouldEnrichMissingState(_ address: Address?) -> Bool {
-        guard let address = address else { return false }
+        guard let address else { return false }
         return normalized(address.regionOrStateName) == nil
+    }
+
+    private func isLikelyMalformedStreetLine(_ address: Address?) -> Bool {
+        guard let address else { return false }
+        guard let streetName = normalized(address.streetName) else {
+            return false
+        }
+
+        if !looksLikePostalCode(streetName) {
+            return false
+        }
+
+        let postalCode = normalized(address.postalCode)
+        let city = normalized(address.cityOrTownName)
+        return postalCode == streetName || city == nil
     }
 
     private func mergedAddress(preferred: Address?, fallback: Address?) -> Address? {
@@ -938,9 +1024,21 @@ class ElementCellViewModel: ObservableObject {
         func pick(_ preferredValue: String?, _ fallbackValue: String?) -> String? {
             return normalized(preferredValue) ?? normalized(fallbackValue)
         }
+        let preferredStreetName = normalized(preferred?.streetName)
+        let selectedStreetName: String?
+        if let preferredStreetName,
+           looksLikePostalCode(preferredStreetName),
+           (preferredStreetName == normalized(preferred?.postalCode) ||
+            preferredStreetName == normalized(fallback?.postalCode) ||
+            normalized(preferred?.cityOrTownName) == nil) {
+            selectedStreetName = normalized(fallback?.streetName)
+        } else {
+            selectedStreetName = preferredStreetName ?? normalized(fallback?.streetName)
+        }
+
         return Address(
             streetNumber: pick(preferred?.streetNumber, fallback?.streetNumber),
-            streetName: pick(preferred?.streetName, fallback?.streetName),
+            streetName: selectedStreetName,
             cityOrTownName: pick(preferred?.cityOrTownName, fallback?.cityOrTownName),
             postalCode: Address.normalizedPostalCode(
                 pick(preferred?.postalCode, fallback?.postalCode),
@@ -949,6 +1047,11 @@ class ElementCellViewModel: ObservableObject {
             regionOrStateName: pick(preferred?.regionOrStateName, fallback?.regionOrStateName),
             countryName: pick(preferred?.countryName, fallback?.countryName)
         )
+    }
+
+    private func looksLikePostalCode(_ value: String) -> Bool {
+        let zipPattern = #"^\d{5}(?:-\d{4})?$"#
+        return value.range(of: zipPattern, options: .regularExpression) != nil
     }
 }
 
@@ -974,33 +1077,5 @@ struct PaymentIcons: View {
             }
         }
         .font(.subheadline)
-    }
-}
-
-class Geocoder {
-    private let geocoder = CLGeocoder()
-    private let semaphore: DispatchSemaphore
-    private let queue = DispatchQueue(label: "geocoder.queue", qos: .utility)
-    
-    init(maxConcurrentRequests: Int = 1) {
-        semaphore = DispatchSemaphore(value: maxConcurrentRequests)
-    }
-    
-    func reverseGeocode(location: CLLocation, completion: @escaping (CLPlacemark?) -> Void) {
-        queue.async {
-            self.semaphore.wait() // Wait for a free slot
-            self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-                defer {
-                    self.semaphore.signal() // Release the slot
-                }
-                
-                guard let placemark = placemarks?.first else {
-                    completion(nil)
-                    return
-                }
-                
-                completion(placemark)
-            }
-        }
     }
 }

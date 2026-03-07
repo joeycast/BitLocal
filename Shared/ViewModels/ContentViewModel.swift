@@ -112,7 +112,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
     @Published var isUpdatingLocation = false
-    @Published var geocodingCache = LRUCache<String, Address>(maxSize: 100)
+    @Published var geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 1_000)
     @Published var path: [Element] = []
     @Published var selectedElement: Element?
     @Published var deepLinkUnavailableState: DeepLinkUnavailableState?
@@ -176,7 +176,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
     let visibleElementsSubject = PassthroughSubject<[Element], Never>()
     let mapStoppedMovingSubject = PassthroughSubject<Void, Never>()
-    let geocoder = Geocoder(maxConcurrentRequests: 1)
+    let geocoder = Geocoder.shared
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
     private let btcMapRepository: BTCMapRepositoryProtocol
     
@@ -506,11 +506,19 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private func loadGeocodingCache() {
         guard let data = try? Data(contentsOf: geocodingCacheFileURL) else { return }
         do {
-            let decoded = try JSONDecoder().decode([String: Address].self, from: data)
+            let decoded = try JSONDecoder().decode([String: ReverseGeocodingCacheEntry].self, from: data)
             geocodingCache.setValues(decoded)
             Debug.log("Loaded geocoding cache: \(decoded.count) entries")
         } catch {
-            Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
+            do {
+                let legacy = try JSONDecoder().decode([String: Address].self, from: data)
+                let migrated = legacy.mapValues { ReverseGeocodingCacheEntry.forAddress($0) }
+                geocodingCache.setValues(migrated)
+                Debug.log("Migrated geocoding cache: \(migrated.count) entries")
+                scheduleGeocodingCacheSave()
+            } catch {
+                Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
+            }
         }
     }
 

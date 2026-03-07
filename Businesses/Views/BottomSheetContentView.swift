@@ -361,8 +361,10 @@ struct CommunitiesListView: View {
         updatedAt: String?
     ) async -> String? {
         await withCheckedContinuation { continuation in
+            let requestKey = "community-country:\(ReverseGeocodingSpatialKey.key(for: coordinate))"
             viewModel.geocoder.reverseGeocode(
-                location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude),
+                requestKey: requestKey
             ) { placemark in
                 let country = placemark?.country?.trimmingCharacters(in: .whitespacesAndNewlines)
                 Task {
