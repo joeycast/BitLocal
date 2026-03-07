@@ -226,6 +226,7 @@ struct BusinessesListView: View {
 
                     if displayedPrimaryResults.isEmpty &&
                         displayedFreshResults.isEmpty &&
+                        !viewModel.merchantSearchIsWaitingForLocalDebounce &&
                         !viewModel.merchantSearchIsLoading {
                         Text(noResultsText)
                             .foregroundStyle(.secondary)
@@ -326,6 +327,10 @@ struct BusinessesListView: View {
     }
 
     private var searchStatusText: String? {
+        if viewModel.selectedMerchantSearchScope == .onMap &&
+            viewModel.merchantSearchIsWaitingForLocalDebounce {
+            return "Searching nearby…"
+        }
         if viewModel.selectedMerchantSearchScope == .worldwide &&
             viewModel.merchantSearchIsWaitingForLocalDebounce {
             return "Searching…"

@@ -1326,7 +1326,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let debounce: UInt64 = selectedMerchantSearchScope == .worldwide
             ? localSearchWorldwideDebounceNanoseconds
             : 0
-        merchantSearchIsWaitingForLocalDebounce = debounce > 0
+        merchantSearchIsWaitingForLocalDebounce = true
 
         localMerchantSearchTask = Task { [weak self] in
             if debounce > 0 {
