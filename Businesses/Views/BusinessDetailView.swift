@@ -184,7 +184,7 @@ struct BusinessDetailView: View {
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
-            elementCellViewModel.updateAddress()
+            elementCellViewModel.onCellAppear()
         }
         .listStyle(InsetGroupedListStyle()) // Consistent list style
         .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))

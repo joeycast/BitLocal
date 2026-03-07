@@ -1761,48 +1761,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         let viewportRect = mapListViewportRect(for: mapView)
         let visibleRect = mapRect(for: viewportRect, in: mapView)
-        let focusCoordinate = mapView.convert(
-            CGPoint(x: viewportRect.midX, y: viewportRect.midY),
-            toCoordinateFrom: mapView
-        )
-        let focusLocation = CLLocation(latitude: focusCoordinate.latitude, longitude: focusCoordinate.longitude)
 
         var visibleIDs = Set<String>()
-        var mergedBoundsByAreaID: [String: MKMapRect] = [:]
 
         for polygon in communityOverlays {
             let areaID = (polygon.subtitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard !areaID.isEmpty, polygon.boundingMapRect.intersects(visibleRect) else { continue }
             visibleIDs.insert(areaID)
-            if let existing = mergedBoundsByAreaID[areaID] {
-                mergedBoundsByAreaID[areaID] = existing.union(polygon.boundingMapRect)
-            } else {
-                mergedBoundsByAreaID[areaID] = polygon.boundingMapRect
-            }
         }
 
-        let filtered = allAreas.filter { visibleIDs.contains($0.id) }
-        return filtered.sorted { lhs, rhs in
-            let lhsDistance = communityDistanceFromFocus(areaID: lhs.id, focus: focusLocation, boundsByAreaID: mergedBoundsByAreaID)
-            let rhsDistance = communityDistanceFromFocus(areaID: rhs.id, focus: focusLocation, boundsByAreaID: mergedBoundsByAreaID)
-            if lhsDistance == rhsDistance {
-                return lhs.displayName.localizedStandardCompare(rhs.displayName) == .orderedAscending
-            }
-            return lhsDistance < rhsDistance
-        }
-    }
-
-    private func communityDistanceFromFocus(
-        areaID: String,
-        focus: CLLocation,
-        boundsByAreaID: [String: MKMapRect]
-    ) -> CLLocationDistance {
-        guard let rect = boundsByAreaID[areaID], !rect.isNull, !rect.isEmpty else {
-            return .greatestFiniteMagnitude
-        }
-        let midpoint = MKMapPoint(x: rect.midX, y: rect.midY).coordinate
-        let center = CLLocation(latitude: midpoint.latitude, longitude: midpoint.longitude)
-        return focus.distance(from: center)
+        return allAreas.filter { visibleIDs.contains($0.id) }
     }
 
     func communityArea(withID id: String) -> V2AreaRecord? {

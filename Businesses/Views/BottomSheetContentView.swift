@@ -10,10 +10,12 @@ import SwiftUI
 import Foundation // for Debug logging
 import UIKit
 import CryptoKit
+import CoreLocation
 
 @available(iOS 17.0, *)
 struct BottomSheetContentView: View {
-    private static let sheetHeightPublishThreshold: CGFloat = 8
+    private static let sheetHeightPublishThreshold: CGFloat = 24
+    private static let sheetHeightBucketSize: CGFloat = 24
 
     @EnvironmentObject var viewModel: ContentViewModel
     var visibleElements: [Element]
@@ -73,10 +75,11 @@ struct BottomSheetContentView: View {
             }
             .ignoresSafeArea(edges: .bottom)
             .onChange(of: geometry.size.height) { _, newHeight in
-                guard abs(viewModel.bottomPadding - newHeight) >= Self.sheetHeightPublishThreshold else {
+                let normalizedHeight = (newHeight / Self.sheetHeightBucketSize).rounded() * Self.sheetHeightBucketSize
+                guard abs(viewModel.bottomPadding - normalizedHeight) >= Self.sheetHeightPublishThreshold else {
                     return
                 }
-                viewModel.bottomPadding = newHeight
+                viewModel.bottomPadding = normalizedHeight
             }
             .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")
@@ -104,9 +107,13 @@ struct BottomSheetContentView: View {
 
 @available(iOS 17.0, *)
 struct CommunitiesListView: View {
+    private let resultsPageSize = 15
+
     @EnvironmentObject private var viewModel: ContentViewModel
+    @ObservedObject private var metadataStore = CommunityRowMetadataObservableStore.shared
     var currentDetent: PresentationDetent? = nil
     @State private var filterText = ""
+    @State private var communityResultsLimit = 15
     @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
@@ -129,12 +136,12 @@ struct CommunitiesListView: View {
                     }
                 }
 
-                Section("Communities") {
+                Section {
                     if filteredCommunities.isEmpty {
                         Text(emptyStateMessage)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(filteredCommunities) { area in
+                        ForEach(displayedCommunities) { area in
                             NavigationLink {
                                 CommunityDetailView(
                                     area: area,
@@ -145,8 +152,19 @@ struct CommunitiesListView: View {
                                         viewModel.selectCommunity(area, presentDetail: false)
                                     }
                             } label: {
-                                CommunityRow(area: area)
+                                CommunityRow(
+                                    area: area,
+                                    metadata: metadataStore.metadataByAreaID[area.id]
+                                )
                             }
+                        }
+
+                        if hasMoreCommunities {
+                            Button("Load more communities") {
+                                communityResultsLimit += resultsPageSize
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .foregroundStyle(.accent)
                         }
                     }
                 }
@@ -159,6 +177,12 @@ struct CommunitiesListView: View {
                 viewModel.clearSelectedCommunity()
             }
             viewModel.ensureCommunityMapAreasLoaded()
+        }
+        .onChange(of: filterText) { _, _ in
+            communityResultsLimit = resultsPageSize
+        }
+        .task(id: metadataPrewarmKey) {
+            await prewarmVisibleMetadata()
         }
     }
 
@@ -203,40 +227,346 @@ struct CommunitiesListView: View {
         let q = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
         return q.isEmpty ? "No communities in current map view" : "No communities found"
     }
+
+    private var displayedCommunities: [V2AreaRecord] {
+        Array(filteredCommunities.prefix(communityResultsLimit))
+    }
+
+    private var hasMoreCommunities: Bool {
+        filteredCommunities.count > displayedCommunities.count
+    }
+
+    private var metadataPrewarmKey: String {
+        let areaKey = displayedCommunities
+            .map { "\($0.id)|\($0.updatedAt ?? "")" }
+            .joined(separator: ",")
+        return areaKey
+    }
+
+    private func prewarmVisibleMetadata() async {
+        let areas = displayedCommunities
+        guard !areas.isEmpty else { return }
+
+        let areasToResolve = areas.filter { area in
+            metadataStore.metadataByAreaID[area.id]?.updatedAt != area.updatedAt
+        }
+
+        guard !areasToResolve.isEmpty else { return }
+
+        let allElements = viewModel.allElements
+
+        // Resolve all communities concurrently on background threads
+        let results = await withTaskGroup(of: CommunityRowMetadata?.self, returning: [CommunityRowMetadata].self) { group in
+            for area in areasToResolve {
+                group.addTask(priority: .utility) {
+                    await self.resolveMetadata(for: area, allElements: allElements)
+                }
+            }
+
+            var collected: [CommunityRowMetadata] = []
+            for await result in group {
+                if let result { collected.append(result) }
+            }
+            return collected
+        }
+
+        guard !Task.isCancelled else { return }
+
+        for metadata in results {
+            metadataStore.metadataByAreaID[metadata.areaID] = metadata
+        }
+    }
+
+    private nonisolated func resolveMetadata(for area: V2AreaRecord, allElements: [Element]) async -> CommunityRowMetadata? {
+        if let cached = await CommunityRowMetadataCache.shared.metadata(for: area.id, updatedAt: area.updatedAt) {
+            return cached
+        }
+
+        guard let polygons = communityPolygons(for: area), !polygons.isEmpty else {
+            return nil
+        }
+
+        // Compute bounding box for cheap pre-filtering
+        var minLat = Double.greatestFiniteMagnitude
+        var maxLat = -Double.greatestFiniteMagnitude
+        var minLon = Double.greatestFiniteMagnitude
+        var maxLon = -Double.greatestFiniteMagnitude
+        for polygon in polygons {
+            for ring in polygon {
+                for point in ring where point.count >= 2 {
+                    minLon = min(minLon, point[0])
+                    maxLon = max(maxLon, point[0])
+                    minLat = min(minLat, point[1])
+                    maxLat = max(maxLat, point[1])
+                }
+            }
+        }
+
+        let members = allElements.filter { element in
+            guard let coordinate = element.mapCoordinate else { return false }
+            // Fast bounding box rejection
+            guard coordinate.latitude >= minLat, coordinate.latitude <= maxLat,
+                  coordinate.longitude >= minLon, coordinate.longitude <= maxLon else {
+                return false
+            }
+            return polygons.contains { polygon in
+                coordinateInPolygon(latitude: coordinate.latitude, longitude: coordinate.longitude, rings: polygon)
+            }
+        }
+
+        let merchantCount = members.count
+        var resolvedCountry = areaCountryFromTags(area)
+
+        if resolvedCountry == nil {
+            resolvedCountry = mostCommonCountry(in: members)
+        }
+
+        if resolvedCountry == nil {
+            resolvedCountry = await CommunityCountryCache.shared.country(for: area.id, updatedAt: area.updatedAt)
+        }
+
+        if resolvedCountry == nil, let center = areaCenterCoordinate(for: area) {
+            resolvedCountry = await reverseGeocodedCountry(for: center, areaID: area.id, updatedAt: area.updatedAt)
+        }
+
+        let metadata = CommunityRowMetadata(
+            areaID: area.id,
+            updatedAt: area.updatedAt,
+            countryName: resolvedCountry,
+            merchantCount: merchantCount,
+            isResolved: true
+        )
+
+        await CommunityRowMetadataCache.shared.setMetadata(metadata)
+        return metadata
+    }
+
+    private func mostCommonCountry(in members: [Element]) -> String? {
+        var counts: [String: Int] = [:]
+        for member in members {
+            guard let country = member.address?.countryName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !country.isEmpty else { continue }
+            counts[country, default: 0] += 1
+        }
+
+        return counts.max { lhs, rhs in
+            if lhs.value == rhs.value { return lhs.key > rhs.key }
+            return lhs.value < rhs.value
+        }?.key
+    }
+
+    private func reverseGeocodedCountry(
+        for coordinate: CLLocationCoordinate2D,
+        areaID: String,
+        updatedAt: String?
+    ) async -> String? {
+        await withCheckedContinuation { continuation in
+            viewModel.geocoder.reverseGeocode(
+                location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            ) { placemark in
+                let country = placemark?.country?.trimmingCharacters(in: .whitespacesAndNewlines)
+                Task {
+                    if let country, !country.isEmpty {
+                        await CommunityCountryCache.shared.setCountry(country, for: areaID, updatedAt: updatedAt)
+                    }
+                    continuation.resume(returning: country)
+                }
+            }
+        }
+    }
+
+    private func areaCountryFromTags(_ area: V2AreaRecord) -> String? {
+        let candidateKeys = ["country", "addr:country", "country_name", "contact:country"]
+        for key in candidateKeys {
+            if let value = area.tags?[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !value.isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private func areaCenterCoordinate(for area: V2AreaRecord) -> CLLocationCoordinate2D? {
+        func parse(_ key: String) -> Double? {
+            guard let raw = area.tags?[key] else { return nil }
+            return Double(raw)
+        }
+
+        if let north = parse("box:north"),
+           let south = parse("box:south"),
+           let east = parse("box:east"),
+           let west = parse("box:west") {
+            return CLLocationCoordinate2D(
+                latitude: (north + south) / 2,
+                longitude: normalizedMidpointLongitude(west: west, east: east)
+            )
+        }
+
+        guard let polygons = communityPolygons(for: area) else { return nil }
+
+        var minLatitude = Double.greatestFiniteMagnitude
+        var maxLatitude = -Double.greatestFiniteMagnitude
+        var minLongitude = Double.greatestFiniteMagnitude
+        var maxLongitude = -Double.greatestFiniteMagnitude
+
+        for polygon in polygons {
+            for ring in polygon {
+                for point in ring where point.count >= 2 {
+                    minLongitude = min(minLongitude, point[0])
+                    maxLongitude = max(maxLongitude, point[0])
+                    minLatitude = min(minLatitude, point[1])
+                    maxLatitude = max(maxLatitude, point[1])
+                }
+            }
+        }
+
+        guard minLatitude.isFinite, maxLatitude.isFinite, minLongitude.isFinite, maxLongitude.isFinite else {
+            return nil
+        }
+
+        return CLLocationCoordinate2D(
+            latitude: (minLatitude + maxLatitude) / 2,
+            longitude: normalizedMidpointLongitude(west: minLongitude, east: maxLongitude)
+        )
+    }
+
+    private func normalizedMidpointLongitude(west: Double, east: Double) -> Double {
+        let delta = east - west
+        if abs(delta) <= 180 {
+            return (west + east) / 2
+        }
+
+        let adjustedEast = delta > 180 ? east - 360 : east + 360
+        let midpoint = (west + adjustedEast) / 2
+        if midpoint > 180 { return midpoint - 360 }
+        if midpoint < -180 { return midpoint + 360 }
+        return midpoint
+    }
+
+    private func communityPolygons(for area: V2AreaRecord) -> [[[[Double]]]]? {
+        guard let geoJSON = area.geoJSON else { return nil }
+
+        var polygons: [[[[Double]]]] = []
+        for feature in geoJSON.features {
+            switch feature.geometry.coordinates {
+            case .multiPolygon(let multipolygon):
+                polygons.append(contentsOf: multipolygon)
+            case .polygon(let polygon):
+                polygons.append(polygon)
+            }
+        }
+
+        return polygons.isEmpty ? nil : polygons
+    }
+
+    private func coordinateInPolygon(latitude: Double, longitude: Double, rings: [[[Double]]]) -> Bool {
+        guard let outerRing = rings.first,
+              pointInRing(latitude: latitude, longitude: longitude, ring: outerRing) else {
+            return false
+        }
+
+        for hole in rings.dropFirst() {
+            if pointInRing(latitude: latitude, longitude: longitude, ring: hole) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private func pointInRing(latitude: Double, longitude: Double, ring: [[Double]]) -> Bool {
+        guard ring.count >= 3 else { return false }
+
+        var inside = false
+        var previousIndex = ring.count - 1
+
+        for index in ring.indices {
+            guard ring[index].count >= 2, ring[previousIndex].count >= 2 else {
+                previousIndex = index
+                continue
+            }
+
+            let currentLongitude = ring[index][0]
+            let currentLatitude = ring[index][1]
+            let previousLongitude = ring[previousIndex][0]
+            let previousLatitude = ring[previousIndex][1]
+
+            let intersects = ((currentLatitude > latitude) != (previousLatitude > latitude))
+                && (longitude < (previousLongitude - currentLongitude) * (latitude - currentLatitude)
+                    / ((previousLatitude - currentLatitude) == 0 ? 1e-12 : (previousLatitude - currentLatitude))
+                    + currentLongitude)
+
+            if intersects {
+                inside.toggle()
+            }
+
+            previousIndex = index
+        }
+
+        return inside
+    }
 }
 
 @available(iOS 17.0, *)
 private struct CommunityRow: View {
     let area: V2AreaRecord
+    let metadata: CommunityRowMetadata?
 
     var body: some View {
         HStack(spacing: 10) {
             communityIcon
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(area.displayName)
-                    .font(.headline)
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
-                HStack(spacing: 8) {
-                    if let org = area.tags?["organization"], !org.isEmpty {
-                        Text(org)
-                    }
-                    if let continent = area.tags?["continent"], !continent.isEmpty {
-                        Text(continent)
+                    .lineLimit(2)
+
+                Group {
+                    if let countryName = metadata?.countryName, !countryName.isEmpty {
+                        Text(countryName)
+                    } else if metadata?.isResolved == false || metadata == nil {
+                        PlaceholderLine(width: 84, height: 10)
                     }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
+
             Spacer()
+
+            merchantCountBadge
         }
+        .padding(.vertical, 4)
         .contentShape(.rect)
+        .accessibilityElement(children: .combine)
     }
 
     private var communityIcon: some View {
         CommunityIconImage(url: iconURL, placeholderSystemName: "person.3.fill", scaleToFill: true)
-        .frame(width: 28, height: 28)
-        .background(.secondary.opacity(0.12), in: .circle)
-        .clipShape(.circle)
+            .frame(width: 32, height: 32)
+            .background(Color.accentColor.opacity(0.10), in: .circle)
+            .clipShape(.circle)
+    }
+
+    @ViewBuilder
+    private var merchantCountBadge: some View {
+        if let merchantCount = metadata?.merchantCount {
+            HStack(spacing: 8) {
+                Image(systemName: "storefront")
+                    .font(.system(size: 10, weight: .semibold))
+
+                Text("\(merchantCount)")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.secondary.opacity(0.12), in: Capsule())
+        } else if metadata?.isResolved == false || metadata == nil {
+            PlaceholderCapsule(width: 44, height: 24)
+        }
     }
 
     private var iconURL: URL? {
@@ -249,6 +579,123 @@ private struct CommunityRow: View {
     }
 }
 
+private struct CommunityRowMetadata: Codable, Sendable {
+    let areaID: String
+    let updatedAt: String?
+    let countryName: String?
+    let merchantCount: Int?
+    let isResolved: Bool
+}
+
+private actor CommunityCountryCache {
+    static let shared = CommunityCountryCache()
+
+    private let fileURL: URL
+    private var storage: [String: CommunityCountryRecord]
+
+    init() {
+        let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        fileURL = cachesDirectory.appendingPathComponent("community_country_cache.json")
+
+        if let data = try? Data(contentsOf: fileURL),
+           let decoded = try? JSONDecoder().decode([String: CommunityCountryRecord].self, from: data) {
+            storage = decoded
+        } else {
+            storage = [:]
+        }
+    }
+
+    func country(for areaID: String, updatedAt: String?) -> String? {
+        guard let record = storage[areaID], record.updatedAt == updatedAt else { return nil }
+        return record.country
+    }
+
+    func setCountry(_ country: String, for areaID: String, updatedAt: String?) {
+        storage[areaID] = CommunityCountryRecord(updatedAt: updatedAt, country: country)
+        persist()
+    }
+
+    private func persist() {
+        guard let data = try? JSONEncoder().encode(storage) else { return }
+        try? data.write(to: fileURL, options: [.atomic])
+    }
+}
+
+private struct PlaceholderLine: View {
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        ShimmerShape(shape: RoundedRectangle(cornerRadius: height / 2, style: .continuous))
+            .frame(width: width, height: height)
+    }
+}
+
+private struct PlaceholderCapsule: View {
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        ShimmerShape(shape: Capsule())
+            .frame(width: width, height: height)
+    }
+}
+
+private struct ShimmerShape<S: Shape>: View {
+    let shape: S
+    private let duration: Double = 1.5
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let elapsed = timeline.date.timeIntervalSinceReferenceDate
+            let phase = CGFloat(elapsed.truncatingRemainder(dividingBy: duration) / duration)
+            let mapped = -0.8 + phase * 2.6  // maps 0…1 → -0.8…1.8
+
+            shape
+                .fill(Color.primary.opacity(0.08))
+                .overlay {
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            Color.primary.opacity(0.14),
+                            .clear
+                        ],
+                        startPoint: UnitPoint(x: mapped - 0.3, y: 0.3),
+                        endPoint: UnitPoint(x: mapped + 0.3, y: 0.7)
+                    )
+                    .clipShape(shape)
+                }
+        }
+    }
+}
+
+private struct CommunityCountryRecord: Codable, Sendable {
+    let updatedAt: String?
+    let country: String
+}
+
+private actor CommunityRowMetadataCache {
+    static let shared = CommunityRowMetadataCache()
+
+    private var storage: [String: CommunityRowMetadata] = [:]
+
+    func metadata(for areaID: String, updatedAt: String?) -> CommunityRowMetadata? {
+        guard let metadata = storage[areaID], metadata.updatedAt == updatedAt else { return nil }
+        return metadata
+    }
+
+    func setMetadata(_ metadata: CommunityRowMetadata) {
+        storage[metadata.areaID] = metadata
+    }
+}
+
+@MainActor
+private final class CommunityRowMetadataObservableStore: ObservableObject {
+    static let shared = CommunityRowMetadataObservableStore()
+
+    @Published var metadataByAreaID: [String: CommunityRowMetadata] = [:]
+}
 
 @available(iOS 17.0, *)
 struct CommunityDetailView: View {
