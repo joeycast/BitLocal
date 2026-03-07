@@ -64,9 +64,7 @@ struct BottomSheetContentView: View {
                 }
                 .onChange(of: viewModel.isSearchActive) { _, isActive in
                     guard viewModel.mapDisplayMode != .communities else { return }
-                    if isActive {
-                        promoteSheetToLargeIfNeeded()
-                    } else {
+                    if !isActive {
                         viewModel.unifiedSearchText = ""
                         viewModel.performUnifiedSearch()
                     }
@@ -100,13 +98,6 @@ struct BottomSheetContentView: View {
                 }
             }
         )
-    }
-
-    private func promoteSheetToLargeIfNeeded() {
-        guard currentDetent != .large else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            currentDetent = .large
-        }
     }
 }
 

@@ -131,12 +131,6 @@ struct IPhoneLayoutView: View {
                         AboutView()
                     }
             }
-            .onChange(of: viewModel.isSearchActive) { _, isActive in
-                guard viewModel.mapDisplayMode == .merchants else { return }
-                if isActive && bottomSheetDetent == collapsedSheetDetent {
-                    bottomSheetDetent = defaultSheetDetent
-                }
-            }
             .onAppear {
                 hasLiveSheetMeasurement = false
                 hasAcceptedDefaultLiveMeasurement = false
