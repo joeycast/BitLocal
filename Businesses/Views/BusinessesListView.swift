@@ -150,8 +150,11 @@ struct BusinessesListView: View {
 
             if !featuredTopSortedElements.isEmpty {
                 Section {
-                    ForEach(featuredTopSortedElements, id: \.id) { element in
-                        merchantRow(for: element)
+                    ForEach(Array(featuredTopSortedElements.enumerated()), id: \.element.id) { index, element in
+                        merchantRow(
+                            for: element,
+                            showsBottomDivider: index == featuredTopSortedElements.count - 1
+                        )
                     }
                 } header: {
                     merchantSectionHeader(
@@ -221,8 +224,11 @@ struct BusinessesListView: View {
                     } else {
                         if !displayedFeaturedPrimaryResults.isEmpty {
                             Section {
-                                ForEach(displayedFeaturedPrimaryResults, id: \.id) { element in
-                                    merchantSearchRow(for: element)
+                                ForEach(Array(displayedFeaturedPrimaryResults.enumerated()), id: \.element.id) { index, element in
+                                    merchantSearchRow(
+                                        for: element,
+                                        showsBottomDivider: index == displayedFeaturedPrimaryResults.count - 1
+                                    )
                                 }
                             } header: {
                                 merchantSectionHeader(
@@ -268,6 +274,7 @@ struct BusinessesListView: View {
                 }
             }
             .listStyle(.plain)
+            .listSectionSpacing(0)
             .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
             .contentMargins(.top, 0, for: .scrollContent)
             .background(Color.clear)
@@ -360,7 +367,7 @@ struct BusinessesListView: View {
         cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
     }
 
-    private func merchantSearchRow(for element: Element) -> some View {
+    private func merchantSearchRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
         let cellVM = cellViewModel(for: element)
         return Button {
             viewModel.setSelectionSource(.list)
@@ -372,7 +379,7 @@ struct BusinessesListView: View {
             viewModel.path = [element]
         } label: {
             ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM)
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
                     .padding(.trailing, 18)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .bold))
@@ -385,7 +392,7 @@ struct BusinessesListView: View {
         }
     }
 
-    private func merchantRow(for element: Element) -> some View {
+    private func merchantRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
         let cellVM = cellViewModel(for: element)
         return Button {
             viewModel.setSelectionSource(.list)
@@ -397,7 +404,7 @@ struct BusinessesListView: View {
             viewModel.path = [element]
         } label: {
             ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM)
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
                     .padding(.trailing, 18)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .bold))
@@ -568,6 +575,7 @@ struct BusinessesListView: View {
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
+    var showsBottomDivider = false
     @State private var appeared = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     
@@ -616,6 +624,14 @@ struct ElementCell: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 PaymentIcons(element: viewModel.element)
+            }
+
+            if showsBottomDivider {
+                Rectangle()
+                    .fill(Color(.separator))
+                    .frame(height: 1)
+                    .padding(.top, 10)
+                    .padding(.trailing, -18)
             }
         }
         .contentShape(Rectangle())
