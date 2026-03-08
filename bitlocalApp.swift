@@ -11,10 +11,12 @@ import Foundation // for Debug logging
 @main
 @available(iOS 17.0, *)
 struct bitlocalApp: App {
+    @UIApplicationDelegateAdaptor(BitLocalAppDelegate.self) private var appDelegate
 
     // Add the environment property to track the app's scene phase
     @Environment(\.scenePhase) var scenePhase
     @StateObject private var contentViewModel = ContentViewModel()
+    @StateObject private var merchantAlertsManager = MerchantAlertsManager.shared
     
     // Track scene phase timing to avoid false triggers
     @State private var lastActiveTime: Date = Date()
@@ -29,6 +31,10 @@ struct bitlocalApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(contentViewModel)
+                .environmentObject(merchantAlertsManager)
+                .task {
+                    await merchantAlertsManager.refreshStatus()
+                }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     Debug.log("scenePhase changed from \(oldPhase) to: \(newPhase)")
                     
@@ -46,6 +52,9 @@ struct bitlocalApp: App {
         switch newPhase {
         case .active:
             handleActiveState(from: oldPhase)
+            Task {
+                await merchantAlertsManager.refreshStatus()
+            }
             
         case .inactive:
             Debug.log("Scene became inactive")

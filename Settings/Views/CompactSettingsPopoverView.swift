@@ -4,7 +4,9 @@ import MapKit
 struct CompactSettingsPopoverView: View {
     @Binding var selectedMapType: MKMapType
     @EnvironmentObject var appearanceManager: AppearanceManager
+    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
+    @State private var showingMerchantAlerts = false
     var onDone: (() -> Void)? = nil
 
     var body: some View {
@@ -48,6 +50,35 @@ struct CompactSettingsPopoverView: View {
                     .pickerStyle(.segmented)
                 }
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Merchant Alerts")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+
+                    Button {
+                        showingMerchantAlerts = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(merchantAlertsManager.currentSubscription?.displayName ?? "Daily city digests")
+                                    .font(.callout.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                Text(merchantAlertsManager.currentSubscription == nil ? "Configure a city to receive CloudKit notifications." : "Manage your subscribed city and notification status.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "bell.badge")
+                                .foregroundStyle(.accent)
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 // Done Button
                 Button(action: { onDone?() }) {
                     Text("done_button")
@@ -66,6 +97,10 @@ struct CompactSettingsPopoverView: View {
             .shadow(color: Color.black.opacity(0.14), radius: 18, x: 0, y: 6)
             .frame(width: 300)
         }
-        .frame(width: 350, height: 360) // match or slightly larger than the inner frame
+        .frame(width: 350, height: 460) // match or slightly larger than the inner frame
+        .sheet(isPresented: $showingMerchantAlerts) {
+            MerchantAlertsView()
+                .environmentObject(merchantAlertsManager)
+        }
     }
 }

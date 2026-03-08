@@ -1,0 +1,43 @@
+name: CloudKit Digest Sync
+
+on:
+  schedule:
+    - cron: "17 14 * * *"
+  workflow_dispatch:
+    inputs:
+      updated_since:
+        description: "Override the BTC Map updated_since anchor (ISO-8601)"
+        required: false
+        type: string
+
+concurrency:
+  group: cloudkit-digest-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Sync BTC Map digests into CloudKit
+        env:
+          CLOUDKIT_CONTAINER_ID: ${{ secrets.CLOUDKIT_CONTAINER_ID }}
+          CLOUDKIT_ENVIRONMENT: ${{ secrets.CLOUDKIT_ENVIRONMENT }}
+          CLOUDKIT_DATABASE: ${{ secrets.CLOUDKIT_DATABASE }}
+          CLOUDKIT_SERVER_KEY_ID: ${{ secrets.CLOUDKIT_SERVER_KEY_ID }}
+          CLOUDKIT_SERVER_PRIVATE_KEY: ${{ secrets.CLOUDKIT_SERVER_PRIVATE_KEY }}
+          BTCMAP_INITIAL_UPDATED_SINCE: ${{ secrets.BTCMAP_INITIAL_UPDATED_SINCE }}
+          DIGEST_WINDOW_HOURS: ${{ secrets.DIGEST_WINDOW_HOURS }}
+          OVERRIDE_UPDATED_SINCE: ${{ github.event.inputs.updated_since }}
+        run: node scripts/cloudkit_digest_sync.mjs

@@ -12,6 +12,7 @@ import Foundation // for Debug logging
 struct RootView: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
     @EnvironmentObject var contentViewModel: ContentViewModel
+    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
     
     var body: some View {
@@ -88,6 +89,9 @@ struct RootView: View {
         .sheet(item: $contentViewModel.deepLinkUnavailableState) { state in
             DeepLinkUnavailableView(state: state)
                 .environmentObject(contentViewModel)
+        }
+        .sheet(item: $merchantAlertsManager.activeDigest) { digest in
+            MerchantAlertDigestView(digest: digest)
         }
         .animation(.easeInOut(duration: 0.3), value: didCompleteOnboarding)
     }

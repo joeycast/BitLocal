@@ -7,7 +7,17 @@
 		<string>applinks:www.bitlocal.app</string>
 		<string>applinks:bitlocal.app</string>
 	</array>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.app.bitlocal.bitlocal</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
 	<key>com.apple.developer.maps</key>
 	<true/>
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>
