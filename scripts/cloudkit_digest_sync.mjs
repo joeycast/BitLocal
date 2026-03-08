@@ -140,8 +140,9 @@ async function upsertCityDigest(digest) {
 }
 
 async function upsertSyncState(state) {
-  await forceReplaceRecord({
+  await upsertRecord({
     recordName: SYNC_STATE_RECORD_NAME,
+    recordType: SYNC_STATE_RECORD_TYPE,
     fields: {
       incrementalAnchorUpdatedSince: stringField(state.incrementalAnchorUpdatedSince),
       lastSuccessfulSyncAt: safeTimestampField(state.lastSuccessfulSyncAt),
@@ -203,25 +204,6 @@ async function lookupRecord(recordName) {
   }
 
   return match;
-}
-
-async function forceReplaceRecord({ recordName, fields }) {
-  const sanitizedFields = Object.fromEntries(
-    Object.entries(fields).filter(([, value]) => value !== null && value !== undefined)
-  );
-
-  await cloudKitRequest("/records/modify", {
-    atomic: false,
-    operations: [
-      {
-        operationType: "forceReplace",
-        record: {
-          recordName,
-          fields: sanitizedFields
-        }
-      }
-    ]
-  });
 }
 
 function decodeSyncStateRecord(fields) {
