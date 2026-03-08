@@ -24,7 +24,7 @@ const environment = {
   environment: process.env.CLOUDKIT_ENVIRONMENT || "development",
   database: (process.env.CLOUDKIT_DATABASE || "public").toLowerCase(),
   serverKeyId: requireEnv("CLOUDKIT_SERVER_KEY_ID"),
-  serverPrivateKey: normalizePem(requireEnv("CLOUDKIT_SERVER_PRIVATE_KEY")),
+  serverPrivateKey: createSigningKey(requireEnv("CLOUDKIT_SERVER_PRIVATE_KEY")),
   initialUpdatedSince: process.env.OVERRIDE_UPDATED_SINCE || process.env.BTCMAP_INITIAL_UPDATED_SINCE || "1970-01-01T00:00:00Z",
   digestWindowHours: Number.parseInt(process.env.DIGEST_WINDOW_HOURS || "24", 10)
 };
@@ -358,7 +358,33 @@ function stringListField(values) {
 }
 
 function normalizePem(value) {
-  return value.replace(/\\n/g, "\n");
+  return value
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\\n/g, "\n");
+}
+
+function createSigningKey(value) {
+  const pem = normalizePem(value);
+  const type = pem.includes("BEGIN EC PRIVATE KEY") ? "sec1" : "pkcs8";
+
+  try {
+    return crypto.createPrivateKey({
+      key: pem,
+      format: "pem",
+      type
+    });
+  } catch (primaryError) {
+    try {
+      return crypto.createPrivateKey(pem);
+    } catch (fallbackError) {
+      throw new Error(
+        `Unable to parse CLOUDKIT_SERVER_PRIVATE_KEY as an unencrypted PEM key. ` +
+        `Primary parser failed with: ${primaryError.message}. ` +
+        `Fallback parser failed with: ${fallbackError.message}.`
+      );
+    }
+  }
 }
 
 function isoDateWithoutMilliseconds(date = new Date()) {
