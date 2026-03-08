@@ -27,7 +27,7 @@ struct MerchantAlertsView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingCityPicker) {
+            .navigationDestination(isPresented: $showingCityPicker) {
                 MerchantAlertCityPickerView(model: citySearchModel) { choice in
                     Task {
                         await merchantAlertsManager.enableNotifications(for: choice)

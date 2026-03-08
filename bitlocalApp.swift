@@ -25,7 +25,6 @@ struct bitlocalApp: App {
     
     init() {
         MyFont.registerFonts()
-        MerchantAlertCitySearchModel.shared.prepare()
     }
     
     var body: some Scene {
