@@ -140,9 +140,8 @@ async function upsertCityDigest(digest) {
 }
 
 async function upsertSyncState(state) {
-  await replaceRecord({
+  await forceReplaceRecord({
     recordName: SYNC_STATE_RECORD_NAME,
-    recordType: SYNC_STATE_RECORD_TYPE,
     fields: {
       incrementalAnchorUpdatedSince: stringField(state.incrementalAnchorUpdatedSince),
       lastSuccessfulSyncAt: safeTimestampField(state.lastSuccessfulSyncAt),
@@ -188,21 +187,6 @@ async function upsertRecord({ recordName, recordType, fields }) {
   }
 }
 
-async function replaceRecord({ recordName, recordType, fields }) {
-  const existing = await lookupRecord(recordName).catch((error) => {
-    if (isCloudKitNotFound(error)) {
-      return null;
-    }
-    throw error;
-  });
-
-  if (existing) {
-    await deleteRecord(recordName, existing.recordChangeTag);
-  }
-
-  await upsertRecord({ recordName, recordType, fields });
-}
-
 async function lookupRecord(recordName) {
   const response = await cloudKitRequest("/records/lookup", {
     records: [
@@ -220,15 +204,19 @@ async function lookupRecord(recordName) {
   return match;
 }
 
-async function deleteRecord(recordName, recordChangeTag) {
+async function forceReplaceRecord({ recordName, fields }) {
+  const sanitizedFields = Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== null && value !== undefined)
+  );
+
   await cloudKitRequest("/records/modify", {
     atomic: false,
     operations: [
       {
-        operationType: "delete",
+        operationType: "forceReplace",
         record: {
           recordName,
-          ...(recordChangeTag ? { recordChangeTag } : {})
+          fields: sanitizedFields
         }
       }
     ]
