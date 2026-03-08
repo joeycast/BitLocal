@@ -1,6 +1,7 @@
 import CloudKit
 import CryptoKit
 import MapKit
+import Security
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -134,6 +135,8 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private let publicDatabase: CKDatabase
     private let subscriptionsKey = "merchant_alert_subscriptions_v1"
     private let lastDigestKey = "merchant_alert_last_digest_v1"
+    private let keychainService = "app.bitlocal.bitlocal.merchant-alerts"
+    private let keychainSubscriptionsAccount = "merchant_alert_subscriptions_v1"
     private let digestRecordType = "CityDigest"
     private let localNotificationKindKey = "merchant_alert_kind"
     private let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
@@ -322,7 +325,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func loadPersistedState() {
-        if let data = userDefaults.data(forKey: subscriptionsKey),
+        if let data = loadPersistedSubscriptionsData(),
            let decoded = try? JSONDecoder().decode([CitySubscription].self, from: data) {
             subscriptions = decoded
         }
@@ -334,10 +337,18 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func persistSubscriptions() {
+        guard !subscriptions.isEmpty else {
+            clearPersistedSubscriptions()
+            return
+        }
+
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         if let data = try? encoder.encode(subscriptions) {
             userDefaults.set(data, forKey: subscriptionsKey)
+            saveSubscriptionsToKeychain(data)
+        } else {
+            clearPersistedSubscriptions()
         }
     }
 
@@ -437,6 +448,69 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         let digest = SHA256.hash(data: Data(cityKey.utf8))
         let hashed = digest.compactMap { String(format: "%02x", $0) }.joined()
         return "city-digest-\(hashed)"
+    }
+
+    private func loadPersistedSubscriptionsData() -> Data? {
+        if let data = userDefaults.data(forKey: subscriptionsKey) {
+            return data
+        }
+        return loadSubscriptionsFromKeychain()
+    }
+
+    private func loadSubscriptionsFromKeychain() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainSubscriptionsAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess else { return nil }
+        return item as? Data
+    }
+
+    private func saveSubscriptionsToKeychain(_ data: Data) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainSubscriptionsAccount
+        ]
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+
+        guard updateStatus == errSecItemNotFound else {
+            Debug.log("Merchant alert keychain update failed with status \(updateStatus)")
+            return
+        }
+
+        var createQuery = query
+        createQuery[kSecValueData as String] = data
+        let createStatus = SecItemAdd(createQuery as CFDictionary, nil)
+        if createStatus != errSecSuccess {
+            Debug.log("Merchant alert keychain add failed with status \(createStatus)")
+        }
+    }
+
+    private func clearPersistedSubscriptions() {
+        userDefaults.removeObject(forKey: subscriptionsKey)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainSubscriptionsAccount
+        ]
+
+        SecItemDelete(query as CFDictionary)
     }
 }
 

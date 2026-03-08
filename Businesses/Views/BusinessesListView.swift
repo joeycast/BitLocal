@@ -64,6 +64,8 @@ struct BusinessesListView: View {
                     Spacer(minLength: 0)
                 } else if isFilteringMerchants {
                     searchResultsView
+                } else if viewModel.activeMerchantAlertDigest != nil {
+                    digestResultsView
                 } else if elements.isEmpty {
                     if shouldShowEmptyState {
                         Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
@@ -171,23 +173,6 @@ struct BusinessesListView: View {
 
     private var normalListView: some View {
         List {
-            if let digest = viewModel.activeMerchantAlertDigest {
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("New merchants in \(digest.cityDisplayName)")
-                            .font(.headline)
-                        Text(digest.summaryLine)
-                            .foregroundStyle(.secondary)
-
-                        Button("Clear Alert Filter") {
-                            viewModel.clearMerchantAlertDigest()
-                        }
-                        .font(.footnote.weight(.semibold))
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-
             // Events carousel (only renders if events exist)
             Section {
                 EventsDiscoverySection()
@@ -248,6 +233,46 @@ struct BusinessesListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: topSortedElements)
+        }
+    }
+
+    private var digestResultsView: some View {
+        List {
+            if let digest = viewModel.activeMerchantAlertDigest {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("New merchants in \(digest.cityDisplayName)")
+                            .font(.headline)
+                        Text(digest.summaryLine)
+                            .foregroundStyle(.secondary)
+
+                        Button("Clear Alert Filter") {
+                            viewModel.clearMerchantAlertDigest()
+                        }
+                        .font(.footnote.weight(.semibold))
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Section {
+                ForEach(elements, id: \.id) { element in
+                    merchantRow(for: element)
+                }
+
+                footerView
+            }
+            .clearListRowBackground(if: shouldUseGlassyRows)
+        }
+        .listStyle(.plain)
+        .listSectionSpacing(0)
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .background(Color.clear)
+        .environment(\.defaultMinListRowHeight, 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: elements)
         }
     }
 
@@ -352,7 +377,8 @@ struct BusinessesListView: View {
     }
 
     private var shouldShowCategoryChips: Bool {
-        !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
+        guard viewModel.activeMerchantAlertDigest == nil else { return false }
+        return !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
     }
 
     private var shouldHideCollapsedSheetContent: Bool {

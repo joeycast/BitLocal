@@ -7,6 +7,7 @@ struct MerchantAlertsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingCityPicker = false
+    @StateObject private var citySearchModel = MerchantAlertCitySearchModel()
 
     var body: some View {
         NavigationStack {
@@ -26,7 +27,7 @@ struct MerchantAlertsView: View {
                 }
             }
             .sheet(isPresented: $showingCityPicker) {
-                MerchantAlertCityPickerView { choice in
+                MerchantAlertCityPickerView(model: citySearchModel) { choice in
                     Task {
                         await merchantAlertsManager.enableNotifications(for: choice)
                     }
@@ -80,6 +81,7 @@ struct MerchantAlertsView: View {
                 }
 
                 Button("Change City") {
+                    citySearchModel.prepare()
                     showingCityPicker = true
                 }
 
@@ -93,6 +95,7 @@ struct MerchantAlertsView: View {
                     .foregroundStyle(.secondary)
 
                 Button("Choose City") {
+                    citySearchModel.prepare()
                     showingCityPicker = true
                 }
                 .disabled(!merchantAlertsManager.canEnableAlerts)
@@ -200,7 +203,8 @@ struct MerchantAlertDigestView: View {
 @available(iOS 17.0, *)
 private struct MerchantAlertCityPickerView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var model = MerchantAlertCitySearchModel()
+    @ObservedObject var model: MerchantAlertCitySearchModel
+    @FocusState private var isSearchFieldFocused: Bool
 
     let onSelection: (MerchantAlertCityChoice) -> Void
 
@@ -211,6 +215,7 @@ private struct MerchantAlertCityPickerView: View {
                     TextField("Search for a city", text: $model.searchText)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
+                        .focused($isSearchFieldFocused)
                 }
 
                 if model.isLoading {
@@ -260,6 +265,12 @@ private struct MerchantAlertCityPickerView: View {
                     }
                 }
             }
+            .onAppear {
+                model.prepare()
+                DispatchQueue.main.async {
+                    isSearchFieldFocused = true
+                }
+            }
         }
     }
 }
@@ -273,6 +284,7 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
     private let completer = MKLocalSearchCompleter()
     private var searchTask: Task<Void, Never>?
     private var resolvedChoices: [String: MerchantAlertCityChoice] = [:]
+    private var hasPrepared = false
 
     override init() {
         super.init()
@@ -298,6 +310,12 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
                 }
             }
         }
+    }
+
+    func prepare() {
+        guard !hasPrepared else { return }
+        hasPrepared = true
+        _ = completer.results.count
     }
 
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
