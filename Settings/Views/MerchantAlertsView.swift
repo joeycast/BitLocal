@@ -1,4 +1,5 @@
 import MapKit
+import QuartzCore
 import SwiftUI
 
 @available(iOS 17.0, *)
@@ -81,6 +82,7 @@ struct MerchantAlertsView: View {
                 }
 
                 Button("Change City") {
+                    citySearchModel.beginProfilingSession(reason: "change-city")
                     citySearchModel.prepare()
                     showingCityPicker = true
                 }
@@ -95,6 +97,7 @@ struct MerchantAlertsView: View {
                     .foregroundStyle(.secondary)
 
                 Button("Choose City") {
+                    citySearchModel.beginProfilingSession(reason: "choose-city")
                     citySearchModel.prepare()
                     showingCityPicker = true
                 }
@@ -255,9 +258,16 @@ private struct MerchantAlertCityPickerView: View {
                 }
             }
             .onAppear {
+                model.markPickerAppeared()
                 model.prepare()
                 DispatchQueue.main.async {
                     isSearchFieldFocused = true
+                    model.markFocusApplied()
+                }
+            }
+            .onChange(of: isSearchFieldFocused) { _, focused in
+                if focused {
+                    model.markFocusObserved()
                 }
             }
         }
@@ -272,6 +282,9 @@ private struct MerchantAlertCityPickerView: View {
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .focused($isSearchFieldFocused)
+                .onChange(of: model.searchText) { _, newValue in
+                    model.markSearchTextChanged(newValue)
+                }
 
             if !model.searchText.isEmpty {
                 Button {
@@ -327,6 +340,7 @@ final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MKLocalSea
     private var searchTask: Task<Void, Never>?
     private var resolvedChoices: [String: MerchantAlertCityChoice] = [:]
     private var hasPrepared = false
+    private var profile = MerchantAlertSearchProfile()
 
     override init() {
         super.init()
@@ -345,18 +359,25 @@ final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MKLocalSea
                 }
 
                 searchTask = Task { @MainActor in
+                    self.profile.markFirstEligibleQuery(trimmed)
                     isLoading = true
                     try? await Task.sleep(nanoseconds: 400_000_000)
                     guard !Task.isCancelled else { return }
+                    self.profile.markCompleterQuerySet(trimmed)
                     completer.queryFragment = trimmed
                 }
             }
         }
     }
 
+    func beginProfilingSession(reason: String) {
+        profile = MerchantAlertSearchProfile(reason: reason)
+    }
+
     func prepare() {
         guard !hasPrepared else { return }
         hasPrepared = true
+        profile.markPrepare()
         completer.queryFragment = "a"
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             guard let self else { return }
@@ -369,6 +390,7 @@ final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MKLocalSea
     }
 
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        profile.markCompleterResults(count: completer.results.count)
         results = Array(completer.results.prefix(8)).map {
             MerchantAlertCitySearchResult(
                 title: $0.title,
@@ -381,6 +403,7 @@ final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MKLocalSea
 
     func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         Debug.log("Merchant alert city search failed: \(error.localizedDescription)")
+        profile.markCompleterFailure(error)
         isLoading = false
     }
 
@@ -414,6 +437,22 @@ final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MKLocalSea
             return nil
         }
     }
+
+    func markPickerAppeared() {
+        profile.markPickerAppeared()
+    }
+
+    func markFocusApplied() {
+        profile.markFocusApplied()
+    }
+
+    func markFocusObserved() {
+        profile.markFocusObserved()
+    }
+
+    func markSearchTextChanged(_ value: String) {
+        profile.markSearchTextChanged(value)
+    }
 }
 
 struct MerchantAlertCitySearchResult: Identifiable {
@@ -421,4 +460,71 @@ struct MerchantAlertCitySearchResult: Identifiable {
     let title: String
     let subtitle: String
     let completion: MKLocalSearchCompletion
+}
+
+private struct MerchantAlertSearchProfile {
+    let reason: String
+    private let startTime: CFTimeInterval
+    private var didLogFirstTextChange = false
+    private var didLogFirstEligibleQuery = false
+    private var didLogFirstResults = false
+
+    init(reason: String = "unspecified") {
+        self.reason = reason
+        self.startTime = CACurrentMediaTime()
+        Debug.log("Merchant alert search profile started (\(reason))")
+    }
+
+    mutating func markPrepare() {
+        log("prepare()")
+    }
+
+    mutating func markPickerAppeared() {
+        log("picker onAppear")
+    }
+
+    mutating func markFocusApplied() {
+        log("focus requested")
+    }
+
+    mutating func markFocusObserved() {
+        log("focus observed")
+    }
+
+    mutating func markSearchTextChanged(_ value: String) {
+        guard !didLogFirstTextChange, !value.isEmpty else { return }
+        didLogFirstTextChange = true
+        log("first text change -> '\(value)'")
+    }
+
+    mutating func markFirstEligibleQuery(_ query: String) {
+        guard !didLogFirstEligibleQuery else { return }
+        didLogFirstEligibleQuery = true
+        log("first eligible query -> '\(query)'")
+    }
+
+    mutating func markCompleterQuerySet(_ query: String) {
+        log("completer.queryFragment set -> '\(query)'")
+    }
+
+    mutating func markCompleterResults(count: Int) {
+        if !didLogFirstResults {
+            didLogFirstResults = true
+            log("first completer results -> \(count)")
+        } else {
+            log("completer results -> \(count)")
+        }
+    }
+
+    mutating func markCompleterFailure(_ error: Error) {
+        log("completer failure -> \(error.localizedDescription)")
+    }
+
+    private func elapsedMilliseconds() -> String {
+        String(format: "%.1fms", (CACurrentMediaTime() - startTime) * 1000)
+    }
+
+    private func log(_ message: String) {
+        Debug.log("Merchant alert search [\(reason)] \(elapsedMilliseconds()) \(message)")
+    }
 }
