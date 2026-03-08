@@ -104,7 +104,7 @@ struct IPhoneHeaderView: View {
                 .zIndex(2)
             }
         }
-        .sheet(isPresented: $showingMerchantAlerts) {
+        .fullScreenCover(isPresented: $showingMerchantAlerts) {
             MerchantAlertsView()
                 .environmentObject(MerchantAlertsManager.shared)
         }
