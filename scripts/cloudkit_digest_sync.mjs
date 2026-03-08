@@ -250,9 +250,9 @@ function buildCityDigests(changes, digestWindowStart, digestWindowEnd) {
 }
 
 function normalizePlace(place) {
-  const rawCity = place.address?.city || place["osm:addr:city"] || "";
-  const rawRegion = place.address?.state || place["osm:addr:state"] || "";
-  const rawCountry = place.address?.country || "";
+  const rawCity = place["osm:addr:city"] || "";
+  const rawRegion = place["osm:addr:state"] || "";
+  const rawCountry = place["osm:addr:country"] || "";
   const city = compactWhitespace(rawCity);
   const region = compactWhitespace(rawRegion);
   const country = compactWhitespace(rawCountry);
@@ -266,11 +266,12 @@ function normalizePlace(place) {
 }
 
 function normalizeCityKey(city, region, country) {
-  if (!city || !country) {
+  if (!city) {
     return "";
   }
 
-  return [city, region, country]
+  const components = [city, region, country]
+    .filter(Boolean)
     .map((value) =>
       value
         .normalize("NFKD")
@@ -278,8 +279,9 @@ function normalizeCityKey(city, region, country) {
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase()
-    )
-    .join("|");
+    );
+
+  return components.join("|");
 }
 
 function compactWhitespace(value) {
@@ -332,12 +334,14 @@ function requireEnv(key) {
 
 function stringField(value) {
   return {
+    type: "stringType",
     value
   };
 }
 
 function int64Field(value) {
   return {
+    type: "int64Type",
     value
   };
 }
@@ -345,7 +349,8 @@ function int64Field(value) {
 function timestampField(value) {
   const date = value instanceof Date ? value : new Date(value);
   return {
-    value: date.getTime()
+    type: "timestampType",
+    value: date.toISOString()
   };
 }
 
@@ -364,6 +369,7 @@ function safeTimestampField(value) {
 
 function stringListField(values) {
   return {
+    type: "stringListType",
     value: values
   };
 }
