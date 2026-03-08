@@ -115,9 +115,9 @@ async function upsertMerchant(place) {
       cityKey: stringField(normalized.cityKey),
       cityDisplayName: stringField(normalized.cityDisplayName),
       displayName: stringField(normalized.displayName),
-      createdAt: place.created_at ? timestampField(place.created_at) : null,
-      updatedAt: place.updated_at ? timestampField(place.updated_at) : null,
-      deletedAt: place.deleted_at ? timestampField(place.deleted_at) : null,
+      createdAt: safeTimestampField(place.created_at),
+      updatedAt: safeTimestampField(place.updated_at),
+      deletedAt: safeTimestampField(place.deleted_at),
       sourceHash: stringField(hashObject(place))
     }
   });
@@ -130,8 +130,8 @@ async function upsertCityDigest(digest) {
     fields: {
       cityKey: stringField(digest.cityKey),
       cityDisplayName: stringField(digest.cityDisplayName),
-      digestWindowStart: timestampField(digest.digestWindowStart),
-      digestWindowEnd: timestampField(digest.digestWindowEnd),
+      digestWindowStart: safeTimestampField(digest.digestWindowStart),
+      digestWindowEnd: safeTimestampField(digest.digestWindowEnd),
       merchantCount: int64Field(digest.merchantCount),
       merchantIDs: stringListField(digest.merchantIDs),
       topMerchantNames: stringListField(digest.topMerchantNames)
@@ -145,8 +145,8 @@ async function upsertSyncState(state) {
     recordType: SYNC_STATE_RECORD_TYPE,
     fields: {
       incrementalAnchorUpdatedSince: stringField(state.incrementalAnchorUpdatedSince),
-      lastSuccessfulSyncAt: timestampField(state.lastSuccessfulSyncAt),
-      lastProcessedDigestWindow: timestampField(state.lastProcessedDigestWindow),
+      lastSuccessfulSyncAt: safeTimestampField(state.lastSuccessfulSyncAt),
+      lastProcessedDigestWindow: safeTimestampField(state.lastProcessedDigestWindow),
       bootstrapCompleted: stringField(state.bootstrapCompleted ? "true" : "false")
     }
   });
@@ -348,6 +348,19 @@ function timestampField(value) {
     type: "TIMESTAMP",
     value: date.toISOString()
   };
+}
+
+function safeTimestampField(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return timestampField(date);
 }
 
 function stringListField(values) {
