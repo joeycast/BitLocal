@@ -30,6 +30,15 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Download GeoNames city dataset
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/geonames"
+          curl -fsSL -o "$RUNNER_TEMP/geonames/cities1000.zip" https://download.geonames.org/export/dump/cities1000.zip
+          curl -fsSL -o "$RUNNER_TEMP/geonames/countryInfo.txt" https://download.geonames.org/export/dump/countryInfo.txt
+          curl -fsSL -o "$RUNNER_TEMP/geonames/admin1CodesASCII.txt" https://download.geonames.org/export/dump/admin1CodesASCII.txt
+          unzip -o "$RUNNER_TEMP/geonames/cities1000.zip" -d "$RUNNER_TEMP/geonames"
+
       - name: Sync BTC Map digests into CloudKit
         env:
           CLOUDKIT_CONTAINER_ID: ${{ secrets.CLOUDKIT_CONTAINER_ID }}
@@ -39,5 +48,8 @@ jobs:
           CLOUDKIT_SERVER_PRIVATE_KEY: ${{ secrets.CLOUDKIT_SERVER_PRIVATE_KEY }}
           BTCMAP_INITIAL_UPDATED_SINCE: ${{ secrets.BTCMAP_INITIAL_UPDATED_SINCE }}
           DIGEST_WINDOW_HOURS: ${{ secrets.DIGEST_WINDOW_HOURS }}
+          GEONAMES_CITIES_FILE: ${{ runner.temp }}/geonames/cities1000.txt
+          GEONAMES_COUNTRIES_FILE: ${{ runner.temp }}/geonames/countryInfo.txt
+          GEONAMES_ADMIN1_FILE: ${{ runner.temp }}/geonames/admin1CodesASCII.txt
           OVERRIDE_UPDATED_SINCE: ${{ github.event.inputs.updated_since }}
         run: node scripts/cloudkit_digest_sync.mjs

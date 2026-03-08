@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 
 const SYNC_STATE_RECORD_NAME = "sync-state";
 const DIGEST_RECORD_TYPE = "CityDigest";
@@ -16,7 +17,8 @@ const SYNC_FIELDS = [
   "lon",
   "address",
   "osm:addr:city",
-  "osm:addr:state"
+  "osm:addr:state",
+  "osm:addr:country"
 ];
 
 const environment = {
@@ -26,10 +28,14 @@ const environment = {
   serverKeyId: requireEnv("CLOUDKIT_SERVER_KEY_ID"),
   serverPrivateKey: createSigningKey(requireEnv("CLOUDKIT_SERVER_PRIVATE_KEY")),
   initialUpdatedSince: process.env.OVERRIDE_UPDATED_SINCE || process.env.BTCMAP_INITIAL_UPDATED_SINCE || "1970-01-01T00:00:00Z",
-  digestWindowHours: Number.parseInt(process.env.DIGEST_WINDOW_HOURS || "24", 10)
+  digestWindowHours: Number.parseInt(process.env.DIGEST_WINDOW_HOURS || "24", 10),
+  geoNamesCitiesFile: process.env.GEONAMES_CITIES_FILE || "",
+  geoNamesCountriesFile: process.env.GEONAMES_COUNTRIES_FILE || "",
+  geoNamesAdmin1File: process.env.GEONAMES_ADMIN1_FILE || ""
 };
 
 async function main() {
+  const reverseGeocoder = await loadReverseGeocoder();
   const syncState = await loadSyncState();
   const updatedSince = syncState?.incrementalAnchorUpdatedSince || environment.initialUpdatedSince;
   const changes = await fetchBTCMapChanges(updatedSince);
@@ -41,7 +47,7 @@ async function main() {
   }
 
   for (const place of changes) {
-    await upsertMerchant(place);
+    await upsertMerchant(place, reverseGeocoder);
   }
 
   const latestAnchor = latestUpdatedAt(changes) || updatedSince;
@@ -58,7 +64,7 @@ async function main() {
       return createdAt && createdAt > digestWindowStart;
     });
 
-    const cityDigests = buildCityDigests(digestCandidates, digestWindowStart, digestWindowEnd);
+    const cityDigests = buildCityDigests(digestCandidates, digestWindowStart, digestWindowEnd, reverseGeocoder);
     console.log(`Prepared ${cityDigests.length} city digest record(s).`);
 
     for (const digest of cityDigests) {
@@ -103,9 +109,9 @@ async function loadSyncState() {
   }
 }
 
-async function upsertMerchant(place) {
+async function upsertMerchant(place, reverseGeocoder) {
   const recordName = `merchant-${place.id}`;
-  const normalized = normalizePlace(place);
+  const normalized = normalizePlace(place, reverseGeocoder);
 
   await upsertRecord({
     recordName,
@@ -215,11 +221,11 @@ function decodeSyncStateRecord(fields) {
   };
 }
 
-function buildCityDigests(changes, digestWindowStart, digestWindowEnd) {
+function buildCityDigests(changes, digestWindowStart, digestWindowEnd, reverseGeocoder) {
   const grouped = new Map();
 
   for (const place of changes) {
-    const normalized = normalizePlace(place);
+    const normalized = normalizePlace(place, reverseGeocoder);
     if (!normalized.cityKey) {
       continue;
     }
@@ -249,13 +255,14 @@ function buildCityDigests(changes, digestWindowStart, digestWindowEnd) {
   }));
 }
 
-function normalizePlace(place) {
+function normalizePlace(place, reverseGeocoder) {
   const rawCity = place["osm:addr:city"] || "";
   const rawRegion = place["osm:addr:state"] || "";
   const rawCountry = place["osm:addr:country"] || "";
-  const city = compactWhitespace(rawCity);
-  const region = compactWhitespace(rawRegion);
-  const country = compactWhitespace(rawCountry);
+  const fallback = inferPlaceComponents(place, reverseGeocoder);
+  const city = compactWhitespace(rawCity || fallback.city);
+  const region = compactWhitespace(rawRegion || fallback.region);
+  const country = compactWhitespace(normalizeCountry(rawCountry, fallback.country));
   const displayName = compactWhitespace(place.display_name || place.name || `BTC Map Merchant ${place.id}`);
 
   return {
@@ -266,26 +273,23 @@ function normalizePlace(place) {
 }
 
 function normalizeCityKey(city, region, country) {
-  if (!city) {
+  const normalizedCity = normalizeKeyComponent(city);
+  if (!normalizedCity) {
     return "";
   }
 
-  const components = [city, region, country]
-    .filter(Boolean)
-    .map((value) =>
-      value
-        .normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase()
-    );
-
-  return components.join("|");
+  return [normalizedCity, normalizeKeyComponent(region), normalizeKeyComponent(country)].join("|");
 }
 
 function compactWhitespace(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeKeyComponent(value) {
+  return compactWhitespace(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function parseDate(value) {
@@ -449,6 +453,181 @@ async function cloudKitRequest(subpath, body) {
 
 function isCloudKitNotFound(error) {
   return /UNKNOWN_ITEM|NOT_FOUND|404|does not exist/i.test(String(error));
+}
+
+async function loadReverseGeocoder() {
+  if (!environment.geoNamesCitiesFile || !environment.geoNamesCountriesFile || !environment.geoNamesAdmin1File) {
+    console.log("GeoNames fallback disabled; city inference will use source address fields only.");
+    return null;
+  }
+
+  const [citiesRaw, countriesRaw, admin1Raw] = await Promise.all([
+    fs.readFile(environment.geoNamesCitiesFile, "utf8"),
+    fs.readFile(environment.geoNamesCountriesFile, "utf8"),
+    fs.readFile(environment.geoNamesAdmin1File, "utf8")
+  ]);
+
+  const countryNames = new Map();
+  for (const line of countriesRaw.split("\n")) {
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const columns = line.split("\t");
+    if (columns.length < 5) {
+      continue;
+    }
+
+    countryNames.set(columns[0], columns[4]);
+  }
+
+  const admin1Names = new Map();
+  for (const line of admin1Raw.split("\n")) {
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const columns = line.split("\t");
+    if (columns.length < 2) {
+      continue;
+    }
+
+    admin1Names.set(columns[0], columns[1]);
+  }
+
+  const buckets = new Map();
+  const rows = citiesRaw.split("\n");
+  let inserted = 0;
+
+  for (const line of rows) {
+    if (!line) {
+      continue;
+    }
+
+    const columns = line.split("\t");
+    if (columns.length < 15) {
+      continue;
+    }
+
+    const latitude = Number.parseFloat(columns[4]);
+    const longitude = Number.parseFloat(columns[5]);
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+      continue;
+    }
+
+    const countryCode = columns[8];
+    const admin1Code = columns[10];
+    const cityName = columns[2] || columns[1];
+    const regionName = admin1Names.get(`${countryCode}.${admin1Code}`) || admin1Code;
+    const countryName = countryNames.get(countryCode) || countryCode;
+
+    const bucketKey = geoBucketKey(latitude, longitude);
+    const bucket = buckets.get(bucketKey) || [];
+    bucket.push({
+      city: cityName,
+      region: regionName,
+      country: countryName,
+      latitude,
+      longitude,
+      population: Number.parseInt(columns[14], 10) || 0
+    });
+    buckets.set(bucketKey, bucket);
+    inserted += 1;
+  }
+
+  console.log(`Loaded GeoNames reverse-geocoding index with ${inserted} cities across ${buckets.size} buckets.`);
+  return {
+    lookup(lat, lon) {
+      return lookupNearestCity(buckets, lat, lon);
+    }
+  };
+}
+
+function inferPlaceComponents(place, reverseGeocoder) {
+  if (!reverseGeocoder) {
+    return { city: "", region: "", country: "" };
+  }
+
+  const latitude = Number.parseFloat(place.lat);
+  const longitude = Number.parseFloat(place.lon);
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return { city: "", region: "", country: "" };
+  }
+
+  return reverseGeocoder.lookup(latitude, longitude) || { city: "", region: "", country: "" };
+}
+
+function normalizeCountry(rawCountry, fallbackCountry) {
+  const country = compactWhitespace(rawCountry);
+  if (!country) {
+    return fallbackCountry;
+  }
+
+  if (country.length === 2 && fallbackCountry) {
+    return fallbackCountry;
+  }
+
+  return country;
+}
+
+function geoBucketKey(lat, lon) {
+  return `${Math.floor(lat)}:${Math.floor(lon)}`;
+}
+
+function lookupNearestCity(buckets, lat, lon) {
+  let best = null;
+
+  for (let radius = 0; radius <= 2; radius += 1) {
+    const candidates = [];
+
+    for (let latOffset = -radius; latOffset <= radius; latOffset += 1) {
+      for (let lonOffset = -radius; lonOffset <= radius; lonOffset += 1) {
+        const key = `${Math.floor(lat) + latOffset}:${Math.floor(lon) + lonOffset}`;
+        const bucket = buckets.get(key);
+        if (bucket) {
+          candidates.push(...bucket);
+        }
+      }
+    }
+
+    if (!candidates.length) {
+      continue;
+    }
+
+    for (const candidate of candidates) {
+      const distance = haversineKilometers(lat, lon, candidate.latitude, candidate.longitude);
+      if (!best || distance < best.distance || (distance === best.distance && candidate.population > best.population)) {
+        best = {
+          city: candidate.city,
+          region: candidate.region,
+          country: candidate.country,
+          distance,
+          population: candidate.population
+        };
+      }
+    }
+
+    if (best) {
+      return {
+        city: best.city,
+        region: best.region,
+        country: best.country
+      };
+    }
+  }
+
+  return null;
+}
+
+function haversineKilometers(lat1, lon1, lat2, lon2) {
+  const toRadians = (value) => value * (Math.PI / 180);
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
 }
 
 main().catch((error) => {
