@@ -9,6 +9,10 @@ on:
         description: "Override the BTC Map updated_since anchor (ISO-8601)"
         required: false
         type: string
+      digest_window_hours:
+        description: "Override digest window length in hours for this run"
+        required: false
+        type: string
 
 concurrency:
   group: cloudkit-digest-sync
@@ -47,7 +51,7 @@ jobs:
           CLOUDKIT_SERVER_KEY_ID: ${{ secrets.CLOUDKIT_SERVER_KEY_ID }}
           CLOUDKIT_SERVER_PRIVATE_KEY: ${{ secrets.CLOUDKIT_SERVER_PRIVATE_KEY }}
           BTCMAP_INITIAL_UPDATED_SINCE: ${{ secrets.BTCMAP_INITIAL_UPDATED_SINCE }}
-          DIGEST_WINDOW_HOURS: ${{ secrets.DIGEST_WINDOW_HOURS }}
+          DIGEST_WINDOW_HOURS: ${{ github.event.inputs.digest_window_hours || secrets.DIGEST_WINDOW_HOURS }}
           GEONAMES_CITIES_FILE: ${{ runner.temp }}/geonames/cities1000.txt
           GEONAMES_COUNTRIES_FILE: ${{ runner.temp }}/geonames/countryInfo.txt
           GEONAMES_ADMIN1_FILE: ${{ runner.temp }}/geonames/admin1CodesASCII.txt
