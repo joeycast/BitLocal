@@ -6,8 +6,8 @@ struct CompactSettingsPopoverView: View {
     @EnvironmentObject var appearanceManager: AppearanceManager
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    @State private var showingMerchantAlerts = false
     var onDone: (() -> Void)? = nil
+    var onMerchantAlertsSelected: (() -> Void)? = nil
 
     var body: some View {
         GeometryReader { geometry in
@@ -56,7 +56,7 @@ struct CompactSettingsPopoverView: View {
                         .foregroundColor(.primary)
 
                     Button {
-                        showingMerchantAlerts = true
+                        onMerchantAlertsSelected?()
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
@@ -98,9 +98,5 @@ struct CompactSettingsPopoverView: View {
             .frame(width: 300)
         }
         .frame(width: 350, height: 460) // match or slightly larger than the inner frame
-        .sheet(isPresented: $showingMerchantAlerts) {
-            MerchantAlertsView()
-                .environmentObject(merchantAlertsManager)
-        }
     }
 }

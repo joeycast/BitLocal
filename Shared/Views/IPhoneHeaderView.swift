@@ -28,6 +28,7 @@ struct IPhoneHeaderView: View {
     private var appearance: Appearance { appearanceManager.appearance }
 
     @State private var settingsButtonFrame: CGRect = .zero
+    @State private var showingMerchantAlerts = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -90,12 +91,22 @@ struct IPhoneHeaderView: View {
                     .onTapGesture { withAnimation { showingSettings = false } }
                 CompactSettingsPopoverView(
                     selectedMapType: selectedMapTypeBinding,
-                    onDone: { withAnimation { showingSettings = false } }
+                    onDone: { withAnimation { showingSettings = false } },
+                    onMerchantAlertsSelected: {
+                        withAnimation { showingSettings = false }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            showingMerchantAlerts = true
+                        }
+                    }
                 )
                 .position(x: settingsButtonFrame.maxX - 120, y: settingsButtonFrame.maxY + 125)
                 .transition(.scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity))
                 .zIndex(2)
             }
+        }
+        .sheet(isPresented: $showingMerchantAlerts) {
+            MerchantAlertsView()
+                .environmentObject(MerchantAlertsManager.shared)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
     }

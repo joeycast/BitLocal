@@ -22,6 +22,7 @@ struct IPadLayoutView: View {
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     
     @State private var settingsButtonFrame: CGRect = .zero
+    @State private var showingMerchantAlerts = false
     
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     
@@ -143,7 +144,13 @@ struct IPadLayoutView: View {
                     // Settings popover positioned relative to the settings button frame
                     CompactSettingsPopoverView(
                         selectedMapType: selectedMapTypeBinding,
-                        onDone: { withAnimation { showingSettings = false } }
+                        onDone: { withAnimation { showingSettings = false } },
+                        onMerchantAlertsSelected: {
+                            withAnimation { showingSettings = false }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                showingMerchantAlerts = true
+                            }
+                        }
                     )
                     .position(
                         x: calculateSidePanelWidth(screenWidth: geometry.size.width) + 125, // Position within side panel
@@ -158,6 +165,10 @@ struct IPadLayoutView: View {
                 }
                 .zIndex(1000)
             }
+        }
+        .sheet(isPresented: $showingMerchantAlerts) {
+            MerchantAlertsView()
+                .environmentObject(MerchantAlertsManager.shared)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
         .onChange(of: viewModel.path) { _, newPath in
