@@ -164,12 +164,11 @@ async function upsertRecord({ recordName, recordType, fields }) {
     throw error;
   });
 
-  const operationType = existing ? "update" : "create";
+  const operationType = existing ? "forceUpdate" : "create";
   const record = {
     recordName,
-    fields: sanitizedFields,
-    ...(!existing ? { recordType } : {}),
-    ...(existing?.recordChangeTag ? { recordChangeTag: existing.recordChangeTag } : {})
+    recordType,
+    fields: sanitizedFields
   };
 
   const body = {
