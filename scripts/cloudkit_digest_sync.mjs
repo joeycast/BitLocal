@@ -173,7 +173,7 @@ async function upsertRecord({ recordName, recordType, fields }) {
   };
 
   const body = {
-    atomic: true,
+    atomic: false,
     operations: [
       {
         operationType,
