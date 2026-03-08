@@ -183,6 +183,7 @@ async function upsertRecord({ recordName, recordType, fields }) {
   const response = await cloudKitRequest("/records/modify", body);
   const result = response.records?.[0];
   if (!result || result.serverErrorCode) {
+    console.error("CloudKit upsert failed:", JSON.stringify({ operationType, record }, null, 2));
     throw new Error(JSON.stringify(result || response));
   }
 }
@@ -335,8 +336,11 @@ function unwrapStringField(field) {
 
 function unwrapTimestampField(field) {
   const value = field?.value;
-  if (!value) {
+  if (value === null || value === undefined) {
     return "";
+  }
+  if (typeof value === "number") {
+    return new Date(value).toISOString();
   }
   return typeof value === "string" ? value : "";
 }
@@ -351,14 +355,12 @@ function requireEnv(key) {
 
 function stringField(value) {
   return {
-    type: "stringType",
     value
   };
 }
 
 function int64Field(value) {
   return {
-    type: "int64Type",
     value
   };
 }
@@ -366,8 +368,7 @@ function int64Field(value) {
 function timestampField(value) {
   const date = value instanceof Date ? value : new Date(value);
   return {
-    type: "timestampType",
-    value: date.toISOString()
+    value: date.getTime()
   };
 }
 
@@ -386,7 +387,6 @@ function safeTimestampField(value) {
 
 function stringListField(values) {
   return {
-    type: "stringListType",
     value: values
   };
 }
