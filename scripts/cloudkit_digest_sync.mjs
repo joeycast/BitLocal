@@ -37,7 +37,7 @@ const environment = {
 async function main() {
   const reverseGeocoder = await loadReverseGeocoder();
   const syncState = await loadSyncState();
-  const updatedSince = syncState?.incrementalAnchorUpdatedSince || environment.initialUpdatedSince;
+  const updatedSince = process.env.OVERRIDE_UPDATED_SINCE || syncState?.incrementalAnchorUpdatedSince || environment.initialUpdatedSince;
   const changes = await fetchBTCMapChanges(updatedSince);
 
   console.log(`Fetched ${changes.length} BTC Map place changes since ${updatedSince}.`);
