@@ -164,7 +164,7 @@ async function upsertRecord({ recordName, recordType, fields }) {
     throw error;
   });
 
-  const operationType = existing ? "forceUpdate" : "create";
+  const operationType = existing ? "update" : "create";
   const record = {
     recordName,
     recordType,
