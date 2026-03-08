@@ -210,50 +210,39 @@ private struct MerchantAlertCityPickerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    TextField("Search for a city", text: $model.searchText)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .focused($isSearchFieldFocused)
-                }
+            VStack(spacing: 0) {
+                searchField
 
                 if model.isLoading {
-                    Section {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
                     }
-                }
-
-                if !model.results.isEmpty {
-                    Section("Results") {
-                        ForEach(model.results) { result in
-                            Button {
-                                Task {
-                                    if let choice = await model.resolve(result) {
-                                        onSelection(choice)
-                                        dismiss()
-                                    }
-                                }
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(result.title)
-                                        .foregroundStyle(.primary)
-                                    Text(result.subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if !model.results.isEmpty {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(model.results) { result in
+                                cityRow(for: result)
+                                Divider()
                             }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
                     }
-                } else if !model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !model.isLoading {
-                    Section {
-                        Text("No locality-level matches found yet. Try a city name like Austin, Berlin, or Nashville.")
-                            .foregroundStyle(.secondary)
-                    }
+                } else if !model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ContentUnavailableView(
+                        "No City Matches",
+                        systemImage: "magnifyingglass",
+                        description: Text("Try a city name like Austin, Berlin, or Nashville.")
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Search Cities",
+                        systemImage: "building.2",
+                        description: Text("Choose the city you want daily new-merchant digests for.")
+                    )
                 }
             }
             .navigationTitle("Choose City")
@@ -272,6 +261,57 @@ private struct MerchantAlertCityPickerView: View {
                 }
             }
         }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search for a city", text: $model.searchText)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .focused($isSearchFieldFocused)
+
+            if !model.searchText.isEmpty {
+                Button {
+                    model.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color(.tertiarySystemFill))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+    }
+
+    @ViewBuilder
+    private func cityRow(for result: MerchantAlertCitySearchResult) -> some View {
+        Button {
+            Task {
+                if let choice = await model.resolve(result) {
+                    onSelection(choice)
+                    dismiss()
+                }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(result.title)
+                    .foregroundStyle(.primary)
+                Text(result.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
     }
 }
 
