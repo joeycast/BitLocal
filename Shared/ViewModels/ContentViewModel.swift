@@ -129,6 +129,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
     @Published private(set) var allElements: [Element] = []
     @Published var visibleElements: [Element] = []
+    @Published private(set) var activeMerchantAlertDigest: CityDigest?
     @Published var isLoading: Bool = false
     @Published var topPadding: CGFloat = 0
     @Published var bottomPadding: CGFloat = 0
@@ -796,6 +797,58 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             width: abs(topLeftPoint.x - bottomRightPoint.x),
             height: abs(topLeftPoint.y - bottomRightPoint.y)
         )
+    }
+
+    private func merchantAlertElements(for digest: CityDigest) -> [Element] {
+        let ids = digest.merchantIDs
+        guard !ids.isEmpty else { return [] }
+
+        let byID = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
+        return ids.compactMap { byID[$0] }
+    }
+
+    private func fitMapToMerchantAlertElements(_ elements: [Element], animated: Bool) {
+        guard !elements.isEmpty else {
+            forceMapRefresh = true
+            return
+        }
+
+        forceMapRefresh = true
+
+        let coordinates = elements.compactMap(\.mapCoordinate)
+        guard !coordinates.isEmpty else { return }
+
+        if coordinates.count == 1, let coordinate = coordinates.first {
+            centerMap(to: coordinate, force: true)
+            return
+        }
+
+        guard let mapView else {
+            let latitudes = coordinates.map(\.latitude)
+            let longitudes = coordinates.map(\.longitude)
+            let center = CLLocationCoordinate2D(
+                latitude: (latitudes.min()! + latitudes.max()!) / 2,
+                longitude: (longitudes.min()! + longitudes.max()!) / 2
+            )
+            let span = MKCoordinateSpan(
+                latitudeDelta: max((latitudes.max()! - latitudes.min()!) * 1.4, 0.02),
+                longitudeDelta: max((longitudes.max()! - longitudes.min()!) * 1.4, 0.02)
+            )
+            let region = MKCoordinateRegion(center: center, span: span)
+            updateMapRegion(center: region.center, span: region.span, animated: animated)
+            return
+        }
+
+        var rect = MKMapRect.null
+        for coordinate in coordinates {
+            let point = MKMapPoint(coordinate)
+            rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
+        }
+
+        let edgePadding = mapListViewportInsets(for: mapView)
+        DispatchQueue.main.async {
+            mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: animated)
+        }
     }
     
     // Zoom to element
@@ -1736,6 +1789,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     var mapElementsForCurrentDisplay: [Element] {
         switch mapDisplayMode {
         case .merchants:
+            if let digest = activeMerchantAlertDigest {
+                return merchantAlertElements(for: digest)
+            }
             let trimmedQuery = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedQuery.count >= 2 {
                 return merchantSearchMapResults
@@ -1744,6 +1800,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         case .communities:
             return selectedCommunityArea == nil ? [] : communityMemberElements
         }
+    }
+
+    var listElementsForCurrentDisplay: [Element] {
+        if let digest = activeMerchantAlertDigest, mapDisplayMode == .merchants {
+            return merchantAlertElements(for: digest)
+        }
+        return visibleElements
+    }
+
+    var isShowingMerchantAlertDigest: Bool {
+        activeMerchantAlertDigest != nil
     }
 
     func setMerchantSearchMapResults(_ results: [Element]) {
@@ -1756,6 +1823,33 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func clearMerchantSearchMapResults() {
         guard !merchantSearchMapResults.isEmpty else { return }
         merchantSearchMapResults = []
+    }
+
+    func activateMerchantAlertDigest(_ digest: CityDigest) {
+        activeMerchantAlertDigest = digest
+        mapDisplayMode = .merchants
+        unifiedSearchText = ""
+        isSearchActive = false
+        localFilteredMerchants = []
+        merchantSearchPrimaryResults = []
+        merchantSearchMapResults = []
+        merchantSearchFreshResults = []
+        merchantSearchNormalizedQuery = ""
+        selectedCommunityArea = nil
+        presentedCommunityArea = nil
+        communityMemberElements = []
+        communityMemberElementIDs = []
+        path = []
+        deselectAnnotation()
+
+        let elements = merchantAlertElements(for: digest)
+        fitMapToMerchantAlertElements(elements, animated: true)
+    }
+
+    func clearMerchantAlertDigest() {
+        guard activeMerchantAlertDigest != nil else { return }
+        activeMerchantAlertDigest = nil
+        forceMapRefresh = true
     }
 
 #if DEBUG

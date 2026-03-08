@@ -272,6 +272,7 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
 
     private let completer = MKLocalSearchCompleter()
     private var searchTask: Task<Void, Never>?
+    private var resolvedChoices: [String: MerchantAlertCityChoice] = [:]
 
     override init() {
         super.init()
@@ -283,7 +284,7 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
                 let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
                 searchTask?.cancel()
 
-                guard !trimmed.isEmpty else {
+                guard trimmed.count >= 2 else {
                     results = []
                     isLoading = false
                     continue
@@ -291,7 +292,7 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
 
                 searchTask = Task { @MainActor in
                     isLoading = true
-                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    try? await Task.sleep(nanoseconds: 400_000_000)
                     guard !Task.isCancelled else { return }
                     completer.queryFragment = trimmed
                 }
@@ -300,7 +301,7 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
     }
 
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        results = completer.results.map {
+        results = Array(completer.results.prefix(8)).map {
             MerchantAlertCitySearchResult(
                 title: $0.title,
                 subtitle: $0.subtitle,
@@ -316,6 +317,11 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
     }
 
     func resolve(_ result: MerchantAlertCitySearchResult) async -> MerchantAlertCityChoice? {
+        let cacheKey = "\(result.title)|\(result.subtitle)"
+        if let cached = resolvedChoices[cacheKey] {
+            return cached
+        }
+
         let request = MKLocalSearch.Request(completion: result.completion)
 
         do {
@@ -332,7 +338,9 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
                 return nil
             }
 
-            return MerchantAlertCityChoice(city: city, region: region, country: country)
+            let choice = MerchantAlertCityChoice(city: city, region: region, country: country)
+            resolvedChoices[cacheKey] = choice
+            return choice
         } catch {
             Debug.log("Merchant alert city resolve failed: \(error.localizedDescription)")
             return nil

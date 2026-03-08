@@ -90,8 +90,9 @@ struct RootView: View {
             DeepLinkUnavailableView(state: state)
                 .environmentObject(contentViewModel)
         }
-        .sheet(item: $merchantAlertsManager.activeDigest) { digest in
-            MerchantAlertDigestView(digest: digest)
+        .onChange(of: merchantAlertsManager.activeDigest?.id) { _, _ in
+            guard let digest = merchantAlertsManager.activeDigest else { return }
+            contentViewModel.activateMerchantAlertDigest(digest)
         }
         .animation(.easeInOut(duration: 0.3), value: didCompleteOnboarding)
     }

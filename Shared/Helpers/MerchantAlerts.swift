@@ -135,6 +135,9 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private let subscriptionsKey = "merchant_alert_subscriptions_v1"
     private let lastDigestKey = "merchant_alert_last_digest_v1"
     private let digestRecordType = "CityDigest"
+    private let localNotificationKindKey = "merchant_alert_kind"
+    private let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
+    private let localNotificationKindDigest = "city_digest"
 
     var currentSubscription: CitySubscription? {
         subscriptions.first(where: \.isEnabled)
@@ -288,21 +291,33 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     func handleRemoteNotification(userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
-              let queryNotification = notification as? CKQueryNotification,
-              let recordID = queryNotification.recordID else {
-            return .noData
-        }
-
         do {
-            let digest = try await fetchDigest(recordID: recordID)
-            activeDigest = digest
+            guard let digest = try await digest(from: userInfo) else {
+                return .noData
+            }
             lastDigest = digest
             persistLastDigest()
+
+            if UIApplication.shared.applicationState == .active {
+                activeDigest = digest
+            } else {
+                try await scheduleLocalNotification(for: digest)
+            }
             return .newData
         } catch {
             errorMessage = error.localizedDescription
             return .failed
+        }
+    }
+
+    func handleNotificationResponse(userInfo: [AnyHashable: Any]) async {
+        do {
+            guard let digest = try await digest(from: userInfo) else { return }
+            lastDigest = digest
+            persistLastDigest()
+            activeDigest = digest
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -345,9 +360,6 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         let notificationInfo = CKSubscription.NotificationInfo()
         notificationInfo.shouldSendContentAvailable = true
-        notificationInfo.alertBody = "New merchant updates are ready in \(subscription.displayName)."
-        notificationInfo.soundName = "default"
-        notificationInfo.desiredKeys = ["cityDisplayName", "merchantCount", "topMerchantNames", "merchantIDs"]
         querySubscription.notificationInfo = notificationInfo
 
         _ = try await publicDatabase.merchantAlertsSaveSubscription(querySubscription)
@@ -360,6 +372,65 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private func fetchDigest(recordID: CKRecord.ID) async throws -> CityDigest {
         let record = try await publicDatabase.merchantAlertsRecord(for: recordID)
         return try CityDigest(record: record)
+    }
+
+    private func digest(from userInfo: [AnyHashable: Any]) async throws -> CityDigest? {
+        if let kind = userInfo[localNotificationKindKey] as? String,
+           kind == localNotificationKindDigest,
+           let recordName = userInfo[localNotificationDigestRecordNameKey] as? String {
+            return try await fetchDigest(recordID: CKRecord.ID(recordName: recordName))
+        }
+
+        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
+              let queryNotification = notification as? CKQueryNotification,
+              let recordID = queryNotification.recordID else {
+            return nil
+        }
+
+        return try await fetchDigest(recordID: recordID)
+    }
+
+    private func scheduleLocalNotification(for digest: CityDigest) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = notificationTitle(for: digest)
+        content.body = notificationBody(for: digest)
+        content.sound = .default
+        content.userInfo = [
+            localNotificationKindKey: localNotificationKindDigest,
+            localNotificationDigestRecordNameKey: digest.id
+        ]
+
+        let identifier = "merchant-alert-\(digest.id)"
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: [identifier])
+        notificationCenter.removeDeliveredNotifications(withIdentifiers: [identifier])
+
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        try await notificationCenter.merchantAlertsAdd(request)
+    }
+
+    private func notificationTitle(for digest: CityDigest) -> String {
+        let city = digest.cityDisplayName.components(separatedBy: ",").first ?? digest.cityDisplayName
+        if digest.merchantCount == 1 {
+            return "New merchant in \(city)"
+        }
+        return "New merchants in \(city)"
+    }
+
+    private func notificationBody(for digest: CityDigest) -> String {
+        let names = Array(digest.topMerchantNames.prefix(2))
+
+        switch names.count {
+        case 2 where digest.merchantCount > 2:
+            return "\(names[0]), \(names[1]), and \(digest.merchantCount - 2) more now accept bitcoin."
+        case 2:
+            return "\(names[0]) and \(names[1]) now accept bitcoin."
+        case 1 where digest.merchantCount > 1:
+            return "\(names[0]) and \(digest.merchantCount - 1) more now accept bitcoin."
+        case 1:
+            return "\(names[0]) now accepts bitcoin."
+        default:
+            return "\(digest.merchantCount) new merchants now accept bitcoin."
+        }
     }
 
     private func cloudKitSubscriptionID(for cityKey: String) -> String {
@@ -437,7 +508,7 @@ final class BitLocalAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        _ = await MerchantAlertsManager.shared.handleRemoteNotification(
+        await MerchantAlertsManager.shared.handleNotificationResponse(
             userInfo: response.notification.request.content.userInfo
         )
     }
@@ -460,6 +531,18 @@ private extension UNUserNotificationCenter {
         await withCheckedContinuation { continuation in
             getNotificationSettings { settings in
                 continuation.resume(returning: settings)
+            }
+        }
+    }
+
+    func merchantAlertsAdd(_ request: UNNotificationRequest) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            add(request) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
             }
         }
     }

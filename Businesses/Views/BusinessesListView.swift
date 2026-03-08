@@ -171,6 +171,23 @@ struct BusinessesListView: View {
 
     private var normalListView: some View {
         List {
+            if let digest = viewModel.activeMerchantAlertDigest {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("New merchants in \(digest.cityDisplayName)")
+                            .font(.headline)
+                        Text(digest.summaryLine)
+                            .foregroundStyle(.secondary)
+
+                        Button("Clear Alert Filter") {
+                            viewModel.clearMerchantAlertDigest()
+                        }
+                        .font(.footnote.weight(.semibold))
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
             // Events carousel (only renders if events exist)
             Section {
                 EventsDiscoverySection()

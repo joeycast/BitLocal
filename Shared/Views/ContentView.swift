@@ -45,7 +45,7 @@ struct ContentView: View {
                 IPadLayoutView(
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
-                    visibleElements: viewModel.visibleElements,
+                    visibleElements: viewModel.listElementsForCurrentDisplay,
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
@@ -56,7 +56,7 @@ struct ContentView: View {
                 IPhoneLayoutView(
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
-                    visibleElements: viewModel.visibleElements,
+                    visibleElements: viewModel.listElementsForCurrentDisplay,
                     showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,

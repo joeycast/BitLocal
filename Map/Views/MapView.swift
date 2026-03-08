@@ -598,7 +598,7 @@ struct MapView: UIViewRepresentable {
                 .delay(for: .seconds(0.5), scheduler: RunLoop.main)
                 .sink { [weak self] _ in
                     guard let self = self else { return }
-                    let all = self.viewModel.allElements
+                    let all = self.viewModel.mapElementsForCurrentDisplay
                     self.updateAnnotations(
                         mapView: mapView,
                         elements: all,
