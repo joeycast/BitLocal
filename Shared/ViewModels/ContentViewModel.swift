@@ -807,6 +807,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return ids.compactMap { byID[$0] }
     }
 
+    private func merchantAlertMissingIDs(for digest: CityDigest) -> [String] {
+        let currentIDs = Set(allElements.map(\.id))
+        return digest.merchantIDs.filter { !currentIDs.contains($0) }
+    }
+
     private func fitMapToMerchantAlertElements(_ elements: [Element], animated: Bool) {
         guard !elements.isEmpty else {
             forceMapRefresh = true
@@ -1844,6 +1849,18 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         let elements = merchantAlertElements(for: digest)
         fitMapToMerchantAlertElements(elements, animated: true)
+
+        let missingIDs = merchantAlertMissingIDs(for: digest)
+        guard !missingIDs.isEmpty else { return }
+
+        Debug.log("Merchant alert digest missing \(missingIDs.count) merchant(s) locally; refreshing merchant dataset")
+        fetchElements { [weak self] in
+            guard let self else { return }
+            guard self.activeMerchantAlertDigest?.id == digest.id else { return }
+
+            let refreshedElements = self.merchantAlertElements(for: digest)
+            self.fitMapToMerchantAlertElements(refreshedElements, animated: true)
+        }
     }
 
     func clearMerchantAlertDigest() {
@@ -3152,7 +3169,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // Fetch elements using the APIManager and update the published elements property
     // Optimized to reduce startup calls
-    func fetchElements() {
+    func fetchElements(completion: (() -> Void)? = nil) {
         Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup)")
         
         // Prevent concurrent calls - use main queue for thread safety
@@ -3161,6 +3178,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             
             guard !self.isLoading else {
                 Debug.log("Already loading, skipping duplicate call")
+                completion?()
                 return
             }
             
@@ -3189,6 +3207,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                                 if self.isInitialStartup {
                                     self.isInitialStartup = false
                                 }
+                                completion?()
                             }
                         }
                         return
@@ -3196,7 +3215,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
                     self.isLoading = false
                     self.scheduleCommunityPrefetchIfNeeded()
-                    
+                    completion?()
+
                     // Center map for returning users who have cached data
                     if let userLoc = self.userLocation {
                         Debug.logMap("Centering map to user location for returning user")
@@ -3245,6 +3265,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     
                     self.isLoading = false
                     self.scheduleCommunityPrefetchIfNeeded()
+                    completion?()
                     
                     // Mark initial startup as complete
                     if self.isInitialStartup {
