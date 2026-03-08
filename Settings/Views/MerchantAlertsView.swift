@@ -7,7 +7,7 @@ struct MerchantAlertsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingCityPicker = false
-    @StateObject private var citySearchModel = MerchantAlertCitySearchModel()
+    @StateObject private var citySearchModel = MerchantAlertCitySearchModel.shared
 
     var body: some View {
         NavigationStack {
@@ -316,7 +316,9 @@ private struct MerchantAlertCityPickerView: View {
 }
 
 @available(iOS 17.0, *)
-private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
+final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
+    static let shared = MerchantAlertCitySearchModel()
+
     @Published var searchText = ""
     @Published private(set) var results: [MerchantAlertCitySearchResult] = []
     @Published private(set) var isLoading = false
@@ -355,7 +357,15 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
     func prepare() {
         guard !hasPrepared else { return }
         hasPrepared = true
-        _ = completer.results.count
+        completer.queryFragment = "a"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self else { return }
+            if self.searchText.isEmpty {
+                self.completer.queryFragment = ""
+                self.results = []
+                self.isLoading = false
+            }
+        }
     }
 
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
@@ -406,7 +416,7 @@ private final class MerchantAlertCitySearchModel: NSObject, ObservableObject, MK
     }
 }
 
-private struct MerchantAlertCitySearchResult: Identifiable {
+struct MerchantAlertCitySearchResult: Identifiable {
     let id = UUID()
     let title: String
     let subtitle: String

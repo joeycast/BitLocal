@@ -206,6 +206,10 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         notificationSettings = await notificationCenter.merchantAlertsSettings()
 
+        if subscriptions.isEmpty, isCloudKitAvailable {
+            await restoreSubscriptionsFromCloudKitIfNeeded()
+        }
+
         if notificationsAuthorized {
             UIApplication.shared.registerForRemoteNotifications()
         }
@@ -450,6 +454,65 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         return "city-digest-\(hashed)"
     }
 
+    private func restoreSubscriptionsFromCloudKitIfNeeded() async {
+        do {
+            let allSubscriptions = try await publicDatabase.merchantAlertsFetchAllSubscriptions()
+            let querySubscriptions = allSubscriptions.compactMap { $0 as? CKQuerySubscription }
+
+            guard let querySubscription = querySubscriptions.first(where: { $0.recordType == digestRecordType }),
+                  let cityKey = extractCityKey(from: querySubscription) else {
+                return
+            }
+
+            let restored = CitySubscription(
+                cityKey: cityKey,
+                city: prettifyCityKeyComponent(cityKey, index: 0),
+                region: prettifyCityKeyComponent(cityKey, index: 1),
+                country: prettifyCityKeyComponent(cityKey, index: 2),
+                displayName: prettifyDisplayName(from: cityKey)
+            )
+
+            subscriptions = [restored]
+            persistSubscriptions()
+        } catch {
+            Debug.log("Merchant alert CloudKit subscription restore failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func extractCityKey(from subscription: CKQuerySubscription) -> String? {
+        let format = subscription.predicate.predicateFormat
+        let matches = format.matches(of: /"([^"]+)"/)
+        guard let last = matches.last else { return nil }
+        return String(last.1)
+    }
+
+    private func prettifyCityKeyComponent(_ cityKey: String, index: Int) -> String {
+        let parts = cityKey.split(separator: "|").map(String.init)
+        guard parts.indices.contains(index) else { return "" }
+        return prettifyComponent(parts[index])
+    }
+
+    private func prettifyDisplayName(from cityKey: String) -> String {
+        cityKey
+            .split(separator: "|")
+            .map { prettifyComponent(String($0)) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+    }
+
+    private func prettifyComponent(_ component: String) -> String {
+        component
+            .split(separator: " ")
+            .map { word in
+                let lower = word.lowercased()
+                if lower.count <= 3 {
+                    return lower.uppercased()
+                }
+                return lower.prefix(1).uppercased() + lower.dropFirst()
+            }
+            .joined(separator: " ")
+    }
+
     private func loadPersistedSubscriptionsData() -> Data? {
         if let data = userDefaults.data(forKey: subscriptionsKey) {
             return data
@@ -674,6 +737,18 @@ private extension CKDatabase {
                     continuation.resume(returning: record)
                 } else {
                     continuation.resume(throwing: MerchantAlertsError.invalidDigestRecord)
+                }
+            }
+        }
+    }
+
+    func merchantAlertsFetchAllSubscriptions() async throws -> [CKSubscription] {
+        try await withCheckedThrowingContinuation { continuation in
+            fetchAllSubscriptions { subscriptions, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: subscriptions ?? [])
                 }
             }
         }
