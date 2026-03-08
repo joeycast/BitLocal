@@ -43,7 +43,7 @@ struct BottomSheetContentView: View {
                             element: element,
                             userLocation: viewModel.userLocation,
                             contentViewModel: viewModel,
-                            currentDetent: currentDetent
+                            currentDetent: currentDetentBinding
                         )
                         .id(element.id)
                         .clearNavigationContainerBackgroundIfAvailable()
@@ -52,7 +52,7 @@ struct BottomSheetContentView: View {
                         if let area = viewModel.presentedCommunityArea {
                             CommunityDetailView(
                                 area: area,
-                                currentDetent: currentDetent
+                                currentDetent: currentDetentBinding
                             )
                                 .environmentObject(viewModel)
                                 .clearNavigationContainerBackgroundIfAvailable()
@@ -102,6 +102,17 @@ struct BottomSheetContentView: View {
             }
         )
     }
+
+    private var currentDetentBinding: Binding<PresentationDetent?> {
+        Binding(
+            get: { currentDetent },
+            set: { newValue in
+                if let newValue {
+                    currentDetent = newValue
+                }
+            }
+        )
+    }
 }
 
 @available(iOS 17.0, *)
@@ -116,6 +127,10 @@ struct CommunitiesListView: View {
     @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
+        let filtered = filteredCommunities
+        let displayed = Array(filtered.prefix(communityResultsLimit))
+        let hasMore = filtered.count > displayed.count
+
         VStack(spacing: 0) {
             searchBar
                 .padding(.top, 20)
@@ -125,7 +140,7 @@ struct CommunitiesListView: View {
                 if viewModel.communityMapAreasIsLoading &&
                     viewModel.communityMapAreas.isEmpty &&
                     viewModel.areaBrowserAreas.isEmpty &&
-                    filteredCommunities.isEmpty {
+                    filtered.isEmpty {
                     Section {
                         HStack {
                             ProgressView()
@@ -136,29 +151,29 @@ struct CommunitiesListView: View {
                 }
 
                 Section {
-                    if filteredCommunities.isEmpty {
+                    if filtered.isEmpty {
                         Text(emptyStateMessage)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(displayedCommunities) { area in
-                            NavigationLink {
-                                CommunityDetailView(
-                                    area: area,
-                                    currentDetent: currentDetent
-                                )
-                                    .environmentObject(viewModel)
-                                    .onAppear {
-                                        viewModel.selectCommunity(area, presentDetail: false)
-                                    }
+                        ForEach(displayed) { area in
+                            Button {
+                                viewModel.selectCommunity(area, presentDetail: true)
                             } label: {
-                                CommunityRow(
-                                    area: area,
-                                    metadata: metadataStore.metadataByAreaID[area.id]
-                                )
+                                ZStack(alignment: .trailing) {
+                                    CommunityRow(
+                                        area: area,
+                                        metadata: metadataStore.metadataByAreaID[area.id]
+                                    )
+                                    .padding(.trailing, 18)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.gray.opacity(0.6))
+                                }
                             }
+                            .buttonStyle(.plain)
                         }
 
-                        if hasMoreCommunities {
+                        if hasMore {
                             Button("Load more communities") {
                                 communityResultsLimit += resultsPageSize
                             }
@@ -180,8 +195,8 @@ struct CommunitiesListView: View {
         .onChange(of: filterText) { _, _ in
             communityResultsLimit = resultsPageSize
         }
-        .task(id: metadataPrewarmKey) {
-            await prewarmVisibleMetadata()
+        .task(id: metadataPrewarmKey(for: displayed)) {
+            await prewarmVisibleMetadata(for: displayed)
         }
     }
 
@@ -227,23 +242,14 @@ struct CommunitiesListView: View {
         return q.isEmpty ? "No communities in current map view" : "No communities found"
     }
 
-    private var displayedCommunities: [V2AreaRecord] {
-        Array(filteredCommunities.prefix(communityResultsLimit))
-    }
-
-    private var hasMoreCommunities: Bool {
-        filteredCommunities.count > displayedCommunities.count
-    }
-
-    private var metadataPrewarmKey: String {
-        let areaKey = displayedCommunities
+    private func metadataPrewarmKey(for areas: [V2AreaRecord]) -> String {
+        let areaKey = areas
             .map { "\($0.id)|\($0.updatedAt ?? "")" }
             .joined(separator: ",")
         return areaKey
     }
 
-    private func prewarmVisibleMetadata() async {
-        let areas = displayedCommunities
+    private func prewarmVisibleMetadata(for areas: [V2AreaRecord]) async {
         guard !areas.isEmpty else { return }
 
         let areasToResolve = areas.filter { area in
@@ -522,7 +528,7 @@ struct CommunityDetailView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var viewModel: ContentViewModel
     let area: V2AreaRecord
-    var currentDetent: PresentationDetent? = nil
+    @Binding private var currentDetent: PresentationDetent?
     @AppStorage("community.lastLightningWalletID") private var lastLightningWalletID: String = ""
     @State private var showLightningAlert = false
     @State private var showWalletAlert = false
@@ -530,6 +536,11 @@ struct CommunityDetailView: View {
     @State private var shareItem: ShareTextItem?
     @State private var linkOpenErrorItem: CommunityLinkOpenError?
     @State private var lightningErrorMessage: String?
+
+    init(area: V2AreaRecord, currentDetent: Binding<PresentationDetent?> = .constant(nil)) {
+        self.area = area
+        self._currentDetent = currentDetent
+    }
 
     var body: some View {
         List {
@@ -556,6 +567,7 @@ struct CommunityDetailView: View {
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             }
 
             if hasAboutData {
@@ -564,6 +576,7 @@ struct CommunityDetailView: View {
                         detailRow(icon: "building.2", text: org)
                     }
                 }
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             }
 
             if !contactInformationLinks.isEmpty {
@@ -572,6 +585,7 @@ struct CommunityDetailView: View {
                         linkableValueRow(item)
                     }
                 }
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             }
 
             if !socialLinks.isEmpty {
@@ -580,6 +594,7 @@ struct CommunityDetailView: View {
                         linkableValueRow(social)
                     }
                 }
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             }
 
             if hasTipsData {
@@ -614,6 +629,7 @@ struct CommunityDetailView: View {
                         )
                     }
                 }
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             }
 
             Section("Verification") {
@@ -636,6 +652,7 @@ struct CommunityDetailView: View {
                     )
                 }
             }
+            .groupedCardListRowBackground(if: shouldUseGlassyRows)
 
             // MARK: Merchants
             Section {
@@ -658,7 +675,7 @@ struct CommunityDetailView: View {
                                 element: element,
                                 userLocation: viewModel.userLocation,
                                 contentViewModel: viewModel,
-                                currentDetent: currentDetent
+                                currentDetent: $currentDetent
                             )
                             .onAppear {
                                 viewModel.setSelectionSource(.list)
@@ -686,16 +703,23 @@ struct CommunityDetailView: View {
                         .background(.secondary.opacity(0.12), in: Capsule())
                 }
             }
+            .groupedCardListRowBackground(if: shouldUseGlassyRows)
         }
         .listStyle(.insetGrouped)
         .contentMargins(.top, 0, for: .scrollContent)
-        .scrollContentBackground(.hidden)
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
         .navigationTitle(area.displayName)
         .navigationBarTitleDisplayMode(.inline)
             .task(id: area.id) {
                 if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
                     viewModel.selectCommunity(area, presentDetail: false)
                 }
+            }
+            .onChange(of: viewModel.communityMemberElements) { _, _ in
+                updateMemberElements()
+            }
+            .onAppear {
+                updateMemberElements()
             }
         .alert("Tip This Community", isPresented: $showLightningAlert) {
             if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
@@ -764,7 +788,6 @@ struct CommunityDetailView: View {
         } message: {
             Text(linkOpenErrorItem?.message ?? "")
         }
-        .background(Color(uiColor: .systemGroupedBackground))
         .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
         .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
         .accessibilityHidden(shouldShowCollapsedHeaderOnly)
@@ -1199,12 +1222,20 @@ struct CommunityDetailView: View {
         viewModel.selectedCommunityArea?.id == area.id
     }
 
-    private var memberElements: [Element] {
-        guard sameSelectedCommunity else { return [] }
-        return viewModel.communityMemberElements.sorted {
+    @State private var memberElements: [Element] = []
+
+    private func updateMemberElements() {
+        guard sameSelectedCommunity else {
+            if !memberElements.isEmpty { memberElements = [] }
+            return
+        }
+        let sorted = viewModel.communityMemberElements.sorted {
             let lhs = $0.displayName ?? $0.id
             let rhs = $1.displayName ?? $1.id
             return lhs.localizedStandardCompare(rhs) == .orderedAscending
+        }
+        if sorted.map(\.id) != memberElements.map(\.id) {
+            memberElements = sorted
         }
     }
 
@@ -1231,6 +1262,17 @@ struct CommunityDetailView: View {
     private var isLargeSheet: Bool {
         guard let detent = currentDetent else { return false }
         return detentIdentifier(detent).contains("large")
+    }
+
+    private var shouldHideSheetBackground: Bool {
+        guard let detent = currentDetent else { return false }
+        return detent != .large
+    }
+
+    private var shouldUseGlassyRows: Bool {
+        guard let detent = currentDetent else { return false }
+        guard #available(iOS 26.0, *) else { return false }
+        return detent != .large
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {

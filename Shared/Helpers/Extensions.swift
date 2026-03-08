@@ -165,6 +165,11 @@ extension View {
             self
         }
     }
+
+    func groupedCardListRowBackground(if shouldBeGlassy: Bool) -> some View {
+        let bg: Color? = shouldBeGlassy ? nil : Color(uiColor: .secondarySystemGroupedBackground)
+        return self.listRowBackground(bg)
+    }
 }
 
 

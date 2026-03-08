@@ -106,6 +106,16 @@ private struct MerchantRemoteSearchPlan: Hashable {
     let source: String
 }
 
+private struct VisibleCommunityListCacheKey: Equatable {
+    let areasHash: Int
+    let mapMode: MapDisplayMode
+    let selectedCommunityID: String?
+    let viewportMinXBucket: Int
+    let viewportMinYBucket: Int
+    let viewportMaxXBucket: Int
+    let viewportMaxYBucket: Int
+}
+
 @available(iOS 17.0, *)
 final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
@@ -169,6 +179,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var mapDisplayMode: MapDisplayMode = .merchants
     private var cachedCommunityOverlays: [MKPolygon]?
     private var lastOverlayAreasHash: Int?
+    private var cachedCommunityListAreas: [V2AreaRecord] = []
+    private var lastCommunityListAreasHash: Int?
+    private var cachedVisibleCommunityListAreas: [V2AreaRecord] = []
+    private var lastVisibleCommunityListCacheKey: VisibleCommunityListCacheKey?
     private var communityGeoJSONHydrationInFlight = false
     private var requestedCommunityAreaDetailIDs = Set<Int>()
 
@@ -1755,8 +1769,18 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     var communityListAreas: [V2AreaRecord] {
-        effectiveCommunityAreasForDisplay
-            .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+        let areas = effectiveCommunityAreasForDisplay
+        let currentHash = areas.hashValue
+        if let lastCommunityListAreasHash, lastCommunityListAreasHash == currentHash {
+            return cachedCommunityListAreas
+        }
+
+        let sorted = areas.sorted {
+            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
+        cachedCommunityListAreas = sorted
+        lastCommunityListAreasHash = currentHash
+        return sorted
     }
 
     var visibleCommunityListAreas: [V2AreaRecord] {
@@ -1767,8 +1791,20 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return allAreas
         }
 
-        let viewportRect = mapListViewportRect(for: mapView)
-        let visibleRect = mapRect(for: viewportRect, in: mapView)
+        let visibleRect = mapRect(for: mapView.bounds, in: mapView)
+        let viewportBucketScale = 1_000.0
+        let cacheKey = VisibleCommunityListCacheKey(
+            areasHash: allAreas.hashValue,
+            mapMode: mapDisplayMode,
+            selectedCommunityID: selectedCommunityArea?.id,
+            viewportMinXBucket: Int((visibleRect.minX / viewportBucketScale).rounded()),
+            viewportMinYBucket: Int((visibleRect.minY / viewportBucketScale).rounded()),
+            viewportMaxXBucket: Int((visibleRect.maxX / viewportBucketScale).rounded()),
+            viewportMaxYBucket: Int((visibleRect.maxY / viewportBucketScale).rounded())
+        )
+        if lastVisibleCommunityListCacheKey == cacheKey {
+            return cachedVisibleCommunityListAreas
+        }
 
         var visibleIDs = Set<String>()
 
@@ -1778,7 +1814,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             visibleIDs.insert(areaID)
         }
 
-        return allAreas.filter { visibleIDs.contains($0.id) }
+        let visibleAreas = allAreas.filter { visibleIDs.contains($0.id) }
+        cachedVisibleCommunityListAreas = visibleAreas
+        lastVisibleCommunityListCacheKey = cacheKey
+        return visibleAreas
     }
 
     func communityArea(withID id: String) -> V2AreaRecord? {

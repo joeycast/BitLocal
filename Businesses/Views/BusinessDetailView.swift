@@ -115,17 +115,17 @@ struct BusinessDetailView: View {
     
     var element: Element
     var userLocation: CLLocation?
-    var currentDetent: PresentationDetent?
+    @Binding private var currentDetent: PresentationDetent?
     
     init(
         element: Element,
         userLocation: CLLocation?,
         contentViewModel: ContentViewModel,
-        currentDetent: PresentationDetent? = nil
+        currentDetent: Binding<PresentationDetent?> = .constant(nil)
     ) {
         self.element = element
         self.userLocation = userLocation
-        self.currentDetent = currentDetent
+        self._currentDetent = currentDetent
         self._elementCellViewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation, viewModel: contentViewModel))
     }
     
@@ -155,27 +155,27 @@ struct BusinessDetailView: View {
         List {
             BusinessDescriptionSection(element: element)
                 .featuredHeader(isFeatured: element.isCurrentlyBoosted())
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BusinessDetailsSection(
                 element: element,
                 elementCellViewModel: elementCellViewModel,
                 isFirstVisibleSection: element.isCurrentlyBoosted() && !element.hasBusinessDescription
             )
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapSocialsSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             PaymentDetailsSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapRequiredAppSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapPlaceCommentsSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapVerificationSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapPaidActionsSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BusinessMapSection(element: element)
-                .clearListRowBackground(if: shouldUseGlassyRows)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
         }
         .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
         .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
