@@ -197,7 +197,7 @@ async function replaceRecord({ recordName, recordType, fields }) {
   });
 
   if (existing) {
-    await deleteRecord(recordName);
+    await deleteRecord(recordName, existing.recordChangeTag);
   }
 
   await upsertRecord({ recordName, recordType, fields });
@@ -220,14 +220,15 @@ async function lookupRecord(recordName) {
   return match;
 }
 
-async function deleteRecord(recordName) {
+async function deleteRecord(recordName, recordChangeTag) {
   await cloudKitRequest("/records/modify", {
     atomic: false,
     operations: [
       {
         operationType: "delete",
         record: {
-          recordName
+          recordName,
+          ...(recordChangeTag ? { recordChangeTag } : {})
         }
       }
     ]
