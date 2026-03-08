@@ -167,8 +167,8 @@ async function upsertRecord({ recordName, recordType, fields }) {
   const operationType = existing ? "update" : "create";
   const record = {
     recordName,
-    recordType,
     fields: sanitizedFields,
+    ...(!existing ? { recordType } : {}),
     ...(existing?.recordChangeTag ? { recordChangeTag: existing.recordChangeTag } : {})
   };
 
