@@ -501,11 +501,18 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func prettifyComponent(_ component: String) -> String {
-        component
+        let uppercaseShortForms: Set<String> = [
+            "al", "ak", "az", "ar", "ca", "co", "ct", "dc", "de", "fl", "ga", "hi", "ia", "id",
+            "il", "in", "ks", "ky", "la", "ma", "md", "me", "mi", "mn", "mo", "ms", "mt", "nc",
+            "nd", "ne", "nh", "nj", "nm", "nv", "ny", "oh", "ok", "or", "pa", "ri", "sc", "sd",
+            "tn", "tx", "ut", "va", "vt", "wa", "wi", "wv", "wy", "uk", "uae", "usa", "us"
+        ]
+
+        return component
             .split(separator: " ")
             .map { word in
                 let lower = word.lowercased()
-                if lower.count <= 3 {
+                if uppercaseShortForms.contains(lower) {
                     return lower.uppercased()
                 }
                 return lower.prefix(1).uppercased() + lower.dropFirst()
