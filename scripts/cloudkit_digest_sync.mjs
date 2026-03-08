@@ -140,7 +140,7 @@ async function upsertCityDigest(digest) {
 }
 
 async function upsertSyncState(state) {
-  await upsertRecord({
+  await replaceRecord({
     recordName: SYNC_STATE_RECORD_NAME,
     recordType: SYNC_STATE_RECORD_TYPE,
     fields: {
@@ -188,6 +188,21 @@ async function upsertRecord({ recordName, recordType, fields }) {
   }
 }
 
+async function replaceRecord({ recordName, recordType, fields }) {
+  const existing = await lookupRecord(recordName).catch((error) => {
+    if (isCloudKitNotFound(error)) {
+      return null;
+    }
+    throw error;
+  });
+
+  if (existing) {
+    await deleteRecord(recordName);
+  }
+
+  await upsertRecord({ recordName, recordType, fields });
+}
+
 async function lookupRecord(recordName) {
   const response = await cloudKitRequest("/records/lookup", {
     records: [
@@ -203,6 +218,20 @@ async function lookupRecord(recordName) {
   }
 
   return match;
+}
+
+async function deleteRecord(recordName) {
+  await cloudKitRequest("/records/modify", {
+    atomic: false,
+    operations: [
+      {
+        operationType: "delete",
+        record: {
+          recordName
+        }
+      }
+    ]
+  });
 }
 
 function decodeSyncStateRecord(fields) {
