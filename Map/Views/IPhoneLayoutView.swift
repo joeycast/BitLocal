@@ -28,6 +28,7 @@ struct IPhoneLayoutView: View {
     
     private var appearance: Appearance { appearanceManager.appearance }
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.3)
+    @State private var settingsSheetDetent: PresentationDetent = .medium
     @State private var hasLiveSheetMeasurement = false
     @State private var hasAcceptedDefaultLiveMeasurement = false
     @State private var pendingLaunchOutlier: CGFloat?
@@ -112,9 +113,7 @@ struct IPhoneLayoutView: View {
             }) {
                 BottomSheetContentView(
                     visibleElements: visibleElements,
-                    currentDetent: $bottomSheetDetent,
-                    showingSettings: $showingSettings,
-                    selectedMapTypeBinding: selectedMapTypeBinding
+                    currentDetent: $bottomSheetDetent
                 )
                     .id("\(appearance.rawValue)-\(systemColorScheme)")
                     .environmentObject(viewModel)
@@ -131,6 +130,17 @@ struct IPhoneLayoutView: View {
                     .presentationBackgroundInteraction(.enabled)
                     .sheet(isPresented: $showingAbout) {
                         AboutView()
+                    }
+                    .sheet(isPresented: $showingSettings) {
+                        NavigationStack {
+                            SettingsView(
+                                selectedMapType: selectedMapTypeBinding,
+                                currentDetent: $settingsSheetDetent
+                            )
+                            .environmentObject(MerchantAlertsManager.shared)
+                        }
+                        .presentationDetents([.medium, .large], selection: $settingsSheetDetent)
+                        .settingsSheetBackground()
                     }
             }
             .onAppear {
@@ -189,6 +199,11 @@ struct IPhoneLayoutView: View {
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
                     "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
                 )
+            }
+            .onChange(of: showingSettings) { _, isShowing in
+                if isShowing {
+                    settingsSheetDetent = .medium
+                }
             }
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.25), value: appearance)

@@ -3,6 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct MerchantAlertsView: View {
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @Binding var currentDetent: PresentationDetent
     @State private var showingCityPicker = false
 
     var body: some View {
@@ -10,16 +11,22 @@ struct MerchantAlertsView: View {
             if showsStatusSection {
                 statusSection
             }
-            citySection
-            if merchantAlertsManager.currentSubscription != nil {
-                latestDigestSection
+
+            if let subscription = merchantAlertsManager.currentSubscription {
+                activeCitySection(subscription)
+                latestUpdateSection
+            } else {
+                welcomeSection
             }
-            infoSection
         }
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .listStyle(.insetGrouped)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .clearNavigationContainerBackgroundIfAvailable()
         .navigationTitle("Merchant Alerts")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showingCityPicker) {
-            MerchantAlertCityPickerView { choice in
+            MerchantAlertCityPickerView(currentDetent: $currentDetent) { choice in
                 Task {
                     await merchantAlertsManager.enableNotifications(for: choice)
                 }
@@ -29,6 +36,8 @@ struct MerchantAlertsView: View {
             await merchantAlertsManager.refreshStatus()
         }
     }
+
+    // MARK: - Status
 
     private var showsStatusSection: Bool {
         !merchantAlertsManager.isCloudKitAvailable
@@ -63,71 +72,126 @@ struct MerchantAlertsView: View {
                     .foregroundStyle(.red)
             }
         }
+        .groupedCardListRowBackground(if: shouldUseGlassyRows)
     }
 
-    private var citySection: some View {
-        Section("Your City") {
-            if let subscription = merchantAlertsManager.currentSubscription {
-                VStack(alignment: .leading, spacing: 8) {
+    // MARK: - Welcome (no city chosen)
+
+    private var welcomeSection: some View {
+        Section {
+            VStack(spacing: 16) {
+                Image(systemName: "bell.and.waves.left.and.right")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.accent)
+                    .padding(.top, 8)
+
+                Text("Stay in the loop")
+                    .font(.headline)
+
+                Text("Pick a city and we’ll notify you when new businesses start accepting Bitcoin there.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    showingCityPicker = true
+                } label: {
+                    Text("Pick a City")
+                        .bold()
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!merchantAlertsManager.canEnableAlerts)
+                .padding(.bottom, 4)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+        } footer: {
+            Text("BitLocal checks for new Bitcoin-accepting businesses in your city every day and sends you a notification when it finds new ones.")
+                .foregroundStyle(secondaryTextColor)
+        }
+        .groupedCardListRowBackground(if: shouldUseGlassyRows)
+    }
+
+    // MARK: - Active subscription
+
+    private func activeCitySection(_ subscription: CitySubscription) -> some View {
+        Section {
+            HStack(spacing: 14) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.title2)
+                    .foregroundStyle(.accent)
+
+                VStack(alignment: .leading, spacing: 4) {
                     Text(subscription.displayName)
                         .font(.headline)
-                    Text("We'll let you know when new places start accepting Bitcoin here.")
+                    Text("We’ll let you know when new places start accepting Bitcoin here.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-
-                Button("Change City") {
-                    showingCityPicker = true
-                }
-
-                Button("Stop Alerts", role: .destructive) {
-                    Task {
-                        await merchantAlertsManager.disableNotifications()
-                    }
-                }
-            } else {
-                Text("Pick a city and we'll notify you when new businesses start accepting Bitcoin there.")
-                    .foregroundStyle(.secondary)
-
-                Button("Pick a City") {
-                    showingCityPicker = true
-                }
-                .disabled(!merchantAlertsManager.canEnableAlerts)
             }
+            .padding(.vertical, 4)
+
+            Button("Change City") {
+                showingCityPicker = true
+            }
+        } footer: {
+            Button("Stop Alerts", role: .destructive) {
+                Task {
+                    await merchantAlertsManager.disableNotifications()
+                }
+            }
+            .font(.footnote)
+            .padding(.top, 8)
         }
+        .groupedCardListRowBackground(if: shouldUseGlassyRows)
     }
 
-    private var latestDigestSection: some View {
+    // MARK: - Latest update
+
+    private var latestUpdateSection: some View {
         Section("Latest Update") {
             if let digest = merchantAlertsManager.lastDigest {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(digest.cityDisplayName)
-                        .font(.headline)
-                    Text(digest.summaryLine)
-                        .foregroundStyle(.secondary)
-                    if let digestWindowEnd = digest.digestWindowEnd {
-                        Text(digestWindowEnd.formatted(date: .abbreviated, time: .omitted))
+                Button {
+                    merchantAlertsManager.presentLastDigest()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(digest.summaryLine)
+                                .foregroundStyle(.primary)
+                            if let digestWindowEnd = digest.digestWindowEnd {
+                                Text(digestWindowEnd.formatted(date: .abbreviated, time: .omitted))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.tertiary)
                     }
                 }
-
-                Button("View Details") {
-                    merchantAlertsManager.presentLastDigest()
-                }
+                .buttonStyle(.plain)
             } else {
-                Text("Nothing yet! You'll see updates here as new merchants pop up.")
+                Text("Nothing yet — you’ll see updates here as new merchants pop up.")
                     .foregroundStyle(.secondary)
             }
         }
+        .groupedCardListRowBackground(if: shouldUseGlassyRows)
     }
 
-    private var infoSection: some View {
-        Section("How It Works") {
-            Text("BitLocal checks for new Bitcoin-accepting businesses in your city every day. When we find new ones, you’ll get a notification with the details.")
-                .foregroundStyle(.secondary)
-            Text("Alerts require iCloud sign-in and notification permission.")
-                .foregroundStyle(.secondary)
-        }
+    private var shouldHideSheetBackground: Bool {
+        currentDetent != .large
     }
 
+    private var shouldUseGlassyRows: Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        return currentDetent != .large
+    }
+
+    private var secondaryTextColor: Color {
+        Color(uiColor: .secondaryLabel)
+    }
 }

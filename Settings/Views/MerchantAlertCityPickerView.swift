@@ -3,6 +3,7 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct MerchantAlertCityPickerView: View {
     @Environment(\.dismiss) private var dismiss
+    @Binding var currentDetent: PresentationDetent
     @StateObject private var model = MerchantAlertCityPickerModel()
 
     let onSelection: (MerchantAlertCityChoice) -> Void
@@ -54,8 +55,7 @@ struct MerchantAlertCityPickerView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .cityPickerResultBackground(glassy: shouldUseGlassyBackground)
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, 16)
@@ -65,7 +65,8 @@ struct MerchantAlertCityPickerView: View {
                 .padding(.bottom, 24)
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .clearNavigationContainerBackgroundIfAvailable()
+        .background(shouldHideSheetBackground ? Color.clear : Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Choose City")
         .navigationBarTitleDisplayMode(.inline)
         .ignoresSafeArea(.keyboard)
@@ -100,13 +101,21 @@ struct MerchantAlertCityPickerView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(Color(.tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .cityPickerSearchBackground(glassy: shouldUseGlassyBackground)
     }
 
     private var sectionTitle: String {
         let query = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return query.count >= 2 ? "Search Results" : "Popular Cities"
+    }
+
+    private var shouldHideSheetBackground: Bool {
+        currentDetent != .large
+    }
+
+    private var shouldUseGlassyBackground: Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        return currentDetent != .large
     }
 }
 

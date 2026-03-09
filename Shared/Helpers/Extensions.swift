@@ -170,6 +170,42 @@ extension View {
         let bg: Color? = shouldBeGlassy ? nil : Color(uiColor: .secondarySystemGroupedBackground)
         return self.listRowBackground(bg)
     }
+
+    @ViewBuilder
+    func settingsSheetBackground() -> some View {
+        self
+    }
+
+    @ViewBuilder
+    func pagePresentationSizingIfAvailable() -> some View {
+        if #available(iOS 18.0, *) {
+            self.presentationSizing(.page)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func cityPickerResultBackground(glassy: Bool) -> some View {
+        if glassy {
+            self
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else {
+            self
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    func cityPickerSearchBackground(glassy: Bool) -> some View {
+        if glassy {
+            self
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        } else {
+            self
+                .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
 }
 
 
