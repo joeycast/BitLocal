@@ -92,6 +92,10 @@ enum MerchantAlertsCityNormalizer {
             .joined(separator: "|")
     }
 
+    static func normalizedSearchText(_ raw: String) -> String {
+        normalizeComponent(raw)
+    }
+
     static func displayName(city: String, region: String, country: String) -> String {
         let trimmedCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedRegion = region.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -141,6 +145,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private let localNotificationKindKey = "merchant_alert_kind"
     private let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
     private let localNotificationKindDigest = "city_digest"
+    private var hasRegisteredForRemoteNotifications = false
 
     var currentSubscription: CitySubscription? {
         subscriptions.first(where: \.isEnabled)
@@ -210,9 +215,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             await restoreSubscriptionsFromCloudKitIfNeeded()
         }
 
-        if notificationsAuthorized {
-            UIApplication.shared.registerForRemoteNotifications()
-        }
+        registerForRemoteNotificationsIfNeeded()
     }
 
     func enableNotifications(for choice: MerchantAlertCityChoice) async {
@@ -237,7 +240,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             try await saveCloudKitSubscription(for: subscription)
             subscriptions = [subscription]
             persistSubscriptions()
-            UIApplication.shared.registerForRemoteNotifications()
+            registerForRemoteNotificationsIfNeeded()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -581,6 +584,13 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         ]
 
         SecItemDelete(query as CFDictionary)
+    }
+
+    private func registerForRemoteNotificationsIfNeeded() {
+        guard notificationsAuthorized else { return }
+        guard !hasRegisteredForRemoteNotifications else { return }
+        hasRegisteredForRemoteNotifications = true
+        UIApplication.shared.registerForRemoteNotifications()
     }
 }
 

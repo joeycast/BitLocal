@@ -17,12 +17,6 @@ struct IPadLayoutView: View {
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
-    @AppStorage("appearance") private var appearance: Appearance = .system
-    
-    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    
-    @State private var settingsButtonFrame: CGRect = .zero
-    @State private var showingMerchantAlerts = false
     
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     
@@ -54,13 +48,9 @@ struct IPadLayoutView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         SettingsButtonView(
-                            selectedMapType: selectedMapTypeBinding,
-                            appearance: $appearance,
-                            distanceUnit: $distanceUnit,
                             onSettingsSelected: {
-                                withAnimation { showingSettings.toggle() }
-                            },
-                            onButtonFrameChange: { frame in settingsButtonFrame = frame }
+                                showingSettings = true
+                            }
                         )
                         .opacity(1)
                     }
@@ -69,6 +59,10 @@ struct IPadLayoutView: View {
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
+        }
+        .navigationDestination(isPresented: $showingSettings) {
+            SettingsView(selectedMapType: selectedMapTypeBinding)
+                .environmentObject(MerchantAlertsManager.shared)
         }
         .sheet(item: $viewModel.presentedCommunityArea) { area in
             NavigationStack {
@@ -131,46 +125,6 @@ struct IPadLayoutView: View {
             sidePanel
             mapPanel
         }
-        .overlay {
-            if showingSettings {
-                GeometryReader { geometry in
-                    // Invisible overlay to capture taps and dismiss
-                    Color.black.opacity(0.01)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation { showingSettings = false }
-                        }
-                    
-                    // Settings popover positioned relative to the settings button frame
-                    CompactSettingsPopoverView(
-                        selectedMapType: selectedMapTypeBinding,
-                        onDone: { withAnimation { showingSettings = false } },
-                        onMerchantAlertsSelected: {
-                            withAnimation { showingSettings = false }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                showingMerchantAlerts = true
-                            }
-                        }
-                    )
-                    .position(
-                        x: calculateSidePanelWidth(screenWidth: geometry.size.width) + 125, // Position within side panel
-                        y: settingsButtonFrame.maxY + 225 // Below the button
-                    )
-                    .transition(
-                        .asymmetric(
-                            insertion: .scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity),
-                            removal: .scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity)
-                        )
-                    )
-                }
-                .zIndex(1000)
-            }
-        }
-        .sheet(isPresented: $showingMerchantAlerts) {
-            MerchantAlertsView()
-                .environmentObject(MerchantAlertsManager.shared)
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
         .onChange(of: viewModel.path) { _, newPath in
             if newPath.last != nil {
                 _ = viewModel.consumeSelectionSource()

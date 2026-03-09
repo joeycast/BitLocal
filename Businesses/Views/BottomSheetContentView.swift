@@ -10,6 +10,7 @@ import SwiftUI
 import Foundation // for Debug logging
 import UIKit
 import CryptoKit
+import MapKit
 
 @available(iOS 17.0, *)
 struct BottomSheetContentView: View {
@@ -19,6 +20,8 @@ struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
+    @Binding var showingSettings: Bool
+    var selectedMapTypeBinding: Binding<MKMapType>
 
     var body: some View {
         GeometryReader { geometry in
@@ -59,6 +62,19 @@ struct BottomSheetContentView: View {
                         }
                     }
                     .clearNavigationContainerBackgroundIfAvailable()
+                }
+                .fullScreenCover(isPresented: $showingSettings) {
+                    NavigationStack {
+                        SettingsView(selectedMapType: selectedMapTypeBinding)
+                            .environmentObject(MerchantAlertsManager.shared)
+                            .toolbar {
+                                ToolbarItem(placement: .topBarLeading) {
+                                    Button("Done") {
+                                        showingSettings = false
+                                    }
+                                }
+                            }
+                    }
                 }
                 .onChange(of: viewModel.unifiedSearchText) { _, _ in
                     guard viewModel.mapDisplayMode != .communities else { return }

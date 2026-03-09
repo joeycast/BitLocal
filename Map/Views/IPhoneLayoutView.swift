@@ -112,7 +112,9 @@ struct IPhoneLayoutView: View {
             }) {
                 BottomSheetContentView(
                     visibleElements: visibleElements,
-                    currentDetent: $bottomSheetDetent
+                    currentDetent: $bottomSheetDetent,
+                    showingSettings: $showingSettings,
+                    selectedMapTypeBinding: selectedMapTypeBinding
                 )
                     .id("\(appearance.rawValue)-\(systemColorScheme)")
                     .environmentObject(viewModel)

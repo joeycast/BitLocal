@@ -23,12 +23,8 @@ struct IPhoneHeaderView: View {
     // Use environment object for instant updates
     @EnvironmentObject var appearanceManager: AppearanceManager
     @Environment(\.colorScheme) private var systemColorScheme
-    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     private var appearance: Appearance { appearanceManager.appearance }
-
-    @State private var settingsButtonFrame: CGRect = .zero
-    @State private var showingMerchantAlerts = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -48,13 +44,7 @@ struct IPhoneHeaderView: View {
                         .foregroundColor(.accentColor)
                     Spacer()
                     SettingsButtonView(
-                        selectedMapType: selectedMapTypeBinding,
-                        appearance: $appearanceManager.appearance,
-                        distanceUnit: $distanceUnit,
-                        onSettingsSelected: { showingSettings = true },
-                        onButtonFrameChange: { frame in
-                            settingsButtonFrame = frame
-                        }
+                        onSettingsSelected: { showingSettings = true }
                     )
                     .frame(width: headerControlWidth, height: headerControlHeight)
                 }
@@ -84,31 +74,6 @@ struct IPhoneHeaderView: View {
             }
             .preference(key: HeaderHeightKey.self, value: totalHeight)
         }
-        .overlay(alignment: .topLeading) {
-            if showingSettings {
-                Color.black.opacity(0.01)
-                    .ignoresSafeArea()
-                    .onTapGesture { withAnimation { showingSettings = false } }
-                CompactSettingsPopoverView(
-                    selectedMapType: selectedMapTypeBinding,
-                    onDone: { withAnimation { showingSettings = false } },
-                    onMerchantAlertsSelected: {
-                        withAnimation { showingSettings = false }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            showingMerchantAlerts = true
-                        }
-                    }
-                )
-                .position(x: settingsButtonFrame.maxX - 120, y: settingsButtonFrame.maxY + 125)
-                .transition(.scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity))
-                .zIndex(2)
-            }
-        }
-        .fullScreenCover(isPresented: $showingMerchantAlerts) {
-            MerchantAlertsView()
-                .environmentObject(MerchantAlertsManager.shared)
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
     }
 
     private var backgroundColorForCurrentScheme: Color {
