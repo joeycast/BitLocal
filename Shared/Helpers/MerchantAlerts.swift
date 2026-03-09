@@ -48,10 +48,13 @@ struct CitySubscription: Codable, Hashable, Identifiable {
 }
 
 struct MerchantAlertCityChoice: Hashable, Identifiable {
-    let id = UUID()
     let city: String
     let region: String
     let country: String
+
+    var id: String {
+        cityKey
+    }
 
     var cityKey: String {
         MerchantAlertsCityNormalizer.cityKey(city: city, region: region, country: country)
@@ -108,7 +111,7 @@ enum MerchantAlertsCityNormalizer {
         return "\(trimmedCity), \(secondaryParts.joined(separator: ", "))"
     }
 
-    private static func normalizeComponent(_ raw: String) -> String {
+    static func normalizedComponent(_ raw: String) -> String {
         let folded = raw.folding(
             options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
             locale: .current
@@ -118,6 +121,10 @@ enum MerchantAlertsCityNormalizer {
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+    }
+
+    private static func normalizeComponent(_ raw: String) -> String {
+        normalizedComponent(raw)
     }
 }
 

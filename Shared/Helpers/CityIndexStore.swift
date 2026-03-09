@@ -133,6 +133,62 @@ actor CityIndexStore {
             .map(\.2)
     }
 
+    func result(forCityKey cityKey: String) async -> CitySearchResult? {
+        guard await openDatabaseIfNeeded() else { return nil }
+
+        let sql = """
+        SELECT city, region, country, city_key
+        FROM city_search
+        WHERE city_key = ?
+        LIMIT 1;
+        """
+
+        guard let database else { return nil }
+        guard let statement = prepareStatement(sql: sql, database: database) else { return nil }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_text(statement, 1, cityKey, -1, transientSQLiteDestructor)
+
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let city = sqliteColumnString(statement, index: 0),
+              let region = sqliteColumnString(statement, index: 1),
+              let country = sqliteColumnString(statement, index: 2),
+              let storedCityKey = sqliteColumnString(statement, index: 3) else {
+            return nil
+        }
+
+        return CitySearchResult(
+            city: city,
+            region: region,
+            country: country,
+            cityKey: storedCityKey
+        )
+    }
+
+    func recommendedCities(
+        near choice: MerchantAlertCityChoice,
+        excluding excludedCityKeys: Set<String> = [],
+        limit: Int
+    ) async -> [CitySearchResult] {
+        guard await openDatabaseIfNeeded() else { return [] }
+
+        let normalizedCountry = MerchantAlertsCityNormalizer.normalizedComponent(choice.country)
+
+        var collected: [CitySearchResult] = []
+        var seenKeys = excludedCityKeys
+        seenKeys.insert(choice.cityKey)
+
+        if !normalizedCountry.isEmpty {
+            let countryMatches = executeRecommendedQuery(
+                pattern: "%|\(normalizedCountry)",
+                limit: limit * 3
+            )
+            appendUnique(countryMatches, to: &collected, seenKeys: &seenKeys, limit: limit)
+        }
+
+        return collected
+    }
+
     private func openDatabaseIfNeeded() async -> Bool {
         if database != nil {
             return true
@@ -203,6 +259,63 @@ actor CityIndexStore {
         }
 
         return results
+    }
+
+    private func executeRecommendedQuery(pattern: String, limit: Int) -> [CitySearchResult] {
+        let sql = """
+        SELECT city, region, country, city_key
+        FROM city_search
+        WHERE city_key LIKE ?
+        ORDER BY ord
+        LIMIT ?;
+        """
+
+        guard let database else { return [] }
+        guard let statement = prepareStatement(sql: sql, database: database) else { return [] }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_text(statement, 1, pattern, -1, transientSQLiteDestructor)
+        sqlite3_bind_int(statement, 2, Int32(limit))
+
+        var results: [CitySearchResult] = []
+        results.reserveCapacity(limit)
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard
+                let city = sqliteColumnString(statement, index: 0),
+                let region = sqliteColumnString(statement, index: 1),
+                let country = sqliteColumnString(statement, index: 2),
+                let cityKey = sqliteColumnString(statement, index: 3)
+            else {
+                continue
+            }
+
+            results.append(
+                CitySearchResult(
+                    city: city,
+                    region: region,
+                    country: country,
+                    cityKey: cityKey
+                )
+            )
+        }
+
+        return results
+    }
+
+    private func appendUnique(
+        _ candidates: [CitySearchResult],
+        to collected: inout [CitySearchResult],
+        seenKeys: inout Set<String>,
+        limit: Int
+    ) {
+        for candidate in candidates where !seenKeys.contains(candidate.cityKey) {
+            collected.append(candidate)
+            seenKeys.insert(candidate.cityKey)
+            if collected.count == limit {
+                break
+            }
+        }
     }
 
     private func prepareStatement(sql: String, database: OpaquePointer) -> OpaquePointer? {
