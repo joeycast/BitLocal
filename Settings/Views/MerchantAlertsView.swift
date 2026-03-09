@@ -94,14 +94,25 @@ struct MerchantAlertsView: View {
                     .multilineTextAlignment(.center)
 
                 Button {
+                    guard merchantAlertsManager.canEnableAlerts else { return }
                     showingCityPicker = true
                 } label: {
                     Text("Pick a City")
                         .bold()
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .foregroundStyle(pickCityButtonForegroundStyle)
+                        .background {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(pickCityButtonBackgroundColor)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .strokeBorder(.white.opacity(pickCityButtonBorderOpacity))
+                                }
+                        }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(!merchantAlertsManager.canEnableAlerts)
+                .buttonStyle(.plain)
+                .allowsHitTesting(merchantAlertsManager.canEnableAlerts)
                 .padding(.bottom, 4)
             }
             .frame(maxWidth: .infinity)
@@ -193,5 +204,25 @@ struct MerchantAlertsView: View {
 
     private var secondaryTextColor: Color {
         Color(uiColor: .secondaryLabel)
+    }
+
+    private var pickCityButtonBackgroundColor: Color {
+        if merchantAlertsManager.canEnableAlerts {
+            return .accentColor
+        }
+
+        if shouldUseGlassyRows {
+            return Color.white.opacity(0.08)
+        }
+
+        return Color(uiColor: .tertiarySystemFill)
+    }
+
+    private var pickCityButtonForegroundStyle: Color {
+        merchantAlertsManager.canEnableAlerts ? .white : Color(uiColor: .secondaryLabel)
+    }
+
+    private var pickCityButtonBorderOpacity: Double {
+        merchantAlertsManager.canEnableAlerts ? 0.0 : (shouldUseGlassyRows ? 0.12 : 0.06)
     }
 }

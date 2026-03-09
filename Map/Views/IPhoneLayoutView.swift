@@ -139,6 +139,8 @@ struct IPhoneLayoutView: View {
                             )
                             .environmentObject(MerchantAlertsManager.shared)
                         }
+                        .id("settings-sheet-\(appearance.rawValue)-\(systemColorScheme)")
+                        .preferredColorScheme(effectiveColorScheme)
                         .presentationDetents([.medium, .large], selection: $settingsSheetDetent)
                         .settingsSheetBackground()
                     }
