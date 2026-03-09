@@ -1,0 +1,56 @@
+DEFINE SCHEMA
+
+    RECORD TYPE Merchant (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        cityDisplayName STRING,
+        cityKey         STRING QUERYABLE,
+        createdAt       TIMESTAMP,
+        deletedAt       TIMESTAMP,
+        displayName     STRING,
+        placeID         STRING,
+        sourceHash      STRING,
+        updatedAt       TIMESTAMP QUERYABLE SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE CityDigest (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        cityDisplayName STRING,
+        cityKey         STRING QUERYABLE,
+        digestWindowEnd TIMESTAMP,
+        digestWindowStart TIMESTAMP QUERYABLE SORTABLE,
+        merchantCount   INT64,
+        merchantIDs     LIST<STRING>,
+        topMerchantNames LIST<STRING>,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE SyncState (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        bootstrapCompleted STRING,
+        incrementalAnchorUpdatedSince STRING,
+        lastProcessedDigestWindow TIMESTAMP,
+        lastSuccessfulSyncAt TIMESTAMP,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );

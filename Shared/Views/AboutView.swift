@@ -56,7 +56,7 @@ struct AboutView: View {
                         showingAddBusinessForm = true
                     } label: {
                         HStack(spacing: 10) {
-                            Image("storefront-fill")
+                            Image(systemName: "storefront.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("add_business_to_map")
                             Spacer()
@@ -68,7 +68,7 @@ struct AboutView: View {
                             footer: Text("support_bitlocal_footer")) {
                         Link(destination: supportBitLocalURL) {
                             HStack(spacing: 10) {
-                                Image("hand-heart-fill")
+                                Image(systemName: "heart.fill")
                                     .aboutIconStyle(size: iconSize)
                                 Text("support_bitlocal_button_label")
                                 Spacer()
@@ -80,7 +80,7 @@ struct AboutView: View {
                 Section(header: Text("contact_section")) {
                     Link(destination: generalSupportInquiriesEmail) {
                         HStack(spacing: 10) {
-                            Image("paper-plane-tilt-fill")
+                            Image(systemName: "paperplane.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("general_support_inquiries")
                             Spacer()
@@ -88,7 +88,7 @@ struct AboutView: View {
                     }
                     Link(destination: reportABugEmail) {
                         HStack(spacing: 10) {
-                            Image("bug-fill")
+                            Image(systemName: "ladybug.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("report_a_bug")
                             Spacer()
@@ -96,7 +96,7 @@ struct AboutView: View {
                     }
                     Link(destination: suggestAFeatureEmail) {
                         HStack(spacing: 10) {
-                            Image("lightbulb-fill")
+                            Image(systemName: "lightbulb.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("suggest_a_feature")
                             Spacer()
@@ -118,7 +118,7 @@ struct AboutView: View {
                 Section(header: Text("more_from_brink_13_Labs_section")) {
                     Link(destination: bitcoinLivePriceChartURL) {
                         HStack(spacing: 10) {
-                            Image("chart-line-up-fill")
+                            Image(systemName: "chart.line.uptrend.xyaxis")
                                 .aboutIconStyle(size: iconSize)
                             Text("bitcoin_live_price_chart_button_label")
                             Spacer()
@@ -127,7 +127,7 @@ struct AboutView: View {
                     if Locale.current.region?.identifier == "US" {
                         Link(destination: movematesMoveTogetherURL) {
                             HStack(spacing: 10) {
-                                Image("person-simple-run-bold")
+                                Image(systemName: "figure.run")
                                     .aboutIconStyle(size: iconSize)
                                 Text("Movemates: Move Together")
                                 Spacer()
@@ -139,7 +139,7 @@ struct AboutView: View {
                 Section(header: Text("other_section")) {
                     Link(destination: bitlocalWebsite) {
                         HStack(spacing: 10) {
-                            Image("compass-fill")
+                            Image(systemName: "safari.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("bitlocal_website")
                             Spacer()
@@ -147,7 +147,7 @@ struct AboutView: View {
                     }
                     Link(destination: brink13LabsWebsite) {
                         HStack(spacing: 10) {
-                            Image("compass-fill")
+                            Image(systemName: "safari.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("brink_13_labs_website")
                             Spacer()
@@ -155,7 +155,7 @@ struct AboutView: View {
                     }
                     Link(destination: privacyPolicyURL) {
                         HStack(spacing: 10) {
-                            Image("hand-palm-fill")
+                            Image(systemName: "hand.raised.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("privacy_policy")
                             Spacer()
@@ -163,7 +163,7 @@ struct AboutView: View {
                     }
                     Link(destination: btcMapURL) {
                         HStack(spacing: 10) {
-                            Image("map-pin-line-fill")
+                            Image(systemName: "mappin.and.ellipse")
                                 .aboutIconStyle(size: iconSize)
                             Text("btc_map")
                             Spacer()
@@ -171,7 +171,7 @@ struct AboutView: View {
                     }
                     Link(destination: openStreetMapURL) {
                         HStack(spacing: 10) {
-                            Image("globe-simple-fill")
+                            Image(systemName: "globe")
                                 .aboutIconStyle(size: iconSize)
                             Text("open_street_map")
                             Spacer()
@@ -179,7 +179,7 @@ struct AboutView: View {
                     }
                     Link(destination: bitcoinResourcesURL) {
                         HStack(spacing: 10) {
-                            Image("currency-btc-fill")
+                            Image(systemName: "bitcoinsign.circle.fill")
                                 .aboutIconStyle(size: iconSize)
                             Text("bitcoin_resources")
                             Spacer()
@@ -197,7 +197,7 @@ struct AboutView: View {
                         #endif
                     } label: {
                         HStack(spacing: 10) {
-                            Image("cards-three-fill")
+                            Image(systemName: "rectangle.stack")
                                 .aboutIconStyle(size: iconSize)
                             Text("show_onboarding_button")
                             Spacer()

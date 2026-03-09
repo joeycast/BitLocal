@@ -15,8 +15,8 @@ struct InfoButtonView: View {
         Button(action: {
             showingAbout = true
         }) {
-            Image("info-fill")
-                .aboutIconStyle(size: 18)
+            Image(systemName: "info.circle.fill")
+                .aboutIconStyle(size: 16)
         }
         .accessibilityLabel(Text("about_accessibility_label"))
     }

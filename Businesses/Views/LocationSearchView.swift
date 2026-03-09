@@ -170,7 +170,7 @@ struct LocationSearchView: View {
                                     .fill(Color.accentColor)
                                     .frame(width: 36, height: 36)
                                     .shadow(radius: 2)
-                                Image(mapType == .standard ? "globe-hemisphere-west-fill" : "map-trifold-fill")
+                                Image(systemName: mapType == .standard ? "globe.americas.fill" : "map.fill")
                                     .aboutIconStyle(size: 16, color: .white)
                             }
                         }
@@ -314,10 +314,10 @@ class LocationSearchViewModel: NSObject, ObservableObject {
 
     func reverseGeocode(coordinate: CLLocationCoordinate2D, completion: @escaping (SearchLocation) -> Void) {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        let geocoder = CLGeocoder()
+        let requestKey = "location-search:\(ReverseGeocodingSpatialKey.key(for: coordinate))"
 
-        geocoder.reverseGeocodeLocation(location) { placemarks, error in
-            guard let placemark = placemarks?.first else { return }
+        Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey) { placemark in
+            guard let placemark else { return }
 
             DispatchQueue.main.async {
                 var addressComponents = BusinessSubmission()

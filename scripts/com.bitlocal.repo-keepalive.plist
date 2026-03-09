@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.bitlocal.repo-keepalive</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/zsh</string>
+		<string>REPO_ROOT_PLACEHOLDER/scripts/repo_keepalive.sh</string>
+		<string>REPO_ROOT_PLACEHOLDER</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>2592000</integer>
+	<key>StandardErrorPath</key>
+	<string>/tmp/com.bitlocal.repo-keepalive.err</string>
+	<key>StandardOutPath</key>
+	<string>/tmp/com.bitlocal.repo-keepalive.out</string>
+	<key>WorkingDirectory</key>
+	<string>REPO_ROOT_PLACEHOLDER</string>
+</dict>
+</plist>

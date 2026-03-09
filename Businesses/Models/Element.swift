@@ -17,6 +17,7 @@ struct Element: Codable, Identifiable, Hashable {
     let createdAt: String
     let updatedAt, deletedAt: String?
     var address: Address?
+    var v4Metadata: ElementV4Metadata?
 
     /// A convenience dictionary of OSM tags (e.g. "cuisine", "shop", "amenity"), suitable for lookup in ElementCategorySymbols.
     var osmTagsDict: [String: String]? {
@@ -69,6 +70,7 @@ struct Element: Codable, Identifiable, Hashable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"
+        case v4Metadata = "v4_metadata"
     }
     
     init(from decoder: Decoder) throws {
@@ -80,6 +82,7 @@ struct Element: Codable, Identifiable, Hashable {
         createdAt = try container.decode(String.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
+        v4Metadata = try container.decodeIfPresent(ElementV4Metadata.self, forKey: .v4Metadata)
         
         if let osmTags = osmJSON?.tags {
             address = Address(
@@ -94,9 +97,83 @@ struct Element: Codable, Identifiable, Hashable {
             address = nil
         }
     }
+
+    init(
+        id: String,
+        osmJSON: OsmJSON?,
+        tags: Tags?,
+        createdAt: String,
+        updatedAt: String?,
+        deletedAt: String?,
+        address: Address? = nil,
+        v4Metadata: ElementV4Metadata? = nil
+    ) {
+        self.id = id
+        self.uuid = UUID()
+        self.osmJSON = osmJSON
+        self.tags = tags
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
+        self.v4Metadata = v4Metadata
+
+        if let address {
+            self.address = address
+        } else if let osmTags = osmJSON?.tags {
+            self.address = Address(
+                streetNumber: osmTags.addrHousenumber,
+                streetName: osmTags.addrStreet,
+                cityOrTownName: osmTags.addrCity,
+                postalCode: Address.normalizedPostalCode(osmTags.addrPostcode, countryName: nil),
+                regionOrStateName: osmTags.addrState,
+                countryName: nil
+            )
+        } else {
+            self.address = nil
+        }
+    }
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    var displayName: String? {
+        let name = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !Self.isInvalidPrimaryName(name) {
+            return name
+        }
+
+        let brandName = osmJSON?.tags?.brand?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !brandName.isEmpty {
+            return brandName
+        }
+
+        let operatorName = osmJSON?.tags?.operator?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !operatorName.isEmpty {
+            return operatorName
+        }
+
+        return nil
+    }
+
+    static func isInvalidPrimaryName(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        if isPlaceholderName(trimmed) { return true }
+        return trimmed.lowercased() == "unnamed"
+    }
+
+    static func isPlaceholderName(_ value: String) -> Bool {
+        value.hasPrefix("BTC Map Place #")
+    }
+
+    var boostExpirationDate: Date? {
+        BTCMapDateParser.parse(v4Metadata?.boostedUntil) ?? BTCMapDateParser.parse(tags?.boostExpires)
+    }
+
+    func isCurrentlyBoosted(referenceDate: Date = Date()) -> Bool {
+        guard let boostExpirationDate else { return false }
+        return boostExpirationDate > referenceDate
     }
 }
 
@@ -171,6 +248,8 @@ struct OsmTags: Codable {
     let addrCity, addrHousenumber, addrPostcode, addrState, addrStreet: String?
     let paymentBitcoin, currencyXBT, paymentOnchain, paymentLightning, paymentLightningContactless: String?
     let name, `operator`: String?
+    let brand: String?
+    let brandWikidata: String?
     let description, descriptionEn, website, contactWebsite, phone, contactPhone, openingHours: String?
     let cuisine: String?
     let shop: String?
@@ -198,6 +277,8 @@ struct OsmTags: Codable {
         case paymentLightningContactless = "payment:lightning_contactless"
         case name
         case `operator`
+        case brand
+        case brandWikidata = "brand:wikidata"
         case description
         case descriptionEn = "description:en"
         case website

@@ -11,6 +11,11 @@
 		F6004F962DED3F43001183AE /* Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F952DED3F43001183AE /* Debug.swift */; };
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
 		F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */; };
+		F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */; };
+		F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */; };
+		F7C0A3013A5B100100000201 /* MerchantAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3003A5B100100000200 /* MerchantAlerts.swift */; };
+		F7C0A3033A5B100100000203 /* MerchantAlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */; };
+		F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */; };
 		F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */; };
 		F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */; };
 		F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */; };
@@ -41,7 +46,11 @@
 		F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B872DE33EF800D68897 /* DistanceUnit.swift */; };
 		F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */; };
 		F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B862DE33EF800D68897 /* Appearance.swift */; };
-		F66E0B902DE33EF800D68897 /* CompactSettingsPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B892DE33EF800D68897 /* CompactSettingsPopoverView.swift */; };
+		F7D100012DE33EF800D68897 /* CityIndexStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100112DE33EF800D68897 /* CityIndexStore.swift */; };
+		F7D100022DE33EF800D68897 /* MerchantAlertCityPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100122DE33EF800D68897 /* MerchantAlertCityPickerView.swift */; };
+		F7D100032DE33EF800D68897 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100132DE33EF800D68897 /* SettingsView.swift */; };
+		F7D100042DE33EF800D68897 /* BundledCities.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = F7D100142DE33EF800D68897 /* BundledCities.sqlite */; };
+		F7D100242DE33EF800D68897 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = F7D100232DE33EF800D68897 /* libsqlite3.tbd */; };
 		F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B952DE33F1200D68897 /* LRUCache.swift */; };
 		F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */; };
 		F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */; };
@@ -63,12 +72,38 @@
 		F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6B565F62DA327BE00EE992E /* CoreLocation.framework */; };
 		F6EFC28E2DE69FAF00D573E1 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC28D2DE69FAF00D573E1 /* RootView.swift */; };
 		F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */; };
+		F7C0A1013A5B100100000001 /* BTCMapV4Contracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */; };
+		F7C0A1113A5B100100000002 /* BTCMapV4Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1103A5B100100000002 /* BTCMapV4Support.swift */; };
+		F7C0A1213A5B100100000003 /* SearchResultRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1203A5B100100000003 /* SearchResultRows.swift */; };
+		F7C0A1223A5B100100000004 /* EventsDiscoverySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1243A5B100100000006 /* EventsDiscoverySection.swift */; };
+		F7C0A1233A5B100100000005 /* AllEventsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1253A5B100100000007 /* AllEventsListView.swift */; };
+		F7C0A1263A5B100100000008 /* AllRegionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1273A5B100100000009 /* AllRegionsListView.swift */; };
+		F7C0A2013A5B100100000101 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F7C0A2153A5B100100000115 /* XCTest.framework */; };
+		F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */; };
+		F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */; };
+		F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */; };
+		F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F7C0A2503A5B100100000150 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F6B565B72DA322FD00EE992E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F6B565BE2DA322FD00EE992E;
+			remoteInfo = bitlocal;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCategorySymbols.swift; sourceTree = "<group>"; };
 		F6004F952DED3F43001183AE /* Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug.swift; sourceTree = "<group>"; };
 		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
+		F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchBehaviorTests.swift; sourceTree = "<group>"; };
+		F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTextNormalizerTests.swift; sourceTree = "<group>"; };
+		F7C0A3003A5B100100000200 /* MerchantAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlerts.swift; sourceTree = "<group>"; };
+		F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertsView.swift; sourceTree = "<group>"; };
+		F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertsModelsTests.swift; sourceTree = "<group>"; };
 		F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmission.swift; sourceTree = "<group>"; };
 		F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmissionViewModel.swift; sourceTree = "<group>"; };
 		F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBusinessFormView.swift; sourceTree = "<group>"; };
@@ -98,7 +133,11 @@
 		F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomiPadNavigationStackTitleView.swift; sourceTree = "<group>"; };
 		F66E0B862DE33EF800D68897 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		F66E0B872DE33EF800D68897 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
-		F66E0B892DE33EF800D68897 /* CompactSettingsPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactSettingsPopoverView.swift; sourceTree = "<group>"; };
+		F7D100112DE33EF800D68897 /* CityIndexStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityIndexStore.swift; sourceTree = "<group>"; };
+		F7D100122DE33EF800D68897 /* MerchantAlertCityPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertCityPickerView.swift; sourceTree = "<group>"; };
+		F7D100132DE33EF800D68897 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F7D100142DE33EF800D68897 /* BundledCities.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = BundledCities.sqlite; sourceTree = "<group>"; };
+		F7D100232DE33EF800D68897 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.text-based-dylib-definition; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsButtonView.swift; sourceTree = "<group>"; };
 		F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailablePaymentMethodsChecks.swift; sourceTree = "<group>"; };
 		F66E0B932DE33F1200D68897 /* BtcMapCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BtcMapCall.swift; sourceTree = "<group>"; };
@@ -125,6 +164,18 @@
 		F6EFC28D2DE69FAF00D573E1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingScreenView.swift; sourceTree = "<group>"; };
+		F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapV4Contracts.swift; sourceTree = "<group>"; };
+		F7C0A1103A5B100100000002 /* BTCMapV4Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapV4Support.swift; sourceTree = "<group>"; };
+		F7C0A1203A5B100100000003 /* SearchResultRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultRows.swift; sourceTree = "<group>"; };
+		F7C0A1243A5B100100000006 /* EventsDiscoverySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsDiscoverySection.swift; sourceTree = "<group>"; };
+		F7C0A1253A5B100100000007 /* AllEventsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllEventsListView.swift; sourceTree = "<group>"; };
+		F7C0A1273A5B100100000009 /* AllRegionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllRegionsListView.swift; sourceTree = "<group>"; };
+		F7C0A2103A5B100100000110 /* bitlocalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = bitlocalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4PlaceRecordDecodingTests.swift; sourceTree = "<group>"; };
+		F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4PlaceToElementMapperTests.swift; sourceTree = "<group>"; };
+		F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4SearchQueryEncodingTests.swift; sourceTree = "<group>"; };
+		F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapMergeTests.swift; sourceTree = "<group>"; };
+		F7C0A2153A5B100100000115 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +184,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				F6B565F72DA327BE00EE992E /* CoreLocation.framework in Frameworks */,
+				F7D100242DE33EF800D68897 /* libsqlite3.tbd in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F7C0A2203A5B100100000120 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7C0A2013A5B100100000101 /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -211,6 +271,10 @@
 				F63E80982F05000100ED1F00 /* AddBusinessInfoView.swift */,
 				F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */,
 				F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */,
+				F7C0A1203A5B100100000003 /* SearchResultRows.swift */,
+				F7C0A1243A5B100100000006 /* EventsDiscoverySection.swift */,
+				F7C0A1253A5B100100000007 /* AllEventsListView.swift */,
+				F7C0A1273A5B100100000009 /* AllRegionsListView.swift */,
 				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
 				F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */,
 			);
@@ -240,10 +304,20 @@
 		F66E0B8B2DE33EF800D68897 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				F66E0B892DE33EF800D68897 /* CompactSettingsPopoverView.swift */,
+				F7D100122DE33EF800D68897 /* MerchantAlertCityPickerView.swift */,
+				F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */,
 				F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */,
+				F7D100132DE33EF800D68897 /* SettingsView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		F7D100152DE33EF800D68897 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F7D100142DE33EF800D68897 /* BundledCities.sqlite */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		F66E0B8C2DE33EF800D68897 /* Settings */ = {
@@ -251,6 +325,7 @@
 			children = (
 				F66E0B882DE33EF800D68897 /* Models */,
 				F66E0B8B2DE33EF800D68897 /* Views */,
+				F7D100152DE33EF800D68897 /* Resources */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -265,7 +340,11 @@
 				F66E0B932DE33F1200D68897 /* BtcMapCall.swift */,
 				F66E0B942DE33F1200D68897 /* Extensions.swift */,
 				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
+				F7C0A3003A5B100100000200 /* MerchantAlerts.swift */,
+				F7D100112DE33EF800D68897 /* CityIndexStore.swift */,
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
+				F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */,
+				F7C0A1103A5B100100000002 /* BTCMapV4Support.swift */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -322,6 +401,7 @@
 		F6B565B62DA322FD00EE992E = {
 			isa = PBXGroup;
 			children = (
+				F7C0A2303A5B100100000130 /* bitlocalTests */,
 				F63E80962F02F97700ED1F00 /* SPEC.md */,
 				F6EFC28F2DE6A06F00D573E1 /* Onboarding */,
 				F66E0BA12DE33F1200D68897 /* Shared */,
@@ -344,6 +424,7 @@
 			isa = PBXGroup;
 			children = (
 				F6B565BF2DA322FD00EE992E /* bitlocal.app */,
+				F7C0A2103A5B100100000110 /* bitlocalTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -352,6 +433,8 @@
 			isa = PBXGroup;
 			children = (
 				F6B565F62DA327BE00EE992E /* CoreLocation.framework */,
+				F7D100232DE33EF800D68897 /* libsqlite3.tbd */,
+				F7C0A2153A5B100100000115 /* XCTest.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -370,6 +453,20 @@
 				F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		F7C0A2303A5B100100000130 /* bitlocalTests */ = {
+			isa = PBXGroup;
+			children = (
+				F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */,
+				F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */,
+				F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */,
+				F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */,
+				F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */,
+				F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */,
+				F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */,
+			);
+			path = bitlocalTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -394,6 +491,25 @@
 			productReference = F6B565BF2DA322FD00EE992E /* bitlocal.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F7C0A2403A5B100100000140 /* bitlocalTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F7C0A2723A5B100100000172 /* Build configuration list for PBXNativeTarget "bitlocalTests" */;
+			buildPhases = (
+				F7C0A2603A5B100100000160 /* Sources */,
+				F7C0A2203A5B100100000120 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F7C0A2513A5B100100000151 /* PBXTargetDependency */,
+			);
+			name = bitlocalTests;
+			packageProductDependencies = (
+			);
+			productName = bitlocalTests;
+			productReference = F7C0A2103A5B100100000110 /* bitlocalTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -407,6 +523,10 @@
 					F6B565BE2DA322FD00EE992E = {
 						CreatedOnToolsVersion = 16.3;
 						LastSwiftMigration = 1630;
+					};
+					F7C0A2403A5B100100000140 = {
+						CreatedOnToolsVersion = 17.0;
+						TestTargetID = F6B565BE2DA322FD00EE992E;
 					};
 				};
 			};
@@ -435,6 +555,7 @@
 			projectRoot = "";
 			targets = (
 				F6B565BE2DA322FD00EE992E /* bitlocal */,
+				F7C0A2403A5B100100000140 /* bitlocalTests */,
 			);
 		};
 /* End PBXProject section */
@@ -448,6 +569,7 @@
 				F63E80972F02F97700ED1F00 /* SPEC.md in Resources */,
 				F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */,
 				F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */,
+				F7D100042DE33EF800D68897 /* BundledCities.sqlite in Resources */,
 				F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -462,6 +584,7 @@
 				F66E0BB12DE35B9100D68897 /* AppearanceManager.swift in Sources */,
 				F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */,
 				F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */,
+				F7C0A3013A5B100100000201 /* MerchantAlerts.swift in Sources */,
 				F63E80932F0180EC00ED1F00 /* MapPreviewView.swift in Sources */,
 				F63E80942F0180EC00ED1F00 /* LocationSearchView.swift in Sources */,
 				F63E80952F0180EC00ED1F00 /* ManualLocationEntryView.swift in Sources */,
@@ -480,7 +603,10 @@
 				F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */,
 				F63E80992F05000100ED1F00 /* AddBusinessInfoView.swift in Sources */,
 				F66E0B8F2DE33EF800D68897 /* Appearance.swift in Sources */,
-				F66E0B902DE33EF800D68897 /* CompactSettingsPopoverView.swift in Sources */,
+				F7D100012DE33EF800D68897 /* CityIndexStore.swift in Sources */,
+				F7D100022DE33EF800D68897 /* MerchantAlertCityPickerView.swift in Sources */,
+				F7C0A3033A5B100100000203 /* MerchantAlertsView.swift in Sources */,
+				F7D100032DE33EF800D68897 /* SettingsView.swift in Sources */,
 				F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */,
 				F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */,
 				F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */,
@@ -492,6 +618,10 @@
 				F63E808E2F017C0800ED1F00 /* BusinessPaymentsView.swift in Sources */,
 				F63E808F2F017C0800ED1F00 /* ReviewSubmissionView.swift in Sources */,
 				F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */,
+				F7C0A1213A5B100100000003 /* SearchResultRows.swift in Sources */,
+				F7C0A1223A5B100100000004 /* EventsDiscoverySection.swift in Sources */,
+				F7C0A1233A5B100100000005 /* AllEventsListView.swift in Sources */,
+				F7C0A1263A5B100100000008 /* AllRegionsListView.swift in Sources */,
 				F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */,
 				F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */,
 				F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */,
@@ -509,10 +639,34 @@
 				F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */,
 				F63E80812EFC302700ED1F00 /* MailComposer.swift in Sources */,
 				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,
+				F7C0A1013A5B100100000001 /* BTCMapV4Contracts.swift in Sources */,
+				F7C0A1113A5B100100000002 /* BTCMapV4Support.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F7C0A2603A5B100100000160 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */,
+				F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */,
+				F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */,
+				F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */,
+				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
+				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
+				F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F7C0A2513A5B100100000151 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F6B565BE2DA322FD00EE992E /* bitlocal */;
+			targetProxy = F7C0A2503A5B100100000150 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F6B565C92DA322FE00EE992E /* Debug */ = {
@@ -647,7 +801,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 45;
+				CURRENT_PROJECT_VERSION = 48;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_APP_SANDBOX = YES;
@@ -673,7 +827,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.0.6;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -696,7 +850,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 45;
+				CURRENT_PROJECT_VERSION = 48;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_APP_SANDBOX = YES;
@@ -722,7 +876,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.0.6;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -733,6 +887,65 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 2.0;
+			};
+			name = Release;
+		};
+		F7C0A2703A5B100100000170 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YUMLYCFT8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/bitlocal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/bitlocal";
+				TEST_TARGET_NAME = bitlocal;
+			};
+			name = Debug;
+		};
+		F7C0A2713A5B100100000171 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5YUMLYCFT8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.bitlocal.bitlocalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/bitlocal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/bitlocal";
+				TEST_TARGET_NAME = bitlocal;
 			};
 			name = Release;
 		};
@@ -753,6 +966,15 @@
 			buildConfigurations = (
 				F6B565CC2DA322FE00EE992E /* Debug */,
 				F6B565CD2DA322FE00EE992E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F7C0A2723A5B100100000172 /* Build configuration list for PBXNativeTarget "bitlocalTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F7C0A2703A5B100100000170 /* Debug */,
+				F7C0A2713A5B100100000171 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

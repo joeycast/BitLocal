@@ -5,117 +5,592 @@ import MapKit
 import CoreLocation
 import Combine
 import Foundation
+import UIKit
 
 @available(iOS 17.0, *)
 struct BusinessesListView: View {
-    
+
     @EnvironmentObject var viewModel: ContentViewModel
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    
+
     let maxListResults = 25
     var elements: [Element]
     var userLocation: CLLocation?
     var currentDetent: PresentationDetent? = nil
-    
+    var liveSheetHeight: CGFloat = 0
+
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
-    
-    private var sortedElements: [Element] {
-        elements.sorted { (element1, element2) -> Bool in
-            guard let distance1 = viewModel.distanceInMiles(element: element1),
-                  let distance2 = viewModel.distanceInMiles(element: element2) else {
-                return false
-            }
-            return distance1 < distance2
-        }
+    @State private var searchResultsLimit = 20
+    @State private var cachedTopSortedElements: [Element] = []
+    @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
+    @State private var showFocusedSearchCategoryChips = false
+    @FocusState private var isSearchFieldFocused: Bool
+
+    private var topSortedElements: [Element] {
+        cachedTopSortedElements
     }
-    
+
+    private var featuredTopSortedElements: [Element] {
+        topSortedElements.filter { $0.isCurrentlyBoosted() }
+    }
+
+    private var regularTopSortedElements: [Element] {
+        topSortedElements.filter { !$0.isCurrentlyBoosted() }
+    }
+
     var body: some View {
-        Group {
-            // 1️⃣ Loading state
-            if viewModel.isLoading {
-                VStack {
-                    Spacer()
-                    LoadingScreenView()
-                    Spacer()
-                }
+        VStack(spacing: 0) {
+            // Always-visible search bar
+            searchBar
+                .padding(.top, 20)
+                .padding(.bottom, 2)
+
+            if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
+                categoryChipsView
+                    .padding(.bottom, 6)
+                    .opacity(contentRevealProgress)
+                    .offset(y: (1 - contentRevealProgress) * -8)
             }
-            // 2️⃣ No locations after loading finishes
-            else if elements.isEmpty {
-                Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
-                    .foregroundColor(.gray)
-                    .font(.title3)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            }
-            // 3️⃣ Show the list when we have elements
-            else {
-                List {
-                    Section {
-                        ForEach(sortedElements.prefix(maxListResults), id: \.id) { element in
-                            let cellVM = cellViewModel(for: element)
-                            Button {
-                                viewModel.setSelectionSource(.list)
-                                viewModel.selectAnnotation(for: element, animated: true)
-                                viewModel.path = [element]
-                            } label: {
-                                ZStack(alignment: .trailing) {
-                                    ElementCell(viewModel: cellVM)
-                                        .padding(.trailing, 18)
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundColor(.gray.opacity(0.6))
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .clearListRowBackground(if: shouldUseGlassyRows)
-                        }
-                        // Insert the footer as its own row:
-                        footerView
-                            .clearListRowBackground(if: shouldUseGlassyRows)
+
+            Group {
+                if viewModel.isLoading {
+                    VStack {
+                        Spacer()
+                        LoadingScreenView()
+                        Spacer()
                     }
-                    .clearListRowBackground(if: shouldUseGlassyRows)
+                } else if shouldHideCollapsedSheetContent {
+                    Spacer(minLength: 0)
+                } else if isFilteringMerchants {
+                    searchResultsView
+                } else if viewModel.activeMerchantAlertDigest != nil {
+                    digestResultsView
+                } else if elements.isEmpty {
+                    if shouldShowEmptyState {
+                        Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
+                            .foregroundStyle(.gray)
+                            .font(.title3)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    } else {
+                        Spacer(minLength: 0)
+                    }
+                } else {
+                    normalListView
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
-                .background(Color.clear)
-                .environment(\.defaultMinListRowHeight, 0)
-                .navigationBarTitleDisplayMode(.inline)
-                .padding(.top)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .opacity(contentRevealProgress)
+            .offset(y: (1 - contentRevealProgress) * 10)
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
-        // OPTIMIZED: Only log significant location changes at the list level
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
+            refreshDiscoveryCache()
+        }
+        .onChange(of: isSearchFieldFocused) { _, focused in
+            if focused && !viewModel.isSearchActive {
+                viewModel.isSearchActive = true
+            } else if !focused {
+                showFocusedSearchCategoryChips = false
+            }
+        }
+        .onChange(of: viewModel.unifiedSearchText) { _, _ in
+            searchResultsLimit = 20
+            clearSearchDrivenMapResults()
+        }
+        .onChange(of: displayedPrimaryResults.map(\.id)) { _, _ in
+            syncDisplayedSearchResultsToMap()
+        }
+        .onChange(of: searchResultsLimit) { _, _ in
+            syncDisplayedSearchResultsToMap()
+        }
+        .onChange(of: viewModel.region.center.latitude) { _, _ in
+            viewModel.handleMerchantSearchMapRegionChange()
+        }
+        .onChange(of: viewModel.region.center.longitude) { _, _ in
+            viewModel.handleMerchantSearchMapRegionChange()
+        }
+        .onChange(of: elements.map(\.id)) { _, _ in
+            refreshDiscoveryCache()
+        }
+        .onAppear {
+            viewModel.ensureEventsLoaded()
+            viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
+            refreshDiscoveryCache()
+            syncDisplayedSearchResultsToMap()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+            guard isSearchFieldFocused else { return }
+            withAnimation(keyboardAnimation(for: notification)) {
+                showFocusedSearchCategoryChips = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+            withAnimation(keyboardAnimation(for: notification)) {
+                showFocusedSearchCategoryChips = false
+            }
         }
     }
-    
-    // OPTIMIZED: Centralized location change handling with deduplication
+
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 15))
+            TextField("Search merchants…", text: $viewModel.unifiedSearchText)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .focused($isSearchFieldFocused)
+                .submitLabel(.search)
+            if !viewModel.unifiedSearchText.isEmpty {
+                Button {
+                    viewModel.unifiedSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 15))
+                }
+            }
+            if viewModel.isSearchActive {
+                Button("Cancel") {
+                    isSearchFieldFocused = false
+                    viewModel.isSearchActive = false
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 12)
+        .background(Color(.tertiarySystemFill))
+        .clipShape(RoundedRectangle(cornerRadius: 40))
+        .padding(.horizontal, 16)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
+    }
+
+    // MARK: - Normal Mode (discovery hub)
+
+    private var normalListView: some View {
+        List {
+            // Events carousel (only renders if events exist)
+            Section {
+                EventsDiscoverySection()
+                    .environmentObject(viewModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .clearListRowBackground(if: shouldUseGlassyRows)
+            }
+
+            if !featuredTopSortedElements.isEmpty {
+                Section {
+                    ForEach(Array(featuredTopSortedElements.enumerated()), id: \.element.id) { index, element in
+                        merchantRow(
+                            for: element,
+                            showsBottomDivider: index == featuredTopSortedElements.count - 1
+                        )
+                    }
+                } header: {
+                    merchantSectionHeader(
+                        title: "Featured Nearby",
+                        systemImage: "star.fill",
+                        tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                        topPadding: -3,
+                        bottomPadding: -14
+                    )
+                }
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            }
+
+            if !regularTopSortedElements.isEmpty || featuredTopSortedElements.isEmpty {
+                Section {
+                    ForEach(regularTopSortedElements, id: \.id) { element in
+                        merchantRow(for: element)
+                    }
+
+                    footerView
+                        .clearListRowBackground(if: shouldUseGlassyRows)
+                } header: {
+                    if !featuredTopSortedElements.isEmpty {
+                        merchantSectionHeader(
+                            title: "More Nearby",
+                            systemImage: "location.fill",
+                            tint: .secondary,
+                            topPadding: 4,
+                            bottomPadding: -14
+                        )
+                    }
+                }
+                .clearListRowBackground(if: shouldUseGlassyRows)
+            }
+        }
+        .listStyle(.plain)
+        .listSectionSpacing(0)
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .background(Color.clear)
+        .environment(\.defaultMinListRowHeight, 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: topSortedElements)
+        }
+    }
+
+    private var digestResultsView: some View {
+        List {
+            if let digest = viewModel.activeMerchantAlertDigest {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("New merchants in \(digest.cityDisplayName)")
+                            .font(.headline)
+                        Text(digest.summaryLine)
+                            .foregroundStyle(.secondary)
+
+                        Button("Clear Alert Filter") {
+                            viewModel.clearMerchantAlertDigest()
+                        }
+                        .font(.footnote.weight(.semibold))
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Section {
+                ForEach(elements, id: \.id) { element in
+                    merchantRow(for: element)
+                }
+
+                footerView
+            }
+            .clearListRowBackground(if: shouldUseGlassyRows)
+        }
+        .listStyle(.plain)
+        .listSectionSpacing(0)
+        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .background(Color.clear)
+        .environment(\.defaultMinListRowHeight, 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: elements)
+        }
+    }
+
+    // MARK: - Search Mode
+
+    private var searchResultsView: some View {
+        VStack(spacing: 0) {
+            List {
+                if trimmedSearchQuery.count == 1 {
+                    Text("Type at least 2 characters to search")
+                        .foregroundStyle(.secondary)
+                } else if trimmedSearchQuery.count >= 2 {
+                    if let statusText = searchStatusText {
+                        Text(statusText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if displayedPrimaryResults.isEmpty &&
+                        !viewModel.merchantSearchIsWaitingForLocalDebounce &&
+                        !viewModel.merchantSearchIsLoading {
+                        Text(noResultsText)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        if !displayedFeaturedPrimaryResults.isEmpty {
+                            Section {
+                                ForEach(Array(displayedFeaturedPrimaryResults.enumerated()), id: \.element.id) { index, element in
+                                    merchantSearchRow(
+                                        for: element,
+                                        showsBottomDivider: index == displayedFeaturedPrimaryResults.count - 1
+                                    )
+                                }
+                            } header: {
+                                merchantSectionHeader(
+                                    title: "Featured Nearby",
+                                    systemImage: "star.fill",
+                                    tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                                    topPadding: 3,
+                                    bottomPadding: -10
+                                )
+                            }
+                        }
+
+                        if !displayedRegularPrimaryResults.isEmpty || displayedFeaturedPrimaryResults.isEmpty {
+                            Section {
+                                ForEach(displayedRegularPrimaryResults, id: \.id) { element in
+                                    merchantSearchRow(for: element)
+                                }
+                            } header: {
+                                if !displayedFeaturedPrimaryResults.isEmpty {
+                                    merchantSectionHeader(
+                                        title: "More Nearby",
+                                        systemImage: "location.fill",
+                                        tint: .secondary,
+                                        topPadding: 4,
+                                        bottomPadding: -14
+                                    )
+                                }
+                            }
+                        } else if !displayedPrimaryResults.isEmpty {
+                            ForEach(displayedPrimaryResults, id: \.id) { element in
+                                merchantSearchRow(for: element)
+                            }
+                        }
+                    }
+
+                    if hasMoreSearchResults {
+                        Button("Load more results") {
+                            searchResultsLimit += 20
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(.accent)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .listSectionSpacing(0)
+            .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+            .contentMargins(.top, 0, for: .scrollContent)
+            .background(Color.clear)
+            .environment(\.defaultMinListRowHeight, 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: Array(viewModel.merchantSearchPrimaryResults.prefix(20)))
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var trimmedSearchQuery: String {
+        viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isFilteringMerchants: Bool {
+        !trimmedSearchQuery.isEmpty
+    }
+
+    private var visibleCategoryChips: [MerchantCategoryChip] {
+        guard trimmedSearchQuery.isEmpty else { return [] }
+        return cachedVisibleCategoryChips
+    }
+
+    private var shouldShowCategoryChips: Bool {
+        guard viewModel.activeMerchantAlertDigest == nil else { return false }
+        return !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
+    }
+
+    private var shouldHideCollapsedSheetContent: Bool {
+        isCollapsedSheet &&
+        !isFilteringMerchants &&
+        !showFocusedSearchCategoryChips &&
+        liveSheetHeight <= collapsedContentRevealHeight
+    }
+
+    private var collapsedContentRevealHeight: CGFloat {
+        140
+    }
+
+    private var contentRevealProgress: CGFloat {
+        if !isCollapsedSheet || showFocusedSearchCategoryChips {
+            return 1
+        }
+
+        let revealRange: CGFloat = 36
+        let rawProgress = (liveSheetHeight - collapsedContentRevealHeight) / revealRange
+        return min(max(rawProgress, 0), 1)
+    }
+
+    private var searchStatusText: String? {
+        if viewModel.merchantSearchIsWaitingForLocalDebounce {
+            return "Searching nearby…"
+        }
+        return nil
+    }
+
+    private var noResultsText: String {
+        "No locations match your search"
+    }
+
+    private var displayedPrimaryResults: [Element] {
+        let limit = min(searchResultsLimit, viewModel.merchantSearchPrimaryResults.count)
+        return Array(viewModel.merchantSearchPrimaryResults.prefix(limit))
+    }
+
+    private var displayedFeaturedPrimaryResults: [Element] {
+        displayedPrimaryResults.filter { $0.isCurrentlyBoosted() }
+    }
+
+    private var displayedRegularPrimaryResults: [Element] {
+        displayedPrimaryResults.filter { !$0.isCurrentlyBoosted() }
+    }
+
+    private var hasMoreSearchResults: Bool {
+        let totalCount = viewModel.merchantSearchPrimaryResults.count
+        return totalCount > searchResultsLimit
+    }
+
+    private var categoryChipsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(visibleCategoryChips) { chip in
+                    Button {
+                        applyCategoryChip(chip)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: chip.symbolName)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(chip.localizedLabel)
+                                .font(.footnote.weight(.medium))
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color(.secondarySystemFill), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(chip.localizedLabel))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+        }
+    }
+
+    private func applyCategoryChip(_ chip: MerchantCategoryChip) {
+        viewModel.isSearchActive = true
+        viewModel.unifiedSearchText = chip.localizedLabel
+    }
+
+    private func refreshDiscoveryCache() {
+        cachedTopSortedElements = nearestElements(elements, limit: maxListResults)
+        cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
+    }
+
+    private func syncDisplayedSearchResultsToMap() {
+        guard trimmedSearchQuery.count >= 2 else {
+            viewModel.clearMerchantSearchMapResults()
+            return
+        }
+        viewModel.setMerchantSearchMapResults(displayedPrimaryResults)
+    }
+
+    private func clearSearchDrivenMapResults() {
+        viewModel.clearMerchantSearchMapResults()
+    }
+
+    private func keyboardAnimation(for notification: Notification) -> Animation {
+        let userInfo = notification.userInfo ?? [:]
+        let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue ?? 0.25
+        return .easeInOut(duration: duration)
+    }
+
+    private func merchantSearchRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
+        let cellVM = cellViewModel(for: element)
+        return Button {
+            viewModel.setSelectionSource(.list)
+            viewModel.selectAnnotationForListSelection(
+                element,
+                animated: true,
+                allowCameraMovement: !isLargeSheet
+            )
+            viewModel.path = [element]
+        } label: {
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: [element])
+        }
+    }
+
+    private func merchantRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
+        let cellVM = cellViewModel(for: element)
+        return Button {
+            viewModel.setSelectionSource(.list)
+            viewModel.selectAnnotationForListSelection(
+                element,
+                animated: true,
+                allowCameraMovement: !isLargeSheet
+            )
+            viewModel.path = [element]
+        } label: {
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            viewModel.requestPlaceholderNameHydration(for: [element])
+        }
+        .clearListRowBackground(if: shouldUseGlassyRows)
+    }
+
+    private func freshMerchantSearchRow(for result: V4PlaceRecord) -> some View {
+        let remoteElement = V4PlaceToElementMapper.placeRecordToElement(result)
+        let cellVM = cellViewModel(for: remoteElement)
+        return Button {
+            viewModel.selectMerchantSearchResult(
+                result,
+                allowCameraMovement: !isLargeSheet
+            )
+        } label: {
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            viewModel.hydrateMerchantSearchPreviewIfNeeded(result)
+        }
+    }
+
     private func handleUserLocationChange(_ newLocation: CLLocation?) {
         guard let newLocation = newLocation else { return }
-        
-        // Only log/process if location actually changed significantly (>10 meters)
         if let lastCoord = lastLoggedLocation {
             let lastLoc = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
             let currentLoc = CLLocation(latitude: newLocation.coordinate.latitude, longitude: newLocation.coordinate.longitude)
-            
-            if lastLoc.distance(from: currentLoc) < 10 {
-                return // Skip if location hasn't changed significantly
-            }
+            if lastLoc.distance(from: currentLoc) < 10 { return }
         }
-        
         lastLoggedLocation = newLocation.coordinate
         Debug.log("User location updated in BusinessesListView: \(newLocation.coordinate.latitude), \(newLocation.coordinate.longitude)")
-        
-        // Update cell view models that need refresh
         for cellVM in cellViewModels.values {
             cellVM.updateUserLocationIfNeeded(newLocation)
         }
     }
-    
+
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
         if let vm = viewModel.cellViewModels[element.id] {
+            let currentName = vm.element.displayName ?? ""
+            let nextName = element.displayName ?? ""
+            let currentUpdated = vm.element.updatedAt ?? ""
+            let nextUpdated = element.updatedAt ?? ""
+            if currentName != nextName || currentUpdated != nextUpdated {
+                let refreshed = ElementCellViewModel(
+                    element: element,
+                    userLocation: viewModel.userLocation,
+                    viewModel: viewModel
+                )
+                DispatchQueue.main.async {
+                    viewModel.cellViewModels[element.id] = refreshed
+                }
+                return refreshed
+            }
             return vm
         } else {
             let newVM = ElementCellViewModel(element: element,
@@ -127,40 +602,91 @@ struct BusinessesListView: View {
             return newVM
         }
     }
-    
+
     private var footerView: some View {
         Group {
-            if sortedElements.count > maxListResults {
+            if elements.count > maxListResults {
                 Text(
                     String(
                         format: NSLocalizedString("locations_returned_footer", comment: "Footer: N locations returned, top M displayed"),
-                        sortedElements.count,
-                        min(sortedElements.count, maxListResults)
+                        elements.count,
+                        min(elements.count, maxListResults)
                     )
                 )
             } else {
                 Text(
                     String(
                         format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
-                        sortedElements.count,
-                        sortedElements.count
+                        elements.count,
+                        elements.count
                     )
                 )
             }
         }
         .font(.footnote)
-        .foregroundColor(.secondary)
+        .foregroundStyle(.secondary)
     }
-    
+
+    private func merchantSectionHeader(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        topPadding: CGFloat,
+        bottomPadding: CGFloat
+    ) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+        }
+        .textCase(nil)
+        .padding(.top, topPadding)
+        .padding(.bottom, bottomPadding)
+    }
+
+    private func nearestElements(_ source: [Element], limit: Int) -> [Element] {
+        guard limit > 0, !source.isEmpty else { return [] }
+        return source
+            .sorted(by: viewModel.merchantBrowseSortOrder)
+            .prefix(limit)
+            .map { $0 }
+    }
+
     private var shouldHideSheetBackground: Bool {
         guard let detent = currentDetent else { return false }
         return detent != .large
     }
-    
+
     private var shouldUseGlassyRows: Bool {
         guard let detent = currentDetent else { return false }
         guard #available(iOS 26.0, *) else { return false }
         return detent != .large
+    }
+
+    private var shouldShowEmptyState: Bool {
+        guard let detent = currentDetent else { return true }
+        return detent != collapsedSheetDetent
+    }
+
+    private var isCollapsedSheet: Bool {
+        guard let detent = currentDetent else { return false }
+        return detent == collapsedSheetDetent
+    }
+
+    private var isLargeSheet: Bool {
+        guard let detent = currentDetent else { return false }
+        return detentIdentifier(detent).contains("large")
+    }
+
+    private var collapsedSheetDetent: PresentationDetent {
+        .fraction(0.11)
+    }
+
+    private func detentIdentifier(_ detent: PresentationDetent) -> String {
+        String(describing: detent).lowercased()
     }
 }
 
@@ -168,6 +694,7 @@ struct BusinessesListView: View {
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
+    var showsBottomDivider = false
     @State private var appeared = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     
@@ -175,10 +702,8 @@ struct ElementCell: View {
         VStack(alignment: .leading, spacing: 2) {
             
             HStack {
-                // Business Name
                 Text(
-                    viewModel.element.osmJSON?.tags?.name ??
-                    viewModel.element.osmJSON?.tags?.operator ??
+                    viewModel.element.displayName ??
                     NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
                 )
                     .foregroundColor(.primary)
@@ -190,18 +715,24 @@ struct ElementCell: View {
                 
                 // Distance from location
                 distanceText
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.medium))
             }
             
-            // Street number and name
-            if let streetNumber = viewModel.address?.streetNumber {
-                Text("\(streetNumber) \(viewModel.address?.streetName ?? "")".trimmingCharacters(in: .whitespaces))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else {
-                Text("\(viewModel.address?.streetName ?? "")")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            HStack(alignment: .center, spacing: 8) {
+                // Street number and name
+                if let streetNumber = viewModel.address?.streetNumber {
+                    Text("\(streetNumber) \(viewModel.address?.streetName ?? "")".trimmingCharacters(in: .whitespaces))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Text("\(viewModel.address?.streetName ?? "")")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
             }
             
             HStack {
@@ -213,8 +744,21 @@ struct ElementCell: View {
                 
                 PaymentIcons(element: viewModel.element)
             }
+
+            if showsBottomDivider {
+                Rectangle()
+                    .fill(Color(.separator))
+                    .frame(height: 1)
+                    .padding(.top, 10)
+                    .padding(.trailing, -18)
+            }
         }
         .contentShape(Rectangle())
+        .onAppear {
+            guard !appeared else { return }
+            appeared = true
+            viewModel.onCellAppear()
+        }
         // REMOVED: Redundant onChange that was causing excessive logging
         // .onChange(of: viewModel.viewModel.userLocation) { _, _ in
         //     viewModel.onCellAppear()
@@ -285,6 +829,7 @@ class ElementCellViewModel: ObservableObject {
     
     private var userLocationCancellable: AnyCancellable?
     private var lastLocationUpdate: CLLocationCoordinate2D?
+    private var isAddressLookupInFlight = false
     
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
@@ -305,16 +850,17 @@ class ElementCellViewModel: ObservableObject {
             }
         
         // Attempt to retrieve cached address, but prefer OSM-tagged fields when present
-        if let cachedAddress = getCachedAddress() {
-            self.address = mergedAddress(preferred: element.address, fallback: cachedAddress)
+        if let cachedEntry = getCachedAddressEntry() {
+            self.address = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
         } else {
             self.address = element.address
         }
-        // Start geocoding only if we don't already have a complete address
-        if !isAddressComplete(self.address) {
-            self.updateAddress()
-        } else if let address = self.address {
-            setCachedAddress(address)
+
+        if let address = self.address,
+           address.hasAnyGeocodingFields,
+           !needsSeedAddressEnrichment(address),
+           shouldPersistInitialAddress(address) {
+            setCachedAddressEntry(.forAddress(address))
             viewModel.scheduleGeocodingCacheSave()
         }
     }
@@ -339,7 +885,7 @@ class ElementCellViewModel: ObservableObject {
     }
     
     func onCellAppear() {
-        if address == nil {
+        if shouldAttemptReverseGeocode() {
             updateAddress()
         }
     }
@@ -348,67 +894,86 @@ class ElementCellViewModel: ObservableObject {
         guard let coord = element.mapCoordinate else {
             return ""
         }
-        return "\(coord.latitude),\(coord.longitude)"
+        return ReverseGeocodingSpatialKey.key(for: coord)
     }
 
-    private func getCachedAddress() -> Address? {
-        guard let coord = element.mapCoordinate else {
-            return nil
-        }
-        let cacheKey = "\(coord.latitude),\(coord.longitude)"
-        return viewModel.geocodingCache.getValue(forKey: cacheKey)
+    private func getCachedAddressEntry() -> ReverseGeocodingCacheEntry? {
+        guard !addressCacheKey.isEmpty else { return nil }
+        return viewModel.geocodingCache.getValue(forKey: addressCacheKey)
     }
 
-    private func setCachedAddress(_ address: Address) {
-        guard let coord = element.mapCoordinate else {
-            return
-        }
-        let cacheKey = "\(coord.latitude),\(coord.longitude)"
-        viewModel.geocodingCache.setValue(address, forKey: cacheKey)
+    private func setCachedAddressEntry(_ entry: ReverseGeocodingCacheEntry) {
+        guard !addressCacheKey.isEmpty else { return }
+        viewModel.geocodingCache.setValue(entry, forKey: addressCacheKey)
     }
 
     func updateAddress() {
-        // Check if the address is already cached
-        if let cachedAddress = getCachedAddress() {
-            let merged = mergedAddress(preferred: element.address, fallback: cachedAddress)
+        if let cachedEntry = getCachedAddressEntry() {
+            let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
             self.address = merged
-            if isAddressComplete(merged) {
+            if cachedEntry.status == .resolved || cachedEntry.status == .partial {
+                return
+            }
+            if !cachedEntry.shouldRetry() {
                 return
             }
         } else if let preferred = element.address {
             self.address = preferred
-            if isAddressComplete(preferred) {
-                setCachedAddress(preferred)
+            if preferred.hasAnyGeocodingFields && !needsSeedAddressEnrichment(preferred) {
+                setCachedAddressEntry(.forAddress(preferred))
                 viewModel.scheduleGeocodingCacheSave()
                 return
             }
         }
 
+        guard !isAddressLookupInFlight else { return }
         guard let coord = element.mapCoordinate else { return }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let cacheKey = addressCacheKey
+        let staleFallback = getCachedAddressEntry()?.address
+
+        isAddressLookupInFlight = true
 
         // Perform geocoding
-        viewModel.geocoder.reverseGeocode(location: location) { [weak self] placemark in
-            guard let self = self, let placemark = placemark else { return }
-            let address = Address(
-                streetNumber: self.normalized(placemark.subThoroughfare),
-                streetName: self.normalized(placemark.thoroughfare),
-                cityOrTownName: self.normalized(placemark.locality),
-                postalCode: Address.normalizedPostalCode(
-                    self.normalized(placemark.postalCode),
+        viewModel.geocoder.reverseGeocode(location: location, requestKey: cacheKey) { [weak self] response in
+            guard let self else { return }
+
+            self.isAddressLookupInFlight = false
+
+            if let placemark = response.placemark {
+                let geocodedAddress = Address(
+                    streetNumber: self.normalized(placemark.subThoroughfare),
+                    streetName: self.normalized(placemark.thoroughfare),
+                    cityOrTownName: self.normalized(placemark.locality),
+                    postalCode: Address.normalizedPostalCode(
+                        self.normalized(placemark.postalCode),
+                        countryName: self.normalized(placemark.country)
+                    ),
+                    regionOrStateName: self.normalized(placemark.administrativeArea),
                     countryName: self.normalized(placemark.country)
-                ),
-                regionOrStateName: self.normalized(placemark.administrativeArea),
-                countryName: self.normalized(placemark.country)
-            )
-            DispatchQueue.main.async {
-                let merged = self.mergedAddress(preferred: self.element.address, fallback: address)
+                )
+                let merged = self.mergedAddress(preferred: self.element.address, fallback: geocodedAddress)
                 self.address = merged
-                if let merged = merged {
-                    self.setCachedAddress(merged)
-                    self.viewModel.scheduleGeocodingCacheSave()
+
+                if let merged, merged.hasAnyGeocodingFields {
+                    self.setCachedAddressEntry(.forAddress(merged))
+                } else {
+                    self.setCachedAddressEntry(
+                        .noResult(retryAfter: Date().addingTimeInterval(24 * 60 * 60))
+                    )
                 }
+            } else if let staleFallback, staleFallback.hasAnyGeocodingFields {
+                self.address = self.mergedAddress(preferred: self.element.address, fallback: staleFallback)
+                self.setCachedAddressEntry(.forAddress(staleFallback))
+            } else if let retryAfter = response.retryAfter {
+                self.setCachedAddressEntry(.failed(retryAfter: retryAfter))
+            } else {
+                self.setCachedAddressEntry(
+                    .noResult(retryAfter: Date().addingTimeInterval(24 * 60 * 60))
+                )
             }
+
+            self.viewModel.scheduleGeocodingCacheSave()
         }
     }
 
@@ -420,11 +985,81 @@ class ElementCellViewModel: ObservableObject {
         return value
     }
 
+    private func shouldAttemptReverseGeocode() -> Bool {
+        if isAddressLookupInFlight {
+            return false
+        }
+
+        if let cachedEntry = getCachedAddressEntry() {
+            switch cachedEntry.status {
+            case .resolved:
+                let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+                return isLikelyMalformedStreetLine(merged)
+            case .partial:
+                let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+                return isLikelyMalformedStreetLine(merged)
+            case .noResult, .failed:
+                return cachedEntry.shouldRetry()
+            }
+        }
+
+        guard let currentAddress = address else {
+            return true
+        }
+
+        return needsSeedAddressEnrichment(currentAddress)
+    }
+
+    private func shouldPersistInitialAddress(_ address: Address) -> Bool {
+        guard let cachedEntry = getCachedAddressEntry() else {
+            return true
+        }
+
+        let mergedCurrent = mergedAddress(preferred: element.address, fallback: address)
+        let mergedCached = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+        let currentStatus = ReverseGeocodingCacheEntry.forAddress(address).status
+        return !addressesMatch(mergedCurrent, mergedCached) || cachedEntry.status != currentStatus
+    }
+
+    private func needsSeedAddressEnrichment(_ address: Address?) -> Bool {
+        guard let address else { return true }
+        return !isAddressComplete(address) || shouldEnrichMissingState(address) || isLikelyMalformedStreetLine(address)
+    }
+
+    private func addressesMatch(_ lhs: Address?, _ rhs: Address?) -> Bool {
+        normalized(lhs?.streetNumber) == normalized(rhs?.streetNumber) &&
+        normalized(lhs?.streetName) == normalized(rhs?.streetName) &&
+        normalized(lhs?.cityOrTownName) == normalized(rhs?.cityOrTownName) &&
+        normalized(lhs?.postalCode) == normalized(rhs?.postalCode) &&
+        normalized(lhs?.regionOrStateName) == normalized(rhs?.regionOrStateName) &&
+        normalized(lhs?.countryName) == normalized(rhs?.countryName)
+    }
+
     private func isAddressComplete(_ address: Address?) -> Bool {
-        guard let address = address else { return false }
+        guard let address else { return false }
         return normalized(address.streetNumber) != nil &&
             normalized(address.streetName) != nil &&
             normalized(address.cityOrTownName) != nil
+    }
+
+    private func shouldEnrichMissingState(_ address: Address?) -> Bool {
+        guard let address else { return false }
+        return normalized(address.regionOrStateName) == nil
+    }
+
+    private func isLikelyMalformedStreetLine(_ address: Address?) -> Bool {
+        guard let address else { return false }
+        guard let streetName = normalized(address.streetName) else {
+            return false
+        }
+
+        if !looksLikePostalCode(streetName) {
+            return false
+        }
+
+        let postalCode = normalized(address.postalCode)
+        let city = normalized(address.cityOrTownName)
+        return postalCode == streetName || city == nil
     }
 
     private func mergedAddress(preferred: Address?, fallback: Address?) -> Address? {
@@ -432,9 +1067,21 @@ class ElementCellViewModel: ObservableObject {
         func pick(_ preferredValue: String?, _ fallbackValue: String?) -> String? {
             return normalized(preferredValue) ?? normalized(fallbackValue)
         }
+        let preferredStreetName = normalized(preferred?.streetName)
+        let selectedStreetName: String?
+        if let preferredStreetName,
+           looksLikePostalCode(preferredStreetName),
+           (preferredStreetName == normalized(preferred?.postalCode) ||
+            preferredStreetName == normalized(fallback?.postalCode) ||
+            normalized(preferred?.cityOrTownName) == nil) {
+            selectedStreetName = normalized(fallback?.streetName)
+        } else {
+            selectedStreetName = preferredStreetName ?? normalized(fallback?.streetName)
+        }
+
         return Address(
             streetNumber: pick(preferred?.streetNumber, fallback?.streetNumber),
-            streetName: pick(preferred?.streetName, fallback?.streetName),
+            streetName: selectedStreetName,
             cityOrTownName: pick(preferred?.cityOrTownName, fallback?.cityOrTownName),
             postalCode: Address.normalizedPostalCode(
                 pick(preferred?.postalCode, fallback?.postalCode),
@@ -444,6 +1091,11 @@ class ElementCellViewModel: ObservableObject {
             countryName: pick(preferred?.countryName, fallback?.countryName)
         )
     }
+
+    private func looksLikePostalCode(_ value: String) -> Bool {
+        let zipPattern = #"^\d{5}(?:-\d{4})?$"#
+        return value.range(of: zipPattern, options: .regularExpression) != nil
+    }
 }
 
 // Payment icons
@@ -451,7 +1103,7 @@ struct PaymentIcons: View {
     let element: Element
     
     var body: some View {
-        HStack {
+        HStack(spacing: 6) {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
                     .foregroundColor(.accentColor)
@@ -467,33 +1119,6 @@ struct PaymentIcons: View {
                     .foregroundColor(.accentColor)
             }
         }
-    }
-}
-
-class Geocoder {
-    private let geocoder = CLGeocoder()
-    private let semaphore: DispatchSemaphore
-    private let queue = DispatchQueue(label: "geocoder.queue", qos: .utility)
-    
-    init(maxConcurrentRequests: Int = 1) {
-        semaphore = DispatchSemaphore(value: maxConcurrentRequests)
-    }
-    
-    func reverseGeocode(location: CLLocation, completion: @escaping (CLPlacemark?) -> Void) {
-        queue.async {
-            self.semaphore.wait() // Wait for a free slot
-            self.geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-                defer {
-                    self.semaphore.signal() // Release the slot
-                }
-                
-                guard let placemark = placemarks?.first else {
-                    completion(nil)
-                    return
-                }
-                
-                completion(placemark)
-            }
-        }
+        .font(.subheadline)
     }
 }

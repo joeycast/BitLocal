@@ -22,7 +22,7 @@ class Annotation: NSObject, Identifiable, MKAnnotation {
     }
     
     var title: String? {
-        element?.osmJSON?.tags?.name
+        element?.displayName
     }
     
     init(element: Element) {

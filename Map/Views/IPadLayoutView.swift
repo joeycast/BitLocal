@@ -17,18 +17,20 @@ struct IPadLayoutView: View {
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
-    @AppStorage("appearance") private var appearance: Appearance = .system
-    
-    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    
-    @State private var settingsButtonFrame: CGRect = .zero
     
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
-            BusinessesListView(elements: visibleElements)
-                .environmentObject(viewModel)
+            Group {
+                if viewModel.mapDisplayMode == .communities {
+                    CommunitiesListView()
+                        .environmentObject(viewModel)
+                } else {
+                    BusinessesListView(elements: visibleElements)
+                        .environmentObject(viewModel)
+                }
+            }
                 .navigationDestination(for: Element.self) { element in
                     BusinessDetailView(
                         element: element,
@@ -46,23 +48,39 @@ struct IPadLayoutView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         SettingsButtonView(
-                            selectedMapType: selectedMapTypeBinding,
-                            appearance: $appearance,
-                            distanceUnit: $distanceUnit,
                             onSettingsSelected: {
-                                withAnimation { showingSettings.toggle() }
-                            },
-                            onButtonFrameChange: { frame in settingsButtonFrame = frame }
+                                showingSettings = true
+                            }
                         )
                         .opacity(1)
                     }
                 }
         }
+        .onChange(of: viewModel.unifiedSearchText) { _, _ in
+            guard viewModel.mapDisplayMode != .communities else { return }
+            viewModel.performUnifiedSearch()
+        }
+        .navigationDestination(isPresented: $showingSettings) {
+            SettingsView(selectedMapType: selectedMapTypeBinding)
+                .environmentObject(MerchantAlertsManager.shared)
+        }
+        .sheet(item: $viewModel.presentedCommunityArea) { area in
+            NavigationStack {
+                CommunityDetailView(area: area)
+                    .environmentObject(viewModel)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Close") {
+                                viewModel.presentedCommunityArea = nil
+                            }
+                        }
+                    }
+            }
+        }
         .sheet(isPresented: $showingAbout) {
             AboutView()
         }
         .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
-        .navigationBarTitleDisplayMode(.automatic)
     }
     
     private var mapPanel: some View {
@@ -94,7 +112,10 @@ struct IPadLayoutView: View {
                 userLocation: viewModel.userLocation,
                 isIPad: true
             )
-            .padding(.trailing, 20),
+            .padding(.trailing, 20)
+            .opacity(showingSettings ? 0 : 1)
+            .allowsHitTesting(!showingSettings)
+            .animation(.easeInOut(duration: 0.2), value: showingSettings),
             alignment: .bottomTrailing
         )
     }
@@ -104,41 +125,9 @@ struct IPadLayoutView: View {
             sidePanel
             mapPanel
         }
-        .overlay {
-            if showingSettings {
-                GeometryReader { geometry in
-                    // Invisible overlay to capture taps and dismiss
-                    Color.black.opacity(0.01)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation { showingSettings = false }
-                        }
-                    
-                    // Settings popover positioned relative to the settings button frame
-                    CompactSettingsPopoverView(
-                        selectedMapType: selectedMapTypeBinding,
-                        onDone: { withAnimation { showingSettings = false } }
-                    )
-                    .position(
-                        x: calculateSidePanelWidth(screenWidth: geometry.size.width) + 125, // Position within side panel
-                        y: settingsButtonFrame.maxY + 225 // Below the button
-                    )
-                    .transition(
-                        .asymmetric(
-                            insertion: .scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity),
-                            removal: .scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity)
-                        )
-                    )
-                }
-                .zIndex(1000)
-            }
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.65, blendDuration: 0.25), value: showingSettings)
         .onChange(of: viewModel.path) { _, newPath in
-            if let selectedElement = newPath.last {
-                if viewModel.consumeSelectionSource() == .mapAnnotation {
-                    viewModel.zoomToElement(selectedElement)
-                }
+            if newPath.last != nil {
+                _ = viewModel.consumeSelectionSource()
             } else {
                 viewModel.deselectAnnotation()
             }

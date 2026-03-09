@@ -66,7 +66,7 @@ extension UIViewController {
 
 extension Element: Equatable {
     static func == (lhs: Element, rhs: Element) -> Bool {
-        return lhs.uuid == rhs.uuid // Assuming 'uuid' is a unique identifier for each Element
+        return lhs.id == rhs.id
     }
 }
 
@@ -165,6 +165,47 @@ extension View {
             self
         }
     }
+
+    func groupedCardListRowBackground(if shouldBeGlassy: Bool) -> some View {
+        let bg: Color? = shouldBeGlassy ? nil : Color(uiColor: .secondarySystemGroupedBackground)
+        return self.listRowBackground(bg)
+    }
+
+    @ViewBuilder
+    func settingsSheetBackground() -> some View {
+        self
+    }
+
+    @ViewBuilder
+    func pagePresentationSizingIfAvailable() -> some View {
+        if #available(iOS 18.0, *) {
+            self.presentationSizing(.page)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func cityPickerResultBackground(glassy: Bool) -> some View {
+        if glassy {
+            self
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else {
+            self
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    func cityPickerSearchBackground(glassy: Bool) -> some View {
+        if glassy {
+            self
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        } else {
+            self
+                .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
 }
 
 
@@ -215,11 +256,22 @@ extension String {
     }
     
     func cleanedForDisplay() -> String {
-        return self
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-            .replacingOccurrences(of: "www.", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutScheme = trimmed.replacingOccurrences(
+            of: #"^https?://"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let withoutWWW = withoutScheme.replacingOccurrences(
+            of: #"^www\."#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        return withoutWWW.replacingOccurrences(
+            of: #"/+$"#,
+            with: "",
+            options: .regularExpression
+        )
     }
 }
 
@@ -281,5 +333,102 @@ extension String {
                            .replacingOccurrences(of: "+ ", with: "+")
         
         return cleaned
+    }
+}
+
+enum FeatureFlags {
+    static let sharePlaceLinksKey = "share_place_links_enabled"
+
+    static var isSharePlaceLinksEnabled: Bool {
+        if UserDefaults.standard.object(forKey: sharePlaceLinksKey) == nil {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: sharePlaceLinksKey)
+    }
+}
+
+enum AppDeepLink: Equatable {
+    case place(id: String)
+}
+
+enum PlaceShareLinkBuilder {
+    static let canonicalHost = "www.bitlocal.app"
+    private static let allowedIDCharacters = CharacterSet.decimalDigits
+
+    static func makeShareURL(forPlaceID placeID: String) -> URL? {
+        let trimmedID = placeID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isValidPlaceID(trimmedID) else { return nil }
+
+        guard let encodedID = trimmedID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            return nil
+        }
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = canonicalHost
+        components.path = "/place/\(encodedID)"
+        return components.url
+    }
+
+    static func isValidPlaceID(_ placeID: String) -> Bool {
+        guard !placeID.isEmpty, placeID.count <= 64 else { return false }
+        return placeID.unicodeScalars.allSatisfy { allowedIDCharacters.contains($0) }
+    }
+}
+
+enum DeepLinkParser {
+    private static let allowedHosts: Set<String> = ["bitlocal.app", "www.bitlocal.app"]
+
+    static func parse(url: URL) -> AppDeepLink? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "https",
+              let host = components.host?.lowercased(),
+              allowedHosts.contains(host) else {
+            return nil
+        }
+
+        let pathComponents = components.path
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
+
+        guard pathComponents.count == 2,
+              pathComponents[0].lowercased() == "place" else {
+            return nil
+        }
+
+        let placeID = pathComponents[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PlaceShareLinkBuilder.isValidPlaceID(placeID) else {
+            return nil
+        }
+
+        return .place(id: placeID)
+    }
+}
+
+enum BTCMapMerchantURLBuilder {
+    static func makeURL(for element: Element) -> URL? {
+        if let merchantURL = merchantURL(forPlaceID: element.id) {
+            return merchantURL
+        }
+
+        guard let coordinate = element.mapCoordinate else {
+            return nil
+        }
+
+        var components = URLComponents(string: "https://btcmap.org/map")
+        components?.queryItems = [
+            URLQueryItem(name: "lat", value: String(coordinate.latitude)),
+            URLQueryItem(name: "long", value: String(coordinate.longitude))
+        ]
+        return components?.url
+    }
+
+    private static func merchantURL(forPlaceID placeID: String) -> URL? {
+        let trimmedID = placeID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PlaceShareLinkBuilder.isValidPlaceID(trimmedID) else {
+            return nil
+        }
+        return URL(string: "https://btcmap.org/merchant/\(trimmedID)")
     }
 }
