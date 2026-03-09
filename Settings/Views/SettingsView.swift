@@ -41,7 +41,7 @@ struct SettingsView: View {
             Divider()
                 .padding(.top, 4)
 
-            merchantAlertsRow
+            merchantAlertsSection
 
             Spacer()
         }
@@ -83,37 +83,68 @@ struct SettingsView: View {
 
     // MARK: - Merchant Alerts
 
-    private var merchantAlertsRow: some View {
-        NavigationLink {
-            MerchantAlertsView(currentDetent: $currentDetent)
-        } label: {
+    private var merchantAlertsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Group {
+                if merchantAlertsManager.isCloudKitAvailable {
+                    NavigationLink {
+                        MerchantAlertsView(currentDetent: $currentDetent)
+                    } label: {
+                        merchantAlertsRow(showChevron: true)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    merchantAlertsRow(showChevron: false)
+                }
+            }
+
+            if !merchantAlertsManager.isCloudKitAvailable {
+                Text("Merchant alerts require iCloud be enabled for your device.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+    }
+
+    private var merchantAlertsSubtitle: String {
+        "Get notified when new merchants appear in your city."
+    }
+
+    @ViewBuilder
+    private func merchantAlertsRow(showChevron: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
-                Image(systemName: "bell.badge")
+                Image(systemName: merchantAlertsManager.currentSubscription == nil ? "bell.badge" : "bell.badge.fill")
                     .font(.title3)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(merchantAlertsManager.isCloudKitAvailable ? .accent : .secondary)
                     .frame(width: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(merchantAlertsManager.currentSubscription?.displayName ?? "Merchant Alerts")
+                    Text("Merchant Alerts")
+                        .font(.headline)
+                        .foregroundStyle(merchantAlertsManager.isCloudKitAvailable ? .primary : .secondary)
+
+                    Text(merchantAlertsSubtitle)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
-                    Text(merchantAlertsManager.currentSubscription == nil
-                         ? "Get notified about new Bitcoin merchants."
-                         : "Following this city for new merchants.")
-                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer()
+                Spacer(minLength: 0)
 
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.tertiary)
+                if showChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.tertiary)
+                        .frame(height: 28)
+                }
             }
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 8)
+        .opacity(merchantAlertsManager.isCloudKitAvailable ? 1 : 0.65)
+        .contentShape(Rectangle())
     }
 }
