@@ -1,5 +1,4 @@
 import SwiftUI
-import UserNotifications
 
 @available(iOS 17.0, *)
 struct MerchantAlertsView: View {
@@ -8,9 +7,13 @@ struct MerchantAlertsView: View {
 
     var body: some View {
         List {
-            statusSection
+            if showsStatusSection {
+                statusSection
+            }
             citySection
-            latestDigestSection
+            if merchantAlertsManager.currentSubscription != nil {
+                latestDigestSection
+            }
             infoSection
         }
         .navigationTitle("Merchant Alerts")
@@ -27,41 +30,48 @@ struct MerchantAlertsView: View {
         }
     }
 
+    private var showsStatusSection: Bool {
+        !merchantAlertsManager.isCloudKitAvailable
+            || merchantAlertsManager.notificationSettings?.authorizationStatus == .denied
+            || merchantAlertsManager.errorMessage != nil
+    }
+
     private var statusSection: some View {
-        Section("Status") {
-            Label(
-                merchantAlertsManager.isCloudKitAvailable ? "iCloud Ready" : "iCloud Required",
-                systemImage: merchantAlertsManager.isCloudKitAvailable ? "checkmark.icloud.fill" : "icloud.slash"
-            )
+        Section {
+            if !merchantAlertsManager.isCloudKitAvailable {
+                Label(
+                    "iCloud Required",
+                    systemImage: "icloud.slash"
+                )
 
-            Text(merchantAlertsManager.cloudKitStatusSummary)
-                .foregroundStyle(.secondary)
-
-            if let settings = merchantAlertsManager.notificationSettings {
-                Text(notificationStatusText(settings.authorizationStatus))
+                Text(merchantAlertsManager.cloudKitStatusSummary)
                     .foregroundStyle(.secondary)
+            }
+
+            if let settings = merchantAlertsManager.notificationSettings,
+               settings.authorizationStatus == .denied {
+                Text("Notifications are turned off for BitLocal. You can turn them on in Settings.")
+                    .foregroundStyle(.secondary)
+
+                Button("Open Settings") {
+                    merchantAlertsManager.openSystemSettings()
+                }
             }
 
             if let errorMessage = merchantAlertsManager.errorMessage {
                 Text(errorMessage)
                     .foregroundStyle(.red)
             }
-
-            if merchantAlertsManager.notificationSettings?.authorizationStatus == .denied {
-                Button("Open Notification Settings") {
-                    merchantAlertsManager.openSystemSettings()
-                }
-            }
         }
     }
 
     private var citySection: some View {
-        Section("City") {
+        Section("Your City") {
             if let subscription = merchantAlertsManager.currentSubscription {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(subscription.displayName)
                         .font(.headline)
-                    Text("Daily new-merchant digests are enabled for this city.")
+                    Text("We'll let you know when new places start accepting Bitcoin here.")
                         .foregroundStyle(.secondary)
                 }
 
@@ -69,16 +79,16 @@ struct MerchantAlertsView: View {
                     showingCityPicker = true
                 }
 
-                Button("Turn Off Alerts", role: .destructive) {
+                Button("Stop Alerts", role: .destructive) {
                     Task {
                         await merchantAlertsManager.disableNotifications()
                     }
                 }
             } else {
-                Text("Choose a city and BitLocal will subscribe this device to daily new-merchant digests for that location.")
+                Text("Pick a city and we'll notify you when new businesses start accepting Bitcoin there.")
                     .foregroundStyle(.secondary)
 
-                Button("Choose City") {
+                Button("Pick a City") {
                     showingCityPicker = true
                 }
                 .disabled(!merchantAlertsManager.canEnableAlerts)
@@ -87,7 +97,7 @@ struct MerchantAlertsView: View {
     }
 
     private var latestDigestSection: some View {
-        Section("Latest Digest") {
+        Section("Latest Update") {
             if let digest = merchantAlertsManager.lastDigest {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(digest.cityDisplayName)
@@ -95,17 +105,17 @@ struct MerchantAlertsView: View {
                     Text(digest.summaryLine)
                         .foregroundStyle(.secondary)
                     if let digestWindowEnd = digest.digestWindowEnd {
-                        Text("Received \(digestWindowEnd.formatted(date: .abbreviated, time: .omitted))")
+                        Text(digestWindowEnd.formatted(date: .abbreviated, time: .omitted))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                Button("Open Digest") {
+                Button("View Details") {
                     merchantAlertsManager.presentLastDigest()
                 }
             } else {
-                Text("No city digests have been received on this device yet.")
+                Text("Nothing yet! You'll see updates here as new merchants pop up.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -113,27 +123,11 @@ struct MerchantAlertsView: View {
 
     private var infoSection: some View {
         Section("How It Works") {
-            Text("BitLocal stores daily city digests in CloudKit’s public database, then uses a CloudKit query subscription to notify devices that follow a matching city.")
+            Text("BitLocal checks for new Bitcoin-accepting businesses in your city every day. When we find new ones, you’ll get a notification with the details.")
                 .foregroundStyle(.secondary)
-            Text("This version requires iCloud and standard notification permission. Users who are not signed in to iCloud can still browse the app, but they cannot enable merchant alerts.")
+            Text("Alerts require iCloud sign-in and notification permission.")
                 .foregroundStyle(.secondary)
         }
     }
 
-    private func notificationStatusText(_ status: UNAuthorizationStatus) -> String {
-        switch status {
-        case .authorized:
-            return "Notifications are enabled for merchant alerts."
-        case .provisional:
-            return "Notifications are provisionally allowed."
-        case .denied:
-            return "Notifications are disabled for BitLocal."
-        case .notDetermined:
-            return "BitLocal has not requested notification permission yet."
-        case .ephemeral:
-            return "Notifications are temporarily available."
-        @unknown default:
-            return "Notification permission status is unknown."
-        }
-    }
 }

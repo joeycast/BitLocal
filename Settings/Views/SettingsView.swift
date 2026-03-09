@@ -62,9 +62,9 @@ struct SettingsView: View {
             } label: {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(merchantAlertsManager.currentSubscription?.displayName ?? "Daily city digests")
+                        Text(merchantAlertsManager.currentSubscription?.displayName ?? "New Merchant Alerts")
                             .foregroundStyle(.primary)
-                        Text(merchantAlertsManager.currentSubscription == nil ? "Configure a city to receive CloudKit notifications." : "Manage your subscribed city and notification status.")
+                        Text(merchantAlertsManager.currentSubscription == nil ? "Get notified when new places start accepting Bitcoin." : "You're following this city for new Bitcoin merchants.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

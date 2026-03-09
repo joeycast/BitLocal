@@ -4,7 +4,6 @@ import SwiftUI
 struct MerchantAlertCityPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model = MerchantAlertCityPickerModel()
-    @FocusState private var isSearchFieldFocused: Bool
 
     let onSelection: (MerchantAlertCityChoice) -> Void
 
@@ -86,7 +85,6 @@ struct MerchantAlertCityPickerView: View {
                 .font(.body)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
-                .focused($isSearchFieldFocused)
                 .submitLabel(.search)
 
             if !model.searchText.isEmpty {

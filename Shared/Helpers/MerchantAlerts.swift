@@ -169,15 +169,15 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         case .available:
             return "Signed in to iCloud"
         case .noAccount:
-            return "Sign in to iCloud to enable merchant alerts."
+            return "Sign in to iCloud in Settings to turn on alerts."
         case .restricted:
-            return "iCloud access is restricted on this device."
+            return "iCloud isn't available on this device."
         case .temporarilyUnavailable:
-            return "iCloud is temporarily unavailable."
+            return "iCloud is temporarily unavailable. Try again in a bit."
         case .couldNotDetermine:
-            return "Checking iCloud status…"
+            return "Checking iCloud…"
         @unknown default:
-            return "BitLocal could not determine your iCloud status."
+            return "Something went wrong checking iCloud. Try again later."
         }
     }
 
@@ -226,7 +226,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         let granted = await requestAuthorizationIfNeeded()
         guard granted else {
-            errorMessage = "BitLocal needs notification permission to send city alerts."
+            errorMessage = "BitLocal needs permission to send you notifications. You can turn this on in Settings."
             return
         }
 
