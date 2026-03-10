@@ -5,6 +5,7 @@ import {
   buildDueDigestCandidateForCity,
   digestRecordName,
   formatLocalDate,
+  normalizePlace,
   zonedDateParts,
   zonedLocalDateTimeToUtc
 } from "./cloudkit_digest_sync.mjs";
@@ -65,4 +66,22 @@ test("buildDueDigestCandidateForCity includes merchants before the city-local bo
 test("formatLocalDate reflects timezone-local date parts", () => {
   const parts = zonedDateParts(new Date("2026-03-09T07:30:00.000Z"), "Europe/London");
   assert.equal(formatLocalDate(parts), "2026-03-09");
+});
+
+test("normalizePlace canonicalizes united states region abbreviations", () => {
+  const normalized = normalizePlace({
+    id: 1,
+    name: "D.R Hair Oceanside",
+    display_name: "D.R Hair Oceanside",
+    created_at: "2026-03-09T23:34:40.170Z",
+    updated_at: "2026-03-09T23:34:40.174Z",
+    lat: "33.1959",
+    lon: "-117.3795",
+    "osm:addr:city": "Oceanside",
+    "osm:addr:state": "CA",
+    "osm:addr:country": "United States"
+  }, null);
+
+  assert.equal(normalized.cityKey, "oceanside|california|united states");
+  assert.equal(normalized.cityDisplayName, "Oceanside, California, United States");
 });

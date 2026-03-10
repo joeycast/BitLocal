@@ -32,6 +32,22 @@ final class MerchantAlertsModelsTests: XCTestCase {
         XCTAssertNotEqual(illinois, missouri)
     }
 
+    func testCityKeyCanonicalizesUnitedStatesRegionAbbreviations() {
+        let abbreviation = MerchantAlertsCityNormalizer.cityKey(
+            city: "Oceanside",
+            region: "CA",
+            country: "United States"
+        )
+        let fullName = MerchantAlertsCityNormalizer.cityKey(
+            city: "Oceanside",
+            region: "California",
+            country: "United States"
+        )
+
+        XCTAssertEqual(abbreviation, fullName)
+        XCTAssertEqual(abbreviation, "oceanside|california|united states")
+    }
+
     func testDisplayNameOmitsEmptyRegion() {
         let displayName = MerchantAlertsCityNormalizer.displayName(
             city: "Singapore",

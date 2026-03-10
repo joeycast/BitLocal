@@ -91,8 +91,65 @@ struct CityDigest: Codable, Hashable, Identifiable {
 }
 
 enum MerchantAlertsCityNormalizer {
+    private static let unitedStatesRegionAliases: [String: String] = [
+        "al": "Alabama",
+        "ak": "Alaska",
+        "az": "Arizona",
+        "ar": "Arkansas",
+        "ca": "California",
+        "co": "Colorado",
+        "ct": "Connecticut",
+        "de": "Delaware",
+        "dc": "District of Columbia",
+        "fl": "Florida",
+        "ga": "Georgia",
+        "hi": "Hawaii",
+        "id": "Idaho",
+        "il": "Illinois",
+        "in": "Indiana",
+        "ia": "Iowa",
+        "ks": "Kansas",
+        "ky": "Kentucky",
+        "la": "Louisiana",
+        "me": "Maine",
+        "md": "Maryland",
+        "ma": "Massachusetts",
+        "mi": "Michigan",
+        "mn": "Minnesota",
+        "ms": "Mississippi",
+        "mo": "Missouri",
+        "mt": "Montana",
+        "ne": "Nebraska",
+        "nv": "Nevada",
+        "nh": "New Hampshire",
+        "nj": "New Jersey",
+        "nm": "New Mexico",
+        "ny": "New York",
+        "nc": "North Carolina",
+        "nd": "North Dakota",
+        "oh": "Ohio",
+        "ok": "Oklahoma",
+        "or": "Oregon",
+        "pa": "Pennsylvania",
+        "ri": "Rhode Island",
+        "sc": "South Carolina",
+        "sd": "South Dakota",
+        "tn": "Tennessee",
+        "tx": "Texas",
+        "ut": "Utah",
+        "vt": "Vermont",
+        "va": "Virginia",
+        "wa": "Washington",
+        "wv": "West Virginia",
+        "wi": "Wisconsin",
+        "wy": "Wyoming"
+    ]
+
     static func cityKey(city: String, region: String, country: String) -> String {
-        [city, region, country]
+        let canonicalCountry = canonicalCountry(country)
+        let canonicalRegion = canonicalRegion(region, country: canonicalCountry)
+
+        return [city, canonicalRegion, canonicalCountry]
             .map(normalizeComponent)
             .joined(separator: "|")
     }
@@ -103,8 +160,8 @@ enum MerchantAlertsCityNormalizer {
 
     static func displayName(city: String, region: String, country: String) -> String {
         let trimmedCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedRegion = region.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCountry = country.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCountry = canonicalCountry(country)
+        let trimmedRegion = canonicalRegion(region, country: trimmedCountry)
 
         let secondaryParts = [trimmedRegion, trimmedCountry].filter { !$0.isEmpty }
         if secondaryParts.isEmpty {
@@ -127,6 +184,25 @@ enum MerchantAlertsCityNormalizer {
 
     private static func normalizeComponent(_ raw: String) -> String {
         normalizedComponent(raw)
+    }
+
+    private static func canonicalCountry(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func canonicalRegion(_ raw: String, country: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trimmed }
+
+        let normalizedCountry = normalizedComponent(country)
+        if normalizedCountry == "united states" || normalizedCountry == "usa" || normalizedCountry == "us" {
+            let normalizedRegion = normalizedComponent(trimmed)
+            if let alias = unitedStatesRegionAliases[normalizedRegion] {
+                return alias
+            }
+        }
+
+        return trimmed
     }
 }
 
@@ -243,15 +319,19 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         do {
             if let previous = currentSubscription, previous.cityKey != subscription.cityKey {
+                Debug.log("Merchant alerts: deleting previous CloudKit subscription for \(previous.cityKey)")
                 try await deleteCloudKitSubscription(for: previous)
             }
 
+            Debug.log("Merchant alerts: saving CloudKit subscription for \(subscription.cityKey)")
             try await saveCloudKitSubscription(for: subscription)
+            Debug.log("Merchant alerts: saved CloudKit subscription for \(subscription.cityKey)")
             subscriptions = [subscription]
             persistSubscriptions()
             registerForRemoteNotificationsIfNeeded()
         } catch {
             errorMessage = error.localizedDescription
+            Debug.log("Merchant alerts: failed to enable notifications for \(subscription.cityKey): \(error.localizedDescription)")
         }
 
         await refreshStatus()
@@ -311,32 +391,41 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
     func handleRemoteNotification(userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
         do {
+            Debug.log("Merchant alerts: received remote notification with keys \(Array(userInfo.keys))")
             guard let digest = try await digest(from: userInfo) else {
+                Debug.log("Merchant alerts: remote notification contained no digest payload")
                 return .noData
             }
+            Debug.log("Merchant alerts: fetched digest \(digest.id) for \(digest.cityKey)")
             lastDigest = digest
             persistLastDigest()
 
             if UIApplication.shared.applicationState == .active {
                 activeDigest = digest
+                Debug.log("Merchant alerts: app active, updated activeDigest to \(digest.id)")
             }
 
             try await scheduleLocalNotification(for: digest)
+            Debug.log("Merchant alerts: scheduled local notification for digest \(digest.id)")
             return .newData
         } catch {
             errorMessage = error.localizedDescription
+            Debug.log("Merchant alerts: failed handling remote notification: \(error.localizedDescription)")
             return .failed
         }
     }
 
     func handleNotificationResponse(userInfo: [AnyHashable: Any]) async {
         do {
+            Debug.log("Merchant alerts: handling notification response with keys \(Array(userInfo.keys))")
             guard let digest = try await digest(from: userInfo) else { return }
+            Debug.log("Merchant alerts: notification response resolved digest \(digest.id) for \(digest.cityKey)")
             lastDigest = digest
             persistLastDigest()
             activeDigest = digest
         } catch {
             errorMessage = error.localizedDescription
+            Debug.log("Merchant alerts: failed handling notification response: \(error.localizedDescription)")
         }
     }
 
@@ -389,6 +478,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         notificationInfo.shouldSendContentAvailable = true
         querySubscription.notificationInfo = notificationInfo
 
+        Debug.log("Merchant alerts: CKQuerySubscription predicate = \(querySubscription.predicate.predicateFormat)")
         _ = try await publicDatabase.merchantAlertsSaveSubscription(querySubscription)
     }
 
@@ -397,6 +487,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func fetchDigest(recordID: CKRecord.ID) async throws -> CityDigest {
+        Debug.log("Merchant alerts: fetching CloudKit digest record \(recordID.recordName)")
         let record = try await publicDatabase.merchantAlertsRecord(for: recordID)
         return try CityDigest(record: record)
     }
@@ -405,6 +496,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         if let kind = userInfo[localNotificationKindKey] as? String,
            kind == localNotificationKindDigest,
            let recordName = userInfo[localNotificationDigestRecordNameKey] as? String {
+            Debug.log("Merchant alerts: resolving local notification payload for digest \(recordName)")
             return try await fetchDigest(recordID: CKRecord.ID(recordName: recordName))
         }
 
@@ -414,6 +506,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             return nil
         }
 
+        Debug.log("Merchant alerts: resolving remote CloudKit payload for digest \(recordID.recordName)")
         return try await fetchDigest(recordID: recordID)
     }
 
@@ -432,6 +525,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         notificationCenter.removeDeliveredNotifications(withIdentifiers: [identifier])
 
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        Debug.log("Merchant alerts: adding local notification request \(identifier) with title '\(content.title)'")
         try await notificationCenter.merchantAlertsAdd(request)
     }
 

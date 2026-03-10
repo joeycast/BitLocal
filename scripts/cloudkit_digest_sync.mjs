@@ -10,6 +10,59 @@ const SYNC_STATE_RECORD_TYPE = "SyncState";
 const DELIVERY_HOUR_LOCAL = 8;
 const QUERY_PAGE_SIZE = 200;
 const CLOUDKIT_DEFAULT_ZONE = "_defaultZone";
+const UNITED_STATES_REGION_ALIASES = {
+  al: "Alabama",
+  ak: "Alaska",
+  az: "Arizona",
+  ar: "Arkansas",
+  ca: "California",
+  co: "Colorado",
+  ct: "Connecticut",
+  de: "Delaware",
+  dc: "District of Columbia",
+  fl: "Florida",
+  ga: "Georgia",
+  hi: "Hawaii",
+  id: "Idaho",
+  il: "Illinois",
+  in: "Indiana",
+  ia: "Iowa",
+  ks: "Kansas",
+  ky: "Kentucky",
+  la: "Louisiana",
+  me: "Maine",
+  md: "Maryland",
+  ma: "Massachusetts",
+  mi: "Michigan",
+  mn: "Minnesota",
+  ms: "Mississippi",
+  mo: "Missouri",
+  mt: "Montana",
+  ne: "Nebraska",
+  nv: "Nevada",
+  nh: "New Hampshire",
+  nj: "New Jersey",
+  nm: "New Mexico",
+  ny: "New York",
+  nc: "North Carolina",
+  nd: "North Dakota",
+  oh: "Ohio",
+  ok: "Oklahoma",
+  or: "Oregon",
+  pa: "Pennsylvania",
+  ri: "Rhode Island",
+  sc: "South Carolina",
+  sd: "South Dakota",
+  tn: "Tennessee",
+  tx: "Texas",
+  ut: "Utah",
+  vt: "Vermont",
+  va: "Virginia",
+  wa: "Washington",
+  wv: "West Virginia",
+  wi: "Wisconsin",
+  wy: "Wyoming"
+};
 
 const SYNC_FIELDS = [
   "id",
@@ -475,8 +528,8 @@ function normalizePlace(place, reverseGeocoder) {
   const rawCountry = place["osm:addr:country"] || "";
   const fallback = inferPlaceComponents(place, reverseGeocoder);
   const city = compactWhitespace(rawCity || fallback.city);
-  const region = compactWhitespace(rawRegion || fallback.region);
   const country = compactWhitespace(normalizeCountry(rawCountry, fallback.country));
+  const region = compactWhitespace(normalizeRegion(rawRegion || fallback.region, country));
   const displayName = compactWhitespace(place.display_name || place.name || `BTC Map Merchant ${place.id}`);
   const timeZoneID = validTimeZoneID(fallback.timeZoneID || "Etc/UTC");
 
@@ -830,6 +883,23 @@ function normalizeCountry(rawCountry, fallbackCountry) {
   return country;
 }
 
+function normalizeRegion(rawRegion, country) {
+  const region = compactWhitespace(rawRegion);
+  if (!region) {
+    return region;
+  }
+
+  const normalizedCountry = normalizeKeyComponent(country);
+  if (normalizedCountry === "united states" || normalizedCountry === "usa" || normalizedCountry === "us") {
+    const alias = UNITED_STATES_REGION_ALIASES[normalizeKeyComponent(region)];
+    if (alias) {
+      return alias;
+    }
+  }
+
+  return region;
+}
+
 function geoBucketKey(lat, lon) {
   return `${Math.floor(lat)}:${Math.floor(lon)}`;
 }
@@ -972,6 +1042,7 @@ export {
   buildDueDigestCandidates,
   digestRecordName,
   formatLocalDate,
+  normalizePlace,
   pendingRecordName,
   validTimeZoneID,
   zonedDateParts,
