@@ -89,3 +89,45 @@ test("normalizePlace canonicalizes united states region abbreviations", () => {
   assert.equal(normalized.cityKey, "oceanside|california|united states");
   assert.equal(normalized.cityDisplayName, "Oceanside, California, United States");
 });
+
+test("normalizePlace prefers address-based location ID over nearest-city fallback", () => {
+  const reverseGeocoder = {
+    lookup() {
+      return {
+        locationID: "geonames:5139614",
+        city: "Astoria",
+        region: "New York",
+        country: "United States",
+        timeZoneID: "America/New_York"
+      };
+    },
+    lookupByCityKey(cityKey) {
+      if (cityKey === "astoria|new york|united states") {
+        return {
+          locationID: "geonames:5107464",
+          city: "Astoria",
+          region: "New York",
+          country: "United States",
+          timeZoneID: "America/New_York",
+          population: 0
+        };
+      }
+      return null;
+    }
+  };
+
+  const normalized = normalizePlace({
+    id: 1,
+    name: "Bitcoin ATM",
+    display_name: "Bitcoin ATM",
+    created_at: "2026-03-09T23:34:40.170Z",
+    updated_at: "2026-03-09T23:34:40.174Z",
+    lat: "40.7643",
+    lon: "-73.9235",
+    "osm:addr:city": "Astoria",
+    "osm:addr:state": "New York",
+    "osm:addr:country": "United States"
+  }, reverseGeocoder);
+
+  assert.equal(normalized.locationID, "geonames:5107464");
+});

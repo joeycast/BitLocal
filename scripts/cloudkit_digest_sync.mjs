@@ -539,9 +539,11 @@ function normalizePlace(place, reverseGeocoder) {
   const region = compactWhitespace(normalizeRegion(rawRegion || fallback.region, country));
   const displayName = compactWhitespace(place.display_name || place.name || `BTC Map Merchant ${place.id}`);
   const timeZoneID = validTimeZoneID(fallback.timeZoneID || "Etc/UTC");
+  const addressLocationID = inferLocationID(city, region, country, reverseGeocoder);
+  const locationID = city ? (addressLocationID || fallback.locationID) : (fallback.locationID || addressLocationID);
 
   return {
-    locationID: fallback.locationID || inferLocationID(city, region, country, reverseGeocoder),
+    locationID,
     cityKey: normalizeCityKey(city, region, country),
     cityDisplayName: [city, region, country].filter(Boolean).join(", "),
     displayName,
