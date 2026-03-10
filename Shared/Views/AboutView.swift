@@ -30,6 +30,7 @@ struct AboutView: View {
     // More from Brink 13 Labs links
     let bitcoinLivePriceChartURL = URL(string: "https://brink13labs.com")!
     let movematesMoveTogetherURL = URL(string: "https://apps.apple.com/us/app/movemates-move-together/id6748308903")!
+    let dandelionURL = URL(string: "https://apps.apple.com/app/id6757363901")!
     
     // Other section links
     let brink13LabsWebsite = URL(string: "https://brink13labs.com")!
@@ -132,6 +133,14 @@ struct AboutView: View {
                                 Text("Movemates: Move Together")
                                 Spacer()
                             }
+                        }
+                    }
+                    Link(destination: dandelionURL) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "camera.macro")
+                                .aboutIconStyle(size: iconSize)
+                            Text("Dandelion: Write and Let Go")
+                            Spacer()
                         }
                     }
                 }
