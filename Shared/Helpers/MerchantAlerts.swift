@@ -319,9 +319,9 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
             if UIApplication.shared.applicationState == .active {
                 activeDigest = digest
-            } else {
-                try await scheduleLocalNotification(for: digest)
             }
+
+            try await scheduleLocalNotification(for: digest)
             return .newData
         } catch {
             errorMessage = error.localizedDescription
