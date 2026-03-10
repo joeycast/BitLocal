@@ -639,7 +639,10 @@ struct MapView: UIViewRepresentable {
         }
 
         private func effectiveViewportRect(for mapView: MKMapView) -> CGRect {
-            viewModel.mapListViewportRect(for: mapView)
+            if viewModel.mapDisplayMode == .merchants {
+                return mapView.bounds
+            }
+            return viewModel.mapListViewportRect(for: mapView)
         }
 
         private func effectiveVisibleMapRect(for mapView: MKMapView, viewportRect: CGRect) -> MKMapRect {
