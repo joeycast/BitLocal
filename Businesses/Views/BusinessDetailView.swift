@@ -110,9 +110,9 @@ struct BusinessDetailView: View {
     @State private var showingShareErrorAlert = false
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
-    
+
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    
+
     var element: Element
     var userLocation: CLLocation?
     @Binding private var currentDetent: PresentationDetent?
@@ -1065,28 +1065,63 @@ private struct BusinessSectionHeader: View {
     var includesFeaturedBadge = false
 
     @Environment(\.businessSectionShowsFeaturedBadge) private var showsFeaturedBadge
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var showingFeaturedInfo = false
 
     private var shouldShowBadge: Bool {
         includesFeaturedBadge || showsFeaturedBadge
     }
 
+    private var isLight: Bool { colorScheme == .light }
+
     var body: some View {
         VStack(alignment: .leading, spacing: shouldShowBadge ? 10 : 0) {
             if shouldShowBadge {
-                HStack {
-                    Spacer(minLength: 0)
-                    Label("Featured Merchant", systemImage: "star.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color(red: 0.71, green: 0.49, blue: 0.08))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color(red: 0.96, green: 0.93, blue: 0.84))
-                        )
-                    Spacer(minLength: 0)
+                Button {
+                    showingFeaturedInfo = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.orange, Color(red: 0.9, green: 0.5, blue: 0.0)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                        Text("Featured Merchant")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(isLight ? Color(red: 0.8, green: 0.4, blue: 0.0) : Color.orange)
+                            .tracking(0.3)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.orange.opacity(isLight ? 0.2 : 0.14),
+                                        Color.orange.opacity(isLight ? 0.12 : 0.07)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.orange.opacity(isLight ? 0.45 : 0.25), lineWidth: isLight ? 1 : 0.5)
+                    )
                 }
-                .padding(.bottom, -2)
+                .buttonStyle(.plain)
+                .padding(.bottom, 2)
+                .alert("Featured Merchant", isPresented: $showingFeaturedInfo) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("This business has been boosted on BTC Map, which means someone in the community has paid to help more people discover it.")
+                }
             }
 
             Text(title)
