@@ -338,13 +338,10 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         do {
             if let previous = currentSubscription, previous.locationID != subscription.locationID {
-                Debug.log("Merchant alerts: deleting previous CloudKit subscription for \(previous.locationID)")
                 try await deleteCloudKitSubscription(for: previous)
             }
 
-            Debug.log("Merchant alerts: saving CloudKit subscription for \(subscription.locationID)")
             try await saveCloudKitSubscription(for: subscription)
-            Debug.log("Merchant alerts: saved CloudKit subscription for \(subscription.locationID)")
             subscriptions = [subscription]
             persistSubscriptions()
             registerForRemoteNotificationsIfNeeded()
@@ -410,22 +407,17 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
     func handleRemoteNotification(userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
         do {
-            Debug.log("Merchant alerts: received remote notification with keys \(Array(userInfo.keys))")
             guard let digest = try await digest(from: userInfo) else {
-                Debug.log("Merchant alerts: remote notification contained no digest payload")
                 return .noData
             }
-            Debug.log("Merchant alerts: fetched digest \(digest.id) for \(digest.cityKey)")
             lastDigest = digest
             persistLastDigest()
 
             if UIApplication.shared.applicationState == .active {
                 activeDigest = digest
-                Debug.log("Merchant alerts: app active, updated activeDigest to \(digest.id)")
             }
 
             try await scheduleLocalNotification(for: digest)
-            Debug.log("Merchant alerts: scheduled local notification for digest \(digest.id)")
             return .newData
         } catch {
             errorMessage = error.localizedDescription
@@ -436,9 +428,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
     func handleNotificationResponse(userInfo: [AnyHashable: Any]) async {
         do {
-            Debug.log("Merchant alerts: handling notification response with keys \(Array(userInfo.keys))")
             guard let digest = try await digest(from: userInfo) else { return }
-            Debug.log("Merchant alerts: notification response resolved digest \(digest.id) for \(digest.cityKey)")
             lastDigest = digest
             persistLastDigest()
             activeDigest = digest
@@ -497,7 +487,6 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         notificationInfo.shouldSendContentAvailable = true
         querySubscription.notificationInfo = notificationInfo
 
-        Debug.log("Merchant alerts: CKQuerySubscription predicate = \(querySubscription.predicate.predicateFormat)")
         _ = try await publicDatabase.merchantAlertsSaveSubscription(querySubscription)
     }
 
@@ -506,7 +495,6 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func fetchDigest(recordID: CKRecord.ID) async throws -> CityDigest {
-        Debug.log("Merchant alerts: fetching CloudKit digest record \(recordID.recordName)")
         let record = try await publicDatabase.merchantAlertsRecord(for: recordID)
         return try CityDigest(record: record)
     }
@@ -515,7 +503,6 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         if let kind = userInfo[localNotificationKindKey] as? String,
            kind == localNotificationKindDigest,
            let recordName = userInfo[localNotificationDigestRecordNameKey] as? String {
-            Debug.log("Merchant alerts: resolving local notification payload for digest \(recordName)")
             return try await fetchDigest(recordID: CKRecord.ID(recordName: recordName))
         }
 
@@ -525,7 +512,6 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             return nil
         }
 
-        Debug.log("Merchant alerts: resolving remote CloudKit payload for digest \(recordID.recordName)")
         return try await fetchDigest(recordID: recordID)
     }
 
@@ -544,7 +530,6 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         notificationCenter.removeDeliveredNotifications(withIdentifiers: [identifier])
 
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
-        Debug.log("Merchant alerts: adding local notification request \(identifier) with title '\(content.title)'")
         try await notificationCenter.merchantAlertsAdd(request)
     }
 
