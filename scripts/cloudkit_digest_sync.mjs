@@ -1,10 +1,15 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
 const SYNC_STATE_RECORD_NAME = "sync-state";
 const DIGEST_RECORD_TYPE = "CityDigest";
+const DIGEST_PENDING_RECORD_TYPE = "CityDigestPending";
 const MERCHANT_RECORD_TYPE = "Merchant";
 const SYNC_STATE_RECORD_TYPE = "SyncState";
+const DELIVERY_HOUR_LOCAL = 8;
+const QUERY_PAGE_SIZE = 200;
+const CLOUDKIT_DEFAULT_ZONE = "_defaultZone";
 
 const SYNC_FIELDS = [
   "id",
@@ -21,61 +26,45 @@ const SYNC_FIELDS = [
   "osm:addr:country"
 ];
 
-const environment = {
-  containerId: requireEnv("CLOUDKIT_CONTAINER_ID"),
-  environment: process.env.CLOUDKIT_ENVIRONMENT || "development",
-  database: (process.env.CLOUDKIT_DATABASE || "public").toLowerCase(),
-  serverKeyId: requireEnv("CLOUDKIT_SERVER_KEY_ID"),
-  serverPrivateKey: createSigningKey(requireEnv("CLOUDKIT_SERVER_PRIVATE_KEY")),
-  initialUpdatedSince: process.env.OVERRIDE_UPDATED_SINCE || process.env.BTCMAP_INITIAL_UPDATED_SINCE || "1970-01-01T00:00:00Z",
-  digestWindowHours: Number.parseInt(process.env.DIGEST_WINDOW_HOURS || "24", 10),
-  geoNamesCitiesFile: process.env.GEONAMES_CITIES_FILE || "",
-  geoNamesCountriesFile: process.env.GEONAMES_COUNTRIES_FILE || "",
-  geoNamesAdmin1File: process.env.GEONAMES_ADMIN1_FILE || ""
-};
+const environment = createEnvironment();
 
 async function main() {
+  if (!environment) {
+    throw new Error("CloudKit digest sync requires configured environment variables.");
+  }
+
   const reverseGeocoder = await loadReverseGeocoder();
+  const runStartedAt = new Date();
+  const deliveryNowUtc = parseDate(environment.nowUtcOverride) || runStartedAt;
   const syncState = await loadSyncState();
-  const updatedSince = process.env.OVERRIDE_UPDATED_SINCE || syncState?.incrementalAnchorUpdatedSince || environment.initialUpdatedSince;
+  const updatedSince = environment.updatedSinceOverride || syncState?.incrementalAnchorUpdatedSince || environment.initialUpdatedSince;
   const changes = await fetchBTCMapChanges(updatedSince);
 
   console.log(`Fetched ${changes.length} BTC Map place changes since ${updatedSince}.`);
 
+  const shouldQueuePending = Boolean(syncState) || Boolean(environment.updatedSinceOverride);
+  const forceReplayPending = Boolean(environment.updatedSinceOverride);
   if (!syncState) {
-    console.log("No CloudKit sync state found. Bootstrapping merchant records without creating digests.");
+    console.log("No CloudKit sync state found. Bootstrapping merchant records without queueing digests.");
   }
 
   for (const place of changes) {
-    await upsertMerchant(place, reverseGeocoder);
+    await syncMerchant(place, reverseGeocoder, { shouldQueuePending, forceReplayPending });
+  }
+
+  const pendingRecords = await queryPendingRecords(environment.cityKeyFilter);
+  const digestCandidates = buildDueDigestCandidates(pendingRecords, deliveryNowUtc);
+  console.log(`Prepared ${digestCandidates.length} city digest record(s).`);
+
+  for (const candidate of digestCandidates) {
+    await processDigestCandidate(candidate);
   }
 
   const latestAnchor = latestUpdatedAt(changes) || updatedSince;
-  const digestWindowEnd = new Date();
-  const digestWindowStart = new Date(digestWindowEnd.getTime() - (environment.digestWindowHours * 60 * 60 * 1000));
-
-  if (syncState) {
-    const digestCandidates = changes.filter((place) => {
-      if (place.deleted_at) {
-        return false;
-      }
-
-      const createdAt = parseDate(place.created_at);
-      return createdAt && createdAt > digestWindowStart;
-    });
-
-    const cityDigests = buildCityDigests(digestCandidates, digestWindowStart, digestWindowEnd, reverseGeocoder);
-    console.log(`Prepared ${cityDigests.length} city digest record(s).`);
-
-    for (const digest of cityDigests) {
-      await upsertCityDigest(digest);
-    }
-  }
-
   await upsertSyncState({
     incrementalAnchorUpdatedSince: latestAnchor,
-    lastSuccessfulSyncAt: digestWindowEnd.toISOString(),
-    lastProcessedDigestWindow: digestWindowEnd.toISOString(),
+    lastSuccessfulSyncAt: runStartedAt.toISOString(),
+    lastProcessedDigestWindow: runStartedAt.toISOString(),
     bootstrapCompleted: true
   });
 
@@ -98,55 +87,122 @@ async function fetchBTCMapChanges(updatedSince) {
 }
 
 async function loadSyncState() {
-  try {
-    const response = await lookupRecord(SYNC_STATE_RECORD_NAME);
-    return decodeSyncStateRecord(response.fields);
-  } catch (error) {
-    if (isCloudKitNotFound(error)) {
-      return null;
-    }
-    throw error;
-  }
+  const record = await loadRecordOrNull(SYNC_STATE_RECORD_NAME);
+  return record ? decodeSyncStateRecord(record.fields) : null;
 }
 
-async function upsertMerchant(place, reverseGeocoder) {
-  const recordName = `merchant-${place.id}`;
+async function syncMerchant(place, reverseGeocoder, options) {
+  const merchantRecordName = merchantRecordNameForPlace(place.id);
+  const existingRecord = await loadRecordOrNull(merchantRecordName);
+  const existingMerchant = existingRecord ? decodeMerchantRecord(existingRecord.fields) : null;
   const normalized = normalizePlace(place, reverseGeocoder);
 
-  await upsertRecord({
-    recordName,
+  await saveRecord({
+    recordName: merchantRecordName,
     recordType: MERCHANT_RECORD_TYPE,
     fields: {
       placeID: stringField(String(place.id)),
       cityKey: stringField(normalized.cityKey),
       cityDisplayName: stringField(normalized.cityDisplayName),
       displayName: stringField(normalized.displayName),
-      createdAt: safeTimestampField(place.created_at),
+      createdAt: safeTimestampField(normalized.merchantCreatedAt),
       updatedAt: safeTimestampField(place.updated_at),
       deletedAt: safeTimestampField(place.deleted_at),
-      sourceHash: stringField(hashObject(place))
+      sourceHash: stringField(hashObject(place)),
+      timeZoneID: stringField(normalized.timeZoneID)
+    },
+    existingRecord
+  });
+
+  const priorPendingRecordName = existingMerchant?.cityKey
+    ? pendingRecordName(existingMerchant.cityKey, place.id)
+    : null;
+  const priorPendingRecord = priorPendingRecordName ? await loadRecordOrNull(priorPendingRecordName) : null;
+
+  if (place.deleted_at) {
+    if (priorPendingRecordName && priorPendingRecord) {
+      await deleteRecords([priorPendingRecordName]);
     }
+    return;
+  }
+
+  if (!options.shouldQueuePending || !normalized.cityKey || !normalized.merchantCreatedAt) {
+    if (priorPendingRecordName
+      && priorPendingRecord
+      && existingMerchant?.cityKey
+      && existingMerchant.cityKey != normalized.cityKey) {
+      await deleteRecords([priorPendingRecordName]);
+    }
+    return;
+  }
+
+  const shouldMaintainPending = !existingMerchant || priorPendingRecord || options.forceReplayPending;
+  if (!shouldMaintainPending) {
+    return;
+  }
+
+  const nextPendingRecordName = pendingRecordName(normalized.cityKey, place.id);
+  if (priorPendingRecordName && priorPendingRecordName !== nextPendingRecordName && priorPendingRecord) {
+    await deleteRecords([priorPendingRecordName]);
+  }
+
+  const nextPendingExisting = priorPendingRecordName === nextPendingRecordName
+    ? priorPendingRecord
+    : await loadRecordOrNull(nextPendingRecordName);
+
+  await saveRecord({
+    recordName: nextPendingRecordName,
+    recordType: DIGEST_PENDING_RECORD_TYPE,
+    fields: {
+      cityKey: stringField(normalized.cityKey),
+      cityDisplayName: stringField(normalized.cityDisplayName),
+      timeZoneID: stringField(normalized.timeZoneID),
+      merchantID: stringField(String(place.id)),
+      merchantName: stringField(normalized.displayName),
+      merchantCreatedAt: safeTimestampField(normalized.merchantCreatedAt)
+    },
+    existingRecord: nextPendingExisting
   });
 }
 
-async function upsertCityDigest(digest) {
-  await upsertRecord({
-    recordName: digest.recordName,
+async function processDigestCandidate(candidate) {
+  const existingDigestRecord = await loadRecordOrNull(candidate.recordName);
+  if (existingDigestRecord) {
+    const existingDigest = decodeDigestRecord(existingDigestRecord);
+    const overlappingPending = candidate.pendingRecords
+      .filter((pending) => existingDigest.merchantIDs.includes(pending.merchantID))
+      .map((pending) => pending.recordName);
+
+    if (overlappingPending.length) {
+      await deleteRecords(overlappingPending);
+    }
+    return;
+  }
+
+  await saveRecord({
+    recordName: candidate.recordName,
     recordType: DIGEST_RECORD_TYPE,
     fields: {
-      cityKey: stringField(digest.cityKey),
-      cityDisplayName: stringField(digest.cityDisplayName),
-      digestWindowStart: safeTimestampField(digest.digestWindowStart),
-      digestWindowEnd: safeTimestampField(digest.digestWindowEnd),
-      merchantCount: int64Field(digest.merchantCount),
-      merchantIDs: stringListField(digest.merchantIDs),
-      topMerchantNames: stringListField(digest.topMerchantNames)
-    }
+      cityKey: stringField(candidate.cityKey),
+      cityDisplayName: stringField(candidate.cityDisplayName),
+      digestWindowStart: safeTimestampField(candidate.digestWindowStart),
+      digestWindowEnd: safeTimestampField(candidate.digestWindowEnd),
+      merchantCount: int64Field(candidate.merchantCount),
+      merchantIDs: stringListField(candidate.merchantIDs),
+      topMerchantNames: stringListField(candidate.topMerchantNames),
+      timeZoneID: stringField(candidate.timeZoneID),
+      deliveryLocalDate: stringField(candidate.deliveryLocalDate)
+    },
+    existingRecord: null
   });
+
+  await deleteRecords(candidate.pendingRecords.map((pending) => pending.recordName));
 }
 
 async function upsertSyncState(state) {
-  await upsertRecord({
+  const existingRecord = await loadRecordOrNull(SYNC_STATE_RECORD_NAME);
+
+  await saveRecord({
     recordName: SYNC_STATE_RECORD_NAME,
     recordType: SYNC_STATE_RECORD_TYPE,
     fields: {
@@ -154,44 +210,69 @@ async function upsertSyncState(state) {
       lastSuccessfulSyncAt: safeTimestampField(state.lastSuccessfulSyncAt),
       lastProcessedDigestWindow: safeTimestampField(state.lastProcessedDigestWindow),
       bootstrapCompleted: stringField(state.bootstrapCompleted ? "true" : "false")
-    }
+    },
+    existingRecord
   });
 }
 
-async function upsertRecord({ recordName, recordType, fields }) {
+async function saveRecord({ recordName, recordType, fields, existingRecord }) {
   const sanitizedFields = Object.fromEntries(
     Object.entries(fields).filter(([, value]) => value !== null && value !== undefined)
   );
 
-  const existing = await lookupRecord(recordName).catch((error) => {
-    if (isCloudKitNotFound(error)) {
-      return null;
-    }
-    throw error;
-  });
-
-  const operationType = existing ? "forceUpdate" : "create";
+  const operationType = existingRecord ? "forceUpdate" : "create";
   const record = {
     recordName,
     recordType,
     fields: sanitizedFields
   };
 
-  const body = {
-    atomic: false,
-    operations: [
-      {
-        operationType,
-        record
-      }
-    ]
-  };
+  const response = await cloudKitModify([
+    {
+      operationType,
+      record
+    }
+  ]);
 
-  const response = await cloudKitRequest("/records/modify", body);
   const result = response.records?.[0];
   if (!result || result.serverErrorCode) {
     console.error("CloudKit upsert failed:", JSON.stringify({ operationType, record }, null, 2));
     throw new Error(JSON.stringify(result || response));
+  }
+
+  return result;
+}
+
+async function deleteRecords(recordNames) {
+  if (!recordNames.length) {
+    return;
+  }
+
+  const uniqueRecordNames = Array.from(new Set(recordNames));
+  for (const chunk of chunkArray(uniqueRecordNames, QUERY_PAGE_SIZE)) {
+    const response = await cloudKitModify(
+      chunk.map((recordName) => ({
+        operationType: "forceDelete",
+        record: { recordName }
+      }))
+    );
+
+    for (const result of response.records || []) {
+      if (result.serverErrorCode) {
+        throw new Error(JSON.stringify(result));
+      }
+    }
+  }
+}
+
+async function loadRecordOrNull(recordName) {
+  try {
+    return await lookupRecord(recordName);
+  } catch (error) {
+    if (isCloudKitNotFound(error)) {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -212,6 +293,83 @@ async function lookupRecord(recordName) {
   return match;
 }
 
+async function queryPendingRecords(cityKeyFilter = "") {
+  const filterBy = [];
+  if (cityKeyFilter) {
+    filterBy.push({
+      fieldName: "cityKey",
+      comparator: "EQUALS",
+      fieldValue: stringField(cityKeyFilter)
+    });
+  }
+
+  const records = await queryRecords({
+    recordType: DIGEST_PENDING_RECORD_TYPE,
+    desiredKeys: [
+      "cityKey",
+      "cityDisplayName",
+      "timeZoneID",
+      "merchantID",
+      "merchantName",
+      "merchantCreatedAt"
+    ],
+    filterBy,
+    sortBy: [
+      {
+        fieldName: "merchantCreatedAt",
+        ascending: true
+      }
+    ]
+  });
+
+  return records
+    .map(decodePendingRecord)
+    .filter((record) => !cityKeyFilter || record.cityKey === cityKeyFilter);
+}
+
+async function queryRecords({ recordType, desiredKeys = [], filterBy = [], sortBy = [] }) {
+  const records = [];
+  let continuationMarker = null;
+
+  do {
+    const body = {
+      query: {
+        recordType
+      },
+      zoneID: {
+        zoneName: CLOUDKIT_DEFAULT_ZONE
+      },
+      resultsLimit: QUERY_PAGE_SIZE
+    };
+
+    if (desiredKeys.length) {
+      body.desiredKeys = desiredKeys;
+    }
+
+    if (filterBy.length) {
+      body.query.filterBy = filterBy;
+    }
+
+    if (sortBy.length) {
+      body.query.sortBy = sortBy;
+    }
+
+    if (continuationMarker) {
+      body.continuationMarker = continuationMarker;
+    }
+
+    const response = await cloudKitRequest("/records/query", body);
+    for (const record of response.records || []) {
+      if (!record.serverErrorCode) {
+        records.push(record);
+      }
+    }
+    continuationMarker = response.continuationMarker || null;
+  } while (continuationMarker);
+
+  return records;
+}
+
 function decodeSyncStateRecord(fields) {
   return {
     incrementalAnchorUpdatedSince: unwrapStringField(fields.incrementalAnchorUpdatedSince),
@@ -221,38 +379,94 @@ function decodeSyncStateRecord(fields) {
   };
 }
 
-function buildCityDigests(changes, digestWindowStart, digestWindowEnd, reverseGeocoder) {
+function decodeMerchantRecord(fields) {
+  return {
+    cityKey: unwrapStringField(fields.cityKey),
+    timeZoneID: unwrapStringField(fields.timeZoneID)
+  };
+}
+
+function decodeDigestRecord(record) {
+  return {
+    merchantIDs: unwrapStringListField(record.fields?.merchantIDs)
+  };
+}
+
+function decodePendingRecord(record) {
+  return {
+    recordName: record.recordName,
+    cityKey: unwrapStringField(record.fields.cityKey),
+    cityDisplayName: unwrapStringField(record.fields.cityDisplayName),
+    timeZoneID: validTimeZoneID(unwrapStringField(record.fields.timeZoneID)),
+    merchantID: unwrapStringField(record.fields.merchantID),
+    merchantName: unwrapStringField(record.fields.merchantName),
+    merchantCreatedAt: parseDate(unwrapTimestampField(record.fields.merchantCreatedAt))
+  };
+}
+
+function buildDueDigestCandidates(pendingRecords, nowUtc) {
   const grouped = new Map();
 
-  for (const place of changes) {
-    const normalized = normalizePlace(place, reverseGeocoder);
-    if (!normalized.cityKey) {
+  for (const record of pendingRecords) {
+    if (!record.cityKey || !record.merchantCreatedAt) {
       continue;
     }
 
-    const current = grouped.get(normalized.cityKey) || {
-      cityKey: normalized.cityKey,
-      cityDisplayName: normalized.cityDisplayName,
-      digestWindowStart,
-      digestWindowEnd,
-      merchantIDs: [],
-      topMerchantNames: []
-    };
-
-    current.merchantIDs.push(String(place.id));
-    if (normalized.displayName && current.topMerchantNames.length < 5) {
-      current.topMerchantNames.push(normalized.displayName);
-    }
-
-    grouped.set(normalized.cityKey, current);
+    const bucket = grouped.get(record.cityKey) || [];
+    bucket.push(record);
+    grouped.set(record.cityKey, bucket);
   }
 
-  return Array.from(grouped.values()).map((digest) => ({
-    ...digest,
-    merchantCount: digest.merchantIDs.length,
-    topMerchantNames: Array.from(new Set(digest.topMerchantNames)).slice(0, 5),
-    recordName: `city-digest-${hashString(`${digest.cityKey}|${digestWindowStart.toISOString()}`)}`
-  }));
+  const candidates = [];
+  for (const [cityKey, records] of grouped.entries()) {
+    const candidate = buildDueDigestCandidateForCity(cityKey, records, nowUtc);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+
+  return candidates.sort((lhs, rhs) => lhs.cityKey.localeCompare(rhs.cityKey));
+}
+
+function buildDueDigestCandidateForCity(cityKey, records, nowUtc) {
+  const timeZoneID = validTimeZoneID(records.find((record) => record.timeZoneID)?.timeZoneID || "Etc/UTC");
+  const localNow = zonedDateParts(nowUtc, timeZoneID);
+  if (localNow.hour < DELIVERY_HOUR_LOCAL) {
+    return null;
+  }
+
+  const deliveryLocalDate = formatLocalDate(localNow);
+  const digestBoundaryUtc = zonedLocalDateTimeToUtc(deliveryLocalDate, DELIVERY_HOUR_LOCAL, 0, 0, timeZoneID);
+  const eligiblePending = records
+    .filter((record) => record.merchantCreatedAt && record.merchantCreatedAt.getTime() <= digestBoundaryUtc.getTime())
+    .sort((lhs, rhs) => lhs.merchantCreatedAt - rhs.merchantCreatedAt);
+
+  if (!eligiblePending.length) {
+    return null;
+  }
+
+  const merchantIDs = eligiblePending.map((record) => record.merchantID);
+  const topMerchantNames = Array.from(
+    new Set(
+      eligiblePending
+        .map((record) => record.merchantName)
+        .filter(Boolean)
+    )
+  ).slice(0, 5);
+
+  return {
+    recordName: digestRecordName(cityKey, deliveryLocalDate),
+    cityKey,
+    cityDisplayName: eligiblePending[0].cityDisplayName,
+    digestWindowStart: eligiblePending[0].merchantCreatedAt,
+    digestWindowEnd: digestBoundaryUtc,
+    merchantCount: merchantIDs.length,
+    merchantIDs,
+    topMerchantNames,
+    timeZoneID,
+    deliveryLocalDate,
+    pendingRecords: eligiblePending
+  };
 }
 
 function normalizePlace(place, reverseGeocoder) {
@@ -264,11 +478,14 @@ function normalizePlace(place, reverseGeocoder) {
   const region = compactWhitespace(rawRegion || fallback.region);
   const country = compactWhitespace(normalizeCountry(rawCountry, fallback.country));
   const displayName = compactWhitespace(place.display_name || place.name || `BTC Map Merchant ${place.id}`);
+  const timeZoneID = validTimeZoneID(fallback.timeZoneID || "Etc/UTC");
 
   return {
     cityKey: normalizeCityKey(city, region, country),
     cityDisplayName: [city, region, country].filter(Boolean).join(", "),
-    displayName
+    displayName,
+    merchantCreatedAt: parseDate(place.created_at),
+    timeZoneID
   };
 }
 
@@ -296,7 +513,8 @@ function parseDate(value) {
   if (!value) {
     return null;
   }
-  const date = new Date(value);
+
+  const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -316,8 +534,24 @@ function hashString(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+function merchantRecordNameForPlace(placeID) {
+  return `merchant-${placeID}`;
+}
+
+function pendingRecordName(cityKey, merchantID) {
+  return `city-digest-pending-${hashString(`${cityKey}|${merchantID}`)}`;
+}
+
+function digestRecordName(cityKey, deliveryLocalDate) {
+  return `city-digest-${hashString(`${cityKey}|${deliveryLocalDate}`)}`;
+}
+
 function unwrapStringField(field) {
   return typeof field?.value === "string" ? field.value : "";
+}
+
+function unwrapStringListField(field) {
+  return Array.isArray(field?.value) ? field.value.filter((value) => typeof value === "string") : [];
 }
 
 function unwrapTimestampField(field) {
@@ -339,23 +573,38 @@ function requireEnv(key) {
   return value;
 }
 
-function stringField(value) {
+function createEnvironment() {
+  if (!process.env.CLOUDKIT_CONTAINER_ID) {
+    return null;
+  }
+
   return {
-    value
+    containerId: requireEnv("CLOUDKIT_CONTAINER_ID"),
+    environment: process.env.CLOUDKIT_ENVIRONMENT || "development",
+    database: (process.env.CLOUDKIT_DATABASE || "public").toLowerCase(),
+    serverKeyId: requireEnv("CLOUDKIT_SERVER_KEY_ID"),
+    serverPrivateKey: createSigningKey(requireEnv("CLOUDKIT_SERVER_PRIVATE_KEY")),
+    initialUpdatedSince: process.env.BTCMAP_INITIAL_UPDATED_SINCE || "1970-01-01T00:00:00Z",
+    geoNamesCitiesFile: process.env.GEONAMES_CITIES_FILE || "",
+    geoNamesCountriesFile: process.env.GEONAMES_COUNTRIES_FILE || "",
+    geoNamesAdmin1File: process.env.GEONAMES_ADMIN1_FILE || "",
+    updatedSinceOverride: process.env.OVERRIDE_UPDATED_SINCE || "",
+    nowUtcOverride: process.env.OVERRIDE_NOW_UTC || "",
+    cityKeyFilter: process.env.CITY_KEY_FILTER || ""
   };
 }
 
+function stringField(value) {
+  return { value };
+}
+
 function int64Field(value) {
-  return {
-    value
-  };
+  return { value };
 }
 
 function timestampField(value) {
   const date = value instanceof Date ? value : new Date(value);
-  return {
-    value: date.getTime()
-  };
+  return { value: date.getTime() };
 }
 
 function safeTimestampField(value) {
@@ -372,9 +621,7 @@ function safeTimestampField(value) {
 }
 
 function stringListField(values) {
-  return {
-    value: values
-  };
+  return { value: values };
 }
 
 function normalizePem(value) {
@@ -399,9 +646,9 @@ function createSigningKey(value) {
       return crypto.createPrivateKey(pem);
     } catch (fallbackError) {
       throw new Error(
-        `Unable to parse CLOUDKIT_SERVER_PRIVATE_KEY as an unencrypted PEM key. ` +
-        `Primary parser failed with: ${primaryError.message}. ` +
-        `Fallback parser failed with: ${fallbackError.message}.`
+        `Unable to parse CLOUDKIT_SERVER_PRIVATE_KEY as an unencrypted PEM key. `
+        + `Primary parser failed with: ${primaryError.message}. `
+        + `Fallback parser failed with: ${fallbackError.message}.`
       );
     }
   }
@@ -421,6 +668,13 @@ function signMessage(message) {
 
 function cloudKitPath(subpath) {
   return `/database/1/${environment.containerId}/${environment.environment}/${environment.database}${subpath}`;
+}
+
+async function cloudKitModify(operations) {
+  return cloudKitRequest("/records/modify", {
+    atomic: false,
+    operations
+  });
 }
 
 async function cloudKitRequest(subpath, body) {
@@ -496,16 +750,15 @@ async function loadReverseGeocoder() {
   }
 
   const buckets = new Map();
-  const rows = citiesRaw.split("\n");
   let inserted = 0;
 
-  for (const line of rows) {
+  for (const line of citiesRaw.split("\n")) {
     if (!line) {
       continue;
     }
 
     const columns = line.split("\t");
-    if (columns.length < 15) {
+    if (columns.length < 18) {
       continue;
     }
 
@@ -520,6 +773,7 @@ async function loadReverseGeocoder() {
     const cityName = columns[2] || columns[1];
     const regionName = admin1Names.get(`${countryCode}.${admin1Code}`) || admin1Code;
     const countryName = countryNames.get(countryCode) || countryCode;
+    const timeZoneID = validTimeZoneID(columns[17] || "Etc/UTC");
 
     const bucketKey = geoBucketKey(latitude, longitude);
     const bucket = buckets.get(bucketKey) || [];
@@ -529,7 +783,8 @@ async function loadReverseGeocoder() {
       country: countryName,
       latitude,
       longitude,
-      population: Number.parseInt(columns[14], 10) || 0
+      population: Number.parseInt(columns[14], 10) || 0,
+      timeZoneID
     });
     buckets.set(bucketKey, bucket);
     inserted += 1;
@@ -545,16 +800,21 @@ async function loadReverseGeocoder() {
 
 function inferPlaceComponents(place, reverseGeocoder) {
   if (!reverseGeocoder) {
-    return { city: "", region: "", country: "" };
+    return { city: "", region: "", country: "", timeZoneID: "Etc/UTC" };
   }
 
   const latitude = Number.parseFloat(place.lat);
   const longitude = Number.parseFloat(place.lon);
   if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-    return { city: "", region: "", country: "" };
+    return { city: "", region: "", country: "", timeZoneID: "Etc/UTC" };
   }
 
-  return reverseGeocoder.lookup(latitude, longitude) || { city: "", region: "", country: "" };
+  return reverseGeocoder.lookup(latitude, longitude) || {
+    city: "",
+    region: "",
+    country: "",
+    timeZoneID: "Etc/UTC"
+  };
 }
 
 function normalizeCountry(rawCountry, fallbackCountry) {
@@ -601,6 +861,7 @@ function lookupNearestCity(buckets, lat, lon) {
           city: candidate.city,
           region: candidate.region,
           country: candidate.country,
+          timeZoneID: candidate.timeZoneID,
           distance,
           population: candidate.population
         };
@@ -611,7 +872,8 @@ function lookupNearestCity(buckets, lat, lon) {
       return {
         city: best.city,
         region: best.region,
-        country: best.country
+        country: best.country,
+        timeZoneID: best.timeZoneID
       };
     }
   }
@@ -630,7 +892,95 @@ function haversineKilometers(lat1, lon1, lat2, lon2) {
   return earthRadiusKm * c;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+function validTimeZoneID(candidate) {
+  const timeZoneID = compactWhitespace(candidate);
+  if (!timeZoneID) {
+    return "Etc/UTC";
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timeZoneID }).format(new Date());
+    return timeZoneID;
+  } catch {
+    return "Etc/UTC";
+  }
+}
+
+function zonedDateParts(date, timeZoneID) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timeZoneID,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  });
+
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    year: Number.parseInt(parts.year, 10),
+    month: Number.parseInt(parts.month, 10),
+    day: Number.parseInt(parts.day, 10),
+    hour: Number.parseInt(parts.hour, 10),
+    minute: Number.parseInt(parts.minute, 10),
+    second: Number.parseInt(parts.second, 10)
+  };
+}
+
+function formatLocalDate(parts) {
+  return `${parts.year.toString().padStart(4, "0")}-${parts.month.toString().padStart(2, "0")}-${parts.day.toString().padStart(2, "0")}`;
+}
+
+function zonedLocalDateTimeToUtc(localDate, hour, minute, second, timeZoneID) {
+  const [year, month, day] = localDate.split("-").map((value) => Number.parseInt(value, 10));
+  let guess = Date.UTC(year, month - 1, day, hour, minute, second);
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const actual = zonedDateParts(new Date(guess), timeZoneID);
+    const desired = Date.UTC(year, month - 1, day, hour, minute, second);
+    const actualAsUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second);
+    const delta = actualAsUtc - desired;
+
+    if (delta === 0) {
+      return new Date(guess);
+    }
+
+    guess -= delta;
+  }
+
+  return new Date(guess);
+}
+
+function chunkArray(values, chunkSize) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += chunkSize) {
+    chunks.push(values.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+export {
+  buildDueDigestCandidateForCity,
+  buildDueDigestCandidates,
+  digestRecordName,
+  formatLocalDate,
+  pendingRecordName,
+  validTimeZoneID,
+  zonedDateParts,
+  zonedLocalDateTimeToUtc
+};
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

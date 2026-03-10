@@ -74,6 +74,8 @@ struct CityDigest: Codable, Hashable, Identifiable {
     let merchantCount: Int
     let merchantIDs: [String]
     let topMerchantNames: [String]
+    let timeZoneID: String?
+    let deliveryLocalDate: String?
 
     var summaryLine: String {
         guard !topMerchantNames.isEmpty else {
@@ -615,6 +617,8 @@ extension CityDigest {
         self.merchantCount = Int((record["merchantCount"] as? Int64) ?? 0)
         self.merchantIDs = (record["merchantIDs"] as? [String]) ?? []
         self.topMerchantNames = (record["topMerchantNames"] as? [String]) ?? []
+        self.timeZoneID = record["timeZoneID"] as? String
+        self.deliveryLocalDate = record["deliveryLocalDate"] as? String
     }
 }
 

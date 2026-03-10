@@ -2,15 +2,19 @@ name: CloudKit Digest Sync
 
 on:
   schedule:
-    - cron: "17 14 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       updated_since:
         description: "Override the BTC Map updated_since anchor (ISO-8601)"
         required: false
         type: string
-      digest_window_hours:
-        description: "Override digest window length in hours for this run"
+      override_now_utc:
+        description: "Override current UTC time for delivery logic (ISO-8601)"
+        required: false
+        type: string
+      city_key_filter:
+        description: "Only process one city key for targeted testing"
         required: false
         type: string
 
@@ -51,9 +55,10 @@ jobs:
           CLOUDKIT_SERVER_KEY_ID: ${{ secrets.CLOUDKIT_SERVER_KEY_ID }}
           CLOUDKIT_SERVER_PRIVATE_KEY: ${{ secrets.CLOUDKIT_SERVER_PRIVATE_KEY }}
           BTCMAP_INITIAL_UPDATED_SINCE: ${{ secrets.BTCMAP_INITIAL_UPDATED_SINCE }}
-          DIGEST_WINDOW_HOURS: ${{ github.event.inputs.digest_window_hours || secrets.DIGEST_WINDOW_HOURS }}
           GEONAMES_CITIES_FILE: ${{ runner.temp }}/geonames/cities1000.txt
           GEONAMES_COUNTRIES_FILE: ${{ runner.temp }}/geonames/countryInfo.txt
           GEONAMES_ADMIN1_FILE: ${{ runner.temp }}/geonames/admin1CodesASCII.txt
           OVERRIDE_UPDATED_SINCE: ${{ github.event.inputs.updated_since }}
+          OVERRIDE_NOW_UTC: ${{ github.event.inputs.override_now_utc }}
+          CITY_KEY_FILTER: ${{ github.event.inputs.city_key_filter }}
         run: node scripts/cloudkit_digest_sync.mjs

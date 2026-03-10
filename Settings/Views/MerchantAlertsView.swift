@@ -88,7 +88,7 @@ struct MerchantAlertsView: View {
                 Text("Stay in the loop")
                     .font(.headline)
 
-                Text("Pick a city and we’ll notify you when new businesses start accepting Bitcoin there.")
+                Text("Pick a city and we’ll send a daily morning digest when new businesses start accepting Bitcoin there.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -118,7 +118,7 @@ struct MerchantAlertsView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
         } footer: {
-            Text("BitLocal checks for new Bitcoin-accepting businesses in your city every day and sends you a notification when it finds new ones.")
+            Text("BitLocal sends a daily morning digest for your city when it finds new Bitcoin-accepting businesses there.")
                 .foregroundStyle(secondaryTextColor)
         }
         .groupedCardListRowBackground(if: shouldUseGlassyRows)
@@ -136,7 +136,7 @@ struct MerchantAlertsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(subscription.displayName)
                         .font(.headline)
-                    Text("We’ll let you know when new places start accepting Bitcoin here.")
+                    Text("We’ll send a daily morning digest when new places start accepting Bitcoin here.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

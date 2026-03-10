@@ -3,7 +3,7 @@
 BitLocal’s phase 2 merchant alerts use three moving parts:
 
 - The iOS app creates a `CKQuerySubscription` for `CityDigest` records in CloudKit.
-- A daily GitHub Actions workflow runs `scripts/cloudkit_digest_sync.mjs`.
+- An hourly GitHub Actions workflow runs `scripts/cloudkit_digest_sync.mjs`.
 - An external Mac mini keepalive job updates [`.github/keepalive.md`](REPO_ROOT_PLACEHOLDER/.github/keepalive.md) once a month so GitHub keeps the scheduled workflow active.
 
 ## CloudKit setup
@@ -13,12 +13,17 @@ BitLocal’s phase 2 merchant alerts use three moving parts:
 3. In CloudKit Dashboard, create these public-database record types:
    - `Merchant`
    - `CityDigest`
+   - `CityDigestPending`
    - `SyncState`
 4. Add queryable fields:
    - `Merchant.cityKey`
+   - `Merchant.createdAt`
    - `Merchant.updatedAt`
+   - `CityDigestPending.cityKey`
+   - `CityDigestPending.merchantCreatedAt`
+   - `CityDigestPending.timeZoneID`
    - `CityDigest.cityKey`
-   - `CityDigest.digestWindowStart`
+   - `CityDigest.digestWindowEnd`
 5. Add these fields:
 
 | Record type | Field | Type |
@@ -31,13 +36,22 @@ BitLocal’s phase 2 merchant alerts use three moving parts:
 | `Merchant` | `updatedAt` | Timestamp |
 | `Merchant` | `deletedAt` | Timestamp |
 | `Merchant` | `sourceHash` | String |
+| `Merchant` | `timeZoneID` | String |
 | `CityDigest` | `cityKey` | String |
 | `CityDigest` | `cityDisplayName` | String |
+| `CityDigest` | `deliveryLocalDate` | String |
 | `CityDigest` | `digestWindowStart` | Timestamp |
 | `CityDigest` | `digestWindowEnd` | Timestamp |
 | `CityDigest` | `merchantCount` | Int(64) |
 | `CityDigest` | `merchantIDs` | List<String> |
+| `CityDigest` | `timeZoneID` | String |
 | `CityDigest` | `topMerchantNames` | List<String> |
+| `CityDigestPending` | `cityKey` | String |
+| `CityDigestPending` | `cityDisplayName` | String |
+| `CityDigestPending` | `timeZoneID` | String |
+| `CityDigestPending` | `merchantID` | String |
+| `CityDigestPending` | `merchantName` | String |
+| `CityDigestPending` | `merchantCreatedAt` | Timestamp |
 | `SyncState` | `incrementalAnchorUpdatedSince` | String |
 | `SyncState` | `lastSuccessfulSyncAt` | Timestamp |
 | `SyncState` | `lastProcessedDigestWindow` | Timestamp |
@@ -55,9 +69,8 @@ Create these repository secrets:
 | `CLOUDKIT_SERVER_KEY_ID` | Yes | The Key ID shown after creating the CloudKit server-to-server key |
 | `CLOUDKIT_SERVER_PRIVATE_KEY` | Yes | The full PEM private key created locally for that server-to-server key |
 | `BTCMAP_INITIAL_UPDATED_SINCE` | No | Bootstrap anchor for the very first sync |
-| `DIGEST_WINDOW_HOURS` | No | Defaults to `24` |
 
-The workflow lives at [`.github/workflows/cloudkit-digest-sync.yml`](REPO_ROOT_PLACEHOLDER/.github/workflows/cloudkit-digest-sync.yml). It runs daily at `14:17 UTC`, supports manual dispatch, and keeps concurrency to one sync at a time.
+The workflow lives at [`.github/workflows/cloudkit-digest-sync.yml`](REPO_ROOT_PLACEHOLDER/.github/workflows/cloudkit-digest-sync.yml). It runs hourly at `:17`, supports manual dispatch with `updated_since`, `override_now_utc`, and `city_key_filter`, and keeps concurrency to one sync at a time.
 
 ## Server-to-server key setup
 
@@ -101,6 +114,6 @@ The job runs immediately on load, then every 30 days. It updates `.github/keepal
 
 ## Notes
 
-- The first GitHub sync bootstraps merchant records and sync state without creating digests.
-- Subsequent runs create `CityDigest` records for merchants whose `created_at` falls inside the digest window.
+- The first GitHub sync bootstraps merchant records and sync state without queueing digests.
+- Subsequent runs queue newly created merchants into `CityDigestPending` and only create `CityDigest` records once the subscribed city reaches its 8:00 AM local delivery window.
 - The iOS app reads those digest records directly from CloudKit when a subscription notification arrives.
