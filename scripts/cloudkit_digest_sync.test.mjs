@@ -20,6 +20,7 @@ test("buildDueDigestCandidateForCity waits until local morning", () => {
   const pending = [
     {
       recordName: "pending-1",
+      locationID: "geonames:1234",
       cityKey: "honolulu|hi|united states",
       cityDisplayName: "Honolulu, HI, United States",
       timeZoneID: "Pacific/Honolulu",
@@ -29,7 +30,7 @@ test("buildDueDigestCandidateForCity waits until local morning", () => {
     }
   ];
 
-  const candidate = buildDueDigestCandidateForCity("honolulu|hi|united states", pending, nowUtc);
+  const candidate = buildDueDigestCandidateForCity("geonames:1234", pending, nowUtc);
   assert.equal(candidate, null);
 });
 
@@ -38,6 +39,7 @@ test("buildDueDigestCandidateForCity includes merchants before the city-local bo
   const pending = [
     {
       recordName: "pending-1",
+      locationID: "geonames:1",
       cityKey: "show low|az|united states",
       cityDisplayName: "Show Low, AZ, United States",
       timeZoneID: "America/Phoenix",
@@ -47,6 +49,7 @@ test("buildDueDigestCandidateForCity includes merchants before the city-local bo
     },
     {
       recordName: "pending-2",
+      locationID: "geonames:1",
       cityKey: "show low|az|united states",
       cityDisplayName: "Show Low, AZ, United States",
       timeZoneID: "America/Phoenix",
@@ -56,10 +59,10 @@ test("buildDueDigestCandidateForCity includes merchants before the city-local bo
     }
   ];
 
-  const candidate = buildDueDigestCandidateForCity("show low|az|united states", pending, nowUtc);
+  const candidate = buildDueDigestCandidateForCity("geonames:1", pending, nowUtc);
   assert.ok(candidate);
   assert.equal(candidate.deliveryLocalDate, "2026-03-09");
-  assert.equal(candidate.recordName, digestRecordName("show low|az|united states", "2026-03-09"));
+  assert.equal(candidate.recordName, digestRecordName("geonames:1", "2026-03-09"));
   assert.deepEqual(candidate.merchantIDs, ["1"]);
 });
 
@@ -82,6 +85,7 @@ test("normalizePlace canonicalizes united states region abbreviations", () => {
     "osm:addr:country": "United States"
   }, null);
 
+  assert.equal(normalized.locationID, "legacy:oceanside|california|united states");
   assert.equal(normalized.cityKey, "oceanside|california|united states");
   assert.equal(normalized.cityDisplayName, "Oceanside, California, United States");
 });

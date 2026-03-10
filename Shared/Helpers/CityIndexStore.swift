@@ -2,12 +2,13 @@ import Foundation
 import SQLite3
 
 struct CitySearchResult: Identifiable, Hashable, Sendable {
+    let locationID: String
     let city: String
     let region: String
     let country: String
     let cityKey: String
 
-    var id: String { cityKey }
+    var id: String { locationID }
 
     var displayName: String {
         MerchantAlertsCityNormalizer.displayName(city: city, region: region, country: country)
@@ -20,7 +21,12 @@ struct CitySearchResult: Identifiable, Hashable, Sendable {
     }
 
     var choice: MerchantAlertCityChoice {
-        MerchantAlertCityChoice(city: city, region: region, country: country)
+        MerchantAlertCityChoice(
+            locationID: locationID,
+            city: city,
+            region: region,
+            country: country
+        )
     }
 }
 
@@ -44,7 +50,7 @@ actor CityIndexStore {
         guard await openDatabaseIfNeeded() else { return [] }
 
         let sql = """
-        SELECT city, region, country, city_key
+        SELECT location_id, city, region, country, city_key
         FROM city_search
         ORDER BY ord
         LIMIT ?;
@@ -80,7 +86,7 @@ actor CityIndexStore {
         }
 
         let sql = """
-        SELECT city, region, country, city_key, aliases, ord, bm25(city_search)
+        SELECT location_id, city, region, country, city_key, aliases, ord, bm25(city_search)
         FROM city_search
         WHERE city_search MATCH ?
         ORDER BY bm25(city_search), ord
@@ -99,22 +105,24 @@ actor CityIndexStore {
 
         while sqlite3_step(statement) == SQLITE_ROW {
             guard
-                let city = sqliteColumnString(statement, index: 0),
-                let region = sqliteColumnString(statement, index: 1),
-                let country = sqliteColumnString(statement, index: 2),
-                let cityKey = sqliteColumnString(statement, index: 3),
-                let aliases = sqliteColumnString(statement, index: 4)
+                let locationID = sqliteColumnString(statement, index: 0),
+                let city = sqliteColumnString(statement, index: 1),
+                let region = sqliteColumnString(statement, index: 2),
+                let country = sqliteColumnString(statement, index: 3),
+                let cityKey = sqliteColumnString(statement, index: 4),
+                let aliases = sqliteColumnString(statement, index: 5)
             else {
                 continue
             }
 
             let record = SQLiteCityRecord(
+                locationID: locationID,
                 city: city,
                 region: region,
                 country: country,
                 cityKey: cityKey,
                 aliases: aliases,
-                rank: Int(sqlite3_column_int(statement, 5))
+                rank: Int(sqlite3_column_int(statement, 6))
             )
 
             guard let score = record.matchScore(query: normalizedQuery, tokens: tokens) else {
@@ -137,7 +145,7 @@ actor CityIndexStore {
         guard await openDatabaseIfNeeded() else { return nil }
 
         let sql = """
-        SELECT city, region, country, city_key
+        SELECT location_id, city, region, country, city_key
         FROM city_search
         WHERE city_key = ?
         LIMIT 1;
@@ -150,14 +158,16 @@ actor CityIndexStore {
         sqlite3_bind_text(statement, 1, cityKey, -1, transientSQLiteDestructor)
 
         guard sqlite3_step(statement) == SQLITE_ROW,
-              let city = sqliteColumnString(statement, index: 0),
-              let region = sqliteColumnString(statement, index: 1),
-              let country = sqliteColumnString(statement, index: 2),
-              let storedCityKey = sqliteColumnString(statement, index: 3) else {
+              let locationID = sqliteColumnString(statement, index: 0),
+              let city = sqliteColumnString(statement, index: 1),
+              let region = sqliteColumnString(statement, index: 2),
+              let country = sqliteColumnString(statement, index: 3),
+              let storedCityKey = sqliteColumnString(statement, index: 4) else {
             return nil
         }
 
         return CitySearchResult(
+            locationID: locationID,
             city: city,
             region: region,
             country: country,
@@ -165,9 +175,43 @@ actor CityIndexStore {
         )
     }
 
+    func result(forLocationID locationID: String) async -> CitySearchResult? {
+        guard await openDatabaseIfNeeded() else { return nil }
+
+        let sql = """
+        SELECT location_id, city, region, country, city_key
+        FROM city_search
+        WHERE location_id = ?
+        LIMIT 1;
+        """
+
+        guard let database else { return nil }
+        guard let statement = prepareStatement(sql: sql, database: database) else { return nil }
+        defer { sqlite3_finalize(statement) }
+
+        sqlite3_bind_text(statement, 1, locationID, -1, transientSQLiteDestructor)
+
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let storedLocationID = sqliteColumnString(statement, index: 0),
+              let city = sqliteColumnString(statement, index: 1),
+              let region = sqliteColumnString(statement, index: 2),
+              let country = sqliteColumnString(statement, index: 3),
+              let cityKey = sqliteColumnString(statement, index: 4) else {
+            return nil
+        }
+
+        return CitySearchResult(
+            locationID: storedLocationID,
+            city: city,
+            region: region,
+            country: country,
+            cityKey: cityKey
+        )
+    }
+
     func recommendedCities(
         near choice: MerchantAlertCityChoice,
-        excluding excludedCityKeys: Set<String> = [],
+        excluding excludedLocationIDs: Set<String> = [],
         limit: Int
     ) async -> [CitySearchResult] {
         guard await openDatabaseIfNeeded() else { return [] }
@@ -175,8 +219,8 @@ actor CityIndexStore {
         let normalizedCountry = MerchantAlertsCityNormalizer.normalizedComponent(choice.country)
 
         var collected: [CitySearchResult] = []
-        var seenKeys = excludedCityKeys
-        seenKeys.insert(choice.cityKey)
+        var seenKeys = excludedLocationIDs
+        seenKeys.insert(choice.locationID)
 
         if !normalizedCountry.isEmpty {
             let countryMatches = executeRecommendedQuery(
@@ -240,16 +284,18 @@ actor CityIndexStore {
 
         while sqlite3_step(statement) == SQLITE_ROW {
             guard
-                let city = sqliteColumnString(statement, index: 0),
-                let region = sqliteColumnString(statement, index: 1),
-                let country = sqliteColumnString(statement, index: 2),
-                let cityKey = sqliteColumnString(statement, index: 3)
+                let locationID = sqliteColumnString(statement, index: 0),
+                let city = sqliteColumnString(statement, index: 1),
+                let region = sqliteColumnString(statement, index: 2),
+                let country = sqliteColumnString(statement, index: 3),
+                let cityKey = sqliteColumnString(statement, index: 4)
             else {
                 continue
             }
 
             results.append(
                 CitySearchResult(
+                    locationID: locationID,
                     city: city,
                     region: region,
                     country: country,
@@ -263,7 +309,7 @@ actor CityIndexStore {
 
     private func executeRecommendedQuery(pattern: String, limit: Int) -> [CitySearchResult] {
         let sql = """
-        SELECT city, region, country, city_key
+        SELECT location_id, city, region, country, city_key
         FROM city_search
         WHERE city_key LIKE ?
         ORDER BY ord
@@ -282,16 +328,18 @@ actor CityIndexStore {
 
         while sqlite3_step(statement) == SQLITE_ROW {
             guard
-                let city = sqliteColumnString(statement, index: 0),
-                let region = sqliteColumnString(statement, index: 1),
-                let country = sqliteColumnString(statement, index: 2),
-                let cityKey = sqliteColumnString(statement, index: 3)
+                let locationID = sqliteColumnString(statement, index: 0),
+                let city = sqliteColumnString(statement, index: 1),
+                let region = sqliteColumnString(statement, index: 2),
+                let country = sqliteColumnString(statement, index: 3),
+                let cityKey = sqliteColumnString(statement, index: 4)
             else {
                 continue
             }
 
             results.append(
                 CitySearchResult(
+                    locationID: locationID,
                     city: city,
                     region: region,
                     country: country,
@@ -309,9 +357,9 @@ actor CityIndexStore {
         seenKeys: inout Set<String>,
         limit: Int
     ) {
-        for candidate in candidates where !seenKeys.contains(candidate.cityKey) {
+        for candidate in candidates where !seenKeys.contains(candidate.locationID) {
             collected.append(candidate)
-            seenKeys.insert(candidate.cityKey)
+            seenKeys.insert(candidate.locationID)
             if collected.count == limit {
                 break
             }
@@ -345,6 +393,7 @@ actor CityIndexStore {
 private let transientSQLiteDestructor = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
 private struct SQLiteCityRecord: Sendable {
+    let locationID: String
     let city: String
     let region: String
     let country: String
@@ -368,7 +417,13 @@ private struct SQLiteCityRecord: Sendable {
     }
 
     var result: CitySearchResult {
-        CitySearchResult(city: city, region: region, country: country, cityKey: cityKey)
+        CitySearchResult(
+            locationID: locationID,
+            city: city,
+            region: region,
+            country: country,
+            cityKey: cityKey
+        )
     }
 
     func matchScore(query: String, tokens: [String]) -> Int? {

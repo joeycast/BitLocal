@@ -266,7 +266,7 @@ struct MerchantAlertCityPickerView: View {
             ReverseGeocodingSpatialKey.key(for: $0.coordinate, precision: 3)
         } ?? "no-location"
 
-        let subscriptionKey = merchantAlertsManager.currentSubscription?.cityKey ?? "no-subscription"
+        let subscriptionKey = merchantAlertsManager.currentSubscription?.locationID ?? "no-subscription"
         return "\(contentViewModel.locationManager.authorizationStatus.rawValue)|\(locationKey)|\(subscriptionKey)"
     }
 
@@ -318,7 +318,12 @@ final class MerchantAlertCityPickerModel: ObservableObject {
         activeSubscription: CitySubscription?
     ) async {
         activeAlertCity = activeSubscription.map {
-            MerchantAlertCityChoice(city: $0.city, region: $0.region, country: $0.country)
+            MerchantAlertCityChoice(
+                locationID: $0.locationID,
+                city: $0.city,
+                region: $0.region,
+                country: $0.country
+            )
         }
 
         await store.preloadIfNeeded()
@@ -400,7 +405,12 @@ final class MerchantAlertCityPickerModel: ObservableObject {
                 return
             }
 
-            let choice = MerchantAlertCityChoice(city: city, region: region, country: country)
+            let choice = MerchantAlertCityChoice(
+                locationID: "legacy:\(MerchantAlertsCityNormalizer.cityKey(city: city, region: region, country: country))",
+                city: city,
+                region: region,
+                country: country
+            )
             let matchedResult = await store.result(forCityKey: choice.cityKey)
             guard !Task.isCancelled else { return }
 
@@ -409,7 +419,7 @@ final class MerchantAlertCityPickerModel: ObservableObject {
                 displayName: matchedResult?.displayName ?? choice.displayName
             )
 
-            if resolvedLocationCity.choice.cityKey == activeAlertCity?.cityKey {
+            if resolvedLocationCity.choice.locationID == activeAlertCity?.locationID {
                 currentLocationCity = nil
             } else {
                 currentLocationCity = resolvedLocationCity
@@ -431,10 +441,10 @@ final class MerchantAlertCityPickerModel: ObservableObject {
 
         var excludedKeys: Set<String> = []
         if let currentLocationCity {
-            excludedKeys.insert(currentLocationCity.choice.cityKey)
+            excludedKeys.insert(currentLocationCity.choice.locationID)
         }
         if let activeAlertCity {
-            excludedKeys.insert(activeAlertCity.cityKey)
+            excludedKeys.insert(activeAlertCity.locationID)
         }
 
         recommendedCities = await store.recommendedCities(

@@ -8,6 +8,7 @@ import UserNotifications
 
 struct CitySubscription: Codable, Hashable, Identifiable {
     let id: UUID
+    let locationID: String
     let cityKey: String
     let city: String
     let region: String
@@ -18,6 +19,7 @@ struct CitySubscription: Codable, Hashable, Identifiable {
 
     init(
         id: UUID = UUID(),
+        locationID: String,
         cityKey: String,
         city: String,
         region: String,
@@ -27,6 +29,7 @@ struct CitySubscription: Codable, Hashable, Identifiable {
         isEnabled: Bool = true
     ) {
         self.id = id
+        self.locationID = locationID
         self.cityKey = cityKey
         self.city = city
         self.region = region
@@ -38,6 +41,7 @@ struct CitySubscription: Codable, Hashable, Identifiable {
 
     init(choice: MerchantAlertCityChoice) {
         self.init(
+            locationID: choice.locationID,
             cityKey: choice.cityKey,
             city: choice.city,
             region: choice.region,
@@ -45,15 +49,29 @@ struct CitySubscription: Codable, Hashable, Identifiable {
             displayName: choice.displayName
         )
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        cityKey = try container.decodeIfPresent(String.self, forKey: .cityKey) ?? ""
+        locationID = try container.decodeIfPresent(String.self, forKey: .locationID) ?? cityKey
+        city = try container.decode(String.self, forKey: .city)
+        region = try container.decode(String.self, forKey: .region)
+        country = try container.decode(String.self, forKey: .country)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+    }
 }
 
 struct MerchantAlertCityChoice: Hashable, Identifiable {
+    let locationID: String
     let city: String
     let region: String
     let country: String
 
     var id: String {
-        cityKey
+        locationID
     }
 
     var cityKey: String {
@@ -67,6 +85,7 @@ struct MerchantAlertCityChoice: Hashable, Identifiable {
 
 struct CityDigest: Codable, Hashable, Identifiable {
     let id: String
+    let locationID: String?
     let cityKey: String
     let cityDisplayName: String
     let digestWindowStart: Date?
@@ -318,20 +337,20 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         let subscription = CitySubscription(choice: choice)
 
         do {
-            if let previous = currentSubscription, previous.cityKey != subscription.cityKey {
-                Debug.log("Merchant alerts: deleting previous CloudKit subscription for \(previous.cityKey)")
+            if let previous = currentSubscription, previous.locationID != subscription.locationID {
+                Debug.log("Merchant alerts: deleting previous CloudKit subscription for \(previous.locationID)")
                 try await deleteCloudKitSubscription(for: previous)
             }
 
-            Debug.log("Merchant alerts: saving CloudKit subscription for \(subscription.cityKey)")
+            Debug.log("Merchant alerts: saving CloudKit subscription for \(subscription.locationID)")
             try await saveCloudKitSubscription(for: subscription)
-            Debug.log("Merchant alerts: saved CloudKit subscription for \(subscription.cityKey)")
+            Debug.log("Merchant alerts: saved CloudKit subscription for \(subscription.locationID)")
             subscriptions = [subscription]
             persistSubscriptions()
             registerForRemoteNotificationsIfNeeded()
         } catch {
             errorMessage = error.localizedDescription
-            Debug.log("Merchant alerts: failed to enable notifications for \(subscription.cityKey): \(error.localizedDescription)")
+            Debug.log("Merchant alerts: failed to enable notifications for \(subscription.locationID): \(error.localizedDescription)")
         }
 
         await refreshStatus()
@@ -466,11 +485,11 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func saveCloudKitSubscription(for subscription: CitySubscription) async throws {
-        let predicate = NSPredicate(format: "cityKey == %@", subscription.cityKey)
+        let predicate = NSPredicate(format: "locationID == %@", subscription.locationID)
         let querySubscription = CKQuerySubscription(
             recordType: digestRecordType,
             predicate: predicate,
-            subscriptionID: cloudKitSubscriptionID(for: subscription.cityKey),
+            subscriptionID: cloudKitSubscriptionID(for: subscription.locationID),
             options: [.firesOnRecordCreation]
         )
 
@@ -483,7 +502,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func deleteCloudKitSubscription(for subscription: CitySubscription) async throws {
-        _ = try await publicDatabase.merchantAlertsDeleteSubscription(withID: cloudKitSubscriptionID(for: subscription.cityKey))
+        _ = try await publicDatabase.merchantAlertsDeleteSubscription(withID: cloudKitSubscriptionID(for: subscription.locationID))
     }
 
     private func fetchDigest(recordID: CKRecord.ID) async throws -> CityDigest {
@@ -554,8 +573,8 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         }
     }
 
-    private func cloudKitSubscriptionID(for cityKey: String) -> String {
-        let digest = SHA256.hash(data: Data(cityKey.utf8))
+    private func cloudKitSubscriptionID(for locationID: String) -> String {
+        let digest = SHA256.hash(data: Data(locationID.utf8))
         let hashed = digest.compactMap { String(format: "%02x", $0) }.joined()
         return "city-digest-\(hashed)"
     }
@@ -566,17 +585,29 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             let querySubscriptions = allSubscriptions.compactMap { $0 as? CKQuerySubscription }
 
             guard let querySubscription = querySubscriptions.first(where: { $0.recordType == digestRecordType }),
-                  let cityKey = extractCityKey(from: querySubscription) else {
+                  let locationID = extractLocationID(from: querySubscription) else {
                 return
             }
 
-            let restored = CitySubscription(
-                cityKey: cityKey,
-                city: prettifyCityKeyComponent(cityKey, index: 0),
-                region: prettifyCityKeyComponent(cityKey, index: 1),
-                country: prettifyCityKeyComponent(cityKey, index: 2),
-                displayName: prettifyDisplayName(from: cityKey)
-            )
+            let restored = if let matchedCity = await CityIndexStore.shared.result(forLocationID: locationID) {
+                CitySubscription(
+                    locationID: matchedCity.locationID,
+                    cityKey: matchedCity.cityKey,
+                    city: matchedCity.city,
+                    region: matchedCity.region,
+                    country: matchedCity.country,
+                    displayName: matchedCity.displayName
+                )
+            } else {
+                CitySubscription(
+                    locationID: locationID,
+                    cityKey: locationID,
+                    city: "",
+                    region: "",
+                    country: "",
+                    displayName: locationID
+                )
+            }
 
             subscriptions = [restored]
             persistSubscriptions()
@@ -585,45 +616,11 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         }
     }
 
-    private func extractCityKey(from subscription: CKQuerySubscription) -> String? {
+    private func extractLocationID(from subscription: CKQuerySubscription) -> String? {
         let format = subscription.predicate.predicateFormat
         let matches = format.matches(of: /"([^"]+)"/)
         guard let last = matches.last else { return nil }
         return String(last.1)
-    }
-
-    private func prettifyCityKeyComponent(_ cityKey: String, index: Int) -> String {
-        let parts = cityKey.split(separator: "|").map(String.init)
-        guard parts.indices.contains(index) else { return "" }
-        return prettifyComponent(parts[index])
-    }
-
-    private func prettifyDisplayName(from cityKey: String) -> String {
-        cityKey
-            .split(separator: "|")
-            .map { prettifyComponent(String($0)) }
-            .filter { !$0.isEmpty }
-            .joined(separator: ", ")
-    }
-
-    private func prettifyComponent(_ component: String) -> String {
-        let uppercaseShortForms: Set<String> = [
-            "al", "ak", "az", "ar", "ca", "co", "ct", "dc", "de", "fl", "ga", "hi", "ia", "id",
-            "il", "in", "ks", "ky", "la", "ma", "md", "me", "mi", "mn", "mo", "ms", "mt", "nc",
-            "nd", "ne", "nh", "nj", "nm", "nv", "ny", "oh", "ok", "or", "pa", "ri", "sc", "sd",
-            "tn", "tx", "ut", "va", "vt", "wa", "wi", "wv", "wy", "uk", "uae", "usa", "us"
-        ]
-
-        return component
-            .split(separator: " ")
-            .map { word in
-                let lower = word.lowercased()
-                if uppercaseShortForms.contains(lower) {
-                    return lower.uppercased()
-                }
-                return lower.prefix(1).uppercased() + lower.dropFirst()
-            }
-            .joined(separator: " ")
     }
 
     private func loadPersistedSubscriptionsData() -> Data? {
@@ -704,6 +701,7 @@ extension CityDigest {
         }
 
         self.id = record.recordID.recordName
+        self.locationID = record["locationID"] as? String
         self.cityKey = cityKey
         self.cityDisplayName = (record["cityDisplayName"] as? String) ?? cityKey
         self.digestWindowStart = record["digestWindowStart"] as? Date

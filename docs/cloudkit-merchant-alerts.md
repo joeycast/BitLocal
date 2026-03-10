@@ -16,12 +16,15 @@ BitLocal’s phase 2 merchant alerts use three moving parts:
    - `CityDigestPending`
    - `SyncState`
 4. Add queryable fields:
+   - `Merchant.locationID`
    - `Merchant.cityKey`
    - `Merchant.createdAt`
    - `Merchant.updatedAt`
+   - `CityDigestPending.locationID`
    - `CityDigestPending.cityKey`
    - `CityDigestPending.merchantCreatedAt`
    - `CityDigestPending.timeZoneID`
+   - `CityDigest.locationID`
    - `CityDigest.cityKey`
    - `CityDigest.digestWindowEnd`
 5. Add these fields:
@@ -29,6 +32,7 @@ BitLocal’s phase 2 merchant alerts use three moving parts:
 | Record type | Field | Type |
 |---|---|---|
 | `Merchant` | `placeID` | String |
+| `Merchant` | `locationID` | String |
 | `Merchant` | `cityKey` | String |
 | `Merchant` | `cityDisplayName` | String |
 | `Merchant` | `displayName` | String |
@@ -37,6 +41,7 @@ BitLocal’s phase 2 merchant alerts use three moving parts:
 | `Merchant` | `deletedAt` | Timestamp |
 | `Merchant` | `sourceHash` | String |
 | `Merchant` | `timeZoneID` | String |
+| `CityDigest` | `locationID` | String |
 | `CityDigest` | `cityKey` | String |
 | `CityDigest` | `cityDisplayName` | String |
 | `CityDigest` | `deliveryLocalDate` | String |
@@ -46,6 +51,7 @@ BitLocal’s phase 2 merchant alerts use three moving parts:
 | `CityDigest` | `merchantIDs` | List<String> |
 | `CityDigest` | `timeZoneID` | String |
 | `CityDigest` | `topMerchantNames` | List<String> |
+| `CityDigestPending` | `locationID` | String |
 | `CityDigestPending` | `cityKey` | String |
 | `CityDigestPending` | `cityDisplayName` | String |
 | `CityDigestPending` | `timeZoneID` | String |
@@ -116,4 +122,5 @@ The job runs immediately on load, then every 30 days. It updates `.github/keepal
 
 - The first GitHub sync bootstraps merchant records and sync state without queueing digests.
 - Subsequent runs queue newly created merchants into `CityDigestPending` and only create `CityDigest` records once the subscribed city reaches its 8:00 AM local delivery window.
+- `locationID` is the canonical join key between the app picker, subscriptions, pending records, and digests. `cityKey` remains as human-readable/debug metadata.
 - The iOS app reads those digest records directly from CloudKit when a subscription notification arrives.

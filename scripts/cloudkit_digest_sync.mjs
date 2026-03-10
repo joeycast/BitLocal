@@ -155,6 +155,7 @@ async function syncMerchant(place, reverseGeocoder, options) {
     recordType: MERCHANT_RECORD_TYPE,
     fields: {
       placeID: stringField(String(place.id)),
+      locationID: stringField(normalized.locationID),
       cityKey: stringField(normalized.cityKey),
       cityDisplayName: stringField(normalized.cityDisplayName),
       displayName: stringField(normalized.displayName),
@@ -162,13 +163,13 @@ async function syncMerchant(place, reverseGeocoder, options) {
       updatedAt: safeTimestampField(place.updated_at),
       deletedAt: safeTimestampField(place.deleted_at),
       sourceHash: stringField(hashObject(place)),
-      timeZoneID: stringField(normalized.timeZoneID)
+    timeZoneID: stringField(normalized.timeZoneID)
     },
     existingRecord
   });
 
-  const priorPendingRecordName = existingMerchant?.cityKey
-    ? pendingRecordName(existingMerchant.cityKey, place.id)
+  const priorPendingRecordName = existingMerchant?.locationID
+    ? pendingRecordName(existingMerchant.locationID, place.id)
     : null;
   const priorPendingRecord = priorPendingRecordName ? await loadRecordOrNull(priorPendingRecordName) : null;
 
@@ -179,11 +180,11 @@ async function syncMerchant(place, reverseGeocoder, options) {
     return;
   }
 
-  if (!options.shouldQueuePending || !normalized.cityKey || !normalized.merchantCreatedAt) {
+  if (!options.shouldQueuePending || !normalized.locationID || !normalized.merchantCreatedAt) {
     if (priorPendingRecordName
       && priorPendingRecord
-      && existingMerchant?.cityKey
-      && existingMerchant.cityKey != normalized.cityKey) {
+      && existingMerchant?.locationID
+      && existingMerchant.locationID != normalized.locationID) {
       await deleteRecords([priorPendingRecordName]);
     }
     return;
@@ -194,7 +195,7 @@ async function syncMerchant(place, reverseGeocoder, options) {
     return;
   }
 
-  const nextPendingRecordName = pendingRecordName(normalized.cityKey, place.id);
+  const nextPendingRecordName = pendingRecordName(normalized.locationID, place.id);
   if (priorPendingRecordName && priorPendingRecordName !== nextPendingRecordName && priorPendingRecord) {
     await deleteRecords([priorPendingRecordName]);
   }
@@ -207,6 +208,7 @@ async function syncMerchant(place, reverseGeocoder, options) {
     recordName: nextPendingRecordName,
     recordType: DIGEST_PENDING_RECORD_TYPE,
     fields: {
+      locationID: stringField(normalized.locationID),
       cityKey: stringField(normalized.cityKey),
       cityDisplayName: stringField(normalized.cityDisplayName),
       timeZoneID: stringField(normalized.timeZoneID),
@@ -236,6 +238,7 @@ async function processDigestCandidate(candidate) {
     recordName: candidate.recordName,
     recordType: DIGEST_RECORD_TYPE,
     fields: {
+      locationID: stringField(candidate.locationID),
       cityKey: stringField(candidate.cityKey),
       cityDisplayName: stringField(candidate.cityDisplayName),
       digestWindowStart: safeTimestampField(candidate.digestWindowStart),
@@ -360,6 +363,7 @@ async function queryPendingRecords(cityKeyFilter = "") {
     recordType: DIGEST_PENDING_RECORD_TYPE,
     desiredKeys: [
       "cityKey",
+      "locationID",
       "cityDisplayName",
       "timeZoneID",
       "merchantID",
@@ -434,6 +438,7 @@ function decodeSyncStateRecord(fields) {
 
 function decodeMerchantRecord(fields) {
   return {
+    locationID: unwrapStringField(fields.locationID) || unwrapStringField(fields.cityKey),
     cityKey: unwrapStringField(fields.cityKey),
     timeZoneID: unwrapStringField(fields.timeZoneID)
   };
@@ -448,6 +453,7 @@ function decodeDigestRecord(record) {
 function decodePendingRecord(record) {
   return {
     recordName: record.recordName,
+    locationID: unwrapStringField(record.fields.locationID) || unwrapStringField(record.fields.cityKey),
     cityKey: unwrapStringField(record.fields.cityKey),
     cityDisplayName: unwrapStringField(record.fields.cityDisplayName),
     timeZoneID: validTimeZoneID(unwrapStringField(record.fields.timeZoneID)),
@@ -461,27 +467,27 @@ function buildDueDigestCandidates(pendingRecords, nowUtc) {
   const grouped = new Map();
 
   for (const record of pendingRecords) {
-    if (!record.cityKey || !record.merchantCreatedAt) {
+    if (!record.locationID || !record.merchantCreatedAt) {
       continue;
     }
 
-    const bucket = grouped.get(record.cityKey) || [];
+    const bucket = grouped.get(record.locationID) || [];
     bucket.push(record);
-    grouped.set(record.cityKey, bucket);
+    grouped.set(record.locationID, bucket);
   }
 
   const candidates = [];
-  for (const [cityKey, records] of grouped.entries()) {
-    const candidate = buildDueDigestCandidateForCity(cityKey, records, nowUtc);
+  for (const [locationID, records] of grouped.entries()) {
+    const candidate = buildDueDigestCandidateForCity(locationID, records, nowUtc);
     if (candidate) {
       candidates.push(candidate);
     }
   }
 
-  return candidates.sort((lhs, rhs) => lhs.cityKey.localeCompare(rhs.cityKey));
+  return candidates.sort((lhs, rhs) => lhs.locationID.localeCompare(rhs.locationID));
 }
 
-function buildDueDigestCandidateForCity(cityKey, records, nowUtc) {
+function buildDueDigestCandidateForCity(locationID, records, nowUtc) {
   const timeZoneID = validTimeZoneID(records.find((record) => record.timeZoneID)?.timeZoneID || "Etc/UTC");
   const localNow = zonedDateParts(nowUtc, timeZoneID);
   if (localNow.hour < DELIVERY_HOUR_LOCAL) {
@@ -508,8 +514,9 @@ function buildDueDigestCandidateForCity(cityKey, records, nowUtc) {
   ).slice(0, 5);
 
   return {
-    recordName: digestRecordName(cityKey, deliveryLocalDate),
-    cityKey,
+    recordName: digestRecordName(locationID, deliveryLocalDate),
+    locationID,
+    cityKey: eligiblePending[0].cityKey,
     cityDisplayName: eligiblePending[0].cityDisplayName,
     digestWindowStart: eligiblePending[0].merchantCreatedAt,
     digestWindowEnd: digestBoundaryUtc,
@@ -534,12 +541,27 @@ function normalizePlace(place, reverseGeocoder) {
   const timeZoneID = validTimeZoneID(fallback.timeZoneID || "Etc/UTC");
 
   return {
+    locationID: fallback.locationID || inferLocationID(city, region, country, reverseGeocoder),
     cityKey: normalizeCityKey(city, region, country),
     cityDisplayName: [city, region, country].filter(Boolean).join(", "),
     displayName,
     merchantCreatedAt: parseDate(place.created_at),
     timeZoneID
   };
+}
+
+function inferLocationID(city, region, country, reverseGeocoder) {
+  const cityKey = normalizeCityKey(city, region, country);
+  if (!cityKey) {
+    return "";
+  }
+
+  const matched = reverseGeocoder?.lookupByCityKey?.(cityKey);
+  if (matched?.locationID) {
+    return matched.locationID;
+  }
+
+  return `legacy:${cityKey}`;
 }
 
 function normalizeCityKey(city, region, country) {
@@ -591,12 +613,12 @@ function merchantRecordNameForPlace(placeID) {
   return `merchant-${placeID}`;
 }
 
-function pendingRecordName(cityKey, merchantID) {
-  return `city-digest-pending-${hashString(`${cityKey}|${merchantID}`)}`;
+function pendingRecordName(locationID, merchantID) {
+  return `city-digest-pending-${hashString(`${locationID}|${merchantID}`)}`;
 }
 
-function digestRecordName(cityKey, deliveryLocalDate) {
-  return `city-digest-${hashString(`${cityKey}|${deliveryLocalDate}`)}`;
+function digestRecordName(locationID, deliveryLocalDate) {
+  return `city-digest-${hashString(`${locationID}|${deliveryLocalDate}`)}`;
 }
 
 function unwrapStringField(field) {
@@ -803,6 +825,7 @@ async function loadReverseGeocoder() {
   }
 
   const buckets = new Map();
+  const byCityKey = new Map();
   let inserted = 0;
 
   for (const line of citiesRaw.split("\n")) {
@@ -823,23 +846,44 @@ async function loadReverseGeocoder() {
 
     const countryCode = columns[8];
     const admin1Code = columns[10];
+    const geonameId = columns[0];
     const cityName = columns[2] || columns[1];
     const regionName = admin1Names.get(`${countryCode}.${admin1Code}`) || admin1Code;
     const countryName = countryNames.get(countryCode) || countryCode;
     const timeZoneID = validTimeZoneID(columns[17] || "Etc/UTC");
+    const locationID = geonameId ? `geonames:${geonameId}` : "";
+    const cityKey = normalizeCityKey(cityName, regionName, countryName);
+    const population = Number.parseInt(columns[14], 10) || 0;
 
     const bucketKey = geoBucketKey(latitude, longitude);
     const bucket = buckets.get(bucketKey) || [];
     bucket.push({
+      locationID,
+      cityKey,
       city: cityName,
       region: regionName,
       country: countryName,
       latitude,
       longitude,
-      population: Number.parseInt(columns[14], 10) || 0,
+      population,
       timeZoneID
     });
     buckets.set(bucketKey, bucket);
+
+    if (cityKey) {
+      const existing = byCityKey.get(cityKey);
+      if (!existing || population > existing.population) {
+        byCityKey.set(cityKey, {
+          locationID,
+          cityKey,
+          city: cityName,
+          region: regionName,
+          country: countryName,
+          timeZoneID,
+          population
+        });
+      }
+    }
     inserted += 1;
   }
 
@@ -847,22 +891,26 @@ async function loadReverseGeocoder() {
   return {
     lookup(lat, lon) {
       return lookupNearestCity(buckets, lat, lon);
+    },
+    lookupByCityKey(cityKey) {
+      return byCityKey.get(cityKey) || null;
     }
   };
 }
 
 function inferPlaceComponents(place, reverseGeocoder) {
   if (!reverseGeocoder) {
-    return { city: "", region: "", country: "", timeZoneID: "Etc/UTC" };
+    return { locationID: "", city: "", region: "", country: "", timeZoneID: "Etc/UTC" };
   }
 
   const latitude = Number.parseFloat(place.lat);
   const longitude = Number.parseFloat(place.lon);
   if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-    return { city: "", region: "", country: "", timeZoneID: "Etc/UTC" };
+    return { locationID: "", city: "", region: "", country: "", timeZoneID: "Etc/UTC" };
   }
 
   return reverseGeocoder.lookup(latitude, longitude) || {
+    locationID: "",
     city: "",
     region: "",
     country: "",
@@ -928,6 +976,7 @@ function lookupNearestCity(buckets, lat, lon) {
       const distance = haversineKilometers(lat, lon, candidate.latitude, candidate.longitude);
       if (!best || distance < best.distance || (distance === best.distance && candidate.population > best.population)) {
         best = {
+          locationID: candidate.locationID,
           city: candidate.city,
           region: candidate.region,
           country: candidate.country,
@@ -940,6 +989,7 @@ function lookupNearestCity(buckets, lat, lon) {
 
     if (best) {
       return {
+        locationID: best.locationID,
         city: best.city,
         region: best.region,
         country: best.country,

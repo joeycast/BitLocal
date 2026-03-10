@@ -57,4 +57,21 @@ final class MerchantAlertsModelsTests: XCTestCase {
 
         XCTAssertEqual(displayName, "Singapore, Singapore")
     }
+
+    func testCitySubscriptionDecodesLegacyLocationIDFromCityKey() throws {
+        let payload = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "cityKey": "astoria|new york|united states",
+          "city": "Astoria",
+          "region": "New York",
+          "country": "United States",
+          "displayName": "Astoria, New York, United States",
+          "isEnabled": true
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(CitySubscription.self, from: payload)
+        XCTAssertEqual(decoded.locationID, "astoria|new york|united states")
+    }
 }
