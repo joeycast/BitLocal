@@ -16,8 +16,8 @@ struct BusinessesListView: View {
     let maxListResults = 25
     var elements: [Element]
     var userLocation: CLLocation?
-    var currentDetent: PresentationDetent? = nil
     var liveSheetHeight: CGFloat = 0
+    @Binding private var currentDetent: PresentationDetent?
 
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
@@ -26,6 +26,18 @@ struct BusinessesListView: View {
     @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
     @State private var showFocusedSearchCategoryChips = false
     @FocusState private var isSearchFieldFocused: Bool
+
+    init(
+        elements: [Element],
+        userLocation: CLLocation? = nil,
+        currentDetent: Binding<PresentationDetent?> = .constant(nil),
+        liveSheetHeight: CGFloat = 0
+    ) {
+        self.elements = elements
+        self.userLocation = userLocation
+        self.liveSheetHeight = liveSheetHeight
+        self._currentDetent = currentDetent
+    }
 
     private var topSortedElements: [Element] {
         cachedTopSortedElements
@@ -53,13 +65,10 @@ struct BusinessesListView: View {
                     .offset(y: (1 - contentRevealProgress) * -8)
             }
 
-            Group {
-                if viewModel.isLoading {
-                    VStack {
-                        Spacer()
-                        LoadingScreenView()
-                        Spacer()
-                    }
+            ZStack {
+                if isShowingInitialLoadingState {
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if shouldHideCollapsedSheetContent {
                     Spacer(minLength: 0)
                 } else if isFilteringMerchants {
@@ -78,11 +87,17 @@ struct BusinessesListView: View {
                 } else {
                     normalListView
                 }
+
+                if isShowingInitialLoadingState {
+                    LoadingScreenView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.clear)
+                }
             }
             .opacity(contentRevealProgress)
             .offset(y: (1 - contentRevealProgress) * 10)
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
             refreshDiscoveryCache()
@@ -377,8 +392,13 @@ struct BusinessesListView: View {
     }
 
     private var shouldShowCategoryChips: Bool {
+        guard viewModel.hasLoadedInitialData, !isShowingInitialLoadingState else { return false }
         guard viewModel.activeMerchantAlertDigest == nil else { return false }
         return !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
+    }
+
+    private var isShowingInitialLoadingState: Bool {
+        viewModel.isLoading && elements.isEmpty && !viewModel.hasLoadedInitialData
     }
 
     private var shouldHideCollapsedSheetContent: Bool {
@@ -488,24 +508,11 @@ struct BusinessesListView: View {
 
     private func merchantSearchRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
         let cellVM = cellViewModel(for: element)
-        return Button {
-            viewModel.setSelectionSource(.list)
-            viewModel.selectAnnotationForListSelection(
-                element,
-                animated: true,
-                allowCameraMovement: !isLargeSheet
-            )
-            viewModel.path = [element]
+        return NavigationLink {
+            businessDetailDestination(for: element)
         } label: {
-            ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
-                    .padding(.trailing, 18)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
-            }
+            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
         }
-        .buttonStyle(.plain)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -513,24 +520,11 @@ struct BusinessesListView: View {
 
     private func merchantRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
         let cellVM = cellViewModel(for: element)
-        return Button {
-            viewModel.setSelectionSource(.list)
-            viewModel.selectAnnotationForListSelection(
-                element,
-                animated: true,
-                allowCameraMovement: !isLargeSheet
-            )
-            viewModel.path = [element]
+        return NavigationLink {
+            businessDetailDestination(for: element)
         } label: {
-            ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
-                    .padding(.trailing, 18)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
-            }
+            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
         }
-        .buttonStyle(.plain)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -655,6 +649,26 @@ struct BusinessesListView: View {
             .map { $0 }
     }
 
+    private func businessDetailDestination(for element: Element) -> some View {
+        BusinessDetailView(
+            element: element,
+            userLocation: viewModel.userLocation,
+            contentViewModel: viewModel,
+            currentDetent: $currentDetent
+        )
+        .onAppear {
+            prepareListNavigation(for: element)
+        }
+    }
+
+    private func prepareListNavigation(for element: Element) {
+        viewModel.setSelectionSource(.list)
+        viewModel.selectAnnotationForListSelection(
+            element,
+            animated: true,
+            allowCameraMovement: !isLargeSheet
+        )
+    }
     private var shouldHideSheetBackground: Bool {
         guard let detent = currentDetent else { return false }
         return detent != .large
@@ -667,6 +681,7 @@ struct BusinessesListView: View {
     }
 
     private var shouldShowEmptyState: Bool {
+        guard viewModel.hasLoadedInitialData else { return false }
         guard let detent = currentDetent else { return true }
         return detent != collapsedSheetDetent
     }
