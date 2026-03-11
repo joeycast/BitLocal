@@ -122,6 +122,7 @@ struct V4PlaceRecord: Codable, Hashable, Identifiable {
     let osmAddrHouseNumber: String?
     let osmAddrStreet: String?
     let osmAddrCity: String?
+    let osmAddrCountry: String?
     let osmAddrState: String?
     let osmAddrPostcode: String?
     let osmOperator: String?
@@ -164,6 +165,7 @@ struct V4PlaceRecord: Codable, Hashable, Identifiable {
         case osmAddrHouseNumber = "osm:addr:housenumber"
         case osmAddrStreet = "osm:addr:street"
         case osmAddrCity = "osm:addr:city"
+        case osmAddrCountry = "osm:addr:country"
         case osmAddrState = "osm:addr:state"
         case osmAddrPostcode = "osm:addr:postcode"
         case osmOperator = "osm:operator"
@@ -191,14 +193,18 @@ struct V4SyncState: Codable, Hashable {
     var snapshotLastModifiedRFC1123: String?
     var incrementalAnchorUpdatedSince: String?
     var lastSuccessfulSyncAt: String?
+    var bundledGeneratedAt: String?
+    var bundledSourceAnchor: String?
     var schemaVersion: Int
 
-    static let currentSchemaVersion = 3
+    static let currentSchemaVersion = 5
 
     enum CodingKeys: String, CodingKey {
         case snapshotLastModifiedRFC1123
         case incrementalAnchorUpdatedSince
         case lastSuccessfulSyncAt
+        case bundledGeneratedAt
+        case bundledSourceAnchor
         case schemaVersion
     }
 
@@ -206,11 +212,15 @@ struct V4SyncState: Codable, Hashable {
         snapshotLastModifiedRFC1123: String?,
         incrementalAnchorUpdatedSince: String?,
         lastSuccessfulSyncAt: String?,
+        bundledGeneratedAt: String? = nil,
+        bundledSourceAnchor: String? = nil,
         schemaVersion: Int
     ) {
         self.snapshotLastModifiedRFC1123 = snapshotLastModifiedRFC1123
         self.incrementalAnchorUpdatedSince = incrementalAnchorUpdatedSince
         self.lastSuccessfulSyncAt = lastSuccessfulSyncAt
+        self.bundledGeneratedAt = bundledGeneratedAt
+        self.bundledSourceAnchor = bundledSourceAnchor
         self.schemaVersion = schemaVersion
     }
 
@@ -219,6 +229,8 @@ struct V4SyncState: Codable, Hashable {
         snapshotLastModifiedRFC1123 = try container.decodeIfPresent(String.self, forKey: .snapshotLastModifiedRFC1123)
         incrementalAnchorUpdatedSince = try container.decodeIfPresent(String.self, forKey: .incrementalAnchorUpdatedSince)
         lastSuccessfulSyncAt = try container.decodeIfPresent(String.self, forKey: .lastSuccessfulSyncAt)
+        bundledGeneratedAt = try container.decodeIfPresent(String.self, forKey: .bundledGeneratedAt)
+        bundledSourceAnchor = try container.decodeIfPresent(String.self, forKey: .bundledSourceAnchor)
         // Older persisted sync-state files did not include schemaVersion.
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 0
     }
@@ -227,6 +239,8 @@ struct V4SyncState: Codable, Hashable {
         snapshotLastModifiedRFC1123: nil,
         incrementalAnchorUpdatedSince: nil,
         lastSuccessfulSyncAt: nil,
+        bundledGeneratedAt: nil,
+        bundledSourceAnchor: nil,
         schemaVersion: 0
     )
 }
@@ -382,8 +396,14 @@ protocol BTCMapSearchServiceProtocol {
 
 protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
     func loadCachedElements() -> [Element]?
+    func loadCachedElements(ids: [String]) -> [Element]
     func hasCachedData() -> Bool
     func refreshElements(completion: @escaping ([Element]?) -> Void)
+    @discardableResult
+    func upsertFetchedPlace(_ record: V4PlaceRecord) -> Element
+    @discardableResult
+    func persistMergedAddress(_ address: Address?, forMerchantID merchantID: String) -> Element?
+    func processAddressEnrichmentJobs(limit: Int)
     func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void)
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void)
     func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void)

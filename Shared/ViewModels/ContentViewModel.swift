@@ -325,7 +325,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     self.placeholderNameHydrationInFlight.remove(id)
 
                     guard case .success(let record) = result else { return }
-                    let hydrated = V4PlaceToElementMapper.placeRecordToElement(record)
+                    let hydrated = self.btcMapRepository.upsertFetchedPlace(record)
 
                     var byID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
                     byID[id] = hydrated
@@ -439,7 +439,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             guard let self = self else { return }
             self.appState = .background
             self.hasBeenInactive = true
-            self.saveGeocodingCache()
         }
     }
 
@@ -483,7 +482,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                         return
                     }
 
-                    let element = V4PlaceToElementMapper.placeRecordToElement(record)
+                    let element = self.btcMapRepository.upsertFetchedPlace(record)
                     self.upsertElementIntoStore(element)
                     if let coordinate = element.mapCoordinate {
                         self.centerMap(to: coordinate, force: true)
@@ -511,43 +510,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func scheduleGeocodingCacheSave() {
         geocodingCacheSaveWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.saveGeocodingCache()
-        }
-        geocodingCacheSaveWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
     }
 
     private func loadGeocodingCache() {
-        guard let data = try? Data(contentsOf: geocodingCacheFileURL) else { return }
-        do {
-            let decoded = try JSONDecoder().decode([String: ReverseGeocodingCacheEntry].self, from: data)
-            geocodingCache.setValues(decoded)
-            Debug.log("Loaded geocoding cache: \(decoded.count) entries")
-        } catch {
-            do {
-                let legacy = try JSONDecoder().decode([String: Address].self, from: data)
-                let migrated = legacy.mapValues { ReverseGeocodingCacheEntry.forAddress($0) }
-                geocodingCache.setValues(migrated)
-                Debug.log("Migrated geocoding cache: \(migrated.count) entries")
-                scheduleGeocodingCacheSave()
-            } catch {
-                Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
-            }
-        }
+        geocodingCache.setValues([:])
     }
 
-    private func saveGeocodingCache() {
-        let values = geocodingCache.allValues()
-        guard !values.isEmpty else { return }
-        do {
-            let data = try JSONEncoder().encode(values)
-            try data.write(to: geocodingCacheFileURL, options: [.atomic])
-            Debug.log("Saved geocoding cache: \(values.count) entries")
-        } catch {
-            Debug.log("Failed to save geocoding cache: \(error.localizedDescription)")
-        }
-    }
+    private func saveGeocodingCache() {}
 
     private func shouldRefreshAfterInactive() -> Bool {
         // Add logic to determine if refresh is needed
@@ -802,13 +771,18 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private func merchantAlertElements(for digest: CityDigest) -> [Element] {
         let ids = digest.merchantIDs
         guard !ids.isEmpty else { return [] }
+        let cached = btcMapRepository.loadCachedElements(ids: ids)
+        guard !cached.isEmpty else {
+            let inMemory = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
+            return ids.compactMap { inMemory[$0] }
+        }
 
-        let byID = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
+        let byID = Dictionary(uniqueKeysWithValues: cached.map { ($0.id, $0) })
         return ids.compactMap { byID[$0] }
     }
 
     private func merchantAlertMissingIDs(for digest: CityDigest) -> [String] {
-        let currentIDs = Set(allElements.map(\.id))
+        let currentIDs = Set(btcMapRepository.loadCachedElements(ids: digest.merchantIDs).map(\.id))
         return digest.merchantIDs.filter { !currentIDs.contains($0) }
     }
 
@@ -1853,10 +1827,38 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let missingIDs = merchantAlertMissingIDs(for: digest)
         guard !missingIDs.isEmpty else { return }
 
-        Debug.log("Merchant alert digest missing \(missingIDs.count) merchant(s) locally; refreshing merchant dataset")
-        fetchElements { [weak self] in
+        Debug.log("Merchant alert digest missing \(missingIDs.count) merchant(s) locally; fetching merchants by ID")
+
+        let group = DispatchGroup()
+        let resultQueue = DispatchQueue(label: "merchant-alert-digest-fetch")
+        var fetchedElements: [Element] = []
+
+        for id in missingIDs {
+            group.enter()
+            btcMapRepository.fetchPlace(id: id) { [weak self] result in
+                defer { group.leave() }
+                guard let self else { return }
+                guard case .success(let record) = result else { return }
+                guard record.deletedAt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true else { return }
+                let element = self.btcMapRepository.upsertFetchedPlace(record)
+                resultQueue.sync {
+                    fetchedElements.append(element)
+                }
+            }
+        }
+
+        group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard self.activeMerchantAlertDigest?.id == digest.id else { return }
+
+            if !fetchedElements.isEmpty {
+                var byID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
+                for element in fetchedElements {
+                    byID[element.id] = element
+                }
+                self.allElements = Array(byID.values)
+                self.forceMapRefresh = true
+            }
 
             let refreshedElements = self.merchantAlertElements(for: digest)
             self.fitMapToMerchantAlertElements(refreshedElements, animated: true)
@@ -2481,7 +2483,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             btcMapRepository.fetchPlace(id: id) { result in
                 defer { group.leave() }
                 guard case .success(let record) = result else { return }
-                let mapped = V4PlaceToElementMapper.placeRecordToElement(record)
+                let mapped = self.btcMapRepository.upsertFetchedPlace(record)
                 if !(mapped.deletedAt?.isEmpty ?? true) { return }
                 resultQueue.sync {
                     hydratedMembers.append(mapped)
@@ -3022,6 +3024,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 guard let self else { return }
                 self.merchantSearchPreviewHydrationInFlight.remove(id)
                 guard case .success(let hydratedRecord) = result else { return }
+                let hydratedElement = self.btcMapRepository.upsertFetchedPlace(hydratedRecord)
 
                 if let index = self.merchantSearchFreshResults.firstIndex(where: { $0.idString == id }) {
                     self.merchantSearchFreshResults[index] = hydratedRecord
@@ -3029,7 +3032,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 if let index = self.merchantSearchResults.firstIndex(where: { $0.idString == id }) {
                     self.merchantSearchResults[index] = hydratedRecord
                 }
-                self.upsertElementIntoStore(V4PlaceToElementMapper.placeRecordToElement(hydratedRecord))
+                self.upsertElementIntoStore(hydratedElement)
             }
         }
     }
@@ -3047,7 +3050,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     guard let self = self else { return }
                     switch result {
                     case .success(let fullRecord):
-                        let fullElement = V4PlaceToElementMapper.placeRecordToElement(fullRecord)
+                        let fullElement = self.btcMapRepository.upsertFetchedPlace(fullRecord)
                         self.presentMerchantSearchSelection(
                             fullElement,
                             allowCameraMovement: allowCameraMovement
@@ -3081,6 +3084,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         )
         selectedElement = element
         path = [element]
+    }
+
+    @discardableResult
+    func persistResolvedAddress(_ address: Address?, forMerchantID merchantID: String) -> Element? {
+        let updated = btcMapRepository.persistMergedAddress(address, forMerchantID: merchantID)
+        guard let updated else { return nil }
+        upsertElementIntoStore(updated)
+        if selectedElement?.id == merchantID {
+            selectedElement = updated
+        }
+        return updated
     }
 
     private func upsertElementIntoStore(_ element: Element) {
@@ -3204,6 +3218,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                                 }
                                 self.isLoading = false
                                 self.scheduleCommunityPrefetchIfNeeded()
+                                self.btcMapRepository.processAddressEnrichmentJobs(limit: 15)
                                 if self.isInitialStartup {
                                     self.isInitialStartup = false
                                 }
@@ -3236,6 +3251,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                         // Still check for updates, but don't block UI
                         self.checkForUpdatesInBackground()
                     }
+                    self.btcMapRepository.processAddressEnrichmentJobs(limit: 15)
                     return
                 }
             }
@@ -3265,6 +3281,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     
                     self.isLoading = false
                     self.scheduleCommunityPrefetchIfNeeded()
+                    self.btcMapRepository.processAddressEnrichmentJobs(limit: 15)
                     completion?()
                     
                     // Mark initial startup as complete
@@ -3314,6 +3331,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 } else {
                     Debug.log("Background update: No new data available")
                 }
+
+                self.btcMapRepository.processAddressEnrichmentJobs(limit: 15)
             }
         }
     }

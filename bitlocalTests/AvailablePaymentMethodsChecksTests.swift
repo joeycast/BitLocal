@@ -58,6 +58,7 @@ final class AvailablePaymentMethodsChecksTests: XCTestCase {
     ) -> Element {
         let tags = OsmTags(
             addrCity: nil,
+            addrCountry: nil,
             addrHousenumber: nil,
             addrPostcode: nil,
             addrState: nil,

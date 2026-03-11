@@ -108,11 +108,7 @@ struct ReverseGeocodingCacheEntry: Codable {
 
 extension Address {
     private static func normalizedGeocodingComponent(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !value.isEmpty else {
-            return nil
-        }
-        return value
+        normalizedAddressComponent(value)
     }
 
     var hasAnyGeocodingFields: Bool {
@@ -121,7 +117,8 @@ extension Address {
         Address.normalizedGeocodingComponent(cityOrTownName) != nil ||
         Address.normalizedGeocodingComponent(postalCode) != nil ||
         Address.normalizedGeocodingComponent(regionOrStateName) != nil ||
-        Address.normalizedGeocodingComponent(countryName) != nil
+        Address.normalizedGeocodingComponent(countryName) != nil ||
+        Address.normalizedGeocodingComponent(countryCode) != nil
     }
 
     var isCompleteForReverseGeocoding: Bool {

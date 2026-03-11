@@ -9,6 +9,10 @@ struct MerchantSearchResultRow: View {
     let referenceLocation: CLLocation?
 
     var body: some View {
+        let compactAddress = result.formattedAddress(
+            style: .compact(referenceRegionCode: Locale.autoupdatingCurrent.region?.identifier)
+        )
+
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 HStack(spacing: 4) {
@@ -32,8 +36,15 @@ struct MerchantSearchResultRow: View {
                 }
             }
 
-            if let address = result.address, !address.isEmpty {
-                Text(address)
+            if let primaryLine = compactAddress?.primaryLine {
+                Text(primaryLine)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            if let secondaryLine = compactAddress?.secondaryLine {
+                Text(secondaryLine)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -59,6 +70,43 @@ struct MerchantSearchResultRow: View {
             let miles = meters / 1609.34
             return miles < 10 ? String(format: "%.1f mi", miles) : String(format: "%.0f mi", miles)
         }
+    }
+}
+
+private extension V4PlaceRecord {
+    var structuredAddress: Address? {
+        let country = Address.countryComponents(from: osmAddrCountry)
+        let hasStructuredFields = [
+            osmAddrHouseNumber,
+            osmAddrStreet,
+            osmAddrCity,
+            osmAddrState,
+            osmAddrPostcode,
+            country.countryName,
+            country.countryCode
+        ]
+        .contains { Address.normalizedAddressComponent($0) != nil }
+
+        guard hasStructuredFields else { return nil }
+
+        return Address(
+            streetNumber: osmAddrHouseNumber,
+            streetName: osmAddrStreet,
+            cityOrTownName: osmAddrCity,
+            postalCode: Address.normalizedPostalCode(
+                osmAddrPostcode,
+                countryName: country.countryName,
+                countryCode: country.countryCode,
+                regionOrStateName: osmAddrState
+            ),
+            regionOrStateName: osmAddrState,
+            countryName: country.countryName,
+            countryCode: country.countryCode
+        )
+    }
+
+    func formattedAddress(style: AddressDisplayStyle) -> FormattedAddress? {
+        AddressDisplayFormatter.format(address: structuredAddress, rawAddress: address, style: style)
     }
 }
 

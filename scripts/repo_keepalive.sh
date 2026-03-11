@@ -1,7 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
-REPO_DIR="${1:-REPO_ROOT_PLACEHOLDER}"
+SCRIPT_DIR="$(cd "$(dirname "${(%):-%N}")" && pwd)"
+REPO_DIR="${1:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 KEEPALIVE_FILE=".github/keepalive.md"
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 STAMP="$(date -u +%Y-%m-%d)"

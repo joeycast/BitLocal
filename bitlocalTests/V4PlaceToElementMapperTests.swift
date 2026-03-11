@@ -39,6 +39,7 @@ final class V4PlaceToElementMapperTests: XCTestCase {
             osmAddrHouseNumber: "1",
             osmAddrStreet: "Lightning Ave",
             osmAddrCity: "Nashville",
+            osmAddrCountry: "US",
             osmAddrState: "TN",
             osmAddrPostcode: "37201",
             osmOperator: "Cafe Bitcoin LLC",
@@ -61,6 +62,8 @@ final class V4PlaceToElementMapperTests: XCTestCase {
         XCTAssertEqual(element.v4Metadata?.verifiedAt, "2025-01-03T00:00:00Z")
         XCTAssertEqual(element.v4Metadata?.paymentProvider, "coinos")
         XCTAssertEqual(element.v4Metadata?.imageURL, "https://cdn.example.com/cafe.jpg")
+        XCTAssertEqual(element.address?.countryCode, "US")
+        XCTAssertEqual(element.address?.streetLine, "1 Lightning Ave")
     }
 
     func testMapsIconToShopCategoryWhenNeeded() {
@@ -100,6 +103,7 @@ final class V4PlaceToElementMapperTests: XCTestCase {
             osmAddrHouseNumber: nil,
             osmAddrStreet: nil,
             osmAddrCity: nil,
+            osmAddrCountry: nil,
             osmAddrState: nil,
             osmAddrPostcode: nil,
             osmOperator: nil,
@@ -111,6 +115,209 @@ final class V4PlaceToElementMapperTests: XCTestCase {
 
         XCTAssertEqual(element.osmJSON?.tags?.shop, "computer")
         XCTAssertNil(element.osmJSON?.tags?.amenity)
+    }
+
+    func testKeepsRawAddressAsFallbackInsteadOfTreatingItAsStreet() {
+        let record = V4PlaceRecord(
+            id: 44,
+            lat: 10.0,
+            lon: 20.0,
+            icon: "cafe",
+            name: "Raw Address Merchant",
+            address: "188 ซอย 6",
+            openingHours: nil,
+            comments: nil,
+            createdAt: "2025-01-01T00:00:00Z",
+            updatedAt: "2025-01-02T00:00:00Z",
+            deletedAt: nil,
+            verifiedAt: nil,
+            osmID: nil,
+            osmURL: nil,
+            phone: nil,
+            website: nil,
+            twitter: nil,
+            facebook: nil,
+            instagram: nil,
+            line: nil,
+            telegram: nil,
+            email: nil,
+            boostedUntil: nil,
+            requiredAppURL: nil,
+            description: nil,
+            image: nil,
+            paymentProvider: nil,
+            osmPaymentBitcoin: nil,
+            osmCurrencyXBT: nil,
+            osmPaymentOnchain: nil,
+            osmPaymentLightning: nil,
+            osmPaymentLightningContactless: nil,
+            osmAddrHouseNumber: nil,
+            osmAddrStreet: nil,
+            osmAddrCity: nil,
+            osmAddrCountry: nil,
+            osmAddrState: nil,
+            osmAddrPostcode: nil,
+            osmOperator: nil,
+            osmBrand: nil,
+            osmBrandWikidata: nil
+        )
+
+        let element = V4PlaceToElementMapper.placeRecordToElement(record)
+
+        XCTAssertNil(element.address)
+        XCTAssertEqual(element.v4Metadata?.rawAddress, "188 ซอย 6")
+        XCTAssertNil(element.osmJSON?.tags?.addrStreet)
+    }
+
+    func testUsesStructuredAddressWhenAvailableAndHidesMatchingCountryInCompactStyle() {
+        let address = Address(
+            streetNumber: "1132",
+            streetName: "4th Avenue South",
+            cityOrTownName: "Nashville",
+            postalCode: "37210",
+            regionOrStateName: "TN",
+            countryName: nil,
+            countryCode: "US"
+        )
+
+        let compact = AddressDisplayFormatter.format(
+            address: address,
+            rawAddress: nil,
+            style: .compact(referenceRegionCode: "US")
+        )
+        let detail = AddressDisplayFormatter.format(
+            address: address,
+            rawAddress: nil,
+            style: .detail(includeCountry: true)
+        )
+
+        XCTAssertEqual(compact?.primaryLine, "1132 4th Avenue South")
+        XCTAssertEqual(compact?.secondaryLine, "Nashville, TN 37210")
+        XCTAssertEqual(detail?.multiline, "1132 4th Avenue South\nNashville, TN 37210\nUnited States")
+        XCTAssertFalse(compact?.singleLine?.contains("United States") ?? true)
+        XCTAssertTrue(detail?.singleLine?.contains("United States") ?? false)
+    }
+
+    func testNormalizesZipPlus4ForObviousUnitedStatesAddressWithoutCountryCode() {
+        let address = Address(
+            streetNumber: "3213",
+            streetName: "Grand Avenue",
+            cityOrTownName: "Miami",
+            postalCode: Address.normalizedPostalCode(
+                "33133-5010",
+                countryName: nil,
+                countryCode: nil,
+                regionOrStateName: "FL"
+            ),
+            regionOrStateName: "FL",
+            countryName: nil,
+            countryCode: nil
+        )
+
+        let compact = AddressDisplayFormatter.format(
+            address: address,
+            rawAddress: nil,
+            style: .compact(referenceRegionCode: "US")
+        )
+
+        XCTAssertEqual(address.postalCode, "33133")
+        XCTAssertEqual(compact?.secondaryLine, "Miami, FL 33133")
+    }
+
+    func testUsesLocaleAwareOrderingForGermanyCompactRows() {
+        let address = Address(
+            streetNumber: "25",
+            streetName: "Holzmarktstraße",
+            cityOrTownName: "Berlin",
+            postalCode: "10243",
+            regionOrStateName: nil,
+            countryName: nil,
+            countryCode: "DE"
+        )
+
+        let compact = AddressDisplayFormatter.format(
+            address: address,
+            rawAddress: nil,
+            style: .compact(referenceRegionCode: "US")
+        )
+        let detail = AddressDisplayFormatter.format(
+            address: address,
+            rawAddress: nil,
+            style: .detail(includeCountry: true)
+        )
+
+        XCTAssertEqual(compact?.primaryLine, "25 Holzmarktstraße")
+        XCTAssertEqual(compact?.secondaryLine, "10243 Berlin")
+        XCTAssertFalse(compact?.singleLine?.contains("Germany") ?? true)
+        XCTAssertTrue(detail?.singleLine?.contains("Germany") ?? false)
+    }
+
+    func testVisibleListRowKeepsFrozenCompactAddressUntilItReappears() {
+        let initialAddress = Address(
+            streetNumber: "72",
+            streetName: "HH Kreuzbergstraße",
+            cityOrTownName: "Berlin",
+            postalCode: "10965",
+            regionOrStateName: nil,
+            countryName: nil,
+            countryCode: nil
+        )
+        let enrichedAddress = Address(
+            streetNumber: "72",
+            streetName: "HH Kreuzbergstraße",
+            cityOrTownName: "Berlin",
+            postalCode: "10965",
+            regionOrStateName: nil,
+            countryName: "Germany",
+            countryCode: "DE"
+        )
+        let element = Element(
+            id: "frozen-row",
+            osmJSON: nil,
+            tags: nil,
+            createdAt: "2025-01-01T00:00:00Z",
+            updatedAt: "2025-01-01T00:00:00Z",
+            deletedAt: nil,
+            address: initialAddress,
+            v4Metadata: ElementV4Metadata(
+                icon: nil,
+                commentsCount: nil,
+                verifiedAt: nil,
+                boostedUntil: nil,
+                osmID: nil,
+                osmURL: nil,
+                email: nil,
+                twitter: nil,
+                facebook: nil,
+                instagram: nil,
+                telegram: nil,
+                line: nil,
+                requiredAppURL: nil,
+                imageURL: nil,
+                paymentProvider: nil,
+                rawAddress: nil
+            )
+        )
+        let viewModel = ElementCellViewModel(
+            element: element,
+            userLocation: nil,
+            viewModel: ContentViewModel(),
+            allowsLiveAddressEnrichment: false
+        )
+
+        viewModel.onCellAppear()
+        let frozenBefore = viewModel.compactDisplayAddress
+
+        viewModel.adoptResolvedAddress(enrichedAddress)
+        let frozenAfter = viewModel.compactDisplayAddress
+
+        XCTAssertEqual(frozenBefore?.secondaryLine, "Berlin 10965")
+        XCTAssertEqual(frozenAfter?.secondaryLine, "Berlin 10965")
+
+        viewModel.onCellDisappear()
+        viewModel.onCellAppear()
+
+        XCTAssertEqual(viewModel.compactDisplayAddress?.secondaryLine, "10965 Berlin")
     }
 
     func testSymbolResolutionUsesMaterialV4IconAliasWhenTagsMissing() {

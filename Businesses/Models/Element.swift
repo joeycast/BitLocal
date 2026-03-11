@@ -6,6 +6,7 @@
 //
 
 
+import Contacts
 import Foundation
 
 // MARK: - Element
@@ -84,18 +85,7 @@ struct Element: Codable, Identifiable, Hashable {
         deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
         v4Metadata = try container.decodeIfPresent(ElementV4Metadata.self, forKey: .v4Metadata)
         
-        if let osmTags = osmJSON?.tags {
-            address = Address(
-                streetNumber: osmTags.addrHousenumber,
-                streetName: osmTags.addrStreet,
-                cityOrTownName: osmTags.addrCity,
-                postalCode: Address.normalizedPostalCode(osmTags.addrPostcode, countryName: nil),
-                regionOrStateName: osmTags.addrState,
-                countryName: nil
-            )
-        } else {
-            address = nil
-        }
+        address = Self.address(from: osmJSON?.tags)
     }
 
     init(
@@ -117,20 +107,7 @@ struct Element: Codable, Identifiable, Hashable {
         self.deletedAt = deletedAt
         self.v4Metadata = v4Metadata
 
-        if let address {
-            self.address = address
-        } else if let osmTags = osmJSON?.tags {
-            self.address = Address(
-                streetNumber: osmTags.addrHousenumber,
-                streetName: osmTags.addrStreet,
-                cityOrTownName: osmTags.addrCity,
-                postalCode: Address.normalizedPostalCode(osmTags.addrPostcode, countryName: nil),
-                regionOrStateName: osmTags.addrState,
-                countryName: nil
-            )
-        } else {
-            self.address = nil
-        }
+        self.address = address ?? Self.address(from: osmJSON?.tags)
     }
     
     func hash(into hasher: inout Hasher) {
@@ -167,6 +144,39 @@ struct Element: Codable, Identifiable, Hashable {
         value.hasPrefix("BTC Map Place #")
     }
 
+    private static func address(from osmTags: OsmTags?) -> Address? {
+        guard let osmTags else { return nil }
+
+        let country = Address.countryComponents(from: osmTags.addrCountry)
+        let hasStructuredFields = [
+            osmTags.addrHousenumber,
+            osmTags.addrStreet,
+            osmTags.addrCity,
+            osmTags.addrState,
+            osmTags.addrPostcode,
+            country.countryName,
+            country.countryCode
+        ]
+        .contains { Address.normalizedAddressComponent($0) != nil }
+
+        guard hasStructuredFields else { return nil }
+
+        return Address(
+            streetNumber: osmTags.addrHousenumber,
+            streetName: osmTags.addrStreet,
+            cityOrTownName: osmTags.addrCity,
+            postalCode: Address.normalizedPostalCode(
+                osmTags.addrPostcode,
+                countryName: country.countryName,
+                countryCode: country.countryCode,
+                regionOrStateName: osmTags.addrState
+            ),
+            regionOrStateName: osmTags.addrState,
+            countryName: country.countryName,
+            countryCode: country.countryCode
+        )
+    }
+
     var boostExpirationDate: Date? {
         BTCMapDateParser.parse(v4Metadata?.boostedUntil) ?? BTCMapDateParser.parse(tags?.boostExpires)
     }
@@ -185,45 +195,462 @@ struct Address: Codable {
     let postalCode: String?
     let regionOrStateName: String?
     let countryName: String?
-    
-    init(streetNumber: String?, streetName: String?, cityOrTownName: String?, postalCode: String?, regionOrStateName: String?, countryName: String?) {
+    let countryCode: String?
+
+    init(
+        streetNumber: String?,
+        streetName: String?,
+        cityOrTownName: String?,
+        postalCode: String?,
+        regionOrStateName: String?,
+        countryName: String?,
+        countryCode: String? = nil
+    ) {
         self.streetNumber = streetNumber
         self.streetName = streetName
         self.cityOrTownName = cityOrTownName
         self.postalCode = postalCode
         self.regionOrStateName = regionOrStateName
         self.countryName = countryName
+        self.countryCode = Address.normalizedCountryCode(countryCode)
     }
 }
 
 extension Address {
-    static func normalizedPostalCode(_ value: String?, countryName: String?) -> String? {
+    private static let unitedStatesAliases: Set<String> = [
+        "united states",
+        "united states of america",
+        "usa",
+        "u.s.a.",
+        "us",
+        "u.s."
+    ]
+
+    private static let unitedStatesStateAbbreviations: Set<String> = [
+        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA",
+        "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA",
+        "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY",
+        "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX",
+        "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+    ]
+
+    struct CountryComponents {
+        let countryName: String?
+        let countryCode: String?
+    }
+
+    static func normalizedAddressComponent(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    static func normalizedCountryCode(_ value: String?) -> String? {
+        guard let value = normalizedAddressComponent(value) else { return nil }
+        let uppercased = value.uppercased()
+        guard uppercased.count == 2 else { return nil }
+        return uppercased
+    }
+
+    static func countryComponents(from rawCountry: String?) -> CountryComponents {
+        guard let country = normalizedAddressComponent(rawCountry) else {
+            return CountryComponents(countryName: nil, countryCode: nil)
+        }
+
+        if let countryCode = normalizedCountryCode(country) {
+            return CountryComponents(countryName: nil, countryCode: countryCode)
+        }
+
+        return CountryComponents(countryName: country, countryCode: nil)
+    }
+
+    static func normalizedPostalCode(
+        _ value: String?,
+        countryName: String?,
+        countryCode: String? = nil,
+        regionOrStateName: String? = nil
+    ) -> String? {
         guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
               !trimmed.isEmpty else {
             return nil
         }
-        if shouldStripZipExtension(value: trimmed, countryName: countryName) {
+        if shouldStripZipExtension(
+            value: trimmed,
+            countryName: countryName,
+            countryCode: countryCode,
+            regionOrStateName: regionOrStateName
+        ) {
             return String(trimmed.prefix(5))
         }
         return trimmed
     }
 
-    private static func shouldStripZipExtension(value: String, countryName: String?) -> Bool {
+    private static func shouldStripZipExtension(
+        value: String,
+        countryName: String?,
+        countryCode: String?,
+        regionOrStateName: String?
+    ) -> Bool {
         let zipPlus4Pattern = #"^\d{5}-\d{4}$"#
         guard value.range(of: zipPlus4Pattern, options: .regularExpression) != nil else {
             return false
         }
-        guard let countryName = countryName?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !countryName.isEmpty else {
+        if isClearlyUnitedStates(countryName: countryName, countryCode: countryCode, regionOrStateName: regionOrStateName) {
             return true
         }
-        let normalizedCountry = countryName.lowercased()
-        return normalizedCountry == "united states" ||
-            normalizedCountry == "united states of america" ||
-            normalizedCountry == "usa" ||
-            normalizedCountry == "u.s.a." ||
-            normalizedCountry == "us" ||
-            normalizedCountry == "u.s."
+        return false
+    }
+
+    private static func isClearlyUnitedStates(
+        countryName: String?,
+        countryCode: String?,
+        regionOrStateName: String?
+    ) -> Bool {
+        if normalizedCountryCode(countryCode) == "US" {
+            return true
+        }
+
+        if let countryName = normalizedAddressComponent(countryName)?.lowercased(),
+           unitedStatesAliases.contains(countryName) {
+            return true
+        }
+
+        if let region = normalizedAddressComponent(regionOrStateName)?.uppercased(),
+           unitedStatesStateAbbreviations.contains(region) {
+            return true
+        }
+
+        return false
+    }
+
+    var hasStructuredDisplayFields: Bool {
+        [
+            streetNumber,
+            streetName,
+            cityOrTownName,
+            postalCode,
+            regionOrStateName,
+            countryName,
+            countryCode
+        ]
+        .contains { Address.normalizedAddressComponent($0) != nil }
+    }
+
+    var streetLine: String? {
+        let components = [streetNumber, streetName]
+            .compactMap { Address.normalizedAddressComponent($0) }
+        guard !components.isEmpty else { return nil }
+        return components.joined(separator: " ")
+    }
+
+    var localizedCountryName: String? {
+        if let countryName = Address.normalizedAddressComponent(countryName) {
+            return countryName
+        }
+
+        guard let countryCode = Address.normalizedCountryCode(countryCode) else {
+            return nil
+        }
+        return Locale.autoupdatingCurrent.localizedString(forRegionCode: countryCode) ?? countryCode
+    }
+
+    func matches(regionCode: String?) -> Bool {
+        guard let regionCode = Address.normalizedCountryCode(regionCode) else { return false }
+        if Address.normalizedCountryCode(countryCode) == regionCode {
+            return true
+        }
+
+        guard let countryName = Address.normalizedAddressComponent(countryName)?
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .autoupdatingCurrent),
+              let localizedRegion = Locale.autoupdatingCurrent.localizedString(forRegionCode: regionCode)?
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .autoupdatingCurrent) else {
+            return false
+        }
+        return countryName == localizedRegion
+    }
+
+    var isClearlyUnitedStates: Bool {
+        Address.isClearlyUnitedStates(
+            countryName: countryName,
+            countryCode: countryCode,
+            regionOrStateName: regionOrStateName
+        )
+    }
+
+    static func merged(preferred: Address?, fallback: Address?) -> Address? {
+        guard preferred != nil || fallback != nil else { return nil }
+
+        func pick(_ preferredValue: String?, _ fallbackValue: String?) -> String? {
+            normalizedAddressComponent(preferredValue) ?? normalizedAddressComponent(fallbackValue)
+        }
+
+        return Address(
+            streetNumber: pick(preferred?.streetNumber, fallback?.streetNumber),
+            streetName: pick(preferred?.streetName, fallback?.streetName),
+            cityOrTownName: pick(preferred?.cityOrTownName, fallback?.cityOrTownName),
+            postalCode: normalizedPostalCode(
+                pick(preferred?.postalCode, fallback?.postalCode),
+                countryName: pick(preferred?.countryName, fallback?.countryName),
+                countryCode: pick(preferred?.countryCode, fallback?.countryCode),
+                regionOrStateName: pick(preferred?.regionOrStateName, fallback?.regionOrStateName)
+            ),
+            regionOrStateName: pick(preferred?.regionOrStateName, fallback?.regionOrStateName),
+            countryName: pick(preferred?.countryName, fallback?.countryName),
+            countryCode: pick(preferred?.countryCode, fallback?.countryCode)
+        )
+    }
+
+    static func needsEnrichment(_ address: Address?) -> Bool {
+        guard let address else { return true }
+        guard address.hasStructuredDisplayFields else { return true }
+
+        return normalizedAddressComponent(address.cityOrTownName) == nil ||
+            normalizedAddressComponent(address.regionOrStateName) == nil ||
+            (normalizedAddressComponent(address.countryName) == nil &&
+             normalizedAddressComponent(address.countryCode) == nil)
+    }
+
+    func postalAddress(includeCountry: Bool) -> CNPostalAddress? {
+        guard hasStructuredDisplayFields else { return nil }
+
+        let postalAddress = CNMutablePostalAddress()
+        postalAddress.street = streetLine ?? ""
+        postalAddress.city = Address.normalizedAddressComponent(cityOrTownName) ?? ""
+        postalAddress.state = Address.normalizedAddressComponent(regionOrStateName) ?? ""
+        postalAddress.postalCode = Address.normalizedAddressComponent(postalCode) ?? ""
+
+        if includeCountry {
+            postalAddress.country = localizedCountryName ?? ""
+        }
+
+        if let countryCode = Address.normalizedCountryCode(countryCode) {
+            postalAddress.isoCountryCode = countryCode
+        }
+
+        return postalAddress
+    }
+}
+
+struct FormattedAddress {
+    let primaryLine: String?
+    let secondaryLine: String?
+    let multiline: String?
+    let singleLine: String?
+}
+
+enum AddressDisplayStyle {
+    case compact(referenceRegionCode: String?)
+    case detail(includeCountry: Bool)
+    case singleLine(includeCountry: Bool)
+}
+
+enum AddressDisplayFormatter {
+    static func format(address: Address?, rawAddress: String?, style: AddressDisplayStyle) -> FormattedAddress? {
+        if let address, address.hasStructuredDisplayFields {
+            return formatStructured(address: address, style: style)
+        }
+
+        guard let rawAddress = Address.normalizedAddressComponent(rawAddress) else { return nil }
+        return formatRaw(rawAddress, style: style)
+    }
+
+    private static func formatStructured(address: Address, style: AddressDisplayStyle) -> FormattedAddress? {
+        let includeCountry: Bool
+        switch style {
+        case .compact(let referenceRegionCode):
+            _ = referenceRegionCode
+            includeCountry = false
+        case .detail(let value), .singleLine(let value):
+            includeCountry = value
+        }
+
+        let lines = postalLines(for: address, includeCountry: includeCountry)
+        guard !lines.isEmpty else { return nil }
+
+        switch style {
+        case .compact:
+            let adjustedLines = adjustedCompactLines(lines, address: address, includeCountry: includeCountry)
+            let primaryLine = adjustedLines.first
+            let secondaryLine = joinedLines(Array(adjustedLines.dropFirst()), separator: ", ")
+            return FormattedAddress(
+                primaryLine: primaryLine,
+                secondaryLine: secondaryLine,
+                multiline: joinedLines(adjustedLines, separator: "\n"),
+                singleLine: joinedLines(adjustedLines, separator: ", ")
+            )
+        case .detail:
+            let adjustedLines = adjustedDetailLines(lines, address: address, includeCountry: includeCountry)
+            return FormattedAddress(
+                primaryLine: adjustedLines.first,
+                secondaryLine: joinedLines(Array(adjustedLines.dropFirst()), separator: "\n"),
+                multiline: joinedLines(adjustedLines, separator: "\n"),
+                singleLine: joinedLines(adjustedLines, separator: ", ")
+            )
+        case .singleLine:
+            let adjustedLines = adjustedSingleLineLines(lines, address: address, includeCountry: includeCountry)
+            let singleLine = joinedLines(adjustedLines, separator: ", ")
+            return FormattedAddress(
+                primaryLine: singleLine,
+                secondaryLine: nil,
+                multiline: singleLine,
+                singleLine: singleLine
+            )
+        }
+    }
+
+    private static func postalLines(for address: Address, includeCountry: Bool) -> [String] {
+        guard let postalAddress = address.postalAddress(includeCountry: includeCountry) else {
+            return []
+        }
+
+        let formatted = CNPostalAddressFormatter.string(from: postalAddress, style: .mailingAddress)
+        return formatted
+            .components(separatedBy: .newlines)
+            .compactMap(Address.normalizedAddressComponent)
+    }
+
+    private static func adjustedCompactLines(_ lines: [String], address: Address, includeCountry: Bool) -> [String] {
+        guard address.isClearlyUnitedStates, !lines.isEmpty else { return lines }
+
+        let primaryLine = Address.normalizedAddressComponent(address.streetLine)
+        let city = Address.normalizedAddressComponent(address.cityOrTownName)
+        let state = Address.normalizedAddressComponent(address.regionOrStateName)
+        let postalCode = Address.normalizedAddressComponent(address.postalCode)
+        let country = includeCountry ? Address.normalizedAddressComponent(address.localizedCountryName) : nil
+
+        var localityParts: [String] = []
+        if let city, let state {
+            localityParts.append("\(city), \(state)")
+        } else {
+            localityParts.append(contentsOf: [city, state].compactMap { $0 })
+        }
+        if let postalCode {
+            localityParts.append(postalCode)
+        }
+
+        let localityLine = joinedLines(localityParts, separator: " ")
+        var adjusted: [String] = []
+        if let primaryLine {
+            adjusted.append(primaryLine)
+        }
+        if let localityLine {
+            adjusted.append(localityLine)
+        }
+        if let country {
+            adjusted.append(country)
+        }
+        return adjusted.isEmpty ? lines : adjusted
+    }
+
+    private static func adjustedDetailLines(_ lines: [String], address: Address, includeCountry: Bool) -> [String] {
+        guard address.isClearlyUnitedStates, !lines.isEmpty else { return lines }
+        return adjustedUnitedStatesLines(address: address, includeCountry: includeCountry, fallback: lines)
+    }
+
+    private static func adjustedSingleLineLines(_ lines: [String], address: Address, includeCountry: Bool) -> [String] {
+        guard address.isClearlyUnitedStates, !lines.isEmpty else { return lines }
+        return adjustedUnitedStatesLines(address: address, includeCountry: includeCountry, fallback: lines)
+    }
+
+    private static func adjustedUnitedStatesLines(address: Address, includeCountry: Bool, fallback: [String]) -> [String] {
+        let primaryLine = Address.normalizedAddressComponent(address.streetLine)
+        let city = Address.normalizedAddressComponent(address.cityOrTownName)
+        let state = Address.normalizedAddressComponent(address.regionOrStateName)
+        let postalCode = Address.normalizedAddressComponent(address.postalCode)
+        let country = includeCountry ? Address.normalizedAddressComponent(address.localizedCountryName) : nil
+
+        var localityParts: [String] = []
+        if let city, let state {
+            localityParts.append("\(city), \(state)")
+        } else {
+            localityParts.append(contentsOf: [city, state].compactMap { $0 })
+        }
+        if let postalCode {
+            localityParts.append(postalCode)
+        }
+
+        let localityLine = joinedLines(localityParts, separator: " ")
+        var adjusted: [String] = []
+        if let primaryLine {
+            adjusted.append(primaryLine)
+        }
+        if let localityLine {
+            adjusted.append(localityLine)
+        }
+        if let country {
+            adjusted.append(country)
+        }
+        return adjusted.isEmpty ? fallback : adjusted
+    }
+
+    private static func formatRaw(_ rawAddress: String, style: AddressDisplayStyle) -> FormattedAddress {
+        let lines = rawAddress
+            .components(separatedBy: .newlines)
+            .compactMap(Address.normalizedAddressComponent)
+        let collapsed = joinedLines(lines, separator: ", ") ?? rawAddress
+
+        switch style {
+        case .compact:
+            return FormattedAddress(
+                primaryLine: lines.first ?? rawAddress,
+                secondaryLine: joinedLines(Array(lines.dropFirst()), separator: ", "),
+                multiline: joinedLines(lines, separator: "\n") ?? rawAddress,
+                singleLine: collapsed
+            )
+        case .detail:
+            return FormattedAddress(
+                primaryLine: lines.first ?? rawAddress,
+                secondaryLine: joinedLines(Array(lines.dropFirst()), separator: "\n"),
+                multiline: joinedLines(lines, separator: "\n") ?? rawAddress,
+                singleLine: collapsed
+            )
+        case .singleLine:
+            return FormattedAddress(
+                primaryLine: collapsed,
+                secondaryLine: nil,
+                multiline: collapsed,
+                singleLine: collapsed
+            )
+        }
+    }
+
+    private static func joinedLines(_ lines: [String], separator: String) -> String? {
+        let filtered = lines.compactMap(Address.normalizedAddressComponent)
+        guard !filtered.isEmpty else { return nil }
+        return filtered.joined(separator: separator)
+    }
+}
+
+extension Element {
+    var rawAddress: String? {
+        Address.normalizedAddressComponent(v4Metadata?.rawAddress)
+    }
+
+    func updatingAddress(_ address: Address?) -> Element {
+        Element(
+            id: id,
+            osmJSON: osmJSON,
+            tags: tags,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            deletedAt: deletedAt,
+            address: address,
+            v4Metadata: v4Metadata
+        )
+    }
+
+    func formattedAddress(using resolvedAddress: Address?, style: AddressDisplayStyle) -> FormattedAddress? {
+        if let address, address.hasStructuredDisplayFields {
+            return AddressDisplayFormatter.format(address: resolvedAddress ?? address, rawAddress: nil, style: style)
+        }
+
+        if let rawAddress {
+            return AddressDisplayFormatter.format(address: nil, rawAddress: rawAddress, style: style)
+        }
+
+        return AddressDisplayFormatter.format(address: resolvedAddress, rawAddress: nil, style: style)
     }
 }
 
@@ -245,7 +672,7 @@ struct OsmJSON: Codable {
 
 // MARK: - OsmTags
 struct OsmTags: Codable {
-    let addrCity, addrHousenumber, addrPostcode, addrState, addrStreet: String?
+    let addrCity, addrCountry, addrHousenumber, addrPostcode, addrState, addrStreet: String?
     let paymentBitcoin, currencyXBT, paymentOnchain, paymentLightning, paymentLightningContactless: String?
     let name, `operator`: String?
     let brand: String?
@@ -266,6 +693,7 @@ struct OsmTags: Codable {
     
     enum CodingKeys: String, CodingKey {
         case addrCity = "addr:city"
+        case addrCountry = "addr:country"
         case addrHousenumber = "addr:housenumber"
         case addrPostcode = "addr:postcode"
         case addrState = "addr:state"

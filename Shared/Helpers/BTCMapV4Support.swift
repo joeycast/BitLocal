@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 enum BTCMapV4Error: LocalizedError {
@@ -35,7 +36,8 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         "osm:payment:bitcoin", "osm:currency:XBT", "osm:payment:onchain",
         "osm:payment:lightning", "osm:payment:lightning_contactless",
         "osm:addr:housenumber", "osm:addr:street", "osm:addr:city",
-        "osm:addr:state", "osm:addr:postcode", "osm:operator", "osm:brand", "osm:brand:wikidata"
+        "osm:addr:country", "osm:addr:state", "osm:addr:postcode",
+        "osm:operator", "osm:brand", "osm:brand:wikidata"
     ]
 
     init(session: URLSession = .shared) {
@@ -549,6 +551,7 @@ struct V4PlaceToElementMapper {
             addrHousenumber: nil,
             addrStreet: nil,
             addrCity: nil,
+            addrCountry: nil,
             addrState: nil,
             addrPostcode: nil
         )
@@ -625,8 +628,9 @@ struct V4PlaceToElementMapper {
             paymentLightning: record.osmPaymentLightning,
             paymentLightningContactless: record.osmPaymentLightningContactless,
             addrHousenumber: record.osmAddrHouseNumber,
-            addrStreet: record.osmAddrStreet ?? record.address,
+            addrStreet: record.osmAddrStreet,
             addrCity: record.osmAddrCity,
+            addrCountry: record.osmAddrCountry,
             addrState: record.osmAddrState,
             addrPostcode: record.osmAddrPostcode
         )
@@ -648,23 +652,27 @@ struct V4PlaceToElementMapper {
         )
 
         let address: Address?
-        if record.osmAddrStreet != nil || record.osmAddrCity != nil || record.osmAddrState != nil || record.osmAddrPostcode != nil {
+        let country = Address.countryComponents(from: record.osmAddrCountry)
+        if record.osmAddrHouseNumber != nil ||
+            record.osmAddrStreet != nil ||
+            record.osmAddrCity != nil ||
+            record.osmAddrState != nil ||
+            record.osmAddrPostcode != nil ||
+            country.countryName != nil ||
+            country.countryCode != nil {
             address = Address(
                 streetNumber: record.osmAddrHouseNumber,
                 streetName: record.osmAddrStreet,
                 cityOrTownName: record.osmAddrCity,
-                postalCode: Address.normalizedPostalCode(record.osmAddrPostcode, countryName: nil),
+                postalCode: Address.normalizedPostalCode(
+                    record.osmAddrPostcode,
+                    countryName: country.countryName,
+                    countryCode: country.countryCode,
+                    regionOrStateName: record.osmAddrState
+                ),
                 regionOrStateName: record.osmAddrState,
-                countryName: nil
-            )
-        } else if let raw = record.address, !raw.isEmpty {
-            address = Address(
-                streetNumber: nil,
-                streetName: raw,
-                cityOrTownName: nil,
-                postalCode: nil,
-                regionOrStateName: nil,
-                countryName: nil
+                countryName: country.countryName,
+                countryCode: country.countryCode
             )
         } else {
             address = nil
@@ -730,6 +738,7 @@ struct V4PlaceToElementMapper {
         addrHousenumber: String?,
         addrStreet: String?,
         addrCity: String?,
+        addrCountry: String?,
         addrState: String?,
         addrPostcode: String?
     ) -> OsmTags {
@@ -737,6 +746,7 @@ struct V4PlaceToElementMapper {
 
         return OsmTags(
             addrCity: addrCity,
+            addrCountry: addrCountry,
             addrHousenumber: addrHousenumber,
             addrPostcode: addrPostcode,
             addrState: addrState,
@@ -784,27 +794,27 @@ struct V4PlaceToElementMapper {
 final class BTCMapRepository: BTCMapRepositoryProtocol {
     static let shared = BTCMapRepository()
     static let epochISO8601 = "1970-01-01T00:00:00Z"
+    private static let incrementalRefreshThreshold: TimeInterval = 6 * 60 * 60
 
     private let v2Client = BTCMapV2Client()
     private let v2AreasClient = BTCMapV2AreasClient()
     private let v3Client = BTCMapV3AreasClient()
     private let v4Client: BTCMapV4ClientProtocol
+    private let merchantStore: MerchantStore
     private let userDefaults: UserDefaults
     private let modeKey = "btcmap_data_source_mode"
+    private let enrichmentQueue = DispatchQueue(label: "btcmap-repository.enrichment", qos: .utility)
+    private let geocoder = Geocoder.shared
+    private var isEnrichmentProcessing = false
 
-    init(v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(), userDefaults: UserDefaults = .standard) {
+    init(
+        v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(),
+        merchantStore: MerchantStore = BTCMapRepository.makeDefaultMerchantStore(),
+        userDefaults: UserDefaults = .standard
+    ) {
         self.v4Client = v4Client
+        self.merchantStore = merchantStore
         self.userDefaults = userDefaults
-    }
-
-    private var v4ElementsFileURL: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("btcmap_elements_v4.json")
-    }
-
-    private var v4SyncStateFileURL: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("btcmap_v4_sync_state.json")
     }
 
     func loadCachedElements() -> [Element]? {
@@ -816,6 +826,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         case .auto:
             return loadV4Elements() ?? v2Client.loadCachedElements()
         }
+    }
+
+    func loadCachedElements(ids: [String]) -> [Element] {
+        merchantStore.loadElements(ids: ids)
     }
 
     func hasCachedData() -> Bool {
@@ -875,6 +889,38 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         v4Client.fetchPlaceComments(placeID: placeID, completion: completion)
     }
 
+    @discardableResult
+    func upsertFetchedPlace(_ record: V4PlaceRecord) -> Element {
+        let element = V4PlaceToElementMapper.placeRecordToElement(record)
+        merchantStore.upsert(element)
+        scheduleCityLinkageResolution(for: [element.id])
+        return merchantStore.loadElements(ids: [element.id]).first ?? element
+    }
+
+    @discardableResult
+    func persistMergedAddress(_ address: Address?, forMerchantID merchantID: String) -> Element? {
+        let persisted = merchantStore.persistMergedAddress(address, forMerchantID: merchantID)
+        if persisted != nil {
+            scheduleCityLinkageResolution(for: [merchantID])
+        }
+        return persisted
+    }
+
+    func processAddressEnrichmentJobs(limit: Int) {
+        guard limit > 0 else { return }
+
+        enrichmentQueue.async { [weak self] in
+            guard let self else { return }
+            guard !self.isEnrichmentProcessing else { return }
+
+            let candidates = self.merchantStore.pendingEnrichmentCandidates(limit: limit)
+            guard !candidates.isEmpty else { return }
+
+            self.isEnrichmentProcessing = true
+            self.processEnrichmentCandidates(candidates, index: 0)
+        }
+    }
+
     private var dataSourceMode: BTCMapDataSourceMode {
         guard let raw = userDefaults.string(forKey: modeKey),
               let mode = BTCMapDataSourceMode(rawValue: raw) else {
@@ -885,6 +931,8 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
 
     private func refreshV4(allowV2Fallback: Bool, completion: @escaping ([Element]?) -> Void) {
         let hadV4Cache = hasV4CachedData()
+        let currentElements = loadV4Elements() ?? []
+        let syncState = loadV4SyncState()
         let startIncremental: () -> Void = { [weak self] in
             self?.performV4IncrementalSync(completion: { result in
                 switch result {
@@ -901,6 +949,12 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
             })
         }
 
+        let requiresForcedBackfill = shouldForceFullNameBackfill(existing: currentElements, syncState: syncState)
+        if hadV4Cache && !requiresForcedBackfill && !shouldPerformIncrementalSync(syncState: syncState) {
+            completion(currentElements)
+            return
+        }
+
         if !hadV4Cache {
             Debug.logAPI("BTCMapRepository: no v4 cache, bootstrapping snapshot")
             v4Client.fetchSnapshot { [weak self] result in
@@ -912,9 +966,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                 case .success(let payload):
                     let fallbackTimestamp = Self.rfc1123ToISO8601(payload.lastModified) ?? Self.currentISO8601()
                     let mapped = payload.records.map { V4PlaceToElementMapper.snapshotRecordToElement($0, fallbackTimestamp: fallbackTimestamp) }
-                    self.saveV4Elements(mapped)
+                    self.merchantStore.replaceAllElements(mapped)
                     var syncState = self.loadV4SyncState()
                     syncState.snapshotLastModifiedRFC1123 = payload.lastModified
+                    syncState.bundledSourceAnchor = fallbackTimestamp
                     // Snapshot payload omits names and rich fields. Force a full incremental
                     // backfill once so cached elements are upgraded to complete place records.
                     syncState.incrementalAnchorUpdatedSince = Self.epochISO8601
@@ -940,7 +995,6 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         let existing = loadV4Elements() ?? []
         var syncState = loadV4SyncState()
         var anchor = syncState.incrementalAnchorUpdatedSince ?? Self.epochISO8601
-        var merged = existing
         var pageCount = 0
         var maxPages = 20
 
@@ -955,7 +1009,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
             pageCount += 1
             v4Client.fetchPlaces(updatedSince: anchor, includeDeleted: true) { [weak self] result in
                 guard let self else {
-                    completion(.success(merged))
+                    completion(.success(existing))
                     return
                 }
                 switch result {
@@ -965,14 +1019,25 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                     if records.isEmpty {
                         syncState.schemaVersion = V4SyncState.currentSchemaVersion
                         syncState.lastSuccessfulSyncAt = Self.currentISO8601()
-                        self.saveV4Elements(merged)
                         self.saveV4SyncState(syncState)
-                        completion(.success(merged))
+                        completion(.success(self.loadV4Elements() ?? existing))
                         return
                     }
 
                     let incoming = records.map(V4PlaceToElementMapper.placeRecordToElement)
-                    merged = Self.mergeElements(existing: merged, incoming: incoming)
+                    incoming.forEach { element in
+                        let isDeleted = !(element.deletedAt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                        if isDeleted {
+                            self.merchantStore.deleteMerchant(id: element.id)
+                        } else {
+                            self.merchantStore.upsert(element)
+                        }
+                    }
+
+                    let updatedMerchantIDs = incoming
+                        .filter { $0.deletedAt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true }
+                        .map(\.id)
+                    self.scheduleCityLinkageResolution(for: updatedMerchantIDs)
 
                     if let maxUpdated = records.compactMap({ $0.updatedAt }).max(),
                        self.parseFlexibleDate(maxUpdated) != nil {
@@ -980,7 +1045,6 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                         syncState.incrementalAnchorUpdatedSince = maxUpdated
                     }
 
-                    self.saveV4Elements(merged)
                     self.saveV4SyncState(syncState)
 
                     if records.count >= 5000 && pageCount < maxPages {
@@ -989,7 +1053,8 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                         syncState.schemaVersion = V4SyncState.currentSchemaVersion
                         syncState.lastSuccessfulSyncAt = Self.currentISO8601()
                         self.saveV4SyncState(syncState)
-                        completion(.success(merged))
+                        self.processAddressEnrichmentJobs(limit: 15)
+                        completion(.success(self.loadV4Elements() ?? existing))
                     }
                 }
             }
@@ -1008,50 +1073,138 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private func loadV4Elements() -> [Element]? {
-        do {
-            let data = try Data(contentsOf: v4ElementsFileURL)
-            let elements = try JSONDecoder().decode([Element].self, from: data)
-            return elements.isEmpty ? nil : elements
-        } catch {
-            return nil
-        }
-    }
-
-    private func saveV4Elements(_ elements: [Element]) {
-        DispatchQueue.global(qos: .utility).async {
-            do {
-                let data = try JSONEncoder().encode(elements)
-                try data.write(to: self.v4ElementsFileURL, options: .atomic)
-                Debug.logCache("Saved \(elements.count) v4 elements to \(self.v4ElementsFileURL.lastPathComponent)")
-            } catch {
-                Debug.logCache("Failed to save v4 elements: \(error.localizedDescription)")
-            }
-        }
+        merchantStore.loadElements()
     }
 
     private func hasV4CachedData() -> Bool {
-        guard FileManager.default.fileExists(atPath: v4ElementsFileURL.path) else { return false }
-        return (loadV4Elements()?.isEmpty == false)
+        merchantStore.hasCachedData()
     }
 
     private func loadV4SyncState() -> V4SyncState {
-        do {
-            let data = try Data(contentsOf: v4SyncStateFileURL)
-            return try JSONDecoder().decode(V4SyncState.self, from: data)
-        } catch {
-            return .empty
-        }
+        merchantStore.loadSyncState()
     }
 
     private func saveV4SyncState(_ state: V4SyncState) {
-        DispatchQueue.global(qos: .utility).async {
-            do {
-                let data = try JSONEncoder().encode(state)
-                try data.write(to: self.v4SyncStateFileURL, options: .atomic)
-            } catch {
-                Debug.logCache("Failed to save v4 sync state: \(error.localizedDescription)")
+        merchantStore.saveSyncState(state)
+    }
+
+    private func shouldPerformIncrementalSync(syncState: V4SyncState, referenceDate: Date = Date()) -> Bool {
+        guard let lastSuccessfulSyncAt = syncState.lastSuccessfulSyncAt,
+              let lastSyncDate = parseFlexibleDate(lastSuccessfulSyncAt) else {
+            return true
+        }
+        return referenceDate.timeIntervalSince(lastSyncDate) >= Self.incrementalRefreshThreshold
+    }
+
+    private func processEnrichmentCandidates(_ candidates: [MerchantEnrichmentCandidate], index: Int) {
+        guard index < candidates.count else {
+            enrichmentQueue.async { [weak self] in
+                self?.isEnrichmentProcessing = false
+            }
+            return
+        }
+
+        let candidate = candidates[index]
+        merchantStore.markEnrichmentAttemptStarted(for: candidate.merchantID)
+
+        let location = CLLocation(latitude: candidate.latitude, longitude: candidate.longitude)
+        geocoder.reverseGeocode(location: location, requestKey: "merchant:\(candidate.merchantID)") { [weak self] response in
+            guard let self else { return }
+
+            if let placemark = response.placemark {
+                let geocodedAddress = Address(
+                    streetNumber: self.normalized(placemark.subThoroughfare),
+                    streetName: self.normalized(placemark.thoroughfare),
+                    cityOrTownName: self.normalized(placemark.locality),
+                    postalCode: Address.normalizedPostalCode(
+                        self.normalized(placemark.postalCode),
+                        countryName: self.normalized(placemark.country),
+                        countryCode: self.normalized(placemark.isoCountryCode),
+                        regionOrStateName: self.normalized(placemark.administrativeArea)
+                    ),
+                    regionOrStateName: self.normalized(placemark.administrativeArea),
+                    countryName: self.normalized(placemark.country),
+                    countryCode: self.normalized(placemark.isoCountryCode)
+                )
+
+                let fallback = Address.merged(preferred: geocodedAddress, fallback: candidate.mergedAddress)
+                let merged = Address.merged(preferred: candidate.sourceAddress, fallback: fallback)
+                _ = self.persistMergedAddress(merged, forMerchantID: candidate.merchantID)
+
+                if Address.needsEnrichment(merged) {
+                    self.merchantStore.markEnrichmentDeferred(
+                        for: candidate.merchantID,
+                        status: "partial",
+                        retryAfter: Date().addingTimeInterval(24 * 60 * 60)
+                    )
+                }
+            } else if let retryAfter = response.retryAfter {
+                self.merchantStore.markEnrichmentDeferred(
+                    for: candidate.merchantID,
+                    status: "failed",
+                    retryAfter: retryAfter,
+                    errorCode: (response.error as NSError?)?.domain
+                )
+            } else {
+                self.merchantStore.markEnrichmentDeferred(
+                    for: candidate.merchantID,
+                    status: "no_result",
+                    retryAfter: Date().addingTimeInterval(24 * 60 * 60)
+                )
+            }
+
+            self.enrichmentQueue.async { [weak self] in
+                self?.processEnrichmentCandidates(candidates, index: index + 1)
             }
         }
+    }
+
+    private func scheduleCityLinkageResolution(for merchantIDs: [String]) {
+        let uniqueMerchantIDs = Array(Set(merchantIDs))
+        guard !uniqueMerchantIDs.isEmpty else { return }
+
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            for merchantID in uniqueMerchantIDs {
+                guard let merchant = self.merchantStore.loadElements(ids: [merchantID]).first else { continue }
+                guard let address = merchant.address else {
+                    self.merchantStore.processPendingCityLinkage(forMerchantID: merchantID, locationID: nil, cityKey: nil)
+                    continue
+                }
+
+                let country = Address.normalizedAddressComponent(address.localizedCountryName ?? address.countryName ?? address.countryCode) ?? ""
+                let city = Address.normalizedAddressComponent(address.cityOrTownName) ?? ""
+                guard !city.isEmpty, !country.isEmpty else {
+                    self.merchantStore.processPendingCityLinkage(
+                        forMerchantID: merchantID,
+                        locationID: nil,
+                        cityKey: nil
+                    )
+                    continue
+                }
+
+                let region = Address.normalizedAddressComponent(address.regionOrStateName) ?? ""
+                let cityKey = MerchantAlertsCityNormalizer.cityKey(city: city, region: region, country: country)
+                let resolved = await CityIndexStore.shared.result(forCityKey: cityKey)
+                self.merchantStore.processPendingCityLinkage(
+                    forMerchantID: merchantID,
+                    locationID: resolved?.locationID,
+                    cityKey: resolved?.cityKey ?? cityKey
+                )
+            }
+        }
+    }
+
+    private func normalized(_ value: String?) -> String? {
+        Address.normalizedAddressComponent(value)
+    }
+
+    private static func makeDefaultMerchantStore() -> MerchantStore {
+        let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+        return MerchantStore(
+            legacyElementsURL: cachesDirectory?.appendingPathComponent("btcmap_elements_v4.json"),
+            legacySyncStateURL: cachesDirectory?.appendingPathComponent("btcmap_v4_sync_state.json")
+        )
     }
 
     static func mergeElements(existing: [Element], incoming: [Element]) -> [Element] {

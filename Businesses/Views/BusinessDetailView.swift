@@ -12,30 +12,19 @@ import Translation
 #endif
 
 // Helper function to open location in Maps with full details
-func openLocationInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?) {
+func openLocationInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?, rawAddress: String?) {
     Debug.log("openLocationInMaps called - Name: \(name ?? "nil"), Street#: \(address?.streetNumber ?? "nil"), Street: \(address?.streetName ?? "nil"), City: \(address?.cityOrTownName ?? "nil")")
 
     // Build search query with name and address to help find the actual place
-    var searchQuery = ""
-    if let name = name {
-        searchQuery = name
-    }
+    let formattedAddress = AddressDisplayFormatter.format(
+        address: address,
+        rawAddress: rawAddress,
+        style: .singleLine(includeCountry: true)
+    )?.singleLine
 
-    // Build full street address with number
-    var fullAddress = ""
-    if let streetNumber = address?.streetNumber, !streetNumber.isEmpty {
-        fullAddress = streetNumber + " "
-    }
-    if let streetName = address?.streetName {
-        fullAddress += streetName
-    }
-
-    if !fullAddress.isEmpty, let city = address?.cityOrTownName {
-        if !searchQuery.isEmpty {
-            searchQuery += ", "
-        }
-        searchQuery += "\(fullAddress), \(city)"
-    }
+    let searchQuery = [name, formattedAddress]
+        .compactMap { Address.normalizedAddressComponent($0) }
+        .joined(separator: ", ")
 
     Debug.log("Search query: \(searchQuery)")
 
@@ -54,48 +43,44 @@ func openLocationInMaps(coordinate: CLLocationCoordinate2D, name: String?, addre
             } else {
                 Debug.log("MKLocalSearch failed, using fallback. Error: \(error?.localizedDescription ?? "none")")
                 // Fallback: open with coordinates if search fails
-                openCoordinateInMaps(coordinate: coordinate, name: name, address: address)
+                openCoordinateInMaps(coordinate: coordinate, name: name, address: address, rawAddress: rawAddress)
             }
         }
     } else {
         Debug.log("No search query, using fallback")
         // No search info available, fallback to coordinates
-        openCoordinateInMaps(coordinate: coordinate, name: name, address: address)
+        openCoordinateInMaps(coordinate: coordinate, name: name, address: address, rawAddress: rawAddress)
     }
 }
 
 // Fallback function to open just the coordinates
-private func openCoordinateInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?) {
+private func openCoordinateInMaps(coordinate: CLLocationCoordinate2D, name: String?, address: Address?, rawAddress: String?) {
     var addressDict: [String: Any] = [:]
+    let postalAddress = address?.postalAddress(includeCountry: true)
 
-    // Build full street address with street number
-    var fullStreet = ""
-    if let streetNumber = address?.streetNumber, !streetNumber.isEmpty {
-        fullStreet = streetNumber
-    }
-    if let streetName = address?.streetName {
-        if !fullStreet.isEmpty {
-            fullStreet += " "
-        }
-        fullStreet += streetName
-    }
-    if !fullStreet.isEmpty {
-        addressDict[CNPostalAddressStreetKey] = fullStreet
+    if let street = Address.normalizedAddressComponent(postalAddress?.street) {
+        addressDict[CNPostalAddressStreetKey] = street
+    } else if let rawAddress = Address.normalizedAddressComponent(rawAddress) {
+        addressDict[CNPostalAddressStreetKey] = rawAddress
     }
 
-    if let city = address?.cityOrTownName {
+    if let city = Address.normalizedAddressComponent(postalAddress?.city) {
         addressDict[CNPostalAddressCityKey] = city
     }
 
-    if let state = address?.regionOrStateName {
+    if let state = Address.normalizedAddressComponent(postalAddress?.state) {
         addressDict[CNPostalAddressStateKey] = state
     }
 
-    if let postalCode = address?.postalCode {
+    if let postalCode = Address.normalizedAddressComponent(postalAddress?.postalCode) {
         addressDict[CNPostalAddressPostalCodeKey] = postalCode
     }
 
-    Debug.log("Opening coordinate in Maps - Name: \(name ?? "nil"), Street: \(fullStreet), City: \(addressDict[CNPostalAddressCityKey] ?? "nil"), State: \(addressDict[CNPostalAddressStateKey] ?? "nil"), Zip: \(addressDict[CNPostalAddressPostalCodeKey] ?? "nil")")
+    if let country = Address.normalizedAddressComponent(postalAddress?.country) {
+        addressDict[CNPostalAddressCountryKey] = country
+    }
+
+    Debug.log("Opening coordinate in Maps - Name: \(name ?? "nil"), Street: \(addressDict[CNPostalAddressStreetKey] ?? "nil"), City: \(addressDict[CNPostalAddressCityKey] ?? "nil"), State: \(addressDict[CNPostalAddressStateKey] ?? "nil"), Zip: \(addressDict[CNPostalAddressPostalCodeKey] ?? "nil")")
 
     let placemark = MKPlacemark(coordinate: coordinate, addressDictionary: addressDict)
     let mapItem = MKMapItem(placemark: placemark)
@@ -126,7 +111,14 @@ struct BusinessDetailView: View {
         self.element = element
         self.userLocation = userLocation
         self._currentDetent = currentDetent
-        self._elementCellViewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation, viewModel: contentViewModel))
+        self._elementCellViewModel = StateObject(
+            wrappedValue: ElementCellViewModel(
+                element: element,
+                userLocation: userLocation,
+                viewModel: contentViewModel,
+                allowsLiveAddressEnrichment: true
+            )
+        )
     }
     
     fileprivate func localizedDistanceString() -> String? {
@@ -898,7 +890,12 @@ struct BusinessDetailsSection: View {
             // Business Address
             if let coord = element.mapCoordinate {
                 Button(action: {
-                    openLocationInMaps(coordinate: coord, name: element.displayName, address: elementCellViewModel.address)
+                    openLocationInMaps(
+                        coordinate: coord,
+                        name: element.displayName,
+                        address: elementCellViewModel.address,
+                        rawAddress: element.rawAddress
+                    )
                 }) {
                     businessLinkValueRow(
                         icon: "map",
@@ -1003,26 +1000,10 @@ private func businessLinkValueRow(
 
 private extension BusinessDetailsSection {
     var addressDisplayText: String {
-        let streetNumber = elementCellViewModel.address?.streetNumber?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let streetName = elementCellViewModel.address?.streetName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let streetLine = [streetNumber, streetName]
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-
-        let city = elementCellViewModel.address?.cityOrTownName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let region = elementCellViewModel.address?.regionOrStateName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let postalCode = elementCellViewModel.address?.postalCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-        let localityParts = [city, region]
-            .filter { !$0.isEmpty }
-        let locality = localityParts.joined(separator: ", ")
-        let secondLine = [locality, postalCode]
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-
-        return [streetLine, secondLine]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+        element.formattedAddress(
+            using: elementCellViewModel.address,
+            style: .detail(includeCountry: true)
+        )?.multiline ?? ""
     }
 }
 

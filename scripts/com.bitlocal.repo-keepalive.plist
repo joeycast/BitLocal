@@ -7,8 +7,8 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/zsh</string>
-		<string>REPO_ROOT_PLACEHOLDER/scripts/repo_keepalive.sh</string>
-		<string>REPO_ROOT_PLACEHOLDER</string>
+		<string>/ABSOLUTE/PATH/TO/bitlocal/scripts/repo_keepalive.sh</string>
+		<string>/ABSOLUTE/PATH/TO/bitlocal</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
@@ -19,6 +19,6 @@
 	<key>StandardOutPath</key>
 	<string>/tmp/com.bitlocal.repo-keepalive.out</string>
 	<key>WorkingDirectory</key>
-	<string>REPO_ROOT_PLACEHOLDER</string>
+	<string>/ABSOLUTE/PATH/TO/bitlocal</string>
 </dict>
 </plist>

@@ -4,7 +4,7 @@ BitLocal’s phase 2 merchant alerts use three moving parts:
 
 - The iOS app creates a `CKQuerySubscription` for `CityDigest` records in CloudKit.
 - An hourly GitHub Actions workflow runs `scripts/cloudkit_digest_sync.mjs`.
-- An external Mac mini keepalive job updates [`.github/keepalive.md`](REPO_ROOT_PLACEHOLDER/.github/keepalive.md) once a month so GitHub keeps the scheduled workflow active.
+- An external Mac mini keepalive job updates `.github/keepalive.md` once a month so GitHub keeps the scheduled workflow active.
 
 ## CloudKit setup
 
@@ -76,7 +76,7 @@ Create these repository secrets:
 | `CLOUDKIT_SERVER_PRIVATE_KEY` | Yes | The full PEM private key created locally for that server-to-server key |
 | `BTCMAP_INITIAL_UPDATED_SINCE` | No | Bootstrap anchor for the very first sync |
 
-The workflow lives at [`.github/workflows/cloudkit-digest-sync.yml`](REPO_ROOT_PLACEHOLDER/.github/workflows/cloudkit-digest-sync.yml). It runs hourly at `:17`, supports manual dispatch with `updated_since`, `override_now_utc`, and `city_key_filter`, and keeps concurrency to one sync at a time.
+The workflow lives at `.github/workflows/cloudkit-digest-sync.yml`. It runs hourly at `:17`, supports manual dispatch with `updated_since`, `override_now_utc`, and `city_key_filter`, and keeps concurrency to one sync at a time.
 
 ## Server-to-server key setup
 
@@ -103,12 +103,12 @@ openssl ec -in eckey.pem -pubout
 
 ## Mac mini keepalive
 
-The keepalive script lives at [`scripts/repo_keepalive.sh`](REPO_ROOT_PLACEHOLDER/scripts/repo_keepalive.sh). The sample `launchd` agent is [`scripts/com.bitlocal.repo-keepalive.plist`](REPO_ROOT_PLACEHOLDER/scripts/com.bitlocal.repo-keepalive.plist).
+The keepalive script lives at `scripts/repo_keepalive.sh`. The sample `launchd` agent is `scripts/com.bitlocal.repo-keepalive.plist`.
 
 Suggested install steps on the always-on Mac mini:
 
 1. Copy the plist into `~/Library/LaunchAgents/com.bitlocal.repo-keepalive.plist`.
-2. Ensure the local clone at `REPO_ROOT_PLACEHOLDER` has push access to `origin`.
+2. Update the sample plist so the script path and repo path point at your local clone, then ensure that clone has push access to `origin`.
 3. Load the job with:
 
 ```bash

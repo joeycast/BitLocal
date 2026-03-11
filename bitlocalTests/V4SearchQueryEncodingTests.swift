@@ -217,6 +217,7 @@ final class DeepLinkHandlingTests: XCTestCase {
             osmAddrHouseNumber: nil,
             osmAddrStreet: nil,
             osmAddrCity: nil,
+            osmAddrCountry: nil,
             osmAddrState: nil,
             osmAddrPostcode: nil,
             osmOperator: nil,
@@ -254,8 +255,12 @@ private final class DeepLinkMockRepository: BTCMapRepositoryProtocol {
     }
 
     func loadCachedElements() -> [Element]? { [] }
+    func loadCachedElements(ids: [String]) -> [Element] { [] }
     func hasCachedData() -> Bool { false }
     func refreshElements(completion: @escaping ([Element]?) -> Void) { completion([]) }
+    func upsertFetchedPlace(_ record: V4PlaceRecord) -> Element { V4PlaceToElementMapper.placeRecordToElement(record) }
+    func persistMergedAddress(_ address: Address?, forMerchantID merchantID: String) -> Element? { nil }
+    func processAddressEnrichmentJobs(limit: Int) {}
     func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) { completion(.success([])) }
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) { completion(.success([])) }
     func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) { completion(.failure(DeepLinkMockError.notFound)) }

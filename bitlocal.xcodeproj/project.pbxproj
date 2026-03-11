@@ -16,6 +16,11 @@
 		F7C0A3013A5B100100000201 /* MerchantAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3003A5B100100000200 /* MerchantAlerts.swift */; };
 		F7C0A3033A5B100100000203 /* MerchantAlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */; };
 		F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */; };
+		F7C0A1313A5B100100000031 /* MerchantStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1353A5B100100000035 /* MerchantStore.swift */; };
+		F7C0A1323A5B100100000032 /* BundledMerchants.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = F7C0A1363A5B100100000036 /* BundledMerchants.sqlite */; };
+		F7C0A1333A5B100100000033 /* MerchantStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1373A5B100100000037 /* MerchantStoreTests.swift */; };
+		F7C0A1343A5B100100000034 /* MerchantAlertDigestLookupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A1383A5B100100000038 /* MerchantAlertDigestLookupTests.swift */; };
+		F7C0A1393A5B100100000039 /* BundledMerchantSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A13A3A5B10010000003A /* BundledMerchantSnapshotTests.swift */; };
 		F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */; };
 		F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */; };
 		F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */; };
@@ -104,6 +109,11 @@
 		F7C0A3003A5B100100000200 /* MerchantAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlerts.swift; sourceTree = "<group>"; };
 		F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertsView.swift; sourceTree = "<group>"; };
 		F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertsModelsTests.swift; sourceTree = "<group>"; };
+		F7C0A1353A5B100100000035 /* MerchantStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantStore.swift; sourceTree = "<group>"; };
+		F7C0A1363A5B100100000036 /* BundledMerchants.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = BundledMerchants.sqlite; sourceTree = "<group>"; };
+		F7C0A1373A5B100100000037 /* MerchantStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantStoreTests.swift; sourceTree = "<group>"; };
+		F7C0A1383A5B100100000038 /* MerchantAlertDigestLookupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertDigestLookupTests.swift; sourceTree = "<group>"; };
+		F7C0A13A3A5B10010000003A /* BundledMerchantSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledMerchantSnapshotTests.swift; sourceTree = "<group>"; };
 		F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmission.swift; sourceTree = "<group>"; };
 		F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmissionViewModel.swift; sourceTree = "<group>"; };
 		F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBusinessFormView.swift; sourceTree = "<group>"; };
@@ -316,6 +326,7 @@
 			isa = PBXGroup;
 			children = (
 				F7D100142DE33EF800D68897 /* BundledCities.sqlite */,
+				F7C0A1363A5B100100000036 /* BundledMerchants.sqlite */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -341,6 +352,7 @@
 				F66E0B942DE33F1200D68897 /* Extensions.swift */,
 				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
 				F7C0A3003A5B100100000200 /* MerchantAlerts.swift */,
+				F7C0A1353A5B100100000035 /* MerchantStore.swift */,
 				F7D100112DE33EF800D68897 /* CityIndexStore.swift */,
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
 				F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */,
@@ -459,7 +471,10 @@
 			isa = PBXGroup;
 			children = (
 				F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */,
+				F7C0A13A3A5B10010000003A /* BundledMerchantSnapshotTests.swift */,
+				F7C0A1383A5B100100000038 /* MerchantAlertDigestLookupTests.swift */,
 				F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */,
+				F7C0A1373A5B100100000037 /* MerchantStoreTests.swift */,
 				F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */,
 				F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */,
 				F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */,
@@ -570,6 +585,7 @@
 				F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */,
 				F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */,
 				F7D100042DE33EF800D68897 /* BundledCities.sqlite in Resources */,
+				F7C0A1323A5B100100000032 /* BundledMerchants.sqlite in Resources */,
 				F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -606,6 +622,7 @@
 				F7D100012DE33EF800D68897 /* CityIndexStore.swift in Sources */,
 				F7D100022DE33EF800D68897 /* MerchantAlertCityPickerView.swift in Sources */,
 				F7C0A3033A5B100100000203 /* MerchantAlertsView.swift in Sources */,
+				F7C0A1313A5B100100000031 /* MerchantStore.swift in Sources */,
 				F7D100032DE33EF800D68897 /* SettingsView.swift in Sources */,
 				F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */,
 				F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */,
@@ -649,7 +666,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */,
+				F7C0A1393A5B100100000039 /* BundledMerchantSnapshotTests.swift in Sources */,
+				F7C0A1343A5B100100000034 /* MerchantAlertDigestLookupTests.swift in Sources */,
 				F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */,
+				F7C0A1333A5B100100000033 /* MerchantStoreTests.swift in Sources */,
 				F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */,
 				F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */,
 				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,

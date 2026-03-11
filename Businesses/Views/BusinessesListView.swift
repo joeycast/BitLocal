@@ -734,30 +734,28 @@ struct ElementCell: View {
                     .font(.subheadline.weight(.medium))
             }
             
-            HStack(alignment: .center, spacing: 8) {
-                // Street number and name
-                if let streetNumber = viewModel.address?.streetNumber {
-                    Text("\(streetNumber) \(viewModel.address?.streetName ?? "")".trimmingCharacters(in: .whitespaces))
+            if let primaryLine = viewModel.compactDisplayAddress?.primaryLine {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(primaryLine)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
+
+                    Spacer(minLength: 0)
+                }
+            }
+
+            HStack {
+                if let secondaryLine = viewModel.compactDisplayAddress?.secondaryLine {
+                    Text(secondaryLine)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text("\(viewModel.address?.streetName ?? "")")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                    Spacer(minLength: 0)
                 }
 
-                Spacer(minLength: 0)
-            }
-            
-            HStack {
-                Text("\(viewModel.address?.cityOrTownName ?? "")\(viewModel.address?.cityOrTownName != nil && viewModel.address?.cityOrTownName != "" ? ", " : "")\(viewModel.address?.regionOrStateName ?? "") \(viewModel.address?.postalCode ?? "")")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
                 PaymentIcons(element: viewModel.element)
             }
 
@@ -771,9 +769,13 @@ struct ElementCell: View {
         }
         .contentShape(Rectangle())
         .onAppear {
-            guard !appeared else { return }
             appeared = true
             viewModel.onCellAppear()
+        }
+        .onDisappear {
+            guard appeared else { return }
+            appeared = false
+            viewModel.onCellDisappear()
         }
         // REMOVED: Redundant onChange that was causing excessive logging
         // .onChange(of: viewModel.viewModel.userLocation) { _, _ in
@@ -838,7 +840,9 @@ class ElementCellViewModel: ObservableObject {
     
     let element: Element
     let viewModel: ContentViewModel
+    let allowsLiveAddressEnrichment: Bool
     @Published var address: Address?
+    @Published private(set) var compactDisplayAddress: FormattedAddress?
     
     // OPTIMIZED: Remove the excessive logging from userLocation didSet
     @Published var userLocation: CLLocation?
@@ -846,11 +850,18 @@ class ElementCellViewModel: ObservableObject {
     private var userLocationCancellable: AnyCancellable?
     private var lastLocationUpdate: CLLocationCoordinate2D?
     private var isAddressLookupInFlight = false
+    private var isCompactDisplayFrozen = false
     
-    init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
+    init(
+        element: Element,
+        userLocation: CLLocation?,
+        viewModel: ContentViewModel,
+        allowsLiveAddressEnrichment: Bool = false
+    ) {
         self.element = element
         self.userLocation = userLocation
         self.viewModel = viewModel
+        self.allowsLiveAddressEnrichment = allowsLiveAddressEnrichment
         
         // OPTIMIZED: Subscribe to location changes but with deduplication
         self.userLocationCancellable = viewModel.$userLocation
@@ -865,20 +876,13 @@ class ElementCellViewModel: ObservableObject {
                 self?.userLocation = newLocation
             }
         
-        // Attempt to retrieve cached address, but prefer OSM-tagged fields when present
-        if let cachedEntry = getCachedAddressEntry() {
-            self.address = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+        if let cachedEntry = getCachedAddressEntry(), allowsLiveAddressEnrichment {
+            self.address = Address.merged(preferred: element.address, fallback: cachedEntry.address)
         } else {
             self.address = element.address
         }
 
-        if let address = self.address,
-           address.hasAnyGeocodingFields,
-           !needsSeedAddressEnrichment(address),
-           shouldPersistInitialAddress(address) {
-            setCachedAddressEntry(.forAddress(address))
-            viewModel.scheduleGeocodingCacheSave()
-        }
+        refreshCompactDisplayAddress()
     }
     
     deinit {
@@ -901,9 +905,20 @@ class ElementCellViewModel: ObservableObject {
     }
     
     func onCellAppear() {
+        if !isCompactDisplayFrozen {
+            refreshCompactDisplayAddress()
+            isCompactDisplayFrozen = true
+        }
+
+        guard allowsLiveAddressEnrichment else { return }
         if shouldAttemptReverseGeocode() {
             updateAddress()
         }
+    }
+
+    func onCellDisappear() {
+        isCompactDisplayFrozen = false
+        refreshCompactDisplayAddress()
     }
     
     private var addressCacheKey: String {
@@ -925,8 +940,8 @@ class ElementCellViewModel: ObservableObject {
 
     func updateAddress() {
         if let cachedEntry = getCachedAddressEntry() {
-            let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
-            self.address = merged
+            let merged = Address.merged(preferred: element.address, fallback: cachedEntry.address)
+            adoptResolvedAddress(merged)
             if cachedEntry.status == .resolved || cachedEntry.status == .partial {
                 return
             }
@@ -934,10 +949,9 @@ class ElementCellViewModel: ObservableObject {
                 return
             }
         } else if let preferred = element.address {
-            self.address = preferred
-            if preferred.hasAnyGeocodingFields && !needsSeedAddressEnrichment(preferred) {
+            adoptResolvedAddress(preferred)
+            if preferred.hasAnyGeocodingFields && !Address.needsEnrichment(preferred) {
                 setCachedAddressEntry(.forAddress(preferred))
-                viewModel.scheduleGeocodingCacheSave()
                 return
             }
         }
@@ -963,13 +977,19 @@ class ElementCellViewModel: ObservableObject {
                     cityOrTownName: self.normalized(placemark.locality),
                     postalCode: Address.normalizedPostalCode(
                         self.normalized(placemark.postalCode),
-                        countryName: self.normalized(placemark.country)
+                        countryName: self.normalized(placemark.country),
+                        countryCode: self.normalized(placemark.isoCountryCode),
+                        regionOrStateName: self.normalized(placemark.administrativeArea)
                     ),
                     regionOrStateName: self.normalized(placemark.administrativeArea),
-                    countryName: self.normalized(placemark.country)
+                    countryName: self.normalized(placemark.country),
+                    countryCode: self.normalized(placemark.isoCountryCode)
                 )
-                let merged = self.mergedAddress(preferred: self.element.address, fallback: geocodedAddress)
-                self.address = merged
+                let merged = Address.merged(preferred: self.element.address, fallback: Address.merged(preferred: geocodedAddress, fallback: self.address))
+                self.adoptResolvedAddress(merged)
+                if let merged {
+                    _ = self.viewModel.persistResolvedAddress(merged, forMerchantID: self.element.id)
+                }
 
                 if let merged, merged.hasAnyGeocodingFields {
                     self.setCachedAddressEntry(.forAddress(merged))
@@ -979,7 +999,7 @@ class ElementCellViewModel: ObservableObject {
                     )
                 }
             } else if let staleFallback, staleFallback.hasAnyGeocodingFields {
-                self.address = self.mergedAddress(preferred: self.element.address, fallback: staleFallback)
+                self.adoptResolvedAddress(Address.merged(preferred: self.element.address, fallback: staleFallback))
                 self.setCachedAddressEntry(.forAddress(staleFallback))
             } else if let retryAfter = response.retryAfter {
                 self.setCachedAddressEntry(.failed(retryAfter: retryAfter))
@@ -989,7 +1009,6 @@ class ElementCellViewModel: ObservableObject {
                 )
             }
 
-            self.viewModel.scheduleGeocodingCacheSave()
         }
     }
 
@@ -1001,6 +1020,23 @@ class ElementCellViewModel: ObservableObject {
         return value
     }
 
+    private func refreshCompactDisplayAddressIfNeeded() {
+        guard !isCompactDisplayFrozen else { return }
+        refreshCompactDisplayAddress()
+    }
+
+    func adoptResolvedAddress(_ newAddress: Address?) {
+        address = newAddress
+        refreshCompactDisplayAddressIfNeeded()
+    }
+
+    private func refreshCompactDisplayAddress() {
+        compactDisplayAddress = element.formattedAddress(
+            using: address,
+            style: .compact(referenceRegionCode: Locale.autoupdatingCurrent.region?.identifier)
+        )
+    }
+
     private func shouldAttemptReverseGeocode() -> Bool {
         if isAddressLookupInFlight {
             return false
@@ -1009,11 +1045,11 @@ class ElementCellViewModel: ObservableObject {
         if let cachedEntry = getCachedAddressEntry() {
             switch cachedEntry.status {
             case .resolved:
-                let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
-                return isLikelyMalformedStreetLine(merged)
+                let merged = Address.merged(preferred: element.address, fallback: cachedEntry.address)
+                return Address.needsEnrichment(merged)
             case .partial:
-                let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
-                return isLikelyMalformedStreetLine(merged)
+                let merged = Address.merged(preferred: element.address, fallback: cachedEntry.address)
+                return Address.needsEnrichment(merged)
             case .noResult, .failed:
                 return cachedEntry.shouldRetry()
             }
@@ -1023,23 +1059,7 @@ class ElementCellViewModel: ObservableObject {
             return true
         }
 
-        return needsSeedAddressEnrichment(currentAddress)
-    }
-
-    private func shouldPersistInitialAddress(_ address: Address) -> Bool {
-        guard let cachedEntry = getCachedAddressEntry() else {
-            return true
-        }
-
-        let mergedCurrent = mergedAddress(preferred: element.address, fallback: address)
-        let mergedCached = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
-        let currentStatus = ReverseGeocodingCacheEntry.forAddress(address).status
-        return !addressesMatch(mergedCurrent, mergedCached) || cachedEntry.status != currentStatus
-    }
-
-    private func needsSeedAddressEnrichment(_ address: Address?) -> Bool {
-        guard let address else { return true }
-        return !isAddressComplete(address) || shouldEnrichMissingState(address) || isLikelyMalformedStreetLine(address)
+        return Address.needsEnrichment(currentAddress)
     }
 
     private func addressesMatch(_ lhs: Address?, _ rhs: Address?) -> Bool {
@@ -1048,70 +1068,10 @@ class ElementCellViewModel: ObservableObject {
         normalized(lhs?.cityOrTownName) == normalized(rhs?.cityOrTownName) &&
         normalized(lhs?.postalCode) == normalized(rhs?.postalCode) &&
         normalized(lhs?.regionOrStateName) == normalized(rhs?.regionOrStateName) &&
-        normalized(lhs?.countryName) == normalized(rhs?.countryName)
+        normalized(lhs?.countryName) == normalized(rhs?.countryName) &&
+        normalized(lhs?.countryCode) == normalized(rhs?.countryCode)
     }
 
-    private func isAddressComplete(_ address: Address?) -> Bool {
-        guard let address else { return false }
-        return normalized(address.streetNumber) != nil &&
-            normalized(address.streetName) != nil &&
-            normalized(address.cityOrTownName) != nil
-    }
-
-    private func shouldEnrichMissingState(_ address: Address?) -> Bool {
-        guard let address else { return false }
-        return normalized(address.regionOrStateName) == nil
-    }
-
-    private func isLikelyMalformedStreetLine(_ address: Address?) -> Bool {
-        guard let address else { return false }
-        guard let streetName = normalized(address.streetName) else {
-            return false
-        }
-
-        if !looksLikePostalCode(streetName) {
-            return false
-        }
-
-        let postalCode = normalized(address.postalCode)
-        let city = normalized(address.cityOrTownName)
-        return postalCode == streetName || city == nil
-    }
-
-    private func mergedAddress(preferred: Address?, fallback: Address?) -> Address? {
-        guard preferred != nil || fallback != nil else { return nil }
-        func pick(_ preferredValue: String?, _ fallbackValue: String?) -> String? {
-            return normalized(preferredValue) ?? normalized(fallbackValue)
-        }
-        let preferredStreetName = normalized(preferred?.streetName)
-        let selectedStreetName: String?
-        if let preferredStreetName,
-           looksLikePostalCode(preferredStreetName),
-           (preferredStreetName == normalized(preferred?.postalCode) ||
-            preferredStreetName == normalized(fallback?.postalCode) ||
-            normalized(preferred?.cityOrTownName) == nil) {
-            selectedStreetName = normalized(fallback?.streetName)
-        } else {
-            selectedStreetName = preferredStreetName ?? normalized(fallback?.streetName)
-        }
-
-        return Address(
-            streetNumber: pick(preferred?.streetNumber, fallback?.streetNumber),
-            streetName: selectedStreetName,
-            cityOrTownName: pick(preferred?.cityOrTownName, fallback?.cityOrTownName),
-            postalCode: Address.normalizedPostalCode(
-                pick(preferred?.postalCode, fallback?.postalCode),
-                countryName: pick(preferred?.countryName, fallback?.countryName)
-            ),
-            regionOrStateName: pick(preferred?.regionOrStateName, fallback?.regionOrStateName),
-            countryName: pick(preferred?.countryName, fallback?.countryName)
-        )
-    }
-
-    private func looksLikePostalCode(_ value: String) -> Bool {
-        let zipPattern = #"^\d{5}(?:-\d{4})?$"#
-        return value.range(of: zipPattern, options: .regularExpression) != nil
-    }
 }
 
 // Payment icons
