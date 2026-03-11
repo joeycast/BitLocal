@@ -24,47 +24,7 @@ struct BottomSheetContentView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack {
-                NavigationStack(path: $viewModel.path) {
-                    Group {
-                        if viewModel.mapDisplayMode == .communities {
-                            CommunitiesListView(currentDetent: currentDetent)
-                                .environmentObject(viewModel)
-                        } else {
-                            BusinessesListView(
-                                elements: visibleElements,
-                                currentDetent: currentDetent,
-                                liveSheetHeight: geometry.size.height
-                            )
-                            .environmentObject(viewModel)
-                        }
-                    }
-                    .toolbar(.visible, for: .navigationBar)
-                    .toolbarBackground(.hidden, for: .navigationBar)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .navigationTitle("")
-                    .ignoresSafeArea(.container, edges: .top)
-                    .navigationDestination(for: Element.self) { element in
-                        BusinessDetailView(
-                            element: element,
-                            userLocation: viewModel.userLocation,
-                            contentViewModel: viewModel,
-                            currentDetent: currentDetentBinding
-                        )
-                        .id(element.id)
-                        .clearNavigationContainerBackgroundIfAvailable()
-                    }
-                    .navigationDestination(isPresented: communityDetailBindingIsPresented) {
-                        if let area = viewModel.presentedCommunityArea {
-                            CommunityDetailView(
-                                area: area,
-                                currentDetent: currentDetentBinding
-                            )
-                                .environmentObject(viewModel)
-                                .clearNavigationContainerBackgroundIfAvailable()
-                        }
-                    }
-                    .clearNavigationContainerBackgroundIfAvailable()
-                }
+                navigationStack(sheetHeight: geometry.size.height)
                 .onChange(of: viewModel.unifiedSearchText) { _, _ in
                     guard viewModel.mapDisplayMode != .communities else { return }
                     viewModel.performUnifiedSearch()
@@ -94,6 +54,60 @@ struct BottomSheetContentView: View {
                     viewModel.deselectAnnotation()
                 }
             }
+        }
+    }
+
+    private func navigationStack(sheetHeight: CGFloat) -> some View {
+        NavigationStack(path: $viewModel.path) {
+            sheetRootContent(sheetHeight: sheetHeight)
+                .toolbar(.visible, for: .navigationBar)
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("")
+                .ignoresSafeArea(.container, edges: .top)
+                .navigationDestination(for: Element.self, destination: businessDetailDestination)
+                .navigationDestination(isPresented: communityDetailBindingIsPresented) {
+                    communityDetailDestination
+                }
+                .clearNavigationContainerBackgroundIfAvailable()
+        }
+    }
+
+    @ViewBuilder
+    private func sheetRootContent(sheetHeight: CGFloat) -> some View {
+        if viewModel.mapDisplayMode == .communities {
+            CommunitiesListView(currentDetent: currentDetent)
+                .environmentObject(viewModel)
+        } else {
+            BusinessesListView(
+                elements: visibleElements,
+                currentDetent: currentDetentBinding,
+                liveSheetHeight: sheetHeight
+            )
+            .environmentObject(viewModel)
+        }
+    }
+
+    private func businessDetailDestination(for element: Element) -> some View {
+        BusinessDetailView(
+            element: element,
+            userLocation: viewModel.userLocation,
+            contentViewModel: viewModel,
+            currentDetent: currentDetentBinding
+        )
+        .id(element.id)
+        .clearNavigationContainerBackgroundIfAvailable()
+    }
+
+    @ViewBuilder
+    private var communityDetailDestination: some View {
+        if let area = viewModel.presentedCommunityArea {
+            CommunityDetailView(
+                area: area,
+                currentDetent: currentDetentBinding
+            )
+            .environmentObject(viewModel)
+            .clearNavigationContainerBackgroundIfAvailable()
         }
     }
 
@@ -712,7 +726,7 @@ struct CommunityDetailView: View {
         }
         .listStyle(.insetGrouped)
         .contentMargins(.top, 0, for: .scrollContent)
-        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .scrollContentBackground(.automatic)
         .navigationTitle(area.displayName)
         .navigationBarTitleDisplayMode(.inline)
             .task(id: area.id) {
@@ -1269,15 +1283,8 @@ struct CommunityDetailView: View {
         return detentIdentifier(detent).contains("large")
     }
 
-    private var shouldHideSheetBackground: Bool {
-        guard let detent = currentDetent else { return false }
-        return detent != .large
-    }
-
     private var shouldUseGlassyRows: Bool {
-        guard let detent = currentDetent else { return false }
-        guard #available(iOS 26.0, *) else { return false }
-        return detent != .large
+        false
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {

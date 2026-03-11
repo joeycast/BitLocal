@@ -16,8 +16,8 @@ struct BusinessesListView: View {
     let maxListResults = 25
     var elements: [Element]
     var userLocation: CLLocation?
-    var currentDetent: PresentationDetent? = nil
     var liveSheetHeight: CGFloat = 0
+    @Binding private var currentDetent: PresentationDetent?
 
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
@@ -26,6 +26,18 @@ struct BusinessesListView: View {
     @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
     @State private var showFocusedSearchCategoryChips = false
     @FocusState private var isSearchFieldFocused: Bool
+
+    init(
+        elements: [Element],
+        userLocation: CLLocation? = nil,
+        currentDetent: Binding<PresentationDetent?> = .constant(nil),
+        liveSheetHeight: CGFloat = 0
+    ) {
+        self.elements = elements
+        self.userLocation = userLocation
+        self.liveSheetHeight = liveSheetHeight
+        self._currentDetent = currentDetent
+    }
 
     private var topSortedElements: [Element] {
         cachedTopSortedElements
@@ -642,7 +654,7 @@ struct BusinessesListView: View {
             element: element,
             userLocation: viewModel.userLocation,
             contentViewModel: viewModel,
-            currentDetent: .constant(currentDetent)
+            currentDetent: $currentDetent
         )
         .onAppear {
             prepareListNavigation(for: element)

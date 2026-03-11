@@ -180,7 +180,7 @@ struct BusinessDetailView: View {
         .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
         .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
         .accessibilityHidden(shouldShowCollapsedHeaderOnly)
-        .scrollContentBackground(shouldHideSheetBackground ? .hidden : .automatic)
+        .scrollContentBackground(.automatic)
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
@@ -228,15 +228,8 @@ extension BusinessDetailView {
         }
     }
 
-    private var shouldHideSheetBackground: Bool {
-        guard let detent = currentDetent else { return false }
-        return detent != .large
-    }
-    
     private var shouldUseGlassyRows: Bool {
-        guard let detent = currentDetent else { return false }
-        guard #available(iOS 26.0, *) else { return false }
-        return detent != .large
+        false
     }
 
     private var shouldShowCollapsedHeaderOnly: Bool {
