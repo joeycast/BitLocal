@@ -29,9 +29,6 @@ struct IPhoneLayoutView: View {
     private var appearance: Appearance { appearanceManager.appearance }
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.3)
     @State private var settingsSheetDetent: PresentationDetent = .medium
-    @State private var hasLiveSheetMeasurement = false
-    @State private var hasAcceptedDefaultLiveMeasurement = false
-    @State private var pendingLaunchOutlier: CGFloat?
     private let collapsedSheetDetent: PresentationDetent = .fraction(0.11)
     private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
 
@@ -146,59 +143,21 @@ struct IPhoneLayoutView: View {
                     }
             }
             .onAppear {
-                hasLiveSheetMeasurement = false
-                hasAcceptedDefaultLiveMeasurement = false
-                pendingLaunchOutlier = nil
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                viewModel.bottomPadding = inset
                 Debug.logMap(
                     "Attribution launch: detent=\(bottomSheetDetent), " +
-                    "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
                     "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
                 )
             }
-            .onChange(of: viewModel.bottomPadding) { _, newValue in
-                if newValue > 1 {
-                    let expected = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
-                    let isDefaultDetent = isDefaultLikeDetent(bottomSheetDetent)
-                    let isPlausibleAtDefault = abs(newValue - expected) <= 8
-
-                    if isDefaultDetent && !hasAcceptedDefaultLiveMeasurement {
-                        if isPlausibleAtDefault {
-                            hasAcceptedDefaultLiveMeasurement = true
-                            pendingLaunchOutlier = nil
-                        } else if let previousOutlier = pendingLaunchOutlier,
-                                  abs(newValue - previousOutlier) > 5 {
-                            // The sheet is actively moving/settling; switch to live tracking.
-                            hasAcceptedDefaultLiveMeasurement = true
-                            pendingLaunchOutlier = nil
-                        } else {
-                            pendingLaunchOutlier = newValue
-                            let inset = attributionBottomInset(for: geometry.size.height)
-                            Debug.logMap(
-                                "Attribution bottomPadding ignored (launch outlier): detent=\(bottomSheetDetent), " +
-                                "bottomPadding=\(newValue), expected=\(expected), inset=\(inset)"
-                            )
-                            return
-                        }
-                    }
-                    hasLiveSheetMeasurement = true
-                }
-                let inset = attributionBottomInset(for: geometry.size.height)
-                Debug.logMap(
-                    "Attribution bottomPadding changed: detent=\(bottomSheetDetent), " +
-                    "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
-                    "bottomPadding=\(newValue), mapHeight=\(geometry.size.height), inset=\(inset)"
-                )
+            .onChange(of: geometry.size.height) { _, newHeight in
+                viewModel.bottomPadding = estimatedBottomInsetForDetent(mapHeight: newHeight)
             }
             .onChange(of: bottomSheetDetent) { _, newDetent in
-                if !isDefaultLikeDetent(newDetent) {
-                    // Once the user leaves the default/large viewport, always trust live geometry.
-                    hasAcceptedDefaultLiveMeasurement = true
-                }
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                viewModel.bottomPadding = inset
                 Debug.logMap(
                     "Attribution detent changed: detent=\(newDetent), " +
-                    "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
                     "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
                 )
             }
@@ -234,15 +193,7 @@ struct IPhoneLayoutView: View {
     }
 
     private func attributionBottomInset(for mapHeight: CGFloat) -> CGFloat {
-        let estimatedInset = estimatedBottomInsetForDetent(mapHeight: mapHeight)
-        if isDefaultLikeDetent(bottomSheetDetent), !hasAcceptedDefaultLiveMeasurement {
-            return estimatedInset
-        }
-        // Prefer live bottom-sheet geometry for accurate tracking while dragging.
-        if hasLiveSheetMeasurement, viewModel.bottomPadding > 1 {
-            return min(max(viewModel.bottomPadding, 0), mapHeight - 1)
-        }
-        return estimatedInset
+        estimatedBottomInsetForDetent(mapHeight: mapHeight)
     }
 
     private func estimatedBottomInsetForDetent(mapHeight: CGFloat) -> CGFloat {

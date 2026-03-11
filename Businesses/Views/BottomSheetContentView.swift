@@ -38,7 +38,11 @@ struct BottomSheetContentView: View {
                             .environmentObject(viewModel)
                         }
                     }
-                    .toolbar(.hidden, for: .navigationBar)
+                    .toolbar(.visible, for: .navigationBar)
+                    .toolbarBackground(.hidden, for: .navigationBar)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationTitle("")
+                    .ignoresSafeArea(.container, edges: .top)
                     .navigationDestination(for: Element.self) { element in
                         BusinessDetailView(
                             element: element,
