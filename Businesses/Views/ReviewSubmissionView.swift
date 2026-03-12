@@ -113,15 +113,15 @@ struct ReviewSubmissionView: View {
     }
 
     private func formatAddress() -> String {
-        var parts: [String] = []
-        parts.append("\(submission.streetNumber) \(submission.streetName)")
-        parts.append(submission.city)
-        parts.append(submission.stateProvince)
-        if !submission.postalCode.isEmpty {
-            parts.append(submission.postalCode)
-        }
-        parts.append(submission.country)
-        return parts.joined(separator: ", ")
+        let address = Address(
+            streetNumber: submission.streetNumber,
+            streetName: submission.streetName,
+            cityOrTownName: submission.city,
+            postalCode: submission.postalCode,
+            regionOrStateName: submission.stateProvince,
+            countryName: submission.country
+        )
+        return address.formatted(.singleLine) ?? ""
     }
 
     private func formatPaymentMethods() -> String {

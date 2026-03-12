@@ -185,14 +185,16 @@ struct Address: Codable {
     let postalCode: String?
     let regionOrStateName: String?
     let countryName: String?
-    
-    init(streetNumber: String?, streetName: String?, cityOrTownName: String?, postalCode: String?, regionOrStateName: String?, countryName: String?) {
+    let isoCountryCode: String?
+
+    init(streetNumber: String?, streetName: String?, cityOrTownName: String?, postalCode: String?, regionOrStateName: String?, countryName: String?, isoCountryCode: String? = nil) {
         self.streetNumber = streetNumber
         self.streetName = streetName
         self.cityOrTownName = cityOrTownName
         self.postalCode = postalCode
         self.regionOrStateName = regionOrStateName
         self.countryName = countryName
+        self.isoCountryCode = isoCountryCode
     }
 }
 

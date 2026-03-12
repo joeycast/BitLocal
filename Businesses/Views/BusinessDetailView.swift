@@ -1010,26 +1010,7 @@ private func businessLinkValueRow(
 
 private extension BusinessDetailsSection {
     var addressDisplayText: String {
-        let streetNumber = elementCellViewModel.address?.streetNumber?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let streetName = elementCellViewModel.address?.streetName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let streetLine = [streetNumber, streetName]
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-
-        let city = elementCellViewModel.address?.cityOrTownName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let region = elementCellViewModel.address?.regionOrStateName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let postalCode = elementCellViewModel.address?.postalCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-        let localityParts = [city, region]
-            .filter { !$0.isEmpty }
-        let locality = localityParts.joined(separator: ", ")
-        let secondLine = [locality, postalCode]
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-
-        return [streetLine, secondLine]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+        elementCellViewModel.address?.formatted(.full) ?? ""
     }
 }
 

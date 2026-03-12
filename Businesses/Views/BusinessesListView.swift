@@ -719,14 +719,9 @@ struct ElementCell: View {
             }
             
             HStack(alignment: .center, spacing: 8) {
-                // Street number and name
-                if let streetNumber = viewModel.address?.streetNumber {
-                    Text("\(streetNumber) \(viewModel.address?.streetName ?? "")".trimmingCharacters(in: .whitespaces))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                } else {
-                    Text("\(viewModel.address?.streetName ?? "")")
+                if let formatted = viewModel.address?.formatted(.compact) {
+                    let lines = formatted.components(separatedBy: .newlines)
+                    Text(lines.first ?? "")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -734,14 +729,20 @@ struct ElementCell: View {
 
                 Spacer(minLength: 0)
             }
-            
+
             HStack {
-                Text("\(viewModel.address?.cityOrTownName ?? "")\(viewModel.address?.cityOrTownName != nil && viewModel.address?.cityOrTownName != "" ? ", " : "")\(viewModel.address?.regionOrStateName ?? "") \(viewModel.address?.postalCode ?? "")")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
+                if let formatted = viewModel.address?.formatted(.compact) {
+                    let lines = formatted.components(separatedBy: .newlines)
+                    Text(lines.dropFirst().joined(separator: ", "))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Spacer()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 PaymentIcons(element: viewModel.element)
             }
 
@@ -819,15 +820,18 @@ struct ElementCell: View {
 
 @available(iOS 17.0, *)
 class ElementCellViewModel: ObservableObject {
-    
+
+    static let regionCountryCodeDidChange = Notification.Name("regionCountryCodeDidChange")
+
     let element: Element
     let viewModel: ContentViewModel
     @Published var address: Address?
-    
+
     // OPTIMIZED: Remove the excessive logging from userLocation didSet
     @Published var userLocation: CLLocation?
-    
+
     private var userLocationCancellable: AnyCancellable?
+    private var regionCodeCancellable: AnyCancellable?
     private var lastLocationUpdate: CLLocationCoordinate2D?
     private var isAddressLookupInFlight = false
     
@@ -851,9 +855,11 @@ class ElementCellViewModel: ObservableObject {
         
         // Attempt to retrieve cached address, but prefer OSM-tagged fields when present
         if let cachedEntry = getCachedAddressEntry() {
-            self.address = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+            self.address = enrichWithRegionCountryCode(
+                mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+            )
         } else {
-            self.address = element.address
+            self.address = enrichWithRegionCountryCode(element.address)
         }
 
         if let address = self.address,
@@ -863,11 +869,26 @@ class ElementCellViewModel: ObservableObject {
             setCachedAddressEntry(.forAddress(address))
             viewModel.scheduleGeocodingCacheSave()
         }
+
+        // When a nearby geocode discovers the country code, re-enrich this cell
+        regionCodeCancellable = NotificationCenter.default
+            .publisher(for: Self.regionCountryCodeDidChange)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self,
+                      normalized(self.address?.isoCountryCode) == nil,
+                      let enriched = enrichWithRegionCountryCode(self.address) else { return }
+                self.setAddressIfChanged(enriched)
+                if enriched.hasAnyGeocodingFields {
+                    self.setCachedAddressEntry(.forAddress(enriched))
+                    self.viewModel.scheduleGeocodingCacheSave()
+                }
+            }
     }
-    
+
     deinit {
-        // Cancel the subscription when the view model is deallocated
         userLocationCancellable?.cancel()
+        regionCodeCancellable?.cancel()
     }
     
     // OPTIMIZED: Add method for manual location updates with deduplication
@@ -897,6 +918,51 @@ class ElementCellViewModel: ObservableObject {
         return ReverseGeocodingSpatialKey.key(for: coord)
     }
 
+    /// Coarse key (~111 km) used for the region-level country code cache.
+    /// Countries don't change within this distance except at borders.
+    private var coarseRegionKey: String? {
+        guard let coord = element.mapCoordinate else { return nil }
+        return ReverseGeocodingSpatialKey.key(for: coord, precision: 0)
+    }
+
+    /// Look up the country code from the coarse regional cache (no network).
+    private func regionCountryCode() -> String? {
+        guard let key = coarseRegionKey else { return nil }
+        return viewModel.countryCodeByRegion[key]
+    }
+
+    /// Store a country code in the coarse regional cache after geocoding.
+    private func setRegionCountryCode(_ code: String) {
+        guard let key = coarseRegionKey else { return }
+        let isNew = viewModel.countryCodeByRegion[key] == nil
+        viewModel.countryCodeByRegion[key] = code
+        if isNew {
+            NotificationCenter.default.post(name: Self.regionCountryCodeDidChange, object: nil)
+        }
+    }
+
+    /// Fire exactly one geocode per ~11 km region to discover the country code.
+    /// Does nothing if the region already has a code or a lookup is in flight.
+    private func requestRegionCountryCodeIfNeeded() {
+        guard normalized(address?.isoCountryCode) == nil,
+              let key = coarseRegionKey,
+              viewModel.countryCodeByRegion[key] == nil,
+              !viewModel.pendingRegionCodeLookups.contains(key),
+              let coord = element.mapCoordinate else { return }
+
+        viewModel.pendingRegionCodeLookups.insert(key)
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        let requestKey = "region-code:\(key)"
+
+        viewModel.geocoder.reverseGeocode(location: location, requestKey: requestKey) { [weak self] response in
+            guard let self else { return }
+            self.viewModel.pendingRegionCodeLookups.remove(key)
+            if let code = self.normalized(response.placemark?.isoCountryCode) {
+                self.setRegionCountryCode(code)
+            }
+        }
+    }
+
     private func getCachedAddressEntry() -> ReverseGeocodingCacheEntry? {
         guard !addressCacheKey.isEmpty else { return nil }
         return viewModel.geocodingCache.getValue(forKey: addressCacheKey)
@@ -907,21 +973,60 @@ class ElementCellViewModel: ObservableObject {
         viewModel.geocodingCache.setValue(entry, forKey: addressCacheKey)
     }
 
+    /// Only publish a new address when it actually differs from the current one,
+    /// preventing unnecessary SwiftUI redraws.
+    private func setAddressIfChanged(_ newAddress: Address?) {
+        guard !addressesMatch(address, newAddress) else { return }
+        address = newAddress
+    }
+
+    /// If the address is missing an `isoCountryCode`, try to fill it in from
+    /// the coarse regional cache (populated by geocoding of nearby merchants).
+    /// This avoids a network geocode just to determine the country.
+    private func enrichWithRegionCountryCode(_ address: Address?) -> Address? {
+        guard let address else { return nil }
+        guard normalized(address.isoCountryCode) == nil,
+              let code = regionCountryCode() else {
+            return address
+        }
+        return Address(
+            streetNumber: address.streetNumber,
+            streetName: address.streetName,
+            cityOrTownName: address.cityOrTownName,
+            postalCode: address.postalCode,
+            regionOrStateName: address.regionOrStateName,
+            countryName: address.countryName,
+            isoCountryCode: code
+        )
+    }
+
     func updateAddress() {
         if let cachedEntry = getCachedAddressEntry() {
             let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
-            self.address = merged
+            let enriched = enrichWithRegionCountryCode(merged)
+            setAddressIfChanged(enriched)
+            // Persist regional country code into cache if we just enriched it
+            if let enriched, normalized(cachedEntry.address?.isoCountryCode) == nil,
+               normalized(enriched.isoCountryCode) != nil {
+                setCachedAddressEntry(.forAddress(enriched))
+                viewModel.scheduleGeocodingCacheSave()
+            }
             if cachedEntry.status == .resolved || cachedEntry.status == .partial {
+                requestRegionCountryCodeIfNeeded()
                 return
             }
             if !cachedEntry.shouldRetry() {
+                requestRegionCountryCodeIfNeeded()
                 return
             }
         } else if let preferred = element.address {
-            self.address = preferred
+            let enriched = enrichWithRegionCountryCode(preferred)
+            setAddressIfChanged(enriched)
             if preferred.hasAnyGeocodingFields && !needsSeedAddressEnrichment(preferred) {
-                setCachedAddressEntry(.forAddress(preferred))
+                setCachedAddressEntry(.forAddress(enriched ?? preferred))
                 viewModel.scheduleGeocodingCacheSave()
+                // Address is complete but may still need a country code
+                requestRegionCountryCodeIfNeeded()
                 return
             }
         }
@@ -950,10 +1055,16 @@ class ElementCellViewModel: ObservableObject {
                         countryName: self.normalized(placemark.country)
                     ),
                     regionOrStateName: self.normalized(placemark.administrativeArea),
-                    countryName: self.normalized(placemark.country)
+                    countryName: self.normalized(placemark.country),
+                    isoCountryCode: self.normalized(placemark.isoCountryCode)
                 )
+                // Store country code in coarse regional cache for nearby merchants
+                if let code = self.normalized(placemark.isoCountryCode) {
+                    self.setRegionCountryCode(code)
+                }
+
                 let merged = self.mergedAddress(preferred: self.element.address, fallback: geocodedAddress)
-                self.address = merged
+                self.setAddressIfChanged(merged)
 
                 if let merged, merged.hasAnyGeocodingFields {
                     self.setCachedAddressEntry(.forAddress(merged))
@@ -963,7 +1074,7 @@ class ElementCellViewModel: ObservableObject {
                     )
                 }
             } else if let staleFallback, staleFallback.hasAnyGeocodingFields {
-                self.address = self.mergedAddress(preferred: self.element.address, fallback: staleFallback)
+                self.setAddressIfChanged(self.mergedAddress(preferred: self.element.address, fallback: staleFallback))
                 self.setCachedAddressEntry(.forAddress(staleFallback))
             } else if let retryAfter = response.retryAfter {
                 self.setCachedAddressEntry(.failed(retryAfter: retryAfter))
@@ -1023,7 +1134,7 @@ class ElementCellViewModel: ObservableObject {
 
     private func needsSeedAddressEnrichment(_ address: Address?) -> Bool {
         guard let address else { return true }
-        return !isAddressComplete(address) || shouldEnrichMissingState(address) || isLikelyMalformedStreetLine(address)
+        return !isAddressComplete(address) || isLikelyMalformedStreetLine(address)
     }
 
     private func addressesMatch(_ lhs: Address?, _ rhs: Address?) -> Bool {
@@ -1032,13 +1143,16 @@ class ElementCellViewModel: ObservableObject {
         normalized(lhs?.cityOrTownName) == normalized(rhs?.cityOrTownName) &&
         normalized(lhs?.postalCode) == normalized(rhs?.postalCode) &&
         normalized(lhs?.regionOrStateName) == normalized(rhs?.regionOrStateName) &&
-        normalized(lhs?.countryName) == normalized(rhs?.countryName)
+        normalized(lhs?.countryName) == normalized(rhs?.countryName) &&
+        normalized(lhs?.isoCountryCode) == normalized(rhs?.isoCountryCode)
     }
 
     private func isAddressComplete(_ address: Address?) -> Bool {
         guard let address else { return false }
-        return normalized(address.streetNumber) != nil &&
-            normalized(address.streetName) != nil &&
+        // Street name + city is sufficient — street number is optional (many
+        // international addresses don't have one) and state/region is
+        // supplementary. Only geocode when we're truly missing core fields.
+        return normalized(address.streetName) != nil &&
             normalized(address.cityOrTownName) != nil
     }
 
@@ -1075,6 +1189,10 @@ class ElementCellViewModel: ObservableObject {
             preferredStreetName == normalized(fallback?.postalCode) ||
             normalized(preferred?.cityOrTownName) == nil) {
             selectedStreetName = normalized(fallback?.streetName)
+        } else if let preferredStreetName,
+                  looksLikeRawAddressString(preferredStreetName),
+                  normalized(fallback?.streetName) != nil {
+            selectedStreetName = normalized(fallback?.streetName)
         } else {
             selectedStreetName = preferredStreetName ?? normalized(fallback?.streetName)
         }
@@ -1088,13 +1206,20 @@ class ElementCellViewModel: ObservableObject {
                 countryName: pick(preferred?.countryName, fallback?.countryName)
             ),
             regionOrStateName: pick(preferred?.regionOrStateName, fallback?.regionOrStateName),
-            countryName: pick(preferred?.countryName, fallback?.countryName)
+            countryName: pick(preferred?.countryName, fallback?.countryName),
+            isoCountryCode: normalized(fallback?.isoCountryCode) ?? normalized(preferred?.isoCountryCode)
         )
     }
 
     private func looksLikePostalCode(_ value: String) -> Bool {
         let zipPattern = #"^\d{5}(?:-\d{4})?$"#
         return value.range(of: zipPattern, options: .regularExpression) != nil
+    }
+
+    /// Detects when a raw full-address string (e.g. "Handelskade 24, Willemstad, Curacao")
+    /// was stuffed into the streetName field. Real street names don't contain commas.
+    private func looksLikeRawAddressString(_ value: String) -> Bool {
+        value.contains(",")
     }
 }
 

@@ -123,6 +123,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var userLocation: CLLocation?
     @Published var isUpdatingLocation = false
     @Published var geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 1_000)
+    /// Coarse spatial cache mapping ~11km regions to ISO country codes.
+    /// Populated as a side effect of reverse geocoding; used to assign country
+    /// codes to merchants that already have complete addresses without needing
+    /// an additional geocode request.
+    var countryCodeByRegion: [String: String] = [:]
+    /// Tracks which coarse regions already have a pending country-code geocode
+    /// so we only fire one request per ~11 km area.
+    var pendingRegionCodeLookups: Set<String> = []
     @Published var path: [Element] = []
     @Published var selectedElement: Element?
     @Published var deepLinkUnavailableState: DeepLinkUnavailableState?
