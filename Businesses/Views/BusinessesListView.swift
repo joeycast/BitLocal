@@ -22,6 +22,7 @@ struct BusinessesListView: View {
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
     @State private var searchResultsLimit = 20
+    @State private var discoveryResultsLimit = 25
     @State private var cachedTopSortedElements: [Element] = []
     @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
     @State private var showFocusedSearchCategoryChips = false
@@ -126,6 +127,7 @@ struct BusinessesListView: View {
             viewModel.handleMerchantSearchMapRegionChange()
         }
         .onChange(of: elements.map(\.id)) { _, _ in
+            discoveryResultsLimit = maxListResults
             refreshDiscoveryCache()
         }
         .onAppear {
@@ -221,6 +223,16 @@ struct BusinessesListView: View {
                 Section {
                     ForEach(regularTopSortedElements, id: \.id) { element in
                         merchantRow(for: element)
+                    }
+
+                    if hasMoreDiscoveryResults {
+                        Button("Load more results") {
+                            discoveryResultsLimit += maxListResults
+                            refreshDiscoveryCache()
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(.accent)
+                        .clearListRowBackground(if: shouldUseGlassyRows)
                     }
 
                     footerView
@@ -451,6 +463,10 @@ struct BusinessesListView: View {
         return totalCount > searchResultsLimit
     }
 
+    private var hasMoreDiscoveryResults: Bool {
+        elements.count > topSortedElements.count
+    }
+
     private var categoryChipsView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -484,7 +500,7 @@ struct BusinessesListView: View {
     }
 
     private func refreshDiscoveryCache() {
-        cachedTopSortedElements = nearestElements(elements, limit: maxListResults)
+        cachedTopSortedElements = nearestElements(elements, limit: discoveryResultsLimit)
         cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
     }
 
@@ -598,25 +614,13 @@ struct BusinessesListView: View {
     }
 
     private var footerView: some View {
-        Group {
-            if elements.count > maxListResults {
-                Text(
-                    String(
-                        format: NSLocalizedString("locations_returned_footer", comment: "Footer: N locations returned, top M displayed"),
-                        elements.count,
-                        min(elements.count, maxListResults)
-                    )
-                )
-            } else {
-                Text(
-                    String(
-                        format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
-                        elements.count,
-                        elements.count
-                    )
-                )
-            }
-        }
+        Text(
+            String(
+                format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
+                topSortedElements.count,
+                elements.count
+            )
+        )
         .font(.footnote)
         .foregroundStyle(.secondary)
     }
