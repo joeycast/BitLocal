@@ -153,40 +153,6 @@ struct BusinessDetailView: View {
     }
     
     var body: some View {
-        detailList
-            .frame(height: shouldHideCollapsedSheetContent ? 0 : nil, alignment: .top)
-            .clipped()
-            .opacity(shouldHideCollapsedSheetContent ? 0 : contentRevealProgress)
-            .offset(y: shouldHideCollapsedSheetContent ? 0 : (1 - contentRevealProgress) * 10)
-            .allowsHitTesting(!shouldHideCollapsedSheetContent)
-            .accessibilityHidden(shouldHideCollapsedSheetContent)
-        .onAppear {
-            Debug.log("BusinessDetailView appeared for element: \(element.id)")
-            Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
-            elementCellViewModel.onCellAppear()
-        }
-        .listStyle(InsetGroupedListStyle()) // Consistent list style
-        .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
-        .navigationBarTitleDisplayMode(horizontalSizeClass == .compact ? .inline : .inline)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                shareToolbarItem
-            }
-        }
-        .alert("Unable to share this place", isPresented: $showingShareErrorAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("The place link could not be created.")
-        }
-        .sheet(item: $shareItem) { item in
-            ShareActivityView(items: [item.url])
-        }
-    }
-}
-
-extension BusinessDetailView {
-    private var detailList: some View {
         List {
             BusinessDescriptionSection(element: element)
                 .featuredHeader(isFeatured: shouldShowFeaturedBadgeInExpandedContent)
@@ -212,9 +178,38 @@ extension BusinessDetailView {
             BusinessMapSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
         }
+        .listStyle(.insetGrouped)
+        .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.automatic)
+        .opacity(shouldHideCollapsedSheetContent ? 0 : contentRevealProgress)
+        .offset(y: shouldHideCollapsedSheetContent ? 0 : (1 - contentRevealProgress) * 10)
+        .allowsHitTesting(!shouldHideCollapsedSheetContent)
+        .accessibilityHidden(shouldHideCollapsedSheetContent)
+        .onAppear {
+            Debug.log("BusinessDetailView appeared for element: \(element.id)")
+            Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
+            elementCellViewModel.onCellAppear()
+        }
+        .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                shareToolbarItem
+            }
+        }
+        .alert("Unable to share this place", isPresented: $showingShareErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The place link could not be created.")
+        }
+        .sheet(item: $shareItem) { item in
+            ShareActivityView(items: [item.url])
+        }
     }
+}
 
+extension BusinessDetailView {
     @ViewBuilder
     private var shareToolbarItem: some View {
         if FeatureFlags.isSharePlaceLinksEnabled {
