@@ -674,6 +674,7 @@ struct BusinessesListView: View {
             contentViewModel: viewModel,
             currentDetent: $currentDetent
         )
+        .clearNavigationContainerBackgroundIfAvailable()
         .onAppear {
             prepareListNavigation(for: element)
         }
