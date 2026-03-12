@@ -65,7 +65,9 @@ struct BottomSheetContentView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationTitle("")
                 .ignoresSafeArea(.container, edges: .top)
-                .navigationDestination(for: Element.self, destination: businessDetailDestination)
+                .navigationDestination(for: Element.self) { element in
+                    businessDetailDestination(for: element)
+                }
                 .navigationDestination(isPresented: communityDetailBindingIsPresented) {
                     communityDetailDestination
                 }

@@ -108,6 +108,7 @@ struct BusinessDetailView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State private var region = MKCoordinateRegion()
     @State private var showingShareErrorAlert = false
+    @State private var shareItem: ShareURLItem?
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
 
@@ -152,35 +153,13 @@ struct BusinessDetailView: View {
     }
     
     var body: some View {
-        List {
-            BusinessDescriptionSection(element: element)
-                .featuredHeader(isFeatured: element.isCurrentlyBoosted())
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BusinessDetailsSection(
-                element: element,
-                elementCellViewModel: elementCellViewModel,
-                isFirstVisibleSection: element.isCurrentlyBoosted() && !element.hasBusinessDescription
-            )
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapSocialsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            PaymentDetailsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapRequiredAppSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapPlaceCommentsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapVerificationSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapPaidActionsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BusinessMapSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-        }
-        .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
-        .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
-        .accessibilityHidden(shouldShowCollapsedHeaderOnly)
-        .scrollContentBackground(.automatic)
+        detailList
+            .frame(height: shouldHideCollapsedSheetContent ? 0 : nil, alignment: .top)
+            .clipped()
+            .opacity(shouldHideCollapsedSheetContent ? 0 : contentRevealProgress)
+            .offset(y: shouldHideCollapsedSheetContent ? 0 : (1 - contentRevealProgress) * 10)
+            .allowsHitTesting(!shouldHideCollapsedSheetContent)
+            .accessibilityHidden(shouldHideCollapsedSheetContent)
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
@@ -200,31 +179,56 @@ struct BusinessDetailView: View {
         } message: {
             Text("The place link could not be created.")
         }
+        .sheet(item: $shareItem) { item in
+            ShareActivityView(items: [item.url])
+        }
     }
 }
 
 extension BusinessDetailView {
+    private var detailList: some View {
+        List {
+            BusinessDescriptionSection(element: element)
+                .featuredHeader(isFeatured: shouldShowFeaturedBadgeInExpandedContent)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            BusinessDetailsSection(
+                element: element,
+                elementCellViewModel: elementCellViewModel,
+                isFirstVisibleSection: shouldShowFeaturedBadgeInExpandedContent && !element.hasBusinessDescription
+            )
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            BTCMapSocialsSection(element: element)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            PaymentDetailsSection(element: element)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            BTCMapRequiredAppSection(element: element)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            BTCMapPlaceCommentsSection(element: element)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            BTCMapVerificationSection(element: element)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            BTCMapPaidActionsSection(element: element)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+            BusinessMapSection(element: element)
+                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+        }
+        .scrollContentBackground(.automatic)
+    }
+
     @ViewBuilder
     private var shareToolbarItem: some View {
         if FeatureFlags.isSharePlaceLinksEnabled {
-            if let shareURL = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
-                ShareLink(
-                    item: shareURL,
-                    subject: Text("BitLocal Place"),
-                    message: Text("Check out \(element.displayName ?? "this place") on BitLocal")
-                ) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .accessibilityLabel("Share place")
-            } else {
-                Button {
+            Button {
+                if let shareURL = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
+                    shareItem = ShareURLItem(url: shareURL)
+                } else {
                     Debug.log("Share link generation failed for place id: \(element.id)")
                     showingShareErrorAlert = true
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
                 }
-                .accessibilityLabel("Share place")
+            } label: {
+                Image(systemName: "square.and.arrow.up")
             }
+            .accessibilityLabel("Share place")
         }
     }
 
@@ -232,14 +236,65 @@ extension BusinessDetailView {
         false
     }
 
-    private var shouldShowCollapsedHeaderOnly: Bool {
-        guard let detent = currentDetent else { return false }
-        return detentIdentifier(detent).contains("fraction 0.11")
+    private var shouldHideCollapsedSheetContent: Bool {
+        guard hasLiveSheetMeasurement else {
+            return isCollapsedLikeDetent
+        }
+        return contentViewModel.bottomPadding <= collapsedContentRevealHeight
+    }
+
+    private var collapsedContentRevealHeight: CGFloat {
+        140
+    }
+
+    private var contentRevealProgress: CGFloat {
+        guard hasLiveSheetMeasurement else {
+            return isCollapsedLikeDetent ? 0 : 1
+        }
+
+        if contentViewModel.bottomPadding > (collapsedContentRevealHeight + revealRange) {
+            return 1
+        }
+
+        let rawProgress = (contentViewModel.bottomPadding - collapsedContentRevealHeight) / revealRange
+        return min(max(rawProgress, 0), 1)
+    }
+
+    private var shouldShowFeaturedBadgeInExpandedContent: Bool {
+        element.isCurrentlyBoosted() && !shouldHideCollapsedSheetContent
+    }
+
+    private var hasLiveSheetMeasurement: Bool {
+        contentViewModel.bottomPadding > 1
+    }
+
+    private var revealRange: CGFloat {
+        36
+    }
+
+    private var isCollapsedLikeDetent: Bool {
+        guard let currentDetent else { return false }
+        return detentIdentifier(currentDetent).contains("fraction 0.11")
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
         String(describing: detent).lowercased()
     }
+}
+
+private struct ShareURLItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ShareActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 struct BTCMapPlaceCommentsSection: View {
