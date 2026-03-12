@@ -904,7 +904,7 @@ struct BusinessDetailsSection: View {
                         icon: "map",
                         label: NSLocalizedString("address_label", comment: "Label for address"),
                         value: addressDisplayText,
-                        valueLineLimit: 3
+                        valueLineLimit: 4
                     )
                 }
                 .buttonStyle(.plain)
@@ -1003,7 +1003,7 @@ private func businessLinkValueRow(
 
 private extension BusinessDetailsSection {
     var addressDisplayText: String {
-        elementCellViewModel.address?.formatted(.full) ?? ""
+        elementCellViewModel.address?.formatted(.compact) ?? ""
     }
 }
 
