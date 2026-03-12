@@ -4687,6 +4687,7 @@
     },
     "locations_returned_footer" : {
       "comment" : "Footer: N locations returned, top M displayed",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

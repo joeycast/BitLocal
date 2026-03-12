@@ -173,8 +173,9 @@ struct CommunitiesListView: View {
                     if filtered.isEmpty {
                         Text(emptyStateMessage)
                             .foregroundStyle(.secondary)
+                            .listRowSeparator(.hidden, edges: .top)
                     } else {
-                        ForEach(displayed) { area in
+                        ForEach(Array(displayed.enumerated()), id: \.element.id) { index, area in
                             Button {
                                 viewModel.selectCommunity(area, presentDetail: true)
                             } label: {
@@ -190,6 +191,7 @@ struct CommunitiesListView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+                            .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
                         }
 
                         if hasMore {

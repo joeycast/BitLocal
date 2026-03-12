@@ -204,7 +204,8 @@ struct BusinessesListView: View {
                     ForEach(Array(featuredTopSortedElements.enumerated()), id: \.element.id) { index, element in
                         merchantRow(
                             for: element,
-                            showsBottomDivider: index == featuredTopSortedElements.count - 1
+                            showsBottomDivider: index == featuredTopSortedElements.count - 1,
+                            hidesTopSeparator: index == 0
                         )
                     }
                 } header: {
@@ -221,8 +222,8 @@ struct BusinessesListView: View {
 
             if !regularTopSortedElements.isEmpty || featuredTopSortedElements.isEmpty {
                 Section {
-                    ForEach(regularTopSortedElements, id: \.id) { element in
-                        merchantRow(for: element)
+                    ForEach(Array(regularTopSortedElements.enumerated()), id: \.element.id) { index, element in
+                        merchantRow(for: element, hidesTopSeparator: index == 0)
                     }
 
                     if hasMoreDiscoveryResults {
@@ -283,8 +284,8 @@ struct BusinessesListView: View {
             }
 
             Section {
-                ForEach(elements, id: \.id) { element in
-                    merchantRow(for: element)
+                ForEach(Array(elements.enumerated()), id: \.element.id) { index, element in
+                    merchantRow(for: element, hidesTopSeparator: index == 0)
                 }
 
                 footerView
@@ -316,6 +317,7 @@ struct BusinessesListView: View {
                         Text(statusText)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .listRowSeparator(.hidden, edges: .top)
                     }
 
                     if displayedPrimaryResults.isEmpty &&
@@ -323,13 +325,15 @@ struct BusinessesListView: View {
                         !viewModel.merchantSearchIsLoading {
                         Text(noResultsText)
                             .foregroundStyle(.secondary)
+                            .listRowSeparator(.hidden, edges: .top)
                     } else {
                         if !displayedFeaturedPrimaryResults.isEmpty {
                             Section {
                                 ForEach(Array(displayedFeaturedPrimaryResults.enumerated()), id: \.element.id) { index, element in
                                     merchantSearchRow(
                                         for: element,
-                                        showsBottomDivider: index == displayedFeaturedPrimaryResults.count - 1
+                                        showsBottomDivider: index == displayedFeaturedPrimaryResults.count - 1,
+                                        hidesTopSeparator: index == 0
                                     )
                                 }
                             } header: {
@@ -345,8 +349,8 @@ struct BusinessesListView: View {
 
                         if !displayedRegularPrimaryResults.isEmpty || displayedFeaturedPrimaryResults.isEmpty {
                             Section {
-                                ForEach(displayedRegularPrimaryResults, id: \.id) { element in
-                                    merchantSearchRow(for: element)
+                                ForEach(Array(displayedRegularPrimaryResults.enumerated()), id: \.element.id) { index, element in
+                                    merchantSearchRow(for: element, hidesTopSeparator: index == 0)
                                 }
                             } header: {
                                 if !displayedFeaturedPrimaryResults.isEmpty {
@@ -360,8 +364,8 @@ struct BusinessesListView: View {
                                 }
                             }
                         } else if !displayedPrimaryResults.isEmpty {
-                            ForEach(displayedPrimaryResults, id: \.id) { element in
-                                merchantSearchRow(for: element)
+                            ForEach(Array(displayedPrimaryResults.enumerated()), id: \.element.id) { index, element in
+                                merchantSearchRow(for: element, hidesTopSeparator: index == 0)
                             }
                         }
                     }
@@ -522,7 +526,11 @@ struct BusinessesListView: View {
         return .easeInOut(duration: duration)
     }
 
-    private func merchantSearchRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
+    private func merchantSearchRow(
+        for element: Element,
+        showsBottomDivider: Bool = false,
+        hidesTopSeparator: Bool = false
+    ) -> some View {
         let cellVM = cellViewModel(for: element)
         return NavigationLink {
             businessDetailDestination(for: element)
@@ -532,9 +540,14 @@ struct BusinessesListView: View {
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
+        .listRowSeparator(hidesTopSeparator ? .hidden : .visible, edges: .top)
     }
 
-    private func merchantRow(for element: Element, showsBottomDivider: Bool = false) -> some View {
+    private func merchantRow(
+        for element: Element,
+        showsBottomDivider: Bool = false,
+        hidesTopSeparator: Bool = false
+    ) -> some View {
         let cellVM = cellViewModel(for: element)
         return NavigationLink {
             businessDetailDestination(for: element)
@@ -544,6 +557,7 @@ struct BusinessesListView: View {
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
+        .listRowSeparator(hidesTopSeparator ? .hidden : .visible, edges: .top)
         .clearListRowBackground(if: shouldUseGlassyRows)
     }
 
