@@ -108,7 +108,7 @@ struct IPhoneLayoutView: View {
 //                    Debug.log("Bottom sheet dismissed")
 //                }
 //            )
-            .sheet(isPresented: .constant(didCompleteOnboarding), onDismiss: {
+            .sheet(isPresented: .constant(didCompleteOnboarding && viewModel.isReadyForPostOnboardingPresentation), onDismiss: {
                 Debug.log("Bottom sheet dismissed")
             }) {
                 BottomSheetContentView(

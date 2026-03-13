@@ -41,15 +41,8 @@ struct RootView: View {
             Debug.log("onboarding completion changed to: \(completed)")
 
             guard completed else { return }
-            
-            // 1️⃣ Center map if we already have location
-            if let loc = contentViewModel.userLocation {
-                Debug.log("Centering map to existing user location after onboarding")
-                contentViewModel.centerMap(to: loc.coordinate)
-            } else {
-                Debug.log("No user location yet - requesting location after onboarding")
-                contentViewModel.requestWhenInUseLocationPermission()
-            }
+
+            contentViewModel.preparePostOnboardingPresentation()
 
             // If onboarding warmup already finished, deep links can now resolve immediately.
             contentViewModel.resolvePendingDeepLinkIfNeeded()

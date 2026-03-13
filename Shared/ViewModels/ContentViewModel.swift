@@ -143,6 +143,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var bottomPadding: CGFloat = 0
     @Published var initialRegionSet = false // Track if initial region has been set
     @Published var forceMapRefresh = false // Flag to force map annotation refresh
+    @Published var isReadyForPostOnboardingPresentation = true
     @Published var selectionSource: SelectionSource = .unknown
     // Unified search state
     @Published var unifiedSearchText = ""
@@ -234,6 +235,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var latestCommunitySelectionRequestID = UUID()
     private var hasScheduledCommunityPrefetch = false
     private var communityPrefetchWorkItem: DispatchWorkItem?
+    private var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
     private var placeholderNameHydrationInFlight = Set<String>()
     private var placeholderNameHydrationAttempted = Set<String>()
     private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
@@ -303,6 +305,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self?.hydratePlaceholderNamesIfNeeded(in: elements)
                 self?.refreshMerchantSearchFromVisibleElementsIfNeeded()
                 self?.pruneTransientMerchantCachesIfNeeded()
+            }
+            .store(in: &cancellables)
+        mapStoppedMovingSubject
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in
+                guard let self else { return }
+                guard self.shouldReleasePostOnboardingPresentationAfterNextMapSettle else { return }
+                self.shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+                self.isReadyForPostOnboardingPresentation = true
+                self.forceMapRefresh = true
             }
             .store(in: &cancellables)
     }
@@ -614,6 +626,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self.initialRegionSet = true
             }
 
+            if self.shouldReleasePostOnboardingPresentationAfterNextMapSettle {
+                self.centerMap(to: latestLocation.coordinate, force: true)
+            }
+
             // Always update userLocation and region for other uses, but don't recenter the map
             let currentSpan = self.region.span
             self.region = MKCoordinateRegion(center: latestLocation.coordinate, span: currentSpan)
@@ -648,6 +664,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             case .denied, .restricted:
                 self.isUpdatingLocation = false
                 Debug.log("Location access denied or restricted")
+                self.finishPostOnboardingPresentationIfNeeded()
             case .notDetermined:
                 Debug.log("Location authorization not determined")
             @unknown default:
@@ -1217,6 +1234,31 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 }
             }
         }
+    }
+
+    func preparePostOnboardingPresentation() {
+        let authorizationStatus = locationManager.authorizationStatus
+
+        if let userLocation {
+            isReadyForPostOnboardingPresentation = false
+            shouldReleasePostOnboardingPresentationAfterNextMapSettle = true
+            centerMap(to: userLocation.coordinate, force: true)
+            return
+        }
+
+        if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+            isReadyForPostOnboardingPresentation = false
+            shouldReleasePostOnboardingPresentationAfterNextMapSettle = true
+            requestWhenInUseLocationPermission()
+            return
+        }
+
+        finishPostOnboardingPresentationIfNeeded()
+    }
+
+    func finishPostOnboardingPresentationIfNeeded() {
+        shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+        isReadyForPostOnboardingPresentation = true
     }
     
     // Add a method for user-initiated centering (location button)

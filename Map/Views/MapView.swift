@@ -115,6 +115,15 @@ struct MapView: UIViewRepresentable {
             Debug.logMap("MapView.updateUIView() - SKIPPED (waiting for initial data)")
             return
         }
+
+        guard viewModel.isReadyForPostOnboardingPresentation else {
+            let currentAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+            if !currentAnnotations.isEmpty {
+                mapView.removeAnnotations(currentAnnotations)
+            }
+            Debug.logMap("MapView.updateUIView() - SKIPPED (waiting for post-onboarding map settle)")
+            return
+        }
         
         Debug.logMap("MapView.updateUIView() called!")
 
@@ -598,6 +607,10 @@ struct MapView: UIViewRepresentable {
                 .delay(for: .seconds(0.5), scheduler: RunLoop.main)
                 .sink { [weak self] _ in
                     guard let self = self else { return }
+                    guard self.viewModel.isReadyForPostOnboardingPresentation else {
+                        self.viewModel.mapStoppedMovingSubject.send(())
+                        return
+                    }
                     let all = self.viewModel.mapElementsForCurrentDisplay
                     self.updateAnnotations(
                         mapView: mapView,
