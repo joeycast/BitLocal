@@ -324,6 +324,7 @@ struct BusinessesListView: View {
                 if trimmedSearchQuery.count == 1 {
                     Text("Type at least 2 characters to search")
                         .foregroundStyle(.secondary)
+                        .listRowSeparator(.hidden, edges: .top)
                 } else if trimmedSearchQuery.count >= 2 {
                     if let statusText = searchStatusText {
                         Text(statusText)
