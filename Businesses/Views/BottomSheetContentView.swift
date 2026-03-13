@@ -594,14 +594,14 @@ struct CommunityDetailView: View {
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
             }
 
-            if hasAboutData {
-                Section("About") {
-                    if let org = area.tags?["organization"], !org.isEmpty {
-                        detailRow(icon: "building.2", text: org)
-                    }
-                }
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            }
+//            if hasAboutData {
+//                Section("About") {
+//                    if let org = area.tags?["organization"], !org.isEmpty {
+//                        detailRow(icon: "building.2", text: org)
+//                    }
+//                }
+//                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+//            }
 
             if !contactInformationLinks.isEmpty {
                 Section("Contact Information") {
@@ -912,10 +912,10 @@ struct CommunityDetailView: View {
         .contentShape(.rect)
     }
 
-    private var hasAboutData: Bool {
-        if let val = area.tags?["organization"], !val.isEmpty { return true }
-        return false
-    }
+//    private var hasAboutData: Bool {
+//        if let val = area.tags?["organization"], !val.isEmpty { return true }
+//        return false
+//    }
 
     private var socialLinks: [CommunitySocialLink] {
         let tags = area.tags ?? [:]
