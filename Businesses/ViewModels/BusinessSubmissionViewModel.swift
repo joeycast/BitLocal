@@ -31,7 +31,16 @@ class BusinessSubmissionViewModel: ObservableObject {
 
     func emailSubject() -> String {
         let name = submission.businessName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "New BitLocal Business Submission" : "New BitLocal Business Submission: \(name)"
+        if name.isEmpty {
+            return NSLocalizedString("New BitLocal Business Submission", comment: "Email subject for a new business submission without a business name")
+        }
+        return String(
+            format: NSLocalizedString(
+                "New BitLocal Business Submission: %@",
+                comment: "Email subject for a new business submission with the business name"
+            ),
+            name
+        )
     }
 
     func emailBody() -> String {

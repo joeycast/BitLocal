@@ -755,7 +755,7 @@ struct CommunityDetailView: View {
         .alert("Tip This Community", isPresented: $showLightningAlert) {
             if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
                let payload = payableLightningPayload {
-                Button("Copy and Open \(lastWallet.name)") {
+                Button(String(format: NSLocalizedString("Copy and Open %@", comment: "Button title to copy a value and open the selected wallet"), lastWallet.name)) {
                     openWallet(lastWallet, payload: payload)
                 }
             }
@@ -811,7 +811,7 @@ struct CommunityDetailView: View {
             })
         ) {
             if let copyValue = linkOpenErrorItem?.copyValue {
-                Button("Copy npub") {
+                Button(String(format: NSLocalizedString("Copy %@", comment: "Button title to copy a value label"), "npub")) {
                     UIPasteboard.general.string = copyValue
                 }
             }
@@ -864,7 +864,10 @@ struct CommunityDetailView: View {
                 platformLinkRow(icon: item.icon, label: item.label, value: item.value)
             }
         }
-        .copyValueContextMenu(item.value, title: "Copy \(item.label)")
+        .copyValueContextMenu(
+            item.value,
+            title: String(format: NSLocalizedString("Copy %@", comment: "Context menu title to copy a labeled value"), item.label)
+        )
     }
 
     private func platformLinkRow(icon: String, label: String, value: String) -> some View {
@@ -1052,7 +1055,7 @@ struct CommunityDetailView: View {
                 icon: "checkmark.seal.fill",
                 tint: .green,
                 title: "Verified",
-                statusText: "Last verified: \(formattedDate)",
+                statusText: String(format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"), formattedDate),
                 explanation: "Someone physically confirmed this community within the past year."
             )
         }
@@ -1060,7 +1063,7 @@ struct CommunityDetailView: View {
             icon: "exclamationmark.triangle.fill",
             tint: .orange,
             title: "Not Recently Verified",
-            statusText: "Last verified: \(formattedDate)",
+            statusText: String(format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"), formattedDate),
             explanation: "It has been more than a year since this community was verified."
         )
     }
@@ -1202,7 +1205,7 @@ struct CommunityDetailView: View {
     private func openWallet(_ wallet: LightningWalletOption, payload: String) {
         let appURL = wallet.appURLs.first(where: { UIApplication.shared.canOpenURL($0) }) ?? wallet.appURLs.first
         guard let appURL else {
-            lightningErrorMessage = "The selected wallet could not be opened."
+            lightningErrorMessage = NSLocalizedString("The selected wallet could not be opened.", comment: "Error shown when no wallet URL can be opened")
             return
         }
         UIPasteboard.general.string = payload
@@ -1210,7 +1213,13 @@ struct CommunityDetailView: View {
             if success {
                 lastLightningWalletID = wallet.id
             } else {
-                lightningErrorMessage = "Could not open \(wallet.name). The lightning value has been copied so you can paste it manually."
+                lightningErrorMessage = String(
+                    format: NSLocalizedString(
+                        "Could not open %@. The lightning value has been copied so you can paste it manually.",
+                        comment: "Error shown when opening a specific wallet fails"
+                    ),
+                    wallet.name
+                )
             }
         }
     }
@@ -1332,7 +1341,7 @@ private struct CommunityLinkOpenError {
 
     static func nostr(copyValue: String) -> Self {
         Self(
-            message: "It doesn't look like you have a Nostr app installed.",
+            message: NSLocalizedString("It doesn't look like you have a Nostr app installed.", comment: "Error shown when trying to open a nostr profile without a compatible app"),
             copyValue: copyValue
         )
     }

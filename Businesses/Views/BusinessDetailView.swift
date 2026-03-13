@@ -304,7 +304,7 @@ struct BTCMapPlaceCommentsSection: View {
                     BTCMapPlaceCommentsListView(element: element)
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(expectedCount ?? 0) review\((expectedCount ?? 0) == 1 ? "" : "s")")
+                        Text(String(format: NSLocalizedString("%lld review%@", comment: "Review count label"), expectedCount ?? 0, (expectedCount ?? 0) == 1 ? "" : "s"))
                             .foregroundStyle(.primary)
                     }
                 }
@@ -395,7 +395,7 @@ struct BTCMapPlaceCommentsListView: View {
                 HStack(spacing: 2) {
                     Image(systemName: "bolt.fill")
                         .font(.caption2)
-                    Text("~\(sats) sats")
+                    Text(String(format: NSLocalizedString("~%lld sats", comment: "Approximate sats amount label"), sats))
                         .font(.caption)
                 }
                 .foregroundStyle(.orange)
@@ -689,9 +689,9 @@ struct BTCMapVerificationSection: View {
         var title: LocalizedStringKey {
             switch self {
             case .verified:
-                return "Verified"
-            case .outdated:
-                return "Not Recently Verified"
+                    return LocalizedStringKey("Verified")
+                case .outdated:
+                    return LocalizedStringKey("Not Recently Verified")
             }
         }
 
@@ -726,7 +726,8 @@ struct BTCMapVerificationSection: View {
     var body: some View {
         Section(header: Text("Verification")) {
             if let status, let verifiedDateText {
-                detailRow(icon: status.icon, tint: status.tint, label: status.title, value: LocalizedStringKey("Last verified: \(verifiedDateText)"))
+                let value = String(format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"), verifiedDateText)
+                detailRow(icon: status.icon, tint: status.tint, label: status.title, value: LocalizedStringKey(value))
                 Text(status.explanation)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -742,8 +743,8 @@ struct BTCMapVerificationSection: View {
                 detailRow(
                     icon: "questionmark.circle.fill",
                     tint: .secondary,
-                    label: "Not Yet Verified",
-                    value: "No one has confirmed this location yet."
+                    label: LocalizedStringKey("Not Yet Verified"),
+                    value: LocalizedStringKey("No one has confirmed this location yet.")
                 )
                 Text("This place was added to BitLocal but hasn't been physically checked by a community member.")
                     .font(.footnote)

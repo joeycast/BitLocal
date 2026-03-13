@@ -222,7 +222,7 @@ struct BusinessesListView: View {
                     }
                 } header: {
                     merchantSectionHeader(
-                        title: "Featured Nearby",
+                        title: NSLocalizedString("Featured Nearby", comment: "Section header for boosted nearby merchants"),
                         systemImage: "star.fill",
                         tint: Color(red: 0.71, green: 0.50, blue: 0.12),
                         topPadding: -3,
@@ -253,7 +253,7 @@ struct BusinessesListView: View {
                 } header: {
                     if !featuredTopSortedElements.isEmpty {
                         merchantSectionHeader(
-                            title: "More Nearby",
+                            title: NSLocalizedString("More Nearby", comment: "Section header for additional nearby merchants"),
                             systemImage: "location.fill",
                             tint: .secondary,
                             topPadding: 4,
@@ -281,7 +281,7 @@ struct BusinessesListView: View {
             if let digest = viewModel.activeMerchantAlertDigest {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("New merchants in \(digest.cityDisplayName)")
+                        Text(String(format: NSLocalizedString("New merchants in %@", comment: "Digest header showing the city name"), digest.cityDisplayName))
                             .font(.headline)
                         Text(digest.summaryLine)
                             .foregroundStyle(.secondary)
@@ -351,7 +351,7 @@ struct BusinessesListView: View {
                                 }
                             } header: {
                                 merchantSectionHeader(
-                                    title: "Featured Nearby",
+                                    title: NSLocalizedString("Featured Nearby", comment: "Section header for boosted nearby search results"),
                                     systemImage: "star.fill",
                                     tint: Color(red: 0.71, green: 0.50, blue: 0.12),
                                     topPadding: 3,
@@ -368,7 +368,7 @@ struct BusinessesListView: View {
                             } header: {
                                 if !displayedFeaturedPrimaryResults.isEmpty {
                                     merchantSectionHeader(
-                                        title: "More Nearby",
+                                        title: NSLocalizedString("More Nearby", comment: "Section header for additional nearby search results"),
                                         systemImage: "location.fill",
                                         tint: .secondary,
                                         topPadding: 4,
@@ -458,13 +458,13 @@ struct BusinessesListView: View {
 
     private var searchStatusText: String? {
         if viewModel.merchantSearchIsWaitingForLocalDebounce {
-            return "Searching nearby…"
+            return NSLocalizedString("Searching nearby…", comment: "Status shown while nearby merchant search is in progress")
         }
         return nil
     }
 
     private var noResultsText: String {
-        "No locations match your search"
+        NSLocalizedString("No locations match your search", comment: "Empty state for merchant search with no matches")
     }
 
     private var displayedPrimaryResults: [Element] {

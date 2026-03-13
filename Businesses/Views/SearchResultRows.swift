@@ -102,7 +102,7 @@ struct BTCMapEventRow: View {
         switch (start, end) {
         case let (s?, e?): return "\(s) – \(e)"
         case let (s?, nil): return s
-        case let (nil, e?): return "Until \(e)"
+        case let (nil, e?): return String(format: NSLocalizedString("Until %@", comment: "Event date range label when only the end date is known"), e)
         case (nil, nil): return nil
         }
     }

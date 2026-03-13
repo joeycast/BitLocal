@@ -98,12 +98,12 @@ struct CityDigest: Codable, Hashable, Identifiable {
 
     var summaryLine: String {
         guard !topMerchantNames.isEmpty else {
-            return "\(merchantCount) new merchants"
+            return String(format: NSLocalizedString("%lld new merchants", comment: "Summary line for a digest with no merchant names"), merchantCount)
         }
 
         let headline = topMerchantNames.prefix(2).joined(separator: ", ")
         if merchantCount > topMerchantNames.count {
-            return "\(headline), and more"
+            return String(format: NSLocalizedString("%@, and more", comment: "Summary line that appends and more to merchant names"), headline)
         }
         return headline
     }
@@ -271,17 +271,17 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     var cloudKitStatusSummary: String {
         switch cloudKitAccountStatus {
         case .available:
-            return "Signed in to iCloud"
+            return NSLocalizedString("Signed in to iCloud", comment: "Status text when iCloud is available for merchant alerts")
         case .noAccount:
-            return "Sign in to iCloud in Settings to turn on alerts."
+            return NSLocalizedString("Sign in to iCloud in Settings to turn on alerts.", comment: "Status text prompting the user to sign in to iCloud")
         case .restricted:
-            return "iCloud isn't available on this device."
+            return NSLocalizedString("iCloud isn't available on this device.", comment: "Status text when iCloud is unavailable on device")
         case .temporarilyUnavailable:
-            return "iCloud is temporarily unavailable. Try again in a bit."
+            return NSLocalizedString("iCloud is temporarily unavailable. Try again in a bit.", comment: "Status text when iCloud is temporarily unavailable")
         case .couldNotDetermine:
-            return "Checking iCloud…"
+            return NSLocalizedString("Checking iCloud…", comment: "Status text while checking iCloud availability")
         @unknown default:
-            return "Something went wrong checking iCloud. Try again later."
+            return NSLocalizedString("Something went wrong checking iCloud. Try again later.", comment: "Status text when iCloud availability check fails")
         }
     }
 
@@ -330,7 +330,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         let granted = await requestAuthorizationIfNeeded()
         guard granted else {
-            errorMessage = "BitLocal needs permission to send you notifications. You can turn this on in Settings."
+            errorMessage = NSLocalizedString("BitLocal needs permission to send you notifications. You can turn this on in Settings.", comment: "Error shown when notification permissions are denied")
             return
         }
 
@@ -536,9 +536,9 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private func notificationTitle(for digest: CityDigest) -> String {
         let city = digest.cityDisplayName.components(separatedBy: ",").first ?? digest.cityDisplayName
         if digest.merchantCount == 1 {
-            return "New merchant in \(city)"
+            return String(format: NSLocalizedString("New merchant in %@", comment: "Notification title for one new merchant in a city"), city)
         }
-        return "New merchants in \(city)"
+        return String(format: NSLocalizedString("New merchants in %@", comment: "Notification title for multiple new merchants in a city"), city)
     }
 
     private func notificationBody(for digest: CityDigest) -> String {
@@ -546,15 +546,15 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         switch names.count {
         case 2 where digest.merchantCount > 2:
-            return "\(names[0]), \(names[1]), and \(digest.merchantCount - 2) more now accept bitcoin."
+            return String(format: NSLocalizedString("%@, %@, and %lld more now accept bitcoin.", comment: "Notification body for two named merchants and additional merchants"), names[0], names[1], digest.merchantCount - 2)
         case 2:
-            return "\(names[0]) and \(names[1]) now accept bitcoin."
+            return String(format: NSLocalizedString("%@ and %@ now accept bitcoin.", comment: "Notification body for two named merchants"), names[0], names[1])
         case 1 where digest.merchantCount > 1:
-            return "\(names[0]) and \(digest.merchantCount - 1) more now accept bitcoin."
+            return String(format: NSLocalizedString("%@ and %lld more now accept bitcoin.", comment: "Notification body for one named merchant and additional merchants"), names[0], digest.merchantCount - 1)
         case 1:
-            return "\(names[0]) now accepts bitcoin."
+            return String(format: NSLocalizedString("%@ now accepts bitcoin.", comment: "Notification body for one named merchant"), names[0])
         default:
-            return "\(digest.merchantCount) new merchants now accept bitcoin."
+            return String(format: NSLocalizedString("%lld new merchants now accept bitcoin.", comment: "Notification body when only the merchant count is known"), digest.merchantCount)
         }
     }
 

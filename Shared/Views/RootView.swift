@@ -116,7 +116,7 @@ private struct DeepLinkUnavailableView: View {
                 Text(state.message)
                     .foregroundStyle(.secondary)
 
-                Text("Place ID: \(state.placeID)")
+                Text(String(format: NSLocalizedString("Place ID: %@", comment: "Deep link unavailable detail showing the place identifier"), state.placeID))
                     .font(.footnote.monospaced())
                     .foregroundStyle(.secondary)
 

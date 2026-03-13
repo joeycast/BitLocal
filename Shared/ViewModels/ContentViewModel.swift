@@ -482,7 +482,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func handlePlaceDeepLink(placeID: String) {
         guard PlaceShareLinkBuilder.isValidPlaceID(placeID) else {
-            presentDeepLinkUnavailable(placeID: placeID, reason: "Invalid place identifier.")
+            presentDeepLinkUnavailable(placeID: placeID, reason: NSLocalizedString("Invalid place identifier.", comment: "Reason shown when a shared place ID is malformed"))
             return
         }
 
@@ -498,7 +498,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     if let deletedAt = record.deletedAt, !deletedAt.isEmpty {
                         self.presentDeepLinkUnavailable(
                             placeID: placeID,
-                            reason: "This place is no longer available."
+                            reason: NSLocalizedString("This place is no longer available.", comment: "Reason shown when a shared place has been removed")
                         )
                         return
                     }
@@ -524,8 +524,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         Debug.log("Deep link place unavailable: id=\(placeID), reason=\(reason)")
         deepLinkUnavailableState = DeepLinkUnavailableState(
             placeID: placeID,
-            title: "Place unavailable",
-            message: "We could not open this BitLocal place. It may have been removed or is temporarily unavailable."
+            title: NSLocalizedString("Place unavailable", comment: "Title for unavailable deep-linked place screen"),
+            message: NSLocalizedString("We could not open this BitLocal place. It may have been removed or is temporarily unavailable.", comment: "Message for unavailable deep-linked place screen")
         )
     }
 
@@ -2930,7 +2930,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             } else {
                 self.merchantSearchResults = []
                 self.merchantSearchFreshResults = []
-                self.merchantSearchError = errors.first ?? "Search unavailable"
+                self.merchantSearchError = errors.first ?? NSLocalizedString("Search unavailable", comment: "Fallback error when remote merchant search fails")
                 self.merchantSearchLoadingTimeoutTask?.cancel()
                 self.merchantSearchIsLoading = false
                 self.merchantSearchIsOfflineFallback = true
@@ -3063,7 +3063,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 guard self.merchantSearchIsLoading else { return }
 
                 self.merchantSearchIsLoading = false
-                self.merchantSearchError = self.merchantSearchError ?? "Search timed out"
+                self.merchantSearchError = self.merchantSearchError ?? NSLocalizedString("Search timed out", comment: "Error shown when merchant search takes too long")
                 self.merchantSearchIsOfflineFallback = true
                 Debug.logAPI("Merchant search timeout: requestID=\(requestID)")
             }
