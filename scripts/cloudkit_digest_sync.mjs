@@ -11,6 +11,8 @@ const DELIVERY_HOUR_LOCAL = 8;
 const QUERY_PAGE_SIZE = 200;
 const CLOUDKIT_DEFAULT_ZONE = "_defaultZone";
 const BTCMAP_USER_AGENT = "BitLocal-CloudKitDigestSync/1.0 (GitHub Actions)";
+const BTCMAP_FETCH_MAX_ATTEMPTS = 4;
+const BTCMAP_FETCH_RETRY_BASE_DELAY_MS = 1000;
 const UNITED_STATES_REGION_ALIASES = {
   al: "Alabama",
   ak: "Alaska",
@@ -102,8 +104,21 @@ async function main() {
     console.log("No CloudKit sync state found. Bootstrapping merchant records without queueing digests.");
   }
 
+  const syncSummary = {
+    queuedPending: [],
+    deletedPending: [],
+    createdDigests: [],
+    skippedDigests: []
+  };
+
   for (const place of changes) {
-    await syncMerchant(place, reverseGeocoder, { shouldQueuePending, forceReplayPending });
+    const merchantOutcome = await syncMerchant(place, reverseGeocoder, { shouldQueuePending, forceReplayPending });
+    if (merchantOutcome?.queuedPending) {
+      syncSummary.queuedPending.push(merchantOutcome.queuedPending);
+    }
+    if (merchantOutcome?.deletedPending) {
+      syncSummary.deletedPending.push(...merchantOutcome.deletedPending);
+    }
   }
 
   const pendingRecords = await queryPendingRecords(environment.cityKeyFilter);
@@ -111,7 +126,13 @@ async function main() {
   console.log(`Prepared ${digestCandidates.length} city digest record(s).`);
 
   for (const candidate of digestCandidates) {
-    await processDigestCandidate(candidate);
+    const digestOutcome = await processDigestCandidate(candidate);
+    if (digestOutcome?.createdDigest) {
+      syncSummary.createdDigests.push(digestOutcome.createdDigest);
+    }
+    if (digestOutcome?.skippedDigest) {
+      syncSummary.skippedDigests.push(digestOutcome.skippedDigest);
+    }
   }
 
   const latestAnchor = latestUpdatedAt(changes) || updatedSince;
@@ -122,6 +143,7 @@ async function main() {
     bootstrapCompleted: true
   });
 
+  logSyncSummary(syncSummary);
   console.log("CloudKit digest sync finished.");
 }
 
@@ -132,16 +154,28 @@ async function fetchBTCMapChanges(updatedSince) {
   url.searchParams.set("include_deleted", "true");
   url.searchParams.set("limit", "5000");
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": BTCMAP_USER_AGENT
-    }
-  });
-  if (!response.ok) {
-    throw new Error(`BTC Map sync failed with HTTP ${response.status}`);
-  }
+  for (let attempt = 1; attempt <= BTCMAP_FETCH_MAX_ATTEMPTS; attempt += 1) {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": BTCMAP_USER_AGENT
+      }
+    });
 
-  return response.json();
+    if (response.ok) {
+      return response.json();
+    }
+
+    if (!shouldRetryBTCMapFetch(response.status) || attempt === BTCMAP_FETCH_MAX_ATTEMPTS) {
+      throw new Error(`BTC Map sync failed with HTTP ${response.status}`);
+    }
+
+    const delayMs = BTCMAP_FETCH_RETRY_BASE_DELAY_MS * (2 ** (attempt - 1));
+    console.warn(
+      `BTC Map fetch returned HTTP ${response.status}; retrying in ${delayMs}ms `
+      + `(attempt ${attempt + 1}/${BTCMAP_FETCH_MAX_ATTEMPTS}).`
+    );
+    await sleep(delayMs);
+  }
 }
 
 async function loadSyncState() {
@@ -181,8 +215,20 @@ async function syncMerchant(place, reverseGeocoder, options) {
   if (place.deleted_at) {
     if (priorPendingRecordName && priorPendingRecord) {
       await deleteRecords([priorPendingRecordName]);
+      return {
+        deletedPending: [
+          summarizePendingRecord({
+            recordName: priorPendingRecordName,
+            locationID: existingMerchant?.locationID || "",
+            cityKey: existingMerchant?.cityKey || "",
+            cityDisplayName: existingMerchant?.cityKey || existingMerchant?.locationID || "",
+            merchantID: String(place.id),
+            merchantName: normalized.displayName
+          })
+        ]
+      };
     }
-    return;
+    return null;
   }
 
   if (!options.shouldQueuePending || !normalized.locationID || !normalized.merchantCreatedAt) {
@@ -191,18 +237,23 @@ async function syncMerchant(place, reverseGeocoder, options) {
       && existingMerchant?.locationID
       && existingMerchant.locationID != normalized.locationID) {
       await deleteRecords([priorPendingRecordName]);
+      return {
+        deletedPending: [summarizePendingRecord(priorPendingRecord)]
+      };
     }
-    return;
+    return null;
   }
 
   const shouldMaintainPending = !existingMerchant || priorPendingRecord || options.forceReplayPending;
   if (!shouldMaintainPending) {
-    return;
+    return null;
   }
 
+  const deletedPending = [];
   const nextPendingRecordName = pendingRecordName(normalized.locationID, place.id);
   if (priorPendingRecordName && priorPendingRecordName !== nextPendingRecordName && priorPendingRecord) {
     await deleteRecords([priorPendingRecordName]);
+    deletedPending.push(summarizePendingRecord(priorPendingRecord));
   }
 
   const nextPendingExisting = priorPendingRecordName === nextPendingRecordName
@@ -223,6 +274,19 @@ async function syncMerchant(place, reverseGeocoder, options) {
     },
     existingRecord: nextPendingExisting
   });
+
+  return {
+    queuedPending: {
+      recordName: nextPendingRecordName,
+      locationID: normalized.locationID,
+      cityKey: normalized.cityKey,
+      cityDisplayName: normalized.cityDisplayName,
+      merchantID: String(place.id),
+      merchantName: normalized.displayName,
+      merchantCreatedAt: normalized.merchantCreatedAt?.toISOString() || ""
+    },
+    deletedPending
+  };
 }
 
 async function processDigestCandidate(candidate) {
@@ -236,7 +300,18 @@ async function processDigestCandidate(candidate) {
     if (overlappingPending.length) {
       await deleteRecords(overlappingPending);
     }
-    return;
+    return {
+      skippedDigest: {
+        recordName: candidate.recordName,
+        locationID: candidate.locationID,
+        cityKey: candidate.cityKey,
+        cityDisplayName: candidate.cityDisplayName,
+        merchantCount: candidate.merchantCount,
+        merchantIDs: candidate.merchantIDs,
+        topMerchantNames: candidate.topMerchantNames,
+        reason: "already_exists"
+      }
+    };
   }
 
   await saveRecord({
@@ -258,6 +333,18 @@ async function processDigestCandidate(candidate) {
   });
 
   await deleteRecords(candidate.pendingRecords.map((pending) => pending.recordName));
+  return {
+    createdDigest: {
+      recordName: candidate.recordName,
+      locationID: candidate.locationID,
+      cityKey: candidate.cityKey,
+      cityDisplayName: candidate.cityDisplayName,
+      merchantCount: candidate.merchantCount,
+      merchantIDs: candidate.merchantIDs,
+      topMerchantNames: candidate.topMerchantNames,
+      deliveryLocalDate: candidate.deliveryLocalDate
+    }
+  };
 }
 
 async function upsertSyncState(state) {
@@ -700,6 +787,68 @@ function safeTimestampField(value) {
   }
 
   return timestampField(date);
+}
+
+function summarizePendingRecord(record) {
+  return {
+    recordName: record.recordName,
+    locationID: record.locationID,
+    cityKey: record.cityKey,
+    cityDisplayName: record.cityDisplayName,
+    merchantID: record.merchantID,
+    merchantName: record.merchantName,
+    merchantCreatedAt: record.merchantCreatedAt instanceof Date
+      ? record.merchantCreatedAt.toISOString()
+      : ""
+  };
+}
+
+function logSyncSummary(summary) {
+  console.log(`Queued ${summary.queuedPending.length} pending merchant record(s).`);
+  for (const pending of summary.queuedPending) {
+    console.log(
+      `Pending queued: ${pending.cityDisplayName || pending.locationID} `
+      + `[${pending.locationID}] merchant=${pending.merchantName || pending.merchantID} `
+      + `createdAt=${pending.merchantCreatedAt}`
+    );
+  }
+
+  console.log(`Deleted ${summary.deletedPending.length} pending merchant record(s).`);
+  for (const pending of summary.deletedPending) {
+    console.log(
+      `Pending deleted: ${pending.cityDisplayName || pending.locationID} `
+      + `[${pending.locationID}] merchant=${pending.merchantName || pending.merchantID}`
+    );
+  }
+
+  console.log(`Created ${summary.createdDigests.length} city digest record(s).`);
+  for (const digest of summary.createdDigests) {
+    console.log(
+      `Digest created: ${digest.cityDisplayName || digest.locationID} `
+      + `[${digest.locationID}] merchants=${digest.merchantCount} `
+      + `deliveryDate=${digest.deliveryLocalDate} `
+      + `names=${digest.topMerchantNames.join(", ")}`
+    );
+  }
+
+  console.log(`Skipped ${summary.skippedDigests.length} city digest record(s).`);
+  for (const digest of summary.skippedDigests) {
+    console.log(
+      `Digest skipped: ${digest.cityDisplayName || digest.locationID} `
+      + `[${digest.locationID}] merchants=${digest.merchantCount} `
+      + `reason=${digest.reason}`
+    );
+  }
+}
+
+function shouldRetryBTCMapFetch(status) {
+  return status === 403 || status === 408 || status === 429 || status >= 500;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function stringListField(values) {
