@@ -3175,10 +3175,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         raw.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
     }
 
-    // Fetch elements using the APIManager and update the published elements property
-    // Optimized to reduce startup calls
-    func fetchElements(completion: (() -> Void)? = nil) {
-        Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup)")
+    // Fetch elements using the APIManager and update the published elements property.
+    // `warmupOnly` preloads merchant data without triggering onboarding-hostile side effects.
+    func fetchElements(warmupOnly: Bool = false, completion: (() -> Void)? = nil) {
+        Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly)")
         
         // Prevent concurrent calls - use main queue for thread safety
         DispatchQueue.main.async { [weak self] in
@@ -3224,6 +3224,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     self.isLoading = false
                     self.scheduleCommunityPrefetchIfNeeded()
                     completion?()
+
+                    guard !warmupOnly else {
+                        Debug.log("Warmup fetch loaded cached data; skipping map centering and location prompt")
+                        return
+                    }
 
                     // Center map for returning users who have cached data
                     if let userLoc = self.userLocation {

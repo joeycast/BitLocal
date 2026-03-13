@@ -829,6 +829,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     private let v4Client: BTCMapV4ClientProtocol
     private let userDefaults: UserDefaults
     private let modeKey = "btcmap_data_source_mode"
+    private let cacheWriteQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-writes", qos: .utility)
 
     init(v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(), userDefaults: UserDefaults = .standard) {
         self.v4Client = v4Client
@@ -949,14 +950,15 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                 switch result {
                 case .success(let payload):
                     let fallbackTimestamp = Self.rfc1123ToISO8601(payload.lastModified) ?? Self.currentISO8601()
+                    let initialIncrementalAnchor = Self.rfc1123ToISO8601(payload.lastModified) ?? fallbackTimestamp
                     let mapped = payload.records.map { V4PlaceToElementMapper.snapshotRecordToElement($0, fallbackTimestamp: fallbackTimestamp) }
                     self.saveV4Elements(mapped)
                     var syncState = self.loadV4SyncState()
                     syncState.snapshotLastModifiedRFC1123 = payload.lastModified
-                    // Snapshot payload omits names and rich fields. Force a full incremental
-                    // backfill once so cached elements are upgraded to complete place records.
-                    syncState.incrementalAnchorUpdatedSince = Self.epochISO8601
-                    syncState.schemaVersion = 0
+                    // Follow BTC Map's recommended flow: bootstrap from the CDN snapshot,
+                    // then incrementally apply only changes newer than the snapshot.
+                    syncState.incrementalAnchorUpdatedSince = initialIncrementalAnchor
+                    syncState.schemaVersion = V4SyncState.currentSchemaVersion
                     self.saveV4SyncState(syncState)
                     startIncremental()
                 case .failure(let error):
@@ -977,7 +979,9 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     private func performV4IncrementalSync(completion: @escaping (Result<[Element], Error>) -> Void) {
         let existing = loadV4Elements() ?? []
         var syncState = loadV4SyncState()
-        var anchor = syncState.incrementalAnchorUpdatedSince ?? Self.epochISO8601
+        var anchor = syncState.incrementalAnchorUpdatedSince
+            ?? Self.rfc1123ToISO8601(syncState.snapshotLastModifiedRFC1123)
+            ?? Self.epochISO8601
         var merged = existing
         var pageCount = 0
         var maxPages = 20
@@ -1018,7 +1022,6 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                         syncState.incrementalAnchorUpdatedSince = maxUpdated
                     }
 
-                    self.saveV4Elements(merged)
                     self.saveV4SyncState(syncState)
 
                     if records.count >= 5000 && pageCount < maxPages {
@@ -1026,6 +1029,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                     } else {
                         syncState.schemaVersion = V4SyncState.currentSchemaVersion
                         syncState.lastSuccessfulSyncAt = Self.currentISO8601()
+                        self.saveV4Elements(merged)
                         self.saveV4SyncState(syncState)
                         completion(.success(merged))
                     }
@@ -1056,7 +1060,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private func saveV4Elements(_ elements: [Element]) {
-        DispatchQueue.global(qos: .utility).async {
+        cacheWriteQueue.async {
             do {
                 let data = try JSONEncoder().encode(elements)
                 try data.write(to: self.v4ElementsFileURL, options: .atomic)
@@ -1082,7 +1086,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private func saveV4SyncState(_ state: V4SyncState) {
-        DispatchQueue.global(qos: .utility).async {
+        cacheWriteQueue.async {
             do {
                 let data = try JSONEncoder().encode(state)
                 try data.write(to: self.v4SyncStateFileURL, options: .atomic)

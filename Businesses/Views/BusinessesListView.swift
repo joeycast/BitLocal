@@ -26,6 +26,8 @@ struct BusinessesListView: View {
     @State private var cachedTopSortedElements: [Element] = []
     @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
     @State private var showFocusedSearchCategoryChips = false
+    @State private var canShowEmptyState = false
+    @State private var emptyStateRevealWorkItem: DispatchWorkItem?
     @FocusState private var isSearchFieldFocused: Bool
 
     init(
@@ -76,6 +78,8 @@ struct BusinessesListView: View {
                     searchResultsView
                 } else if viewModel.activeMerchantAlertDigest != nil {
                     digestResultsView
+                } else if shouldShowDiscoveryLoadingState {
+                    LoadingScreenView()
                 } else if elements.isEmpty {
                     if shouldShowEmptyState {
                         Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
@@ -129,12 +133,20 @@ struct BusinessesListView: View {
         .onChange(of: elements.map(\.id)) { _, _ in
             discoveryResultsLimit = maxListResults
             refreshDiscoveryCache()
+            refreshEmptyStateVisibility()
         }
         .onAppear {
             viewModel.ensureEventsLoaded()
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
             refreshDiscoveryCache()
             syncDisplayedSearchResultsToMap()
+            refreshEmptyStateVisibility()
+        }
+        .onChange(of: viewModel.isLoading) { _, _ in
+            refreshEmptyStateVisibility()
+        }
+        .onChange(of: viewModel.hasLoadedInitialData) { _, _ in
+            refreshEmptyStateVisibility()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
             guard isSearchFieldFocused else { return }
@@ -411,6 +423,12 @@ struct BusinessesListView: View {
         guard viewModel.hasLoadedInitialData, !isShowingInitialLoadingState else { return false }
         guard viewModel.activeMerchantAlertDigest == nil else { return false }
         return !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
+    }
+
+    private var shouldShowDiscoveryLoadingState: Bool {
+        guard !isFilteringMerchants else { return false }
+        guard viewModel.activeMerchantAlertDigest == nil else { return false }
+        return viewModel.isLoading && elements.isEmpty && viewModel.allElements.isEmpty
     }
 
     private var isShowingInitialLoadingState: Bool {
@@ -701,6 +719,7 @@ struct BusinessesListView: View {
 
     private var shouldShowEmptyState: Bool {
         guard viewModel.hasLoadedInitialData else { return false }
+        guard canShowEmptyState else { return false }
         guard let detent = currentDetent else { return true }
         return detent != collapsedSheetDetent
     }
@@ -721,6 +740,30 @@ struct BusinessesListView: View {
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
         String(describing: detent).lowercased()
+    }
+
+    private func refreshEmptyStateVisibility() {
+        emptyStateRevealWorkItem?.cancel()
+
+        let shouldDelayEmptyState = !isFilteringMerchants &&
+            viewModel.activeMerchantAlertDigest == nil &&
+            viewModel.hasLoadedInitialData &&
+            elements.isEmpty
+
+        guard shouldDelayEmptyState else {
+            canShowEmptyState = true
+            return
+        }
+
+        canShowEmptyState = false
+
+        let workItem = DispatchWorkItem {
+            guard elements.isEmpty else { return }
+            guard !viewModel.isLoading else { return }
+            canShowEmptyState = true
+        }
+        emptyStateRevealWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: workItem)
     }
 }
 

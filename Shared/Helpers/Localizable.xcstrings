@@ -4452,7 +4452,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hang tight! We’re fetching all the best bitcoin spots near you."
+            "value" : "This should only take a moment."
           }
         },
         "es" : {
@@ -4511,7 +4511,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Loading businesses…"
+            "value" : "Finding nearby bitcoin-friendly places…"
           }
         },
         "es" : {
