@@ -41,6 +41,7 @@ struct RootView: View {
             Debug.log("onboarding completion changed to: \(completed)")
 
             guard completed else { return }
+            Debug.logTiming("onboarding", "didCompleteOnboarding flipped to true")
 
             contentViewModel.preparePostOnboardingPresentation()
 
@@ -79,6 +80,7 @@ struct RootView: View {
 
         let warmupOnly = !didCompleteOnboarding
         Debug.log("Calling fetchElements() from \(source) - warmupOnly=\(warmupOnly)")
+        Debug.logTiming("data", "triggerInitialFetchIfNeeded source=\(source) warmupOnly=\(warmupOnly)")
         hasTriggeredInitialFetch = true
 
         let delay = warmupOnly ? 0.1 : 0.2

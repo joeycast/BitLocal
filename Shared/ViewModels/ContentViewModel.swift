@@ -236,6 +236,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var hasScheduledCommunityPrefetch = false
     private var communityPrefetchWorkItem: DispatchWorkItem?
     private var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+    private var shouldReleasePostOnboardingPresentationAfterNextMapRender = false
     private var placeholderNameHydrationInFlight = Set<String>()
     private var placeholderNameHydrationAttempted = Set<String>()
     private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
@@ -313,8 +314,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 guard let self else { return }
                 guard self.shouldReleasePostOnboardingPresentationAfterNextMapSettle else { return }
                 self.shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
-                self.isReadyForPostOnboardingPresentation = true
-                self.forceMapRefresh = true
+                self.finishPostOnboardingPresentationIfNeeded()
             }
             .store(in: &cancellables)
     }
@@ -645,6 +645,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         Debug.log("LocationManager error: \(error.localizedDescription)")
         DispatchQueue.main.async { [weak self] in
             self?.isUpdatingLocation = false
+            self?.cancelPendingPostOnboardingMapPresentation()
         }
     }
     
@@ -664,7 +665,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             case .denied, .restricted:
                 self.isUpdatingLocation = false
                 Debug.log("Location access denied or restricted")
-                self.finishPostOnboardingPresentationIfNeeded()
+                self.cancelPendingPostOnboardingMapPresentation()
             case .notDetermined:
                 Debug.log("Location authorization not determined")
             @unknown default:
@@ -1171,6 +1172,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return
         }
 
+        Debug.logTiming("map", "centerMap requested (force=\(force), lat=\(coordinate.latitude), lon=\(coordinate.longitude))")
+
         // Allow centering if:
         // 1. Force is true (user explicitly requested it)
         // 2. Never centered before
@@ -1238,10 +1241,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func preparePostOnboardingPresentation() {
         let authorizationStatus = locationManager.authorizationStatus
+        Debug.logTiming("onboarding", "preparePostOnboardingPresentation(auth=\(authorizationStatus.rawValue), hasLocation=\(userLocation != nil))")
 
         if let userLocation {
             isReadyForPostOnboardingPresentation = false
             shouldReleasePostOnboardingPresentationAfterNextMapSettle = true
+            shouldReleasePostOnboardingPresentationAfterNextMapRender = true
             centerMap(to: userLocation.coordinate, force: true)
             return
         }
@@ -1249,6 +1254,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
             isReadyForPostOnboardingPresentation = false
             shouldReleasePostOnboardingPresentationAfterNextMapSettle = true
+            shouldReleasePostOnboardingPresentationAfterNextMapRender = true
             requestWhenInUseLocationPermission()
             return
         }
@@ -1256,9 +1262,26 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         finishPostOnboardingPresentationIfNeeded()
     }
 
+    func notifyPostOnboardingMapRenderFinished() {
+        guard shouldReleasePostOnboardingPresentationAfterNextMapRender else { return }
+        Debug.logTiming("map", "post-onboarding map fully rendered")
+        shouldReleasePostOnboardingPresentationAfterNextMapRender = false
+        finishPostOnboardingPresentationIfNeeded()
+    }
+
     func finishPostOnboardingPresentationIfNeeded() {
-        shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+        guard !shouldReleasePostOnboardingPresentationAfterNextMapSettle,
+              !shouldReleasePostOnboardingPresentationAfterNextMapRender else { return }
+        Debug.logTiming("onboarding", "post-onboarding presentation released")
         isReadyForPostOnboardingPresentation = true
+        forceMapRefresh = true
+    }
+
+    private func cancelPendingPostOnboardingMapPresentation() {
+        shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+        shouldReleasePostOnboardingPresentationAfterNextMapRender = false
+        isReadyForPostOnboardingPresentation = true
+        forceMapRefresh = true
     }
     
     // Add a method for user-initiated centering (location button)
@@ -3221,6 +3244,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // `warmupOnly` preloads merchant data without triggering onboarding-hostile side effects.
     func fetchElements(warmupOnly: Bool = false, completion: (() -> Void)? = nil) {
         Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly)")
+        Debug.logTiming("data", "fetchElements invoked (warmupOnly=\(warmupOnly), allElements=\(allElements.count), isLoading=\(isLoading))")
         
         // Prevent concurrent calls - use main queue for thread safety
         DispatchQueue.main.async { [weak self] in
@@ -3238,16 +3262,19 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             if self.allElements.isEmpty {
                 if let cachedElements = self.btcMapRepository.loadCachedElements(), !cachedElements.isEmpty {
                     Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
+                    Debug.logTiming("data", "loaded \(cachedElements.count) cached elements into memory")
                     self.allElements = cachedElements
                     self.hasLoadedInitialData = true
                     let cachedHasPlaceholders = self.hasPlaceholderNames(in: cachedElements)
 
                     if cachedHasPlaceholders {
                         Debug.logAPI("Cached elements include placeholder names; performing immediate refresh")
+                        Debug.logTiming("data", "cached elements contain placeholders; starting immediate refresh")
                         self.btcMapRepository.refreshElements { [weak self] elements in
                             DispatchQueue.main.async {
                                 guard let self else { return }
                                 let refreshedElements = elements ?? []
+                                Debug.logTiming("data", "immediate refresh completed with \(refreshedElements.count) elements")
                                 if !refreshedElements.isEmpty {
                                     self.allElements = refreshedElements
                                     self.forceMapRefresh = true
@@ -3299,6 +3326,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             let currentElementsEmpty = self.allElements.isEmpty
             Debug.logCache("Repository cache available before refresh: \(hadAnyCache)")
             Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
+            Debug.logTiming("data", "starting repository refresh (hadCache=\(hadAnyCache), currentEmpty=\(currentElementsEmpty), warmupOnly=\(warmupOnly))")
 
             self.btcMapRepository.refreshElements { [weak self] elements in
                 DispatchQueue.main.async {
@@ -3306,6 +3334,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     
                     let refreshedElements = elements ?? []
                     Debug.logAPI("Repository refresh returned \(refreshedElements.count) elements")
+                    Debug.logTiming("data", "repository refresh completed with \(refreshedElements.count) elements")
 
                     if !refreshedElements.isEmpty {
                         Debug.logMap("Setting allElements to repository snapshot (\(refreshedElements.count) elements)")

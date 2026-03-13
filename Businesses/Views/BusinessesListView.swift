@@ -428,7 +428,10 @@ struct BusinessesListView: View {
     private var shouldShowDiscoveryLoadingState: Bool {
         guard !isFilteringMerchants else { return false }
         guard viewModel.activeMerchantAlertDigest == nil else { return false }
-        return viewModel.isLoading && elements.isEmpty && viewModel.allElements.isEmpty
+        if viewModel.isLoading && elements.isEmpty && viewModel.allElements.isEmpty {
+            return true
+        }
+        return viewModel.isLoading && containsPlaceholderMerchantNames(elements)
     }
 
     private var isShowingInitialLoadingState: Bool {
@@ -524,6 +527,13 @@ struct BusinessesListView: View {
     private func refreshDiscoveryCache() {
         cachedTopSortedElements = nearestElements(elements, limit: discoveryResultsLimit)
         cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
+    }
+
+    private func containsPlaceholderMerchantNames(_ elements: [Element]) -> Bool {
+        elements.contains { element in
+            let rawName = element.osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return Element.isInvalidPrimaryName(rawName)
+        }
     }
 
     private func syncDisplayedSearchResultsToMap() {

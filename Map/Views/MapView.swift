@@ -293,6 +293,7 @@ struct MapView: UIViewRepresentable {
         var lastDisplayMode: MapDisplayMode = .merchants
         var lastCommunityAreasHash: Int?
         private var lastAnnotationPassKey: AnnotationPassKey?
+        private var hasLoggedInitialAnnotationPass = false
         var lastVisibleElementIDs: [String] = []
         weak var overlayTapRecognizer: UITapGestureRecognizer?
 
@@ -414,6 +415,11 @@ struct MapView: UIViewRepresentable {
         func updateAnnotations(mapView: MKMapView, elements: [Element]?, elementsHash: Int, force: Bool = false) {
             let annStart = CFAbsoluteTimeGetCurrent()
             guard let elements = elements else { return }
+
+            if !hasLoggedInitialAnnotationPass {
+                hasLoggedInitialAnnotationPass = true
+                Debug.logTiming("map", "initial annotation pass started (elements=\(elements.count), force=\(force))")
+            }
 
             let sourceElements: [Element]
             if viewModel.mapDisplayMode == .communities,
@@ -596,6 +602,13 @@ struct MapView: UIViewRepresentable {
         
         // Detect when the map region changes
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            if animated || !viewModel.isReadyForPostOnboardingPresentation {
+                Debug.logTiming(
+                    "map",
+                    "regionDidChangeAnimated(animated=\(animated), ready=\(viewModel.isReadyForPostOnboardingPresentation))"
+                )
+            }
+
             // Update the view model's region to match the map's region
             if viewModel.initialRegionSet {
                 self.viewModel.syncRegionFromMap(center: mapView.region.center, span: mapView.region.span)
@@ -625,6 +638,12 @@ struct MapView: UIViewRepresentable {
                 mapRegionChangeCompletion = nil // Reset to avoid repeated calls
                 completion()
             }
+        }
+
+        func mapViewDidFinishRenderingMap(_ mapView: MKMapView, fullyRendered: Bool) {
+            guard fullyRendered else { return }
+            Debug.logTiming("map", "mapViewDidFinishRenderingMap fullyRendered=true")
+            viewModel.notifyPostOnboardingMapRenderFinished()
         }
         
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
