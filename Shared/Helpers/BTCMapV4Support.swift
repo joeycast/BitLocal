@@ -1,5 +1,14 @@
 import Foundation
 
+enum BTCMapRequestMetadata {
+    static var appUserAgent: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let build = info?["CFBundleVersion"] as? String ?? "unknown"
+        return "BitLocal-iOS/\(version) (\(build); iOS)"
+    }
+}
+
 enum BTCMapV4Error: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -42,8 +51,17 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         self.session = session
     }
 
+    private func makeRequest(url: URL, method: String = "GET") -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue(BTCMapRequestMetadata.appUserAgent, forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
     func fetchSnapshot(completion: @escaping (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
-        let request = URLRequest(url: snapshotURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        var request = makeRequest(url: snapshotURL)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 30
         session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
@@ -106,8 +124,12 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         components.queryItems = [
             URLQueryItem(name: "fields", value: syncFields.joined(separator: ","))
         ]
-        let url = components.url
-        session.dataTask(with: url!) { data, response, error in
+        guard let url = components.url else {
+            completion(.failure(BTCMapV4Error.invalidURL))
+            return
+        }
+        let request = makeRequest(url: url)
+        session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
                 return
@@ -146,7 +168,8 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             return
         }
 
-        session.dataTask(with: url) { data, response, error in
+        let request = makeRequest(url: url)
+        session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
                 return
@@ -174,7 +197,8 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             completion(.failure(BTCMapV4Error.invalidURL))
             return
         }
-        session.dataTask(with: url) { data, response, error in
+        let request = makeRequest(url: url)
+        session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
                 return
@@ -230,8 +254,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             completion(.failure(BTCMapV4Error.invalidURL))
             return
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = makeRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         do {
@@ -268,8 +291,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             completion(.failure(BTCMapV4Error.invalidURL))
             return
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        var request = makeRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         session.dataTask(with: request) { data, response, error in
@@ -338,6 +360,12 @@ final class BTCMapV3AreasClient {
         self.session = session
     }
 
+    private func makeRequest(url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.setValue(BTCMapRequestMetadata.appUserAgent, forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
     func fetchAreas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
         guard var components = URLComponents(url: baseURL.appendingPathComponent("areas"), resolvingAgainstBaseURL: false) else {
             completion(.failure(BTCMapV3Error.invalidURL))
@@ -377,7 +405,8 @@ final class BTCMapV3AreasClient {
                 return
             }
 
-            session.dataTask(with: url) { data, response, error in
+            let request = makeRequest(url: url)
+            session.dataTask(with: request) { data, response, error in
                 if let error {
                     completion(.failure(error))
                     return
@@ -425,7 +454,8 @@ final class BTCMapV3AreasClient {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
         }
-        session.dataTask(with: url) { data, response, error in
+        let request = makeRequest(url: url)
+        session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
                 return
@@ -453,7 +483,8 @@ final class BTCMapV3AreasClient {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
         }
-        session.dataTask(with: url) { data, response, error in
+        let request = makeRequest(url: url)
+        session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
                 return
@@ -489,6 +520,12 @@ final class BTCMapV2AreasClient {
         self.session = session
     }
 
+    private func makeRequest(url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.setValue(BTCMapRequestMetadata.appUserAgent, forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
     func fetchAreas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) {
         guard var components = URLComponents(url: baseURL.appendingPathComponent("areas"), resolvingAgainstBaseURL: false) else {
             completion(.failure(BTCMapV3Error.invalidURL))
@@ -504,7 +541,8 @@ final class BTCMapV2AreasClient {
             return
         }
 
-        session.dataTask(with: url) { data, response, error in
+        let request = makeRequest(url: url)
+        session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
                 return

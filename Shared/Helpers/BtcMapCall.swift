@@ -112,7 +112,10 @@ class APIManager {
         Debug.logAPI("Requesting URL: \(url.absoluteString)")
         LogManager.shared.log("Requesting URL: \(url.absoluteString)")
         
-        URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
+        var request = URLRequest(url: url)
+        request.setValue(BTCMapRequestMetadata.appUserAgent, forHTTPHeaderField: "User-Agent")
+
+        URLSession.shared.dataTask(with: request) { [weak self] (data, response, error) in
             guard let self = self else {
                 completion(nil)
                 return
@@ -168,7 +171,10 @@ class APIManager {
         Debug.logAPI("Requesting URL: \(url.absoluteString)")
         LogManager.shared.log("Requesting URL: \(url.absoluteString)")
         
-        URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
+        var request = URLRequest(url: url)
+        request.setValue(BTCMapRequestMetadata.appUserAgent, forHTTPHeaderField: "User-Agent")
+
+        URLSession.shared.dataTask(with: request) { [weak self] (data, response, error) in
             // Always background any heavy lifting!
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let self = self else {

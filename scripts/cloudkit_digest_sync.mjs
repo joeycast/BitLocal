@@ -10,6 +10,7 @@ const SYNC_STATE_RECORD_TYPE = "SyncState";
 const DELIVERY_HOUR_LOCAL = 8;
 const QUERY_PAGE_SIZE = 200;
 const CLOUDKIT_DEFAULT_ZONE = "_defaultZone";
+const BTCMAP_USER_AGENT = "BitLocal-CloudKitDigestSync/1.0 (GitHub Actions)";
 const UNITED_STATES_REGION_ALIASES = {
   al: "Alabama",
   ak: "Alaska",
@@ -131,7 +132,11 @@ async function fetchBTCMapChanges(updatedSince) {
   url.searchParams.set("include_deleted", "true");
   url.searchParams.set("limit", "5000");
 
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": BTCMAP_USER_AGENT
+    }
+  });
   if (!response.ok) {
     throw new Error(`BTC Map sync failed with HTTP ${response.status}`);
   }
