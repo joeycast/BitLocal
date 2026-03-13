@@ -108,6 +108,7 @@ struct BottomSheetContentView: View {
                 area: area,
                 currentDetent: currentDetentBinding
             )
+            .id(area.id)
             .environmentObject(viewModel)
             .clearNavigationContainerBackgroundIfAvailable()
         }
@@ -737,6 +738,13 @@ struct CommunityDetailView: View {
                 if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
                     viewModel.selectCommunity(area, presentDetail: false)
                 }
+                updateMemberElements()
+            }
+            .onChange(of: area.id) { _, _ in
+                updateMemberElements()
+            }
+            .onChange(of: viewModel.selectedCommunityArea?.id) { _, _ in
+                updateMemberElements()
             }
             .onChange(of: viewModel.communityMemberElements) { _, _ in
                 updateMemberElements()

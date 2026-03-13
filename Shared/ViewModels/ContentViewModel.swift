@@ -2255,7 +2255,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         // Match BTCMap community page behavior: derive members by polygon containment
         // against the synced v4 places dataset. Fall back to v3 area-elements only when
         // polygon data is unavailable.
-        if let polygonMembers = communityMembersFromPolygon(for: area) {
+        if let polygonMembers = communityMembersFromPolygon(for: area), !polygonMembers.isEmpty {
             communityMemberElements = polygonMembers
             communityMemberElementIDs = Set(polygonMembers.map(\.id))
             communityMembersError = nil
