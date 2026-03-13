@@ -116,7 +116,7 @@ struct BusinessesListView: View {
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             searchResultsLimit = 20
-            clearSearchDrivenMapResults()
+            syncDisplayedSearchResultsToMap()
         }
         .onChange(of: displayedPrimaryResults.map(\.id)) { _, _ in
             syncDisplayedSearchResultsToMap()
@@ -375,10 +375,6 @@ struct BusinessesListView: View {
                                     )
                                 }
                             }
-                        } else if !displayedPrimaryResults.isEmpty {
-                            ForEach(Array(displayedPrimaryResults.enumerated()), id: \.element.id) { index, element in
-                                merchantSearchRow(for: element, hidesTopSeparator: index == 0)
-                            }
                         }
                     }
 
@@ -544,10 +540,6 @@ struct BusinessesListView: View {
         viewModel.setMerchantSearchMapResults(displayedPrimaryResults)
     }
 
-    private func clearSearchDrivenMapResults() {
-        viewModel.clearMerchantSearchMapResults()
-    }
-
     private func keyboardAnimation(for notification: Notification) -> Animation {
         let userInfo = notification.userInfo ?? [:]
         let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue ?? 0.25
@@ -569,6 +561,7 @@ struct BusinessesListView: View {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
         .listRowSeparator(hidesTopSeparator ? .hidden : .visible, edges: .top)
+        .listRowSeparator(showsBottomDivider ? .hidden : .visible, edges: .bottom)
     }
 
     private func merchantRow(
@@ -586,6 +579,7 @@ struct BusinessesListView: View {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
         .listRowSeparator(hidesTopSeparator ? .hidden : .visible, edges: .top)
+        .listRowSeparator(showsBottomDivider ? .hidden : .visible, edges: .bottom)
         .clearListRowBackground(if: shouldUseGlassyRows)
     }
 
@@ -838,7 +832,7 @@ struct ElementCell: View {
                     .fill(Color(.separator))
                     .frame(height: 1)
                     .padding(.top, 10)
-                    .padding(.trailing, -18)
+                    .padding(.trailing, -22)
             }
         }
         .contentShape(Rectangle())

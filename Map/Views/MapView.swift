@@ -182,11 +182,7 @@ struct MapView: UIViewRepresentable {
                 needsUpdate = true
             }
         } else if elements?.isEmpty == true {
-            // Only clear if we actually have annotations to clear
-            let currentAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-            if !currentAnnotations.isEmpty {
-                Debug.logMap("MapView.updateUIView: Clearing \(currentAnnotations.count) annotations")
-                mapView.removeAnnotations(currentAnnotations)
+            if context.coordinator.clearMerchantAnnotations(on: mapView) {
                 needsUpdate = true
             }
         }
@@ -512,7 +508,27 @@ struct MapView: UIViewRepresentable {
             }
             Debug.logMap("⏱ updateAnnotations: \(sourceElements.count) source → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - annStart) * 1000))ms")
         }
-        
+
+        @discardableResult
+        func clearMerchantAnnotations(on mapView: MKMapView) -> Bool {
+            let currentAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+            guard !currentAnnotations.isEmpty || lastElementsHash != nil || !lastVisibleElementIDs.isEmpty else {
+                return false
+            }
+
+            if !currentAnnotations.isEmpty {
+                Debug.logMap("MapView.updateUIView: Clearing \(currentAnnotations.count) annotations")
+                mapView.removeAnnotations(currentAnnotations)
+            }
+
+            // Reset annotation caches so the same search result IDs can be re-added
+            // after transient empty states during search refinement.
+            lastElementsHash = nil
+            lastVisibleElementIDs = []
+            lastAnnotationPassKey = nil
+            return true
+        }
+
         // MARK: - MKMapViewDelegate Methods
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {

@@ -1447,6 +1447,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         merchantSearchIsWaitingForLocalDebounce = true
 
         localMerchantSearchTask = Task { [weak self] in
+            let debounceNanoseconds = self?.effectiveLocalMerchantSearchDebounceNanoseconds() ?? 0
+            if debounceNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: debounceNanoseconds)
+            }
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self else { return }
@@ -3081,6 +3085,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return unifiedSearchDebounceNanoseconds
         case .worldwide:
             return unifiedSearchWorldwideDebounceNanoseconds
+        }
+    }
+
+    private func effectiveLocalMerchantSearchDebounceNanoseconds() -> UInt64 {
+        switch selectedMerchantSearchScope {
+        case .onMap:
+            return unifiedSearchDebounceNanoseconds
+        case .worldwide:
+            return localSearchWorldwideDebounceNanoseconds
         }
     }
 
