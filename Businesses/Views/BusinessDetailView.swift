@@ -958,6 +958,7 @@ struct BusinessDetailsSection: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .copyValueContextMenu(addressDisplayText, title: "Copy Address")
             }
             
             // Business Website - Only show if valid
@@ -972,6 +973,7 @@ struct BusinessDetailsSection: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .copyValueContextMenu(website.cleanedForDisplay(), title: "Copy Website")
             }
             
             // Business Phone - Simple worldwide approach
@@ -987,6 +989,7 @@ struct BusinessDetailsSection: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .copyValueContextMenu(phone.displayablePhoneNumber(), title: "Copy Phone")
                 } else {
                     let _ = Debug.log("Invalid phone number: '\(phone)'")
                 }
@@ -1004,6 +1007,7 @@ struct BusinessDetailsSection: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .copyValueContextMenu(email, title: "Copy Email")
             }
             
             // Opening Hours
@@ -1062,6 +1066,14 @@ private extension View {
     func featuredHeader(isFeatured: Bool) -> some View {
         self
             .environment(\.businessSectionShowsFeaturedBadge, isFeatured)
+    }
+
+    func copyValueContextMenu(_ value: String, title: String = "Copy") -> some View {
+        contextMenu {
+            Button(title) {
+                UIPasteboard.general.string = value
+            }
+        }
     }
 }
 
