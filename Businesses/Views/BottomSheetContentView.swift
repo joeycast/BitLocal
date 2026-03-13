@@ -864,7 +864,7 @@ struct CommunityDetailView: View {
                 platformLinkRow(icon: item.icon, label: item.label, value: item.value)
             }
         }
-        .copyValueContextMenu(item.value)
+        .copyValueContextMenu(item.value, title: "Copy \(item.label)")
     }
 
     private func platformLinkRow(icon: String, label: String, value: String) -> some View {
