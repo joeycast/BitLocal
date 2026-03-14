@@ -645,7 +645,7 @@ struct OnboardingView: View {
                 }
             }
 
-            Text("You can finish onboarding now and turn on city alerts later from Settings once iCloud is available.")
+            Text(LocalizedStringKey("You can finish onboarding now and turn on city alerts later from Settings once iCloud is available."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
