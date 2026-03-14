@@ -236,6 +236,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var communityPrefetchWorkItem: DispatchWorkItem?
     private var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
     private var shouldReleasePostOnboardingPresentationAfterNextMapRender = false
+    private var postOnboardingPresentationFallbackTask: Task<Void, Never>?
     private var placeholderNameHydrationInFlight = Set<String>()
     private var placeholderNameHydrationAttempted = Set<String>()
     private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
@@ -301,6 +302,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         visibleElementsSubject
             .receive(on: RunLoop.main)
             .sink { [weak self] elements in
+                Debug.logTiming("map", "visibleElementsSubject received -> count=\(elements.count)")
                 self?.visibleElements = elements
                 self?.hydratePlaceholderNamesIfNeeded(in: elements)
                 self?.refreshMerchantSearchFromVisibleElementsIfNeeded()
@@ -311,6 +313,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             .receive(on: RunLoop.main)
             .sink { [weak self] in
                 guard let self else { return }
+                Debug.logTiming(
+                    "onboarding",
+                    "mapStoppedMovingSubject received (settle=\(self.shouldReleasePostOnboardingPresentationAfterNextMapSettle), render=\(self.shouldReleasePostOnboardingPresentationAfterNextMapRender), ready=\(self.isReadyForPostOnboardingPresentation))"
+                )
                 guard self.shouldReleasePostOnboardingPresentationAfterNextMapSettle else { return }
                 self.shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
                 self.finishPostOnboardingPresentationIfNeeded()
@@ -626,7 +632,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             }
 
             if self.shouldReleasePostOnboardingPresentationAfterNextMapSettle {
-                self.centerMap(to: latestLocation.coordinate, force: true)
+                let didStartRecentering = self.centerMap(to: latestLocation.coordinate, force: true)
+                if !didStartRecentering {
+                    Debug.logTiming("onboarding", "location update recenter skipped; releasing immediately")
+                    self.shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+                    self.finishPostOnboardingPresentationIfNeeded()
+                }
             }
 
             // Always update userLocation and region for other uses, but don't recenter the map
@@ -1165,10 +1176,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             .store(in: &cancellables)
     }
 
-    func centerMap(to coordinate: CLLocationCoordinate2D, force: Bool = false) {
+    @discardableResult
+    func centerMap(to coordinate: CLLocationCoordinate2D, force: Bool = false) -> Bool {
         guard let mapView = mapView else {
             Debug.log("Cannot center map - mapView is nil")
-            return
+            return false
         }
 
         Debug.logTiming("map", "centerMap requested (force=\(force), lat=\(coordinate.latitude), lon=\(coordinate.longitude))")
@@ -1181,7 +1193,26 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         
         let shouldCenter: Bool
         
-        if force {
+        if force, let lastCoord = lastCenteredCoordinate {
+            let coordinateDistance = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
+                .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+
+            let currentCenter = mapView.region.center
+            let currentCenterDistance = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
+                .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+
+            let isAlreadyNearTarget = coordinateDistance <= 10 && currentCenterDistance <= 100
+            if isAlreadyNearTarget {
+                Debug.logTiming(
+                    "map",
+                    "centerMap skipped forced no-op (coord change: \(coordinateDistance)m, map drift: \(currentCenterDistance)m)"
+                )
+                return false
+            }
+
+            shouldCenter = true
+            Debug.log("Centering map (forced) to coordinate: \(coordinate)")
+        } else if force {
             shouldCenter = true
             Debug.log("Centering map (forced) to coordinate: \(coordinate)")
         } else if lastCenteredCoordinate == nil {
@@ -1200,7 +1231,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             
             if !shouldCenter {
                 Debug.log("Skipping centerMap - coordinate similar (\(coordinateDistance)m) and map close to target (\(currentCenterDistance)m)")
-                return
+                return false
             } else {
                 Debug.log("Centering map to coordinate: \(coordinate) (coord change: \(coordinateDistance)m, map drift: \(currentCenterDistance)m)")
             }
@@ -1236,32 +1267,63 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 }
             }
         }
+
+        return shouldCenter
     }
 
     func preparePostOnboardingPresentation() {
         let authorizationStatus = locationManager.authorizationStatus
         Debug.logTiming("onboarding", "preparePostOnboardingPresentation(auth=\(authorizationStatus.rawValue), hasLocation=\(userLocation != nil))")
 
+        if canPresentMainUIImmediatelyAfterOnboarding {
+            Debug.logTiming(
+                "onboarding",
+                "post-onboarding gate skipped; map content already available (loaded=\(hasLoadedInitialData), visible=\(visibleElements.count), annotations=\(currentMerchantAnnotationCount))"
+            )
+            finishPostOnboardingPresentationImmediately()
+
+            if let userLocation {
+                centerMap(to: userLocation.coordinate, force: true)
+            } else if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+                requestWhenInUseLocationPermission()
+            }
+            return
+        }
+
+        schedulePostOnboardingPresentationFallback()
+
         if let userLocation {
             isReadyForPostOnboardingPresentation = false
             shouldReleasePostOnboardingPresentationAfterNextMapSettle = true
-            shouldReleasePostOnboardingPresentationAfterNextMapRender = true
-            centerMap(to: userLocation.coordinate, force: true)
+            shouldReleasePostOnboardingPresentationAfterNextMapRender = false
+            Debug.logTiming("onboarding", "post-onboarding gate armed for existing user location")
+            let didStartRecentering = centerMap(to: userLocation.coordinate, force: true)
+            if !didStartRecentering {
+                Debug.logTiming("onboarding", "post-onboarding recenter skipped; releasing immediately")
+                shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+                finishPostOnboardingPresentationIfNeeded()
+            }
             return
         }
 
         if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
             isReadyForPostOnboardingPresentation = false
             shouldReleasePostOnboardingPresentationAfterNextMapSettle = true
-            shouldReleasePostOnboardingPresentationAfterNextMapRender = true
+            shouldReleasePostOnboardingPresentationAfterNextMapRender = false
+            Debug.logTiming("onboarding", "post-onboarding gate armed while waiting for location update")
             requestWhenInUseLocationPermission()
             return
         }
 
+        Debug.logTiming("onboarding", "post-onboarding gate not needed; releasing immediately")
         finishPostOnboardingPresentationIfNeeded()
     }
 
     func notifyPostOnboardingMapRenderFinished() {
+        Debug.logTiming(
+            "onboarding",
+            "notifyPostOnboardingMapRenderFinished(armed=\(shouldReleasePostOnboardingPresentationAfterNextMapRender))"
+        )
         guard shouldReleasePostOnboardingPresentationAfterNextMapRender else { return }
         Debug.logTiming("map", "post-onboarding map fully rendered")
         shouldReleasePostOnboardingPresentationAfterNextMapRender = false
@@ -1269,18 +1331,60 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func finishPostOnboardingPresentationIfNeeded() {
+        Debug.logTiming(
+            "onboarding",
+            "finishPostOnboardingPresentationIfNeeded(settle=\(shouldReleasePostOnboardingPresentationAfterNextMapSettle), render=\(shouldReleasePostOnboardingPresentationAfterNextMapRender))"
+        )
         guard !shouldReleasePostOnboardingPresentationAfterNextMapSettle,
               !shouldReleasePostOnboardingPresentationAfterNextMapRender else { return }
+        postOnboardingPresentationFallbackTask?.cancel()
+        postOnboardingPresentationFallbackTask = nil
         Debug.logTiming("onboarding", "post-onboarding presentation released")
         isReadyForPostOnboardingPresentation = true
         forceMapRefresh = true
     }
 
     private func cancelPendingPostOnboardingMapPresentation() {
+        postOnboardingPresentationFallbackTask?.cancel()
+        postOnboardingPresentationFallbackTask = nil
+        Debug.logTiming(
+            "onboarding",
+            "cancelPendingPostOnboardingMapPresentation(settle=\(shouldReleasePostOnboardingPresentationAfterNextMapSettle), render=\(shouldReleasePostOnboardingPresentationAfterNextMapRender))"
+        )
         shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
         shouldReleasePostOnboardingPresentationAfterNextMapRender = false
         isReadyForPostOnboardingPresentation = true
         forceMapRefresh = true
+    }
+
+    private func schedulePostOnboardingPresentationFallback() {
+        postOnboardingPresentationFallbackTask?.cancel()
+        postOnboardingPresentationFallbackTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard let self else { return }
+            guard self.shouldReleasePostOnboardingPresentationAfterNextMapSettle
+                    || self.shouldReleasePostOnboardingPresentationAfterNextMapRender else { return }
+            Debug.logTiming(
+                "onboarding",
+                "post-onboarding presentation fallback released (settle=\(self.shouldReleasePostOnboardingPresentationAfterNextMapSettle), render=\(self.shouldReleasePostOnboardingPresentationAfterNextMapRender))"
+            )
+            self.cancelPendingPostOnboardingMapPresentation()
+        }
+    }
+
+    private var currentMerchantAnnotationCount: Int {
+        mapView?.annotations.compactMap { $0 as? Annotation }.count ?? 0
+    }
+
+    private var canPresentMainUIImmediatelyAfterOnboarding: Bool {
+        guard hasLoadedInitialData else { return false }
+        return !visibleElements.isEmpty || currentMerchantAnnotationCount > 0
+    }
+
+    private func finishPostOnboardingPresentationImmediately() {
+        shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
+        shouldReleasePostOnboardingPresentationAfterNextMapRender = false
+        finishPostOnboardingPresentationIfNeeded()
     }
     
     // Add a method for user-initiated centering (location button)

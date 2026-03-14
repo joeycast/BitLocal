@@ -33,6 +33,9 @@ struct IPhoneLayoutView: View {
     @State private var pendingLaunchOutlier: CGFloat?
     private let collapsedSheetDetent: PresentationDetent = .fraction(0.11)
     private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
+    private var shouldPresentBottomSheet: Bool {
+        didCompleteOnboarding && viewModel.isReadyForPostOnboardingPresentation
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -107,7 +110,7 @@ struct IPhoneLayoutView: View {
 //                    Debug.log("Bottom sheet dismissed")
 //                }
 //            )
-            .sheet(isPresented: .constant(didCompleteOnboarding && viewModel.isReadyForPostOnboardingPresentation), onDismiss: {
+            .sheet(isPresented: .constant(shouldPresentBottomSheet), onDismiss: {
                 Debug.log("Bottom sheet dismissed")
             }) {
                 BottomSheetContentView(
@@ -153,6 +156,19 @@ struct IPhoneLayoutView: View {
                     "Attribution launch: detent=\(bottomSheetDetent), " +
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
                     "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
+                )
+            }
+            .onChange(of: shouldPresentBottomSheet) { _, isPresented in
+                Debug.logTiming(
+                    "onboarding",
+                    "bottom sheet eligibility changed -> presented=\(isPresented), ready=\(viewModel.isReadyForPostOnboardingPresentation), onboarding=\(didCompleteOnboarding), visibleElements=\(visibleElements.count), selected=\(viewModel.selectedElement?.id ?? "nil")"
+                )
+            }
+            .onChange(of: visibleElements.count) { _, count in
+                guard shouldPresentBottomSheet else { return }
+                Debug.logTiming(
+                    "map",
+                    "bottom sheet visibleElements updated -> count=\(count), detent=\(bottomSheetDetent)"
                 )
             }
             .onChange(of: viewModel.bottomPadding) { _, newValue in

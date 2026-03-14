@@ -61,7 +61,17 @@ struct RootView: View {
             evaluateFeatureHintsPresentation()
         }
         .onChange(of: contentViewModel.isReadyForPostOnboardingPresentation) { _, _ in
+            Debug.logTiming(
+                "onboarding",
+                "main UI readiness changed -> ready=\(contentViewModel.isReadyForPostOnboardingPresentation), loaded=\(contentViewModel.hasLoadedInitialData), allElements=\(contentViewModel.allElements.count), visibleElements=\(contentViewModel.visibleElements.count), forceMapRefresh=\(contentViewModel.forceMapRefresh)"
+            )
             evaluateFeatureHintsPresentation()
+        }
+        .onChange(of: contentViewModel.hasLoadedInitialData) { _, loaded in
+            Debug.logTiming(
+                "data",
+                "hasLoadedInitialData changed -> \(loaded), allElements=\(contentViewModel.allElements.count), appState=\(contentViewModel.appState)"
+            )
         }
         .onChange(of: featureHintsController.replayRequestCount) { _, _ in
             evaluateFeatureHintsPresentation()

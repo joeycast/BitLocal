@@ -111,7 +111,10 @@ struct MapView: UIViewRepresentable {
         
         // Skip updates during initial startup until data is loaded
         guard viewModel.hasLoadedInitialData else {
-            Debug.logMap("MapView.updateUIView() - SKIPPED (waiting for initial data)")
+            Debug.logTiming(
+                "data",
+                "MapView.updateUIView skipped -> waiting for initial data (ready=\(viewModel.isReadyForPostOnboardingPresentation), allElements=\(viewModel.allElements.count))"
+            )
             return
         }
 
@@ -120,7 +123,10 @@ struct MapView: UIViewRepresentable {
             if !currentAnnotations.isEmpty {
                 mapView.removeAnnotations(currentAnnotations)
             }
-            Debug.logMap("MapView.updateUIView() - SKIPPED (waiting for post-onboarding map settle)")
+            Debug.logTiming(
+                "onboarding",
+                "MapView.updateUIView skipped -> waiting for post-onboarding settle (existingAnnotations=\(currentAnnotations.count), allElements=\(viewModel.mapElementsForCurrentDisplay.count))"
+            )
             return
         }
         
@@ -503,6 +509,10 @@ struct MapView: UIViewRepresentable {
             }
             if visibleIDs != lastVisibleElementIDs {
                 lastVisibleElementIDs = visibleIDs
+                Debug.logTiming(
+                    "map",
+                    "publishing visible elements -> count=\(refreshedVisibleElements.count), annotations=\(mapView.annotations.compactMap { $0 as? Annotation }.count)"
+                )
                 self.viewModel.visibleElementsSubject.send(refreshedVisibleElements)
             }
             Debug.logMap("⏱ updateAnnotations: \(sourceElements.count) source → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - annStart) * 1000))ms")
@@ -617,6 +627,10 @@ struct MapView: UIViewRepresentable {
         
         // Detect when the map region changes
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            Debug.logTiming(
+                "onboarding",
+                "regionDidChangeAnimated(animated=\(animated), ready=\(viewModel.isReadyForPostOnboardingPresentation), settle=\(viewModel.isReadyForPostOnboardingPresentation ? "n/a" : "pending"))"
+            )
             if animated || !viewModel.isReadyForPostOnboardingPresentation {
                 Debug.logTiming(
                     "map",
