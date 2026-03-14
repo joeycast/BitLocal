@@ -98,7 +98,7 @@ struct OnboardingView: View {
         ),
         OnboardingPage(
             titleKey: "Stay in the loop",
-            subtitleKey: "Choose a city and BitLocal can alert you when new local businesses start accepting bitcoin. You can change this anytime.",
+            subtitleKey: "Get alerts when new local businesses start accepting bitcoin.",
             symbolName: "bell.badge.fill",
             bgColor: .orange,
             kind: .alertsSetup
@@ -133,65 +133,42 @@ struct OnboardingView: View {
                     .opacity(0.95)
                     .ignoresSafeArea()
 
-                if pages[currentPage].kind == .alertsSetup {
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 0) {
-                            onboardingIcon(circleSize: circleSize, iconSize: iconSize)
-                                .padding(.top, max(fullGeo.safeAreaInsets.top + 8, 24))
+                VStack(spacing: 0) {
+                    // Position icon at 1/4 from top for iPhones, 1/3 for iPads
+                    Spacer()
+                        .frame(height: fullGeo.size.height * (isPad ? 0.33 : 0.25) - circleSize / 2)
 
-                            onboardingTextBlock(
-                                titleFont: titleFont,
-                                subtitleFont: subtitleFont,
-                                spacing: spacing
-                            )
-                            .padding(.top, spacing.afterIcon * 0.65)
+                    onboardingIcon(circleSize: circleSize, iconSize: iconSize)
 
-                            onboardingIndicator(spacing: spacing)
-                                .padding(.top, 20)
-                                .padding(.bottom, 18)
+                    onboardingTextBlock(
+                        titleFont: titleFont,
+                        subtitleFont: subtitleFont,
+                        spacing: spacing
+                    )
+                    .padding(.top, spacing.afterIcon)
 
-                            pageControls(
-                                spacing: spacing,
-                                buttonFont: buttonFont,
-                                maxContentWidth: maxContentWidth
-                            )
-                        }
-                        .frame(maxWidth: maxContentWidth)
-                        .padding(.horizontal, isPad ? 32 : 16)
-                        .padding(.bottom, max(fullGeo.safeAreaInsets.bottom, 20))
-                        .frame(maxWidth: .infinity)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                } else {
-                    VStack(spacing: 0) {
-                        // Position icon at 1/4 from top for iPhones, 1/3 for iPads
-                        Spacer()
-                            .frame(height: fullGeo.size.height * (isPad ? 0.33 : 0.25) - circleSize / 2)
-
-                        onboardingIcon(circleSize: circleSize, iconSize: iconSize)
-
-                        onboardingTextBlock(
-                            titleFont: titleFont,
-                            subtitleFont: subtitleFont,
-                            spacing: spacing
+                    if pages[currentPage].kind == .alertsSetup {
+                        alertSupplementaryContent(
+                            maxContentWidth: maxContentWidth,
+                            screenCategory: screenCategory
                         )
-                        .padding(.top, spacing.afterIcon)
-
-                        Spacer()
-
-                        onboardingIndicator(spacing: spacing)
-                            .padding(.bottom, spacing.indicatorBottom)
-
-                        pageControls(
-                            spacing: spacing,
-                            buttonFont: buttonFont,
-                            maxContentWidth: maxContentWidth
-                        )
+                        .padding(.top, min(28, spacing.afterIcon * 0.5))
                     }
-                    .frame(maxWidth: maxContentWidth)
-                    .padding(.horizontal, isPad ? 32 : 16)
-                    .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
+
+                    Spacer()
+
+                    onboardingIndicator(spacing: spacing)
+                        .padding(.bottom, spacing.indicatorBottom)
+
+                    pageControls(
+                        spacing: spacing,
+                        buttonFont: buttonFont,
+                        maxContentWidth: maxContentWidth
+                    )
                 }
+                .frame(maxWidth: maxContentWidth)
+                .padding(.horizontal, isPad ? 32 : 16)
+                .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
             }
         }
         .task(id: alertContextRefreshID) {
@@ -372,6 +349,21 @@ struct OnboardingView: View {
             )
         }
     }
+
+    private func getAlertsSupplementHeight(for category: ScreenCategory) -> CGFloat {
+        switch category {
+        case .iPhoneSmall:
+            return 176
+        case .iPhoneMedium:
+            return 194
+        case .iPhoneLarge:
+            return 212
+        case .iPadSmall:
+            return 248
+        case .iPadMedium, .iPadLarge:
+            return 272
+        }
+    }
     
     private struct SpacingValues {
         let main: CGFloat
@@ -541,35 +533,20 @@ struct OnboardingView: View {
         maxContentWidth: CGFloat
     ) -> some View {
         VStack(spacing: 14) {
-            VStack(spacing: 10) {
-                if shouldShowCloudKitStatusCard {
-                    alertCloudKitStatusCard
-                } else {
-                    alertSearchBar
-
-                    if alertCityPickerModel.isShowingSearchResults {
-                        alertSearchResults
-                    } else {
-                        alertSuggestedCities
-                    }
-                }
-
-                if let errorMessage = merchantAlertsManager.errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 6)
-                }
-
-                if merchantAlertsManager.notificationSettings?.authorizationStatus == .denied {
-                    Button("Open Settings") {
-                        merchantAlertsManager.openSystemSettings()
-                    }
-                    .font(.footnote.weight(.semibold))
-                }
+            if let errorMessage = merchantAlertsManager.errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 6)
             }
-            .frame(maxWidth: min(maxContentWidth * 0.94, 540))
+
+            if merchantAlertsManager.notificationSettings?.authorizationStatus == .denied {
+                Button("Open Settings") {
+                    merchantAlertsManager.openSystemSettings()
+                }
+                .font(.footnote.weight(.semibold))
+            }
 
             if shouldShowEnableAlertsButton {
                 Button {
@@ -585,6 +562,8 @@ struct OnboardingView: View {
                             Image(systemName: "bell.badge.fill")
                         }
                         Text(alertPrimaryButtonTitle)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.84)
                     }
                     .font(buttonFont)
                     .frame(maxWidth: min(maxContentWidth * 0.9, 500))
@@ -612,6 +591,29 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, spacing.buttonHorizontal)
         .padding(.bottom, spacing.bottomPadding)
+    }
+
+    private func alertsSelectionPanel(maxContentWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if shouldShowCloudKitStatusCard {
+                alertCloudKitStatusCard
+            } else {
+                alertSearchBar
+
+                ScrollView(showsIndicators: false) {
+                    Group {
+                        if alertCityPickerModel.isShowingSearchResults {
+                            alertSearchResults
+                        } else {
+                            alertSuggestedCities
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+        }
+        .frame(maxWidth: min(maxContentWidth * 0.92, 500), maxHeight: .infinity, alignment: .top)
     }
 
     private var shouldShowCloudKitStatusCard: Bool {
@@ -651,6 +653,32 @@ struct OnboardingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func alertSupplementaryContent(
+        maxContentWidth: CGFloat,
+        screenCategory: ScreenCategory
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let alertSelectionSupportText {
+                Text(alertSelectionSupportText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+
+            alertsSelectionPanel(maxContentWidth: maxContentWidth)
+        }
+        .frame(
+            maxWidth: min(maxContentWidth * 0.92, 500),
+            minHeight: getAlertsSupplementHeight(for: screenCategory),
+            maxHeight: getAlertsSupplementHeight(for: screenCategory),
+            alignment: .top
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .id("alertSupplement\(currentPage)")
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: currentPage)
     }
 
     private var alertCloudKitStatusTitle: String {
@@ -734,7 +762,7 @@ struct OnboardingView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Search another city", text: $alertCityPickerModel.searchText)
+            TextField("Search city", text: $alertCityPickerModel.searchText)
                 .textFieldStyle(.plain)
                 .font(.body)
                 .textInputAutocapitalization(.words)
@@ -761,13 +789,13 @@ struct OnboardingView: View {
         if alertCityPickerModel.isLoadingBrowseContent {
             ProgressView("Finding a city for you…")
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .padding(.vertical, 14)
         } else {
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 if let currentLocationCity = alertCityPickerModel.currentLocationCity {
                     alertCityCard(
                         title: currentLocationCity.choice.city,
-                        subtitle: "Use your current city: \(currentLocationCity.displayName)",
+                        subtitle: currentLocationCity.displayName,
                         badge: "Current Location",
                         systemImage: "location.fill",
                         accent: .blue,
@@ -778,7 +806,7 @@ struct OnboardingView: View {
                 if let activeAlertCity = alertCityPickerModel.activeAlertCity {
                     alertCityCard(
                         title: activeAlertCity.city,
-                        subtitle: "Alerts are already set up for \(activeAlertCity.displayName)",
+                        subtitle: activeAlertCity.displayName,
                         badge: "Current Alert",
                         systemImage: "bell.badge.fill",
                         accent: .orange,
@@ -789,14 +817,14 @@ struct OnboardingView: View {
                 if alertCityPickerModel.currentLocationCity == nil,
                    alertCityPickerModel.activeAlertCity == nil,
                    alertCityPickerModel.recommendedCities.isEmpty {
-                    Text("Allow location to get a nearby suggestion, or search for any city.")
+                    Text(alertEmptyBrowseText)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 18)
                 } else {
-                    ForEach(alertCityPickerModel.recommendedCities.prefix(3)) { result in
+                    ForEach(alertCityPickerModel.recommendedCities.prefix(2)) { result in
                         alertCityCard(
                             title: result.city,
                             subtitle: result.displayName,
@@ -816,7 +844,7 @@ struct OnboardingView: View {
         if alertCityPickerModel.isLoading && alertCityPickerModel.results.isEmpty {
             ProgressView("Searching cities…")
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .padding(.vertical, 14)
         } else if alertCityPickerModel.results.isEmpty {
             Text("No city matches yet. Try a city name, state, or country.")
                 .font(.footnote)
@@ -825,8 +853,8 @@ struct OnboardingView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 18)
         } else {
-            VStack(spacing: 10) {
-                ForEach(alertCityPickerModel.results.prefix(4)) { result in
+            VStack(spacing: 8) {
+                ForEach(alertCityPickerModel.results.prefix(3)) { result in
                     alertCityCard(
                         title: result.city,
                         subtitle: result.displayName,
@@ -854,41 +882,45 @@ struct OnboardingView: View {
             selectedAlertCity = choice
             hasManuallySelectedAlertCity = true
         } label: {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: systemImage)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(accent)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 38, height: 38)
                     .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(title)
                             .font(.headline)
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .lineLimit(1)
 
                         if let badge {
                             Text(badge)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(accent)
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
+                                .padding(.vertical, 3)
                                 .background(accent.opacity(0.12), in: Capsule())
+                                .lineLimit(1)
                         }
                     }
 
                     Text(subtitle)
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
+                        .lineLimit(2)
                 }
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isSelected ? AnyShapeStyle(pages[currentPage].bgColor) : AnyShapeStyle(.tertiary))
                     .font(.title3)
             }
-            .padding(14)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
@@ -904,10 +936,38 @@ struct OnboardingView: View {
     }
 
     private var alertPrimaryButtonTitle: String {
+        if selectedAlertCity != nil, alertCityPickerModel.currentLocationCity != nil {
+            return "Turn On Alerts"
+        }
         if let selectedAlertCity {
             return "Turn On Alerts for \(selectedAlertCity.city)"
         }
         return "Choose a City First"
+    }
+
+    private var isLocationAuthorizedForAlerts: Bool {
+        let status = viewModel.locationManager.authorizationStatus
+        return status == .authorizedAlways || status == .authorizedWhenInUse
+    }
+
+    private var alertSelectionSupportText: String? {
+        if alertCityPickerModel.currentLocationCity != nil, isLocationAuthorizedForAlerts {
+            return nil
+        }
+
+        if isLocationAuthorizedForAlerts {
+            return "Search any city, or use the suggestion when it appears."
+        }
+
+        return "Search for a city to turn on alerts."
+    }
+
+    private var alertEmptyBrowseText: String {
+        if isLocationAuthorizedForAlerts {
+            return "We’ll suggest your current city when it’s ready, or you can search for any city."
+        }
+
+        return "Search for any city to start alerts."
     }
 
     private func syncSelectedAlertCityIfNeeded() {
