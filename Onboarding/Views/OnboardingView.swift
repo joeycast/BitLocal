@@ -10,19 +10,30 @@ import CoreLocation
 import Foundation // for DebugUtils
 import UIKit     // ← added, for checking userInterfaceIdiom
 
+enum OnboardingPageKind {
+    case info
+    case locationPermission
+    case alertsSetup
+}
+
 struct OnboardingPage {
     let titleKey: String
     let subtitleKey: String
     let symbolName: String
     let bgColor: Color
-    let isLocationPage: Bool
+    let kind: OnboardingPageKind
 }
 
 struct OnboardingView: View {
-    @EnvironmentObject var viewModel: ContentViewModel
+    @EnvironmentObject private var viewModel: ContentViewModel
+    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @State private var currentPage = 0
     @State private var iconScale: CGFloat = 1.0
+    @StateObject private var alertCityPickerModel = MerchantAlertCityPickerModel()
+    @State private var selectedAlertCity: MerchantAlertCityChoice?
+    @State private var hasManuallySelectedAlertCity = false
+    @State private var isEnablingAlerts = false
 
     // ──────────────── Device Detection Helpers ────────────────
     private var isPad: Bool {
@@ -69,28 +80,35 @@ struct OnboardingView: View {
             subtitleKey: "onboarding_discover_subtitle",
             symbolName: "bitcoinsign.circle.fill",
             bgColor: .accentColor,
-            isLocationPage: false
+            kind: .info
         ),
         OnboardingPage(
             titleKey: "onboarding_map_title",
             subtitleKey: "onboarding_map_subtitle",
             symbolName: "map.fill",
             bgColor: .green,
-            isLocationPage: false
+            kind: .info
         ),
         OnboardingPage(
             titleKey: "onboarding_location_title",
             subtitleKey: "onboarding_location_subtitle",
             symbolName: "location.fill",
             bgColor: .blue,
-            isLocationPage: true
+            kind: .locationPermission
+        ),
+        OnboardingPage(
+            titleKey: "Stay in the loop",
+            subtitleKey: "Choose a city and BitLocal can alert you when new local businesses start accepting bitcoin. You can change this anytime.",
+            symbolName: "bell.badge.fill",
+            bgColor: .orange,
+            kind: .alertsSetup
         ),
         OnboardingPage(
             titleKey: "onboarding_ready_title",
             subtitleKey: "onboarding_ready_subtitle",
             symbolName: "binoculars.fill",
             bgColor: .purple,
-            isLocationPage: false
+            kind: .info
         )
     ]
 
@@ -115,151 +133,76 @@ struct OnboardingView: View {
                     .opacity(0.95)
                     .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    // Position icon at 1/4 from top for iPhones, 1/3 for iPads
-                    Spacer()
-                        .frame(height: fullGeo.size.height * (isPad ? 0.33 : 0.25) - circleSize / 2)
-                    
-                    // Icon
-                    ZStack {
-                        Circle()
-                            .fill(pages[currentPage].bgColor)
-                            .frame(width: circleSize, height: circleSize)
-                            .shadow(
-                                color: pages[currentPage].bgColor.opacity(0.3),
-                                radius: circleSize * 0.133,
-                                x: 0,
-                                y: circleSize * 0.067
+                if pages[currentPage].kind == .alertsSetup {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            onboardingIcon(circleSize: circleSize, iconSize: iconSize)
+                                .padding(.top, max(fullGeo.safeAreaInsets.top + 8, 24))
+
+                            onboardingTextBlock(
+                                titleFont: titleFont,
+                                subtitleFont: subtitleFont,
+                                spacing: spacing
                             )
+                            .padding(.top, spacing.afterIcon * 0.65)
 
-                        Image(systemName: pages[currentPage].symbolName)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: iconSize, height: iconSize)
-                            .foregroundColor(.white)
-                            .scaleEffect(iconScale)
-                            .offset(
-                                y: pages[currentPage].symbolName == "location.fill" ? 2 : 0
+                            onboardingIndicator(spacing: spacing)
+                                .padding(.top, 20)
+                                .padding(.bottom, 18)
+
+                            pageControls(
+                                spacing: spacing,
+                                buttonFont: buttonFont,
+                                maxContentWidth: maxContentWidth
                             )
-                            .offset(
-                                x: pages[currentPage].symbolName == "location.fill" ? -4 : 0
-                            )
-                            .offset(
-                                x: pages[currentPage].symbolName == "bitcoinsign.circle.fill" ? 1 : 0
-                            )
-                    }
-                    .id(currentPage)
-                    .animation(.easeInOut(duration: 0.5), value: currentPage)
-
-                    // Title & subtitle
-                    VStack(spacing: spacing.text) {
-                        Text(LocalizedStringKey(pages[currentPage].titleKey))
-                            .font(titleFont)
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.primary)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                            .id("title\(currentPage)")
-                            .animation(.spring(), value: currentPage)
-
-                        Text(LocalizedStringKey(pages[currentPage].subtitleKey))
-                            .font(subtitleFont)
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, spacing.textHorizontal)
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
-                            .id("subtitle\(currentPage)")
-                            .animation(.spring(response: 0.6), value: currentPage)
-                    }
-                    .padding(.top, spacing.afterIcon)
-
-                    Spacer()
-
-                    // Indicator
-                    HStack(spacing: spacing.indicator) {
-                        ForEach(pages.indices, id: \.self) { i in
-                            Capsule()
-                                .fill(
-                                    i == currentPage
-                                        ? pages[currentPage].bgColor
-                                        : Color.gray.opacity(0.3)
-                                )
-                                .frame(
-                                    width: i == currentPage ? spacing.indicatorWidthActive : spacing.indicatorWidth,
-                                    height: spacing.indicatorHeight
-                                )
-                                .animation(.easeInOut(duration: 0.25), value: currentPage)
                         }
+                        .frame(maxWidth: maxContentWidth)
+                        .padding(.horizontal, isPad ? 32 : 16)
+                        .padding(.bottom, max(fullGeo.safeAreaInsets.bottom, 20))
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(.bottom, spacing.indicatorBottom)
+                    .scrollDismissesKeyboard(.interactively)
+                } else {
+                    VStack(spacing: 0) {
+                        // Position icon at 1/4 from top for iPhones, 1/3 for iPads
+                        Spacer()
+                            .frame(height: fullGeo.size.height * (isPad ? 0.33 : 0.25) - circleSize / 2)
 
-                    // Page-specific controls
-                    if pages[currentPage].isLocationPage {
-                        // Location permission UI
-                        VStack(spacing: spacing.button) {
-                            Button {
-                                requestLocationPermission()
-                            } label: {
-                                HStack {
-                                    Image(systemName: "location.fill")
-                                    Text("onboarding_button_enable_location")
-                                }
-                                .font(buttonFont)
-                                .frame(maxWidth: min(maxContentWidth * 0.9, 500))
-                                .padding(.vertical, spacing.buttonPadding)
-                                .background(pages[currentPage].bgColor)
-                                .foregroundColor(.white)
-                                .cornerRadius(14)
-                                .shadow(
-                                    color: pages[currentPage].bgColor.opacity(0.3),
-                                    radius: 6,
-                                    x: 0,
-                                    y: 3
-                                )
-                            }
+                        onboardingIcon(circleSize: circleSize, iconSize: iconSize)
 
-                            Button {
-                                proceedToNextPage()
-                            } label: {
-                                Text("onboarding_button_location_skip")
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.horizontal, spacing.buttonHorizontal)
-                        .padding(.bottom, spacing.bottomPadding)
+                        onboardingTextBlock(
+                            titleFont: titleFont,
+                            subtitleFont: subtitleFont,
+                            spacing: spacing
+                        )
+                        .padding(.top, spacing.afterIcon)
 
-                    } else {
-                        // Next / Get Started button
-                        Button {
-                            proceedToNextPage()
-                        } label: {
-                            Text(
-                                currentPage == pages.count - 1
-                                    ? "onboarding_button_get_started"
-                                    : "onboarding_button_next"
-                            )
-                            .font(buttonFont)
-                            .frame(maxWidth: min(maxContentWidth * 0.9, 500))
-                            .padding(.vertical, spacing.buttonPadding)
-                            .background(pages[currentPage].bgColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(14)
-                            .shadow(
-                                color: pages[currentPage].bgColor.opacity(0.3),
-                                radius: 6,
-                                x: 0,
-                                y: 3
-                            )
-                            .animation(.spring(response: 0.4), value: currentPage)
-                        }
-                        .padding(.horizontal, spacing.buttonHorizontal)
-                        .padding(.bottom, spacing.bottomPadding)
+                        Spacer()
+
+                        onboardingIndicator(spacing: spacing)
+                            .padding(.bottom, spacing.indicatorBottom)
+
+                        pageControls(
+                            spacing: spacing,
+                            buttonFont: buttonFont,
+                            maxContentWidth: maxContentWidth
+                        )
                     }
+                    .frame(maxWidth: maxContentWidth)
+                    .padding(.horizontal, isPad ? 32 : 16)
+                    .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
                 }
-                .frame(maxWidth: maxContentWidth)
-                .padding(.horizontal, isPad ? 32 : 16)
-                .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
             }
+        }
+        .task(id: alertContextRefreshID) {
+            guard pages[currentPage].kind == .alertsSetup else { return }
+            await merchantAlertsManager.refreshStatus()
+            await alertCityPickerModel.syncContext(
+                userLocation: viewModel.userLocation,
+                authorizationStatus: viewModel.locationManager.authorizationStatus,
+                activeSubscription: merchantAlertsManager.currentSubscription
+            )
+            syncSelectedAlertCityIfNeeded()
         }
     }
     
@@ -446,6 +389,534 @@ struct OnboardingView: View {
         let indicatorBottom: CGFloat
     }
 
+    private func onboardingIcon(circleSize: CGFloat, iconSize: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(pages[currentPage].bgColor)
+                .frame(width: circleSize, height: circleSize)
+                .shadow(
+                    color: pages[currentPage].bgColor.opacity(0.3),
+                    radius: circleSize * 0.133,
+                    x: 0,
+                    y: circleSize * 0.067
+                )
+
+            Image(systemName: pages[currentPage].symbolName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: iconSize, height: iconSize)
+                .foregroundStyle(.white)
+                .scaleEffect(iconScale)
+                .offset(
+                    y: pages[currentPage].symbolName == "location.fill" ? 2 : 0
+                )
+                .offset(
+                    x: pages[currentPage].symbolName == "location.fill" ? -4 : 0
+                )
+                .offset(
+                    x: pages[currentPage].symbolName == "bitcoinsign.circle.fill" ? 1 : 0
+                )
+        }
+        .id(currentPage)
+        .animation(.easeInOut(duration: 0.5), value: currentPage)
+    }
+
+    private func onboardingTextBlock(
+        titleFont: Font,
+        subtitleFont: Font,
+        spacing: SpacingValues
+    ) -> some View {
+        VStack(spacing: spacing.text) {
+            Text(LocalizedStringKey(pages[currentPage].titleKey))
+                .font(titleFont)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.primary)
+                .lineLimit(3)
+                .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: false, vertical: true)
+                .transition(.move(edge: .leading).combined(with: .opacity))
+                .id("title\(currentPage)")
+                .animation(.spring(), value: currentPage)
+
+            Text(LocalizedStringKey(pages[currentPage].subtitleKey))
+                .font(subtitleFont)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, spacing.textHorizontal)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .id("subtitle\(currentPage)")
+                .animation(.spring(response: 0.6), value: currentPage)
+        }
+    }
+
+    private func onboardingIndicator(spacing: SpacingValues) -> some View {
+        HStack(spacing: spacing.indicator) {
+            ForEach(pages.indices, id: \.self) { i in
+                Capsule()
+                    .fill(
+                        i == currentPage
+                            ? pages[currentPage].bgColor
+                            : Color.gray.opacity(0.3)
+                    )
+                    .frame(
+                        width: i == currentPage ? spacing.indicatorWidthActive : spacing.indicatorWidth,
+                        height: spacing.indicatorHeight
+                    )
+                    .animation(.easeInOut(duration: 0.25), value: currentPage)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pageControls(
+        spacing: SpacingValues,
+        buttonFont: Font,
+        maxContentWidth: CGFloat
+    ) -> some View {
+        switch pages[currentPage].kind {
+        case .locationPermission:
+            locationControls(
+                spacing: spacing,
+                buttonFont: buttonFont,
+                maxContentWidth: maxContentWidth
+            )
+        case .alertsSetup:
+            alertsControls(
+                spacing: spacing,
+                buttonFont: buttonFont,
+                maxContentWidth: maxContentWidth
+            )
+        case .info:
+            defaultControls(
+                spacing: spacing,
+                buttonFont: buttonFont,
+                maxContentWidth: maxContentWidth
+            )
+        }
+    }
+
+    private func locationControls(
+        spacing: SpacingValues,
+        buttonFont: Font,
+        maxContentWidth: CGFloat
+    ) -> some View {
+        VStack(spacing: spacing.button) {
+            Button {
+                requestLocationPermission()
+            } label: {
+                HStack {
+                    Image(systemName: "location.fill")
+                    Text("onboarding_button_enable_location")
+                }
+                .font(buttonFont)
+                .frame(maxWidth: min(maxContentWidth * 0.9, 500))
+                .padding(.vertical, spacing.buttonPadding)
+                .background(pages[currentPage].bgColor)
+                .foregroundColor(.white)
+                .cornerRadius(14)
+                .shadow(
+                    color: pages[currentPage].bgColor.opacity(0.3),
+                    radius: 6,
+                    x: 0,
+                    y: 3
+                )
+            }
+
+            Button {
+                proceedToNextPage()
+            } label: {
+                Text("onboarding_button_location_skip")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, spacing.buttonHorizontal)
+        .padding(.bottom, spacing.bottomPadding)
+    }
+
+    private func alertsControls(
+        spacing: SpacingValues,
+        buttonFont: Font,
+        maxContentWidth: CGFloat
+    ) -> some View {
+        VStack(spacing: 14) {
+            VStack(spacing: 10) {
+                if shouldShowCloudKitStatusCard {
+                    alertCloudKitStatusCard
+                } else {
+                    alertSearchBar
+
+                    if alertCityPickerModel.isShowingSearchResults {
+                        alertSearchResults
+                    } else {
+                        alertSuggestedCities
+                    }
+                }
+
+                if let errorMessage = merchantAlertsManager.errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 6)
+                }
+
+                if merchantAlertsManager.notificationSettings?.authorizationStatus == .denied {
+                    Button("Open Settings") {
+                        merchantAlertsManager.openSystemSettings()
+                    }
+                    .font(.footnote.weight(.semibold))
+                }
+            }
+            .frame(maxWidth: min(maxContentWidth * 0.94, 540))
+
+            if shouldShowEnableAlertsButton {
+                Button {
+                    Task {
+                        await enableSelectedCityAlerts()
+                    }
+                } label: {
+                    HStack {
+                        if isEnablingAlerts {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "bell.badge.fill")
+                        }
+                        Text(alertPrimaryButtonTitle)
+                    }
+                    .font(buttonFont)
+                    .frame(maxWidth: min(maxContentWidth * 0.9, 500))
+                    .padding(.vertical, spacing.buttonPadding)
+                    .background(pages[currentPage].bgColor.opacity(selectedAlertCity == nil || isEnablingAlerts ? 0.45 : 1))
+                    .foregroundColor(.white)
+                    .cornerRadius(14)
+                    .shadow(
+                        color: pages[currentPage].bgColor.opacity(0.25),
+                        radius: 6,
+                        x: 0,
+                        y: 3
+                    )
+                }
+                .disabled(selectedAlertCity == nil || isEnablingAlerts || !merchantAlertsManager.canEnableAlerts)
+            }
+
+            Button {
+                proceedToNextPage()
+            } label: {
+                Text("Skip for now")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, spacing.buttonHorizontal)
+        .padding(.bottom, spacing.bottomPadding)
+    }
+
+    private var shouldShowCloudKitStatusCard: Bool {
+        merchantAlertsManager.cloudKitAccountStatus != .available
+    }
+
+    private var shouldShowEnableAlertsButton: Bool {
+        merchantAlertsManager.isCloudKitAvailable
+    }
+
+    private var alertCloudKitStatusCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: alertCloudKitStatusIcon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(alertCloudKitStatusTint)
+                    .frame(width: 40, height: 40)
+                    .background(alertCloudKitStatusTint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(alertCloudKitStatusTitle)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text(merchantAlertsManager.cloudKitStatusSummary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Text("You can finish onboarding now and turn on city alerts later from Settings once iCloud is available.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var alertCloudKitStatusTitle: String {
+        switch merchantAlertsManager.cloudKitAccountStatus {
+        case .couldNotDetermine:
+            return "Checking iCloud"
+        case .temporarilyUnavailable:
+            return "iCloud is temporarily unavailable"
+        case .restricted:
+            return "iCloud isn't available"
+        case .noAccount:
+            return "iCloud Required"
+        case .available:
+            return "iCloud is ready"
+        @unknown default:
+            return "iCloud is unavailable"
+        }
+    }
+
+    private var alertCloudKitStatusIcon: String {
+        switch merchantAlertsManager.cloudKitAccountStatus {
+        case .couldNotDetermine:
+            return "icloud"
+        case .temporarilyUnavailable:
+            return "icloud.slash"
+        case .restricted:
+            return "icloud.slash"
+        case .noAccount:
+            return "person.crop.circle.badge.exclamationmark"
+        case .available:
+            return "icloud"
+        @unknown default:
+            return "icloud.slash"
+        }
+    }
+
+    private var alertCloudKitStatusTint: Color {
+        switch merchantAlertsManager.cloudKitAccountStatus {
+        case .couldNotDetermine:
+            return .blue
+        case .available:
+            return .green
+        default:
+            return .orange
+        }
+    }
+
+    private func defaultControls(
+        spacing: SpacingValues,
+        buttonFont: Font,
+        maxContentWidth: CGFloat
+    ) -> some View {
+        Button {
+            proceedToNextPage()
+        } label: {
+            Text(
+                currentPage == pages.count - 1
+                    ? "onboarding_button_get_started"
+                    : "onboarding_button_next"
+            )
+            .font(buttonFont)
+            .frame(maxWidth: min(maxContentWidth * 0.9, 500))
+            .padding(.vertical, spacing.buttonPadding)
+            .background(pages[currentPage].bgColor)
+            .foregroundColor(.white)
+            .cornerRadius(14)
+            .shadow(
+                color: pages[currentPage].bgColor.opacity(0.3),
+                radius: 6,
+                x: 0,
+                y: 3
+            )
+            .animation(.spring(response: 0.4), value: currentPage)
+        }
+        .padding(.horizontal, spacing.buttonHorizontal)
+        .padding(.bottom, spacing.bottomPadding)
+    }
+
+    private var alertSearchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search another city", text: $alertCityPickerModel.searchText)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+
+            if !alertCityPickerModel.searchText.isEmpty {
+                Button {
+                    alertCityPickerModel.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var alertSuggestedCities: some View {
+        if alertCityPickerModel.isLoadingBrowseContent {
+            ProgressView("Finding a city for you…")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+        } else {
+            VStack(spacing: 10) {
+                if let currentLocationCity = alertCityPickerModel.currentLocationCity {
+                    alertCityCard(
+                        title: currentLocationCity.choice.city,
+                        subtitle: "Use your current city: \(currentLocationCity.displayName)",
+                        badge: "Current Location",
+                        systemImage: "location.fill",
+                        accent: .blue,
+                        choice: currentLocationCity.choice
+                    )
+                }
+
+                if let activeAlertCity = alertCityPickerModel.activeAlertCity {
+                    alertCityCard(
+                        title: activeAlertCity.city,
+                        subtitle: "Alerts are already set up for \(activeAlertCity.displayName)",
+                        badge: "Current Alert",
+                        systemImage: "bell.badge.fill",
+                        accent: .orange,
+                        choice: activeAlertCity
+                    )
+                }
+
+                if alertCityPickerModel.currentLocationCity == nil,
+                   alertCityPickerModel.activeAlertCity == nil,
+                   alertCityPickerModel.recommendedCities.isEmpty {
+                    Text("Allow location to get a nearby suggestion, or search for any city.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 18)
+                } else {
+                    ForEach(alertCityPickerModel.recommendedCities.prefix(3)) { result in
+                        alertCityCard(
+                            title: result.city,
+                            subtitle: result.displayName,
+                            badge: nil,
+                            systemImage: "mappin.circle.fill",
+                            accent: .accentColor,
+                            choice: result.choice
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var alertSearchResults: some View {
+        if alertCityPickerModel.isLoading && alertCityPickerModel.results.isEmpty {
+            ProgressView("Searching cities…")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+        } else if alertCityPickerModel.results.isEmpty {
+            Text("No city matches yet. Try a city name, state, or country.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 18)
+        } else {
+            VStack(spacing: 10) {
+                ForEach(alertCityPickerModel.results.prefix(4)) { result in
+                    alertCityCard(
+                        title: result.city,
+                        subtitle: result.displayName,
+                        badge: nil,
+                        systemImage: "mappin.circle.fill",
+                        accent: .accentColor,
+                        choice: result.choice
+                    )
+                }
+            }
+        }
+    }
+
+    private func alertCityCard(
+        title: String,
+        subtitle: String,
+        badge: String?,
+        systemImage: String,
+        accent: Color,
+        choice: MerchantAlertCityChoice
+    ) -> some View {
+        let isSelected = selectedAlertCity?.locationID == choice.locationID
+
+        return Button {
+            selectedAlertCity = choice
+            hasManuallySelectedAlertCity = true
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 40, height: 40)
+                    .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if let badge {
+                            Text(badge)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(accent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(accent.opacity(0.12), in: Capsule())
+                        }
+                    }
+
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? AnyShapeStyle(pages[currentPage].bgColor) : AnyShapeStyle(.tertiary))
+                    .font(.title3)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var alertContextRefreshID: String {
+        let locationKey = viewModel.userLocation.map {
+            ReverseGeocodingSpatialKey.key(for: $0.coordinate, precision: 3)
+        } ?? "no-location"
+        let subscriptionKey = merchantAlertsManager.currentSubscription?.locationID ?? "no-subscription"
+        return "\(currentPage)|\(viewModel.locationManager.authorizationStatus.rawValue)|\(locationKey)|\(subscriptionKey)"
+    }
+
+    private var alertPrimaryButtonTitle: String {
+        if let selectedAlertCity {
+            return "Turn On Alerts for \(selectedAlertCity.city)"
+        }
+        return "Choose a City First"
+    }
+
+    private func syncSelectedAlertCityIfNeeded() {
+        guard !hasManuallySelectedAlertCity else { return }
+        selectedAlertCity = alertCityPickerModel.currentLocationCity?.choice
+            ?? alertCityPickerModel.activeAlertCity
+            ?? alertCityPickerModel.recommendedCities.first?.choice
+    }
+
     private func requestLocationPermission() {
         Debug.log("OnboardingView: User tapped Enable Location button")
         
@@ -454,6 +925,20 @@ struct OnboardingView: View {
         
         // Proceed to next page after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            proceedToNextPage()
+        }
+    }
+
+    private func enableSelectedCityAlerts() async {
+        guard let selectedAlertCity else { return }
+        guard !isEnablingAlerts else { return }
+
+        isEnablingAlerts = true
+        defer { isEnablingAlerts = false }
+
+        await merchantAlertsManager.enableNotifications(for: selectedAlertCity)
+
+        if merchantAlertsManager.currentSubscription?.locationID == selectedAlertCity.locationID {
             proceedToNextPage()
         }
     }
