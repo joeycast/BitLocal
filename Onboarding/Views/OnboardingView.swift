@@ -542,7 +542,7 @@ struct OnboardingView: View {
             }
 
             if merchantAlertsManager.notificationSettings?.authorizationStatus == .denied {
-                Button("Open Settings") {
+                Button(LocalizedStringKey("Open Settings")) {
                     merchantAlertsManager.openSystemSettings()
                 }
                 .font(.footnote.weight(.semibold))
@@ -584,7 +584,7 @@ struct OnboardingView: View {
             Button {
                 proceedToNextPage()
             } label: {
-                Text("Skip for now")
+                Text(LocalizedStringKey("Skip for now"))
                     .font(.body)
                     .foregroundColor(.secondary)
             }
@@ -762,7 +762,7 @@ struct OnboardingView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Search city", text: $alertCityPickerModel.searchText)
+            TextField(LocalizedStringKey("Search city"), text: $alertCityPickerModel.searchText)
                 .textFieldStyle(.plain)
                 .font(.body)
                 .textInputAutocapitalization(.words)
@@ -787,7 +787,7 @@ struct OnboardingView: View {
     @ViewBuilder
     private var alertSuggestedCities: some View {
         if alertCityPickerModel.isLoadingBrowseContent {
-            ProgressView("Finding a city for you…")
+            ProgressView(LocalizedStringKey("Finding a city for you…"))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
         } else {
@@ -796,7 +796,7 @@ struct OnboardingView: View {
                     alertCityCard(
                         title: currentLocationCity.choice.city,
                         subtitle: currentLocationCity.displayName,
-                        badge: "Current Location",
+                        badge: LocalizedStringKey("Current Location"),
                         systemImage: "location.fill",
                         accent: .blue,
                         choice: currentLocationCity.choice
@@ -807,7 +807,7 @@ struct OnboardingView: View {
                     alertCityCard(
                         title: activeAlertCity.city,
                         subtitle: activeAlertCity.displayName,
-                        badge: "Current Alert",
+                        badge: LocalizedStringKey("Current Alert"),
                         systemImage: "bell.badge.fill",
                         accent: .orange,
                         choice: activeAlertCity
@@ -842,11 +842,11 @@ struct OnboardingView: View {
     @ViewBuilder
     private var alertSearchResults: some View {
         if alertCityPickerModel.isLoading && alertCityPickerModel.results.isEmpty {
-            ProgressView("Searching cities…")
+            ProgressView(LocalizedStringKey("Searching cities…"))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
         } else if alertCityPickerModel.results.isEmpty {
-            Text("No city matches yet. Try a city name, state, or country.")
+            Text(LocalizedStringKey("No city matches yet. Try a city name, state, or country."))
                 .font(.footnote)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -871,7 +871,7 @@ struct OnboardingView: View {
     private func alertCityCard(
         title: String,
         subtitle: String,
-        badge: String?,
+        badge: LocalizedStringKey?,
         systemImage: String,
         accent: Color,
         choice: MerchantAlertCityChoice
@@ -937,12 +937,15 @@ struct OnboardingView: View {
 
     private var alertPrimaryButtonTitle: String {
         if selectedAlertCity != nil, alertCityPickerModel.currentLocationCity != nil {
-            return "Turn On Alerts"
+            return NSLocalizedString("Turn On Alerts", comment: "Primary onboarding button title for enabling merchant alerts")
         }
         if let selectedAlertCity {
-            return "Turn On Alerts for \(selectedAlertCity.city)"
+            return String(
+                format: NSLocalizedString("Turn On Alerts for %@", comment: "Primary onboarding button title for enabling merchant alerts for the selected city"),
+                selectedAlertCity.city
+            )
         }
-        return "Choose a City First"
+        return NSLocalizedString("Choose a City First", comment: "Disabled onboarding alert button title shown before the user selects a city")
     }
 
     private var isLocationAuthorizedForAlerts: Bool {
@@ -956,18 +959,18 @@ struct OnboardingView: View {
         }
 
         if isLocationAuthorizedForAlerts {
-            return "Search any city, or use the suggestion when it appears."
+            return NSLocalizedString("Search any city, or use the suggestion when it appears.", comment: "Helper text shown in onboarding when alert city suggestions may appear")
         }
 
-        return "Search for a city to turn on alerts."
+        return NSLocalizedString("Search for a city to turn on alerts.", comment: "Helper text shown in onboarding when the user must search to choose an alert city")
     }
 
     private var alertEmptyBrowseText: String {
         if isLocationAuthorizedForAlerts {
-            return "We’ll suggest your current city when it’s ready, or you can search for any city."
+            return NSLocalizedString("We’ll suggest your current city when it’s ready, or you can search for any city.", comment: "Empty state text shown while the current city suggestion is not yet available during onboarding")
         }
 
-        return "Search for any city to start alerts."
+        return NSLocalizedString("Search for any city to start alerts.", comment: "Empty state text shown when the user needs to search to start onboarding alerts")
     }
 
     private func syncSelectedAlertCityIfNeeded() {
