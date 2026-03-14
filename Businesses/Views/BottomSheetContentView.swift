@@ -17,6 +17,7 @@ struct BottomSheetContentView: View {
     private static let sheetHeightBucketSize: CGFloat = 24
 
     @EnvironmentObject var viewModel: ContentViewModel
+
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
 

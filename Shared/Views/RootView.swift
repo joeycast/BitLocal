@@ -12,12 +12,14 @@ struct RootView: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
     @EnvironmentObject var contentViewModel: ContentViewModel
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @StateObject private var featureHintsController = FeatureHintsController()
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
     
     var body: some View {
         ZStack {
             ContentView()
                 .environmentObject(contentViewModel)
+                .environmentObject(featureHintsController)
             
             if !didCompleteOnboarding {
                 OnboardingView()
@@ -34,7 +36,9 @@ struct RootView: View {
             Debug.log("appState = \(contentViewModel.appState)")
             Debug.log("hasTriggeredInitialFetch = \(hasTriggeredInitialFetch)")
 
+            featureHintsController.installOverlayWindow()
             triggerInitialFetchIfNeeded(source: "RootView.onAppear")
+            evaluateFeatureHintsPresentation()
         }
         .onChange(of: didCompleteOnboarding) { _, completed in
             Debug.log("onboarding completion changed to: \(completed)")
@@ -49,10 +53,18 @@ struct RootView: View {
 
             // 2️⃣ If warmup never started, kick off the normal initial fetch now.
             triggerInitialFetchIfNeeded(source: "RootView.didCompleteOnboarding")
+            evaluateFeatureHintsPresentation()
         }
         .onChange(of: contentViewModel.appState) { _, newState in
             guard newState == .active else { return }
             triggerInitialFetchIfNeeded(source: "RootView.appStateActive")
+            evaluateFeatureHintsPresentation()
+        }
+        .onChange(of: contentViewModel.isReadyForPostOnboardingPresentation) { _, _ in
+            evaluateFeatureHintsPresentation()
+        }
+        .onChange(of: featureHintsController.replayRequestCount) { _, _ in
+            evaluateFeatureHintsPresentation()
         }
         .onOpenURL { url in
             contentViewModel.handleIncomingURL(url)
@@ -94,6 +106,13 @@ struct RootView: View {
                 contentViewModel.resolvePendingDeepLinkIfNeeded()
             }
         }
+    }
+
+    private func evaluateFeatureHintsPresentation() {
+        featureHintsController.evaluatePresentation(
+            didCompleteOnboarding: didCompleteOnboarding,
+            isReadyForMainUI: contentViewModel.isReadyForPostOnboardingPresentation
+        )
     }
 }
 

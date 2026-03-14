@@ -4,6 +4,7 @@ struct AboutView: View {
     
     // For dismissing the SettingsView sheet
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject private var featureHintsController: FeatureHintsController
 
     @State private var showingLogs = false
     @State private var showingAddBusinessForm = false
@@ -195,6 +196,18 @@ struct AboutView: View {
                     }
                 }
                 Section {
+                    Button {
+                        featureHintsController.scheduleReplay()
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkles.rectangle.stack")
+                                .aboutIconStyle(size: iconSize)
+                            Text("Show Hints")
+                            Spacer()
+                        }
+                    }
+
                     Button {
                         UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")
                         // Only dismiss the sheet if we're on an iPad

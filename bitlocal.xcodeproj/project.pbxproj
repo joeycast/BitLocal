@@ -16,6 +16,9 @@
 		F7C0A3013A5B100100000201 /* MerchantAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3003A5B100100000200 /* MerchantAlerts.swift */; };
 		F7C0A3033A5B100100000203 /* MerchantAlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */; };
 		F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */; };
+		F7E200013B13000000000001 /* FeatureHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E200013B13000000000002 /* FeatureHints.swift */; };
+		F7E200013B13000000000003 /* FeatureHintsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E200013B13000000000004 /* FeatureHintsOverlay.swift */; };
+		F7E200013B13000000000005 /* FeatureHintsControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E200013B13000000000006 /* FeatureHintsControllerTests.swift */; };
 		F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */; };
 		F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */; };
 		F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */; };
@@ -104,6 +107,9 @@
 		F7C0A3003A5B100100000200 /* MerchantAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlerts.swift; sourceTree = "<group>"; };
 		F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertsView.swift; sourceTree = "<group>"; };
 		F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertsModelsTests.swift; sourceTree = "<group>"; };
+		F7E200013B13000000000002 /* FeatureHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureHints.swift; sourceTree = "<group>"; };
+		F7E200013B13000000000004 /* FeatureHintsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureHintsOverlay.swift; sourceTree = "<group>"; };
+		F7E200013B13000000000006 /* FeatureHintsControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureHintsControllerTests.swift; sourceTree = "<group>"; };
 		F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmission.swift; sourceTree = "<group>"; };
 		F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmissionViewModel.swift; sourceTree = "<group>"; };
 		F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBusinessFormView.swift; sourceTree = "<group>"; };
@@ -342,6 +348,7 @@
 				F66E0B942DE33F1200D68897 /* Extensions.swift */,
 				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
 				F7C0A3003A5B100100000200 /* MerchantAlerts.swift */,
+				F7E200013B13000000000002 /* FeatureHints.swift */,
 				F7D100112DE33EF800D68897 /* CityIndexStore.swift */,
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
 				F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */,
@@ -366,6 +373,7 @@
 				F66E0B9B2DE33F1200D68897 /* ContentView.swift */,
 				F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */,
 				F66E0B9A2DE33F1200D68897 /* AboutView.swift */,
+				F7E200013B13000000000004 /* FeatureHintsOverlay.swift */,
 				F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */,
 				F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */,
 			);
@@ -459,6 +467,7 @@
 			isa = PBXGroup;
 			children = (
 				F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */,
+				F7E200013B13000000000006 /* FeatureHintsControllerTests.swift */,
 				F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */,
 				F7C0A2113A5B100100000111 /* V4PlaceRecordDecodingTests.swift */,
 				F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */,
@@ -585,6 +594,7 @@
 				F67937662DE2065E00A49AC3 /* bitlocalApp.swift in Sources */,
 				F67937692DE206D200A49AC3 /* CustomFonts.swift in Sources */,
 				F7C0A3013A5B100100000201 /* MerchantAlerts.swift in Sources */,
+				F7E200013B13000000000001 /* FeatureHints.swift in Sources */,
 				F63E80932F0180EC00ED1F00 /* MapPreviewView.swift in Sources */,
 				F63E80942F0180EC00ED1F00 /* LocationSearchView.swift in Sources */,
 				F63E80952F0180EC00ED1F00 /* ManualLocationEntryView.swift in Sources */,
@@ -632,6 +642,7 @@
 				F66E0BA72DE33F1200D68897 /* ContentView.swift in Sources */,
 				F66E0BA82DE33F1200D68897 /* MainView.swift in Sources */,
 				F66E0BA92DE33F1200D68897 /* AboutView.swift in Sources */,
+				F7E200013B13000000000003 /* FeatureHintsOverlay.swift in Sources */,
 				F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */,
 				F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */,
 				F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */,
@@ -649,6 +660,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */,
+				F7E200013B13000000000005 /* FeatureHintsControllerTests.swift in Sources */,
 				F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */,
 				F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */,
 				F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */,

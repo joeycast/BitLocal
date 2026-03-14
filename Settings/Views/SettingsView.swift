@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Binding var currentDetent: PresentationDetent
 
     @EnvironmentObject private var appearanceManager: AppearanceManager
+    @EnvironmentObject private var featureHintsController: FeatureHintsController
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
@@ -92,8 +93,10 @@ struct SettingsView: View {
                         merchantAlertsRow(showChevron: true)
                     }
                     .buttonStyle(.plain)
+                    .featureHintAnchor(.merchantAlerts)
                 } else {
                     merchantAlertsRow(showChevron: false)
+                        .featureHintAnchor(.merchantAlerts)
                 }
             }
 

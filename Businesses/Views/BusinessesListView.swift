@@ -195,6 +195,7 @@ struct BusinessesListView: View {
         .clipShape(RoundedRectangle(cornerRadius: 40))
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
+        .featureHintAnchor(.merchantSearch)
     }
 
     // MARK: - Normal Mode (discovery hub)

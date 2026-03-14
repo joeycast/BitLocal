@@ -10,6 +10,7 @@ import Foundation // for Debug logging
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
+    @EnvironmentObject private var featureHintsController: FeatureHintsController
     @Environment(\.colorScheme) private var systemColorScheme
     @StateObject private var appearanceManager = AppearanceManager()
 
@@ -76,6 +77,16 @@ struct ContentView: View {
                 userLocation = updatedUserLocation
             }
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
+        }
+        .onChange(of: featureHintsController.activeTarget) { _, target in
+            if target == .merchantAlerts {
+                showingSettings = true
+            }
+        }
+        .onChange(of: featureHintsController.isPresenting) { _, isPresenting in
+            if !isPresenting, showingSettings {
+                showingSettings = false
+            }
         }
         .preferredColorScheme(colorSchemeFor(appearanceManager.appearance))
     }

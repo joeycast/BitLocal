@@ -57,6 +57,7 @@ struct MapButtonsView: View {
             }
             .accessibilityLabel(viewModel.mapDisplayMode == .merchants
                                 ? "Show communities" : "Show merchants")
+            .featureHintAnchor(.communityToggle)
 
             Button(action: toggleMapType) {
                 ZStack {
@@ -116,6 +117,7 @@ struct MapButtonsView: View {
             }
             .accessibilityLabel(viewModel.mapDisplayMode == .merchants
                                 ? "Show communities" : "Show merchants")
+            .featureHintAnchor(.communityToggle)
         }
         .frame(width: 46)
         .modifier(GlassCapsuleBackground())
