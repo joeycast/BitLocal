@@ -19502,6 +19502,7 @@
       }
     },
     "Show Hints" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

@@ -1,4 +1,5 @@
 import Combine
+import Foundation
 import SwiftUI
 
 enum FeatureHintTarget: String, Hashable {
@@ -65,11 +66,13 @@ final class FeatureHintsController: ObservableObject {
     @Published private(set) var activeCampaign: FeatureHintCampaign?
     @Published private(set) var currentStepIndex = 0
     @Published private(set) var replayRequestCount = 0
+    @Published private(set) var mainUIPresentationCount = 0
 
     private let userDefaults: UserDefaults
     private var targetFrames: [FeatureHintTarget: CGRect] = [:]
     private var overlayWindow: UIWindow?
     private var overlayWindowCancellable: AnyCancellable?
+    private var hasObservedMainUI = false
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
@@ -122,8 +125,12 @@ final class FeatureHintsController: ObservableObject {
     }
 
     func evaluatePresentation(didCompleteOnboarding: Bool, isReadyForMainUI: Bool) {
+        guard FeatureFlags.isFeatureHintsEnabled else {
+            finish(markCampaignSeen: false)
+            return
+        }
         guard !isPresenting else { return }
-        guard didCompleteOnboarding, isReadyForMainUI else { return }
+        guard didCompleteOnboarding, isReadyForMainUI, hasObservedMainUI else { return }
 
         if userDefaults.bool(forKey: StorageKey.shouldReplayHints) {
             userDefaults.set(false, forKey: StorageKey.shouldReplayHints)
@@ -139,8 +146,17 @@ final class FeatureHintsController: ObservableObject {
     }
 
     func scheduleReplay() {
+        guard FeatureFlags.isFeatureHintsEnabled else { return }
         userDefaults.set(true, forKey: StorageKey.shouldReplayHints)
         replayRequestCount += 1
+    }
+
+    func markMainUIVisible() {
+        guard FeatureFlags.isFeatureHintsEnabled else { return }
+        guard !hasObservedMainUI else { return }
+        hasObservedMainUI = true
+        mainUIPresentationCount += 1
+        Debug.logTiming("onboarding", "feature hints main UI visibility observed")
     }
 
     func advance() {
@@ -162,6 +178,7 @@ final class FeatureHintsController: ObservableObject {
     // MARK: - Overlay window
 
     func installOverlayWindow() {
+        guard FeatureFlags.isFeatureHintsEnabled else { return }
         guard overlayWindow == nil,
               let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
 

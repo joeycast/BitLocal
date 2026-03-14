@@ -327,12 +327,20 @@ extension String {
 
 enum FeatureFlags {
     static let sharePlaceLinksKey = "share_place_links_enabled"
+    static let featureHintsKey = "feature_hints_enabled"
 
     static var isSharePlaceLinksEnabled: Bool {
         if UserDefaults.standard.object(forKey: sharePlaceLinksKey) == nil {
             return true
         }
         return UserDefaults.standard.bool(forKey: sharePlaceLinksKey)
+    }
+
+    static var isFeatureHintsEnabled: Bool {
+        if UserDefaults.standard.object(forKey: featureHintsKey) == nil {
+            return false
+        }
+        return UserDefaults.standard.bool(forKey: featureHintsKey)
     }
 }
 

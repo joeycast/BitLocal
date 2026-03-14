@@ -76,6 +76,9 @@ struct RootView: View {
         .onChange(of: featureHintsController.replayRequestCount) { _, _ in
             evaluateFeatureHintsPresentation()
         }
+        .onChange(of: featureHintsController.mainUIPresentationCount) { _, _ in
+            evaluateFeatureHintsPresentation()
+        }
         .onOpenURL { url in
             contentViewModel.handleIncomingURL(url)
         }

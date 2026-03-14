@@ -17,6 +17,7 @@ struct BottomSheetContentView: View {
     private static let sheetHeightBucketSize: CGFloat = 24
 
     @EnvironmentObject var viewModel: ContentViewModel
+    @EnvironmentObject private var featureHintsController: FeatureHintsController
 
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
@@ -38,6 +39,9 @@ struct BottomSheetContentView: View {
                 }
             }
             .ignoresSafeArea(edges: .bottom)
+            .onAppear {
+                featureHintsController.markMainUIVisible()
+            }
             .onChange(of: geometry.size.height) { _, newHeight in
                 let normalizedHeight = (newHeight / Self.sheetHeightBucketSize).rounded() * Self.sheetHeightBucketSize
                 guard abs(viewModel.bottomPadding - normalizedHeight) >= Self.sheetHeightPublishThreshold else {
