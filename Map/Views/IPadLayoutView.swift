@@ -8,7 +8,6 @@
 import SwiftUI
 import MapKit
 
-@available(iOS 17.0, *)
 struct IPadLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
     var elements: [Element]?
@@ -154,7 +153,6 @@ struct IPadLayoutView: View {
 
 // MARK: - Preview
 
-@available(iOS 17.0, *)
 struct IPadLayoutView_Previews: PreviewProvider {
     @State static var elements: [Element]? = []
     @State static var visibleElements: [Element] = []

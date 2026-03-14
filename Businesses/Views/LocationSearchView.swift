@@ -1,7 +1,6 @@
 import SwiftUI
 import MapKit
 
-@available(iOS 17.0, *)
 struct LocationSearchView: View {
     @Binding var submission: BusinessSubmission
 
@@ -232,7 +231,6 @@ struct SearchResult: Identifiable {
 }
 
 // MARK: - Location Search ViewModel
-@available(iOS 17.0, *)
 class LocationSearchViewModel: NSObject, ObservableObject {
     @Published var searchText = ""
     @Published var searchResults: [SearchResult] = []
@@ -411,7 +409,6 @@ class LocationSearchViewModel: NSObject, ObservableObject {
 }
 
 // MARK: - MKLocalSearchCompleterDelegate
-@available(iOS 17.0, *)
 extension LocationSearchViewModel: MKLocalSearchCompleterDelegate {
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
         DispatchQueue.main.async {

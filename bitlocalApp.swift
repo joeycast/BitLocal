@@ -9,7 +9,6 @@ import SwiftUI
 import Foundation // for Debug logging
 
 @main
-@available(iOS 17.0, *)
 struct bitlocalApp: App {
     @UIApplicationDelegateAdaptor(BitLocalAppDelegate.self) private var appDelegate
 

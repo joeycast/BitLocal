@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 BitLocal is an iOS app that helps users discover physical businesses accepting Bitcoin payments. It displays an interactive map with merchant locations from the BTC Map API.
 
 **Key facts:**
-- 100% SwiftUI, iOS 17.0+, zero external dependencies
+- 100% SwiftUI, iOS 18.0+, zero external dependencies
 - Universal app (iPhone + iPad with distinct layouts)
 - Bundle ID: app.bitlocal.bitlocal
 

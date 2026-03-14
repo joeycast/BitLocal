@@ -1,6 +1,5 @@
 import SwiftUI
 
-@available(iOS 17.0, *)
 struct AboutView: View {
     
     // For dismissing the SettingsView sheet
@@ -233,7 +232,6 @@ struct AboutView: View {
 }
 
 // View preview
-@available(iOS 17.0, *)
 struct AboutView_Previews: PreviewProvider {
     static var previews: some View {
         AboutView()

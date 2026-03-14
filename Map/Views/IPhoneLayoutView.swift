@@ -9,7 +9,6 @@ import SwiftUI
 import MapKit
 import Foundation // for Debug logging
 
-@available(iOS 17.0, *)
 struct IPhoneLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
     var elements: [Element]?

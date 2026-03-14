@@ -1,6 +1,5 @@
 import SwiftUI
 
-@available(iOS 17.0, *)
 struct AddBusinessInfoView: View {
     @Environment(\.dismiss) var dismiss
 
@@ -82,7 +81,6 @@ struct AddBusinessInfoView: View {
     }
 }
 
-@available(iOS 17.0, *)
 private struct InfoCard: View {
     let icon: String
     let title: LocalizedStringKey
@@ -110,7 +108,6 @@ private struct InfoCard: View {
     }
 }
 
-@available(iOS 17.0, *)
 struct AddBusinessInfoView_Previews: PreviewProvider {
     static var previews: some View {
         AddBusinessInfoView()

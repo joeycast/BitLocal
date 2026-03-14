@@ -8,7 +8,6 @@
 import SwiftUI
 import Foundation // for Debug logging
 
-@available(iOS 17.0, *)
 struct RootView: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
     @EnvironmentObject var contentViewModel: ContentViewModel
@@ -98,7 +97,6 @@ struct RootView: View {
     }
 }
 
-@available(iOS 17.0, *)
 private struct DeepLinkUnavailableView: View {
     let state: DeepLinkUnavailableState
     @EnvironmentObject private var contentViewModel: ContentViewModel

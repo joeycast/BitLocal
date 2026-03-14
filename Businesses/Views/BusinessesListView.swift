@@ -7,7 +7,6 @@ import Combine
 import Foundation
 import UIKit
 
-@available(iOS 17.0, *)
 struct BusinessesListView: View {
 
     @EnvironmentObject var viewModel: ContentViewModel
@@ -772,7 +771,6 @@ struct BusinessesListView: View {
     }
 }
 
-@available(iOS 17.0, *)
 struct ElementCell: View {
     
     @ObservedObject var viewModel: ElementCellViewModel
@@ -900,7 +898,6 @@ struct ElementCell: View {
     }
 }
 
-@available(iOS 17.0, *)
 class ElementCellViewModel: ObservableObject {
 
     static let regionCountryCodeDidChange = Notification.Name("regionCountryCodeDidChange")

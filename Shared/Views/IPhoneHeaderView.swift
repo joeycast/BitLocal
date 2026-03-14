@@ -8,7 +8,6 @@
 import SwiftUI
 import MapKit
 
-@available(iOS 17.0, *)
 struct IPhoneHeaderView: View {
     private let headerControlWidth: CGFloat = 46
     private let headerControlHeight: CGFloat = 32

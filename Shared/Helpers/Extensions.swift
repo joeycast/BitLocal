@@ -3,8 +3,7 @@ import Foundation // for Debug logging
 import MapKit
 import CoreLocation
 
-//@available(iOS 17.0, *)
-//// Bottom Sheet
+// Bottom Sheet
 //extension View {
 //    @ViewBuilder
 //    func bottomSheet<Content: View>(
@@ -86,7 +85,6 @@ extension UserDefaults {
     }
 }
 
-@available(iOS 17.0, *)
 extension MKCoordinateRegion {
     var mapRect: MKMapRect {
         let topLeft = CLLocationCoordinate2D(
@@ -146,15 +144,10 @@ extension Image {
     }
 }
 
-@available(iOS 17.0, *)
 extension View {
     @ViewBuilder
     func clearNavigationContainerBackgroundIfAvailable() -> some View {
-        if #available(iOS 18.0, *) {
-            self.containerBackground(.clear, for: .navigation)
-        } else {
-            self
-        }
+        self.containerBackground(.clear, for: .navigation)
     }
     
     @ViewBuilder
@@ -178,11 +171,7 @@ extension View {
 
     @ViewBuilder
     func pagePresentationSizingIfAvailable() -> some View {
-        if #available(iOS 18.0, *) {
-            self.presentationSizing(.page)
-        } else {
-            self
-        }
+        self.presentationSizing(.page)
     }
 
     @ViewBuilder

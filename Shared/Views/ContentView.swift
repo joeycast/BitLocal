@@ -8,7 +8,6 @@ import Combine
 import Foundation
 import Foundation // for Debug logging
 
-@available(iOS 17.0, *)
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @Environment(\.colorScheme) private var systemColorScheme

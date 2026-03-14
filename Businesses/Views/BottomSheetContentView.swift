@@ -12,7 +12,6 @@ import UIKit
 import CryptoKit
 import MapKit
 
-@available(iOS 17.0, *)
 struct BottomSheetContentView: View {
     private static let sheetHeightPublishThreshold: CGFloat = 24
     private static let sheetHeightBucketSize: CGFloat = 24
@@ -137,7 +136,6 @@ struct BottomSheetContentView: View {
     }
 }
 
-@available(iOS 17.0, *)
 struct CommunitiesListView: View {
     private let resultsPageSize = 15
 
@@ -419,7 +417,6 @@ struct CommunitiesListView: View {
     }
 }
 
-@available(iOS 17.0, *)
 private struct CommunityRow: View {
     let area: V2AreaRecord
     let metadata: CommunityRowMetadata?
@@ -547,7 +544,6 @@ private final class CommunityRowMetadataObservableStore: ObservableObject {
     @Published var metadataByAreaID: [String: CommunityRowMetadata] = [:]
 }
 
-@available(iOS 17.0, *)
 struct CommunityDetailView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var viewModel: ContentViewModel
@@ -1317,7 +1313,6 @@ struct CommunityDetailView: View {
     }
 }
 
-@available(iOS 17.0, *)
 private struct CommunitySocialLink: Identifiable {
     let label: String
     let value: String
@@ -1328,13 +1323,11 @@ private struct CommunitySocialLink: Identifiable {
     var isInteractive: Bool { linkTarget != nil }
 }
 
-@available(iOS 17.0, *)
 private enum CommunityLinkTarget {
     case web(URL)
     case appPreferred(appURL: URL)
 }
 
-@available(iOS 17.0, *)
 private struct CommunityLinkOpenError {
     let message: String
     let copyValue: String?
@@ -1347,7 +1340,6 @@ private struct CommunityLinkOpenError {
     }
 }
 
-@available(iOS 17.0, *)
 private struct CommunityVerificationStatus {
     let icon: String
     let tint: Color
@@ -1356,20 +1348,17 @@ private struct CommunityVerificationStatus {
     let explanation: String
 }
 
-@available(iOS 17.0, *)
 private struct LightningWalletOption: Identifiable {
     let id: String
     let name: String
     let appURLs: [URL]
 }
 
-@available(iOS 17.0, *)
 private struct ShareTextItem: Identifiable {
     let id = UUID()
     let text: String
 }
 
-@available(iOS 17.0, *)
 private struct ActivityView: UIViewControllerRepresentable {
     let items: [Any]
 

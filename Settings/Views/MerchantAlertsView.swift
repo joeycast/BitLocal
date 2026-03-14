@@ -1,6 +1,5 @@
 import SwiftUI
 
-@available(iOS 17.0, *)
 struct MerchantAlertsView: View {
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @Binding var currentDetent: PresentationDetent

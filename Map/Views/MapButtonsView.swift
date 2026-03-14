@@ -9,7 +9,6 @@ import SwiftUI
 import MapKit
 import UIKit
 
-@available(iOS 17.0, *)
 struct MapButtonsView: View {
     @ObservedObject var viewModel: ContentViewModel
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -229,7 +228,6 @@ struct MapButtonsView: View {
     }
 }
 
-@available(iOS 17.0, *)
 private struct GlassCapsuleBackground: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {

@@ -1,7 +1,6 @@
 import SwiftUI
 import CoreLocation
 
-@available(iOS 17.0, *)
 struct ManualLocationEntryView: View {
     @Binding var submission: BusinessSubmission
     let onSave: (CLLocationCoordinate2D) -> Void

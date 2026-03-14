@@ -1,6 +1,5 @@
 import SwiftUI
 
-@available(iOS 17.0, *)
 struct AddBusinessFormView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = BusinessSubmissionViewModel()

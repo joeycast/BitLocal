@@ -1,7 +1,6 @@
 import SwiftUI
 import MapKit
 
-@available(iOS 17.0, *)
 struct MapPreviewView: UIViewRepresentable {
     let coordinate: CLLocationCoordinate2D
     let mapType: MKMapType

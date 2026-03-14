@@ -3,7 +3,6 @@ import CoreLocation
 
 // MARK: - Events Discovery Carousel
 
-@available(iOS 17.0, *)
 struct EventsDiscoverySection: View {
     @EnvironmentObject var viewModel: ContentViewModel
 
@@ -75,7 +74,6 @@ struct EventsDiscoverySection: View {
 
 // MARK: - Event Carousel Card
 
-@available(iOS 17.0, *)
 private struct EventCarouselCard: View {
     let event: V4EventRecord
     let userLocation: CLLocation?

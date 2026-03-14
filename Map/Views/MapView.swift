@@ -11,7 +11,6 @@ import MapKit
 import Combine
 import Foundation // for Debug logging
 
-@available(iOS 17.0, *)
 struct MapView: UIViewRepresentable {
     var elements: [Element]?
     @EnvironmentObject var viewModel: ContentViewModel

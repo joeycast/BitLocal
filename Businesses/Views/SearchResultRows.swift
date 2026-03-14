@@ -3,7 +3,6 @@ import CoreLocation
 
 // MARK: - Merchant Search Result Row
 
-@available(iOS 17.0, *)
 struct MerchantSearchResultRow: View {
     let result: V4PlaceRecord
     let referenceLocation: CLLocation?
@@ -64,7 +63,6 @@ struct MerchantSearchResultRow: View {
 
 // MARK: - Event Row
 
-@available(iOS 17.0, *)
 struct BTCMapEventRow: View {
     let event: V4EventRecord
 
@@ -118,7 +116,6 @@ struct BTCMapEventRow: View {
 
 // MARK: - Area Row
 
-@available(iOS 17.0, *)
 struct BTCMapAreaRow: View {
     let area: V3AreaRecord
 

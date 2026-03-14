@@ -1,7 +1,6 @@
 import SwiftUI
 import MessageUI
 
-@available(iOS 17.0, *)
 class BusinessSubmissionViewModel: ObservableObject {
     @Published var submission = BusinessSubmission()
     @Published var showingValidationErrors = false

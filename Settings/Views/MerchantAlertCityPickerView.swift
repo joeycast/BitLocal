@@ -1,7 +1,6 @@
 import CoreLocation
 import SwiftUI
 
-@available(iOS 17.0, *)
 struct MerchantAlertCityPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var contentViewModel: ContentViewModel

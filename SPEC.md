@@ -2,7 +2,7 @@
 
 **Version:** 2.0.5 (Build 43)
 **Last Updated:** December 29, 2025
-**Platform:** iOS 17.0+
+**Platform:** iOS 18.0+
 
 ---
 
@@ -58,7 +58,7 @@ BitLocal bridges the gap between Bitcoin holders and the physical economy by mak
 ### Platform Requirements
 
 - **Platform:** iOS (Universal: iPhone and iPad)
-- **Minimum Version:** iOS 17.0
+- **Minimum Version:** iOS 18.0
 - **Supported Orientations:**
   - iPhone: Portrait only
   - iPad: All orientations (landscape left, landscape right, portrait, portrait upside down)
@@ -67,7 +67,7 @@ BitLocal bridges the gap between Bitcoin holders and the physical economy by mak
 ### Technology Stack
 
 - **Language:** Swift (100% SwiftUI)
-- **Framework:** SwiftUI with iOS 17.0+ APIs
+- **Framework:** SwiftUI with iOS 18.0+ APIs
 - **Architecture Pattern:** MVVM (Model-View-ViewModel)
 - **Total Codebase:** ~8,125 lines of Swift code across 47 files
 - **Mapping Framework:** MapKit (Apple Maps)
@@ -1379,7 +1379,7 @@ Update UI
 - Google Maps option
 - Walking/driving time estimates
 - Public transit options
-- AR walking directions (iOS 17+)
+- AR walking directions (iOS 18+)
 
 **Localization** (Medium Impact, Medium Effort):
 - Spanish (es)
@@ -1478,7 +1478,7 @@ Update UI
 - No Sign in with Apple
 
 **Build Settings:**
-- **Deployment Target:** iOS 17.0
+- **Deployment Target:** iOS 18.0
 - **Swift Version:** 5.9+
 - **Supported Devices:** Universal (iPhone + iPad)
 - **Orientations:**
@@ -1516,6 +1516,16 @@ Update UI
    - External testing (beta users)
    - Up to 10,000 external testers
    - 90-day beta cycles
+
+### Compatibility Cutoff Note
+
+- App Store releases built from this version require iOS 18.0 or later.
+- Existing users on iOS 17 can continue using their installed compatible version.
+- Future BitLocal updates require the device to be upgraded to iOS 18 or later.
+
+**Suggested App Store "What's New" copy:**
+
+BitLocal now requires iOS 18 or later. If you're currently on iOS 17, you can keep using your installed version, but future updates will require upgrading your device to iOS 18.
 
 3. **GitHub** (Open Source - if applicable):
    - Source code repository
@@ -1805,28 +1815,26 @@ External Dependencies: 0 (100% native iOS)
 
 ---
 
-### Why iOS 17.0 Minimum?
+### Why iOS 18.0 Minimum?
 
-**Decision:** Target iOS 17.0 as minimum deployment target
+**Decision:** Target iOS 18.0 as minimum deployment target
 
 **Rationale:**
-- **Modern SwiftUI:** Access to latest SwiftUI features
-- **NavigationStack:** Better navigation than NavigationView
-- **Performance:** iOS 17 SwiftUI is significantly faster
-- **MapKit:** Latest MapKit features and clustering
-- **User Base:** ~70-80% of users on iOS 17+ within months
-- **Development Speed:** Fewer workarounds for old OS bugs
-- **Smaller codebase:** No compatibility shims
+- **Platform simplification:** Cleanly drop legacy compatibility code and unsupported OS handling
+- **Modern SwiftUI:** Standardize on the current SwiftUI and UIKit behavior surface
+- **Performance:** Align with the current iOS runtime and SDK baseline
+- **Maintenance:** Reduce availability annotations and version-specific branching
+- **Release clarity:** Let App Store compatibility gates handle unsupported devices
 
 **Trade-offs:**
 - Excludes users on older devices (iPhone X, 8, etc.)
-- Smaller potential audience
-- Can't reach users who don't update
+- Existing iOS 17 users stay on the last compatible version
+- Can't deliver new features to users who do not upgrade
 
 **Alternatives Considered:**
 - **iOS 15.0:** Much larger user base, but many SwiftUI bugs
 - **iOS 16.0:** Could work, but iOS 17 has NavigationStack improvements
-- **iOS 18.0:** Too cutting-edge, excludes too many users
+- **iOS 17.0:** Supported the previous release line, but now requires extra compatibility paths
 
 ---
 

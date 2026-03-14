@@ -1,7 +1,6 @@
 import MapKit
 import SwiftUI
 
-@available(iOS 17.0, *)
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedMapType: MKMapType

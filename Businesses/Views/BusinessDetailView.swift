@@ -103,7 +103,6 @@ private func openCoordinateInMaps(coordinate: CLLocationCoordinate2D, name: Stri
     mapItem.openInMaps(launchOptions: nil)
 }
 
-@available(iOS 17.0, *)
 struct BusinessDetailView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State private var region = MKCoordinateRegion()
@@ -382,13 +381,7 @@ struct BTCMapPlaceCommentsListView: View {
             }
 
             if !comment.bodyText.isEmpty {
-                if #available(iOS 18.0, *) {
-                    TranslatableReviewBodyTextView(text: comment.bodyText)
-                } else {
-                    Text(comment.bodyText)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                }
+                TranslatableReviewBodyTextView(text: comment.bodyText)
             }
 
             if let sats = comment.amountSats, sats > 0 {
@@ -429,7 +422,6 @@ struct BTCMapPlaceCommentsListView: View {
     }
 }
 
-@available(iOS 18.0, *)
 private struct TranslatableReviewBodyTextView: View {
     let text: String
 
@@ -822,18 +814,13 @@ struct BusinessDescriptionSection: View {
             Section(header: businessSectionHeader(
                 NSLocalizedString("business_description_section", comment: "Section header for business description")
             )) {
-                if #available(iOS 18.0, *) {
-                    TranslatableBusinessDescriptionView(description: description)
-                } else {
-                    Text(description)
-                }
+                TranslatableBusinessDescriptionView(description: description)
             }
         } else {
         }
     }
 }
 
-@available(iOS 18.0, *)
 private struct TranslatableBusinessDescriptionView: View {
     let description: String
 
@@ -935,7 +922,6 @@ private struct TranslatableBusinessDescriptionView: View {
 }
 
 // Business Details Section
-@available(iOS 17.0, *)
 struct BusinessDetailsSection: View {
     var element: Element
     @ObservedObject var elementCellViewModel: ElementCellViewModel

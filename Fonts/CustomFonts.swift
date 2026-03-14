@@ -9,15 +9,13 @@ public struct MyFont {
     }
     
     fileprivate static func registerFont(bundle: Bundle, fontName: String, fontExtension: String) {
-        guard let fontURL = bundle.url(forResource: fontName, withExtension: fontExtension),
-              let fontDataProvider = CGDataProvider(url: fontURL as CFURL),
-              let font = CGFont(fontDataProvider) else {
-            fatalError("Couldn't create font from data")
+        guard let fontURL = bundle.url(forResource: fontName, withExtension: fontExtension) else {
+            fatalError("Couldn't locate font file")
         }
         
         var error: Unmanaged<CFError>?
-        CTFontManagerRegisterGraphicsFont(font, &error)
-        if let error = error {
+        let registered = CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &error)
+        if !registered, let error = error {
             Debug.log("Failed to register font: \(error.takeRetainedValue().localizedDescription)")
         }
     }

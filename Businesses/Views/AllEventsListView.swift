@@ -2,7 +2,6 @@ import SwiftUI
 
 // MARK: - All Events List (pushed onto NavigationStack)
 
-@available(iOS 17.0, *)
 struct AllEventsListView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
 

@@ -2,7 +2,6 @@ import SwiftUI
 
 // MARK: - All Regions List (pushed onto NavigationStack)
 
-@available(iOS 17.0, *)
 struct AllRegionsListView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @Environment(\.dismiss) private var dismiss

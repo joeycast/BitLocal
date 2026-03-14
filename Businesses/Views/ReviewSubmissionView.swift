@@ -1,6 +1,5 @@
 import SwiftUI
 
-@available(iOS 17.0, *)
 struct ReviewSubmissionView: View {
     @Binding var submission: BusinessSubmission
 
@@ -139,7 +138,6 @@ struct ReviewSubmissionView: View {
     }
 }
 
-@available(iOS 17.0, *)
 struct ReviewRow: View {
     let label: String
     let value: String
