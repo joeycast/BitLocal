@@ -817,12 +817,14 @@ struct OnboardingView: View {
                 if alertCityPickerModel.currentLocationCity == nil,
                    alertCityPickerModel.activeAlertCity == nil,
                    alertCityPickerModel.recommendedCities.isEmpty {
-                    Text(alertEmptyBrowseText)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 18)
+                    if let alertEmptyBrowseText {
+                        Text(alertEmptyBrowseText)
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 18)
+                    }
                 } else {
                     ForEach(alertCityPickerModel.recommendedCities.prefix(2)) { result in
                         alertCityCard(
@@ -965,12 +967,12 @@ struct OnboardingView: View {
         return NSLocalizedString("Search for a city to turn on alerts.", comment: "Helper text shown in onboarding when the user must search to choose an alert city")
     }
 
-    private var alertEmptyBrowseText: String {
+    private var alertEmptyBrowseText: String? {
         if isLocationAuthorizedForAlerts {
             return NSLocalizedString("We’ll suggest your current city when it’s ready, or you can search for any city.", comment: "Empty state text shown while the current city suggestion is not yet available during onboarding")
         }
 
-        return NSLocalizedString("Search for any city to start alerts.", comment: "Empty state text shown when the user needs to search to start onboarding alerts")
+        return nil
     }
 
     private func syncSelectedAlertCityIfNeeded() {
