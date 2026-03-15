@@ -27,3 +27,5 @@ struct SettingsButtonFrameKey: PreferenceKey {
         value = nextValue()
     }
 }
+
+// CI test note: no-op source change to exercise PR build workflow.
