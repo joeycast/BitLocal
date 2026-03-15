@@ -9,3 +9,5 @@ BitLocal now requires iOS 18 or later. If you're currently on iOS 17, you can ke
 ### Support Note
 
 Users on iOS 17 remain on the last compatible App Store version. New installs and updates for this release require iOS 18.0 or later.
+
+CI test note: validate pull_request build on develop.
