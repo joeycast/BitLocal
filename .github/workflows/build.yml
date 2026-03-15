@@ -35,7 +35,7 @@ jobs:
             build
 
       - name: Upload simulator app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ios-simulator-build
           path: build/DerivedData/Build/Products/Debug-iphonesimulator/*.app
