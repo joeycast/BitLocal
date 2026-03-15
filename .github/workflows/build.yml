@@ -30,5 +30,13 @@ jobs:
             -scheme bitlocal \
             -configuration Debug \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=26.2' \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-build
+          path: build/DerivedData/Build/Products/Debug-iphonesimulator/*.app
+          retention-days: 1
