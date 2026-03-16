@@ -203,7 +203,11 @@ struct BusinessDetailView: View {
             Text("The place link could not be created.")
         }
         .sheet(item: $shareItem) { item in
-            ShareActivityView(items: [item.url])
+            if let name = item.merchantName, !name.isEmpty {
+                ShareActivityView(items: [String(localized: "Check out \(name) on BitLocal! 🟠"), item.url])
+            } else {
+                ShareActivityView(items: [item.url])
+            }
         }
     }
 }
@@ -214,7 +218,7 @@ extension BusinessDetailView {
         if FeatureFlags.isSharePlaceLinksEnabled {
             Button {
                 if let shareURL = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
-                    shareItem = ShareURLItem(url: shareURL)
+                    shareItem = ShareURLItem(url: shareURL, merchantName: element.displayName)
                 } else {
                     Debug.log("Share link generation failed for place id: \(element.id)")
                     showingShareErrorAlert = true
@@ -279,6 +283,7 @@ extension BusinessDetailView {
 private struct ShareURLItem: Identifiable {
     let id = UUID()
     let url: URL
+    let merchantName: String?
 }
 
 private struct ShareActivityView: UIViewControllerRepresentable {
