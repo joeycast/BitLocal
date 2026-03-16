@@ -3936,6 +3936,65 @@
         }
       }
     },
+    "Check out %@ on BitLocal! 🟠" : {
+      "comment" : "Share sheet message shown when sharing a merchant link. %@ is the merchant name.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schau dir %@ auf BitLocal an! 🟠"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Check out %@ on BitLocal! 🟠"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Descubre %@ en BitLocal! 🟠"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Descubre %@ en BitLocal! 🟠"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Découvrez %@ sur BitLocal ! 🟠"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Découvrez %@ sur BitLocal ! 🟠"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scopri %@ su BitLocal! 🟠"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bekijk %@ op BitLocal! 🟠"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ลองดู %@ บน BitLocal! 🟠"
+          }
+        }
+      }
+    },
     "Checking iCloud…" : {
       "comment" : "Status text while checking iCloud availability",
       "localizations" : {
