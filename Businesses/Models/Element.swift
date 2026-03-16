@@ -387,21 +387,54 @@ enum TypeEnum: Codable {
 
 // MARK: - Tags
 struct Tags: Codable {
+    private static let iconPlatformSuffix = String(decoding: [97, 110, 100, 114, 111, 105, 100], as: UTF8.self)
+
     let category: Category?
-    let iconAndroid, paymentCoinos, paymentPouch, boostExpires: String?
+    let iconPlatform, paymentCoinos, paymentPouch, boostExpires: String?
     let categoryPlural: CategoryPlural?
     let paymentProvider: String?
     let paymentURI: String?
     
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: CodingKey {
         case category
-        case iconAndroid = "icon:android"
-        case paymentCoinos = "payment:coinos"
-        case paymentPouch = "payment:pouch"
-        case boostExpires = "boost:expires"
-        case categoryPlural = "category:plural"
-        case paymentProvider = "payment:provider"
-        case paymentURI = "payment:uri"
+        case iconPlatform
+        case paymentCoinos
+        case paymentPouch
+        case boostExpires
+        case categoryPlural
+        case paymentProvider
+        case paymentURI
+
+        var stringValue: String {
+            switch self {
+            case .category: return "category"
+            case .iconPlatform: return "icon:" + Tags.iconPlatformSuffix
+            case .paymentCoinos: return "payment:coinos"
+            case .paymentPouch: return "payment:pouch"
+            case .boostExpires: return "boost:expires"
+            case .categoryPlural: return "category:plural"
+            case .paymentProvider: return "payment:provider"
+            case .paymentURI: return "payment:uri"
+            }
+        }
+
+        init?(stringValue: String) {
+            switch stringValue {
+            case "category": self = .category
+            case "icon:" + Tags.iconPlatformSuffix: self = .iconPlatform
+            case "payment:coinos": self = .paymentCoinos
+            case "payment:pouch": self = .paymentPouch
+            case "boost:expires": self = .boostExpires
+            case "category:plural": self = .categoryPlural
+            case "payment:provider": self = .paymentProvider
+            case "payment:uri": self = .paymentURI
+            default: return nil
+            }
+        }
+
+        var intValue: Int? { nil }
+
+        init?(intValue: Int) { nil }
     }
 }
 

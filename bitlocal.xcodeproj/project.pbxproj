@@ -13,6 +13,7 @@
 		F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */; };
 		F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */; };
 		F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */; };
+		F62AA0013B1F000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F62AA0013B1F000000000002 /* PrivacyInfo.xcprivacy */; };
 		F7C0A3013A5B100100000201 /* MerchantAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3003A5B100100000200 /* MerchantAlerts.swift */; };
 		F7C0A3033A5B100100000203 /* MerchantAlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */; };
 		F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3043A5B100100000204 /* MerchantAlertsModelsTests.swift */; };
@@ -165,6 +166,7 @@
 		F67937672DE206D200A49AC3 /* CustomFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomFonts.swift; sourceTree = "<group>"; };
 		F67937752DE206E800A49AC3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F67937772DE206F000A49AC3 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		F62AA0013B1F000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F6B565BF2DA322FD00EE992E /* bitlocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bitlocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B565F62DA327BE00EE992E /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.4.sdk/System/Library/Frameworks/CoreLocation.framework; sourceTree = DEVELOPER_DIR; };
 		F6EFC28D2DE69FAF00D573E1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -423,6 +425,7 @@
 				F679377B2DE2070D00A49AC3 /* Resources */,
 				F67937772DE206F000A49AC3 /* LICENSE */,
 				F67937752DE206E800A49AC3 /* Info.plist */,
+				F62AA0013B1F000000000002 /* PrivacyInfo.xcprivacy */,
 				F6B565F52DA327BD00EE992E /* Frameworks */,
 				F6B565C02DA322FD00EE992E /* Products */,
 			);
@@ -580,6 +583,7 @@
 				F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */,
 				F7D100042DE33EF800D68897 /* BundledCities.sqlite in Resources */,
 				F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */,
+				F62AA0013B1F000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -813,7 +817,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 51;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_APP_SANDBOX = YES;
@@ -862,7 +866,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = bitlocal.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 51;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5YUMLYCFT8;
 				ENABLE_APP_SANDBOX = YES;

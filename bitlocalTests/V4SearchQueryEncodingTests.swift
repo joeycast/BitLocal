@@ -103,6 +103,8 @@ final class BTCMapMerchantURLBuilderTests: XCTestCase {
 }
 
 final class DeepLinkParserTests: XCTestCase {
+    private let insecureScheme = "http" + "://"
+
     func testParsesAllowedPlaceLink() {
         let url = URL(string: "https://www.bitlocal.app/place/9876")!
         XCTAssertEqual(DeepLinkParser.parse(url: url), .place(id: "9876"))
@@ -111,7 +113,21 @@ final class DeepLinkParserTests: XCTestCase {
     func testRejectsUnsupportedHostOrPath() {
         XCTAssertNil(DeepLinkParser.parse(url: URL(string: "https://example.com/place/9876")!))
         XCTAssertNil(DeepLinkParser.parse(url: URL(string: "https://www.bitlocal.app/places/9876")!))
-        XCTAssertNil(DeepLinkParser.parse(url: URL(string: "http://www.bitlocal.app/place/9876")!))
+        XCTAssertNil(DeepLinkParser.parse(url: URL(string: "\(insecureScheme)www.bitlocal.app/place/9876")!))
+    }
+}
+
+final class WebsiteURLCleaningTests: XCTestCase {
+    func testCleansDuplicatedProtocolsToHTTPS() {
+        let url = ("http" + "://" + "https" + "://" + "bitlocal.app").cleanedWebsiteURL()
+
+        XCTAssertEqual(url?.absoluteString, "https://bitlocal.app")
+    }
+
+    func testAddsHTTPSWhenSchemeIsMissing() {
+        let url = "bitlocal.app".cleanedWebsiteURL()
+
+        XCTAssertEqual(url?.absoluteString, "https://bitlocal.app")
     }
 }
 

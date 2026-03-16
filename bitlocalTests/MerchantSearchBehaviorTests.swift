@@ -199,6 +199,33 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "tapas").contains(.food))
     }
 
+    func testCategoryGroupResolutionFallsBackToIconPlatformTag() {
+        let element = Self.element(id: "fallback", icon: "restaurant")
+        let elementWithTaggedIcon = Element(
+            id: element.id,
+            osmJSON: element.osmJSON,
+            tags: Tags(
+                category: nil,
+                iconPlatform: "local_cafe",
+                paymentCoinos: nil,
+                paymentPouch: nil,
+                boostExpires: nil,
+                categoryPlural: nil,
+                paymentProvider: nil,
+                paymentURI: nil
+            ),
+            createdAt: element.createdAt,
+            updatedAt: element.updatedAt,
+            deletedAt: element.deletedAt,
+            address: element.address,
+            v4Metadata: nil
+        )
+
+        let groups = ElementCategorySymbols.merchantCategoryGroups(for: elementWithTaggedIcon)
+
+        XCTAssertTrue(groups.contains(.coffee))
+    }
+
     func testDynamicCategoryChipsAreSortedByVisibleCountAndCapped() {
         let elements = [
             Self.element(id: "1", icon: "local_cafe"),

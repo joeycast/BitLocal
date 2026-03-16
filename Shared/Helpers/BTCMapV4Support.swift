@@ -611,7 +611,7 @@ struct V4PlaceToElementMapper {
             osmJSON: osmJSON,
             tags: Tags(
                 category: nil,
-                iconAndroid: record.icon,
+                iconPlatform: record.icon,
                 paymentCoinos: nil,
                 paymentPouch: nil,
                 boostExpires: record.boostedUntil,
@@ -710,7 +710,7 @@ struct V4PlaceToElementMapper {
 
         let tags = Tags(
             category: nil,
-            iconAndroid: record.icon,
+            iconPlatform: record.icon,
             paymentCoinos: nil,
             paymentPouch: nil,
             boostExpires: record.boostedUntil,
@@ -1032,7 +1032,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
             anchor = Self.epochISO8601
             syncState.incrementalAnchorUpdatedSince = Self.epochISO8601
             maxPages = 200
-            Debug.logAPI("BTCMapRepository: forcing one-time full v4 backfill to replace placeholder merchant names")
+            Debug.logAPI("BTCMapRepository: forcing one-time full v4 backfill to replace stale merchant names")
         }
 
         Debug.logTiming("sync", "incremental sync stepper ready (existing=\(existing.count), anchor=\(anchor), maxPages=\(maxPages))")

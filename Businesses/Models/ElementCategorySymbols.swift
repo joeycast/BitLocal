@@ -726,7 +726,7 @@ struct ElementCategorySymbols {
 
     static func merchantCategoryGroups(for element: Element) -> [MerchantCategoryGroup] {
         let iconCandidates = Set(
-            [element.v4Metadata?.icon, element.tags?.iconAndroid]
+            [element.v4Metadata?.icon, element.tags?.iconPlatform]
                 .compactMap { $0?.lowercased() }
         )
 
@@ -767,7 +767,7 @@ struct ElementCategorySymbols {
             osmJSON: nil,
             tags: Tags(
                 category: nil,
-                iconAndroid: icon,
+                iconPlatform: icon,
                 paymentCoinos: nil,
                 paymentPouch: nil,
                 boostExpires: nil,
@@ -910,7 +910,7 @@ struct ElementCategorySymbols {
            let symbol = lookupSymbolName(in: company, forTagValue: companyValue) {
             return Image(systemName: symbol).renderingMode(renderingMode)
         }
-        if let iconSymbol = symbolName(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconAndroid) {
+        if let iconSymbol = symbolName(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconPlatform) {
             return Image(systemName: iconSymbol).renderingMode(renderingMode)
         }
 
@@ -981,7 +981,7 @@ struct ElementCategorySymbols {
            let name = lookupSymbolName(in: company, forTagValue: companyValue) {
             return name
         }
-        if let iconSymbol = symbolName(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconAndroid) {
+        if let iconSymbol = symbolName(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconPlatform) {
             return iconSymbol
         }
         // Fallback
