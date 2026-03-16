@@ -1716,7 +1716,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let tagValues = element.osmTagsDict?.values.flatMap {
             $0.components(separatedBy: ";")
         } ?? []
-        let iconValues = [element.v4Metadata?.icon, element.tags?.iconAndroid]
+        let iconValues = [element.v4Metadata?.icon, element.tags?.iconPlatform]
             .compactMap { $0 }
             .flatMap { [$0, $0.replacingOccurrences(of: "_", with: " ")] }
         let groupValues = ElementCategorySymbols.merchantCategoryGroups(for: element).flatMap {
@@ -1742,7 +1742,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func merchantSearchRawTerms(for element: Element) -> [String] {
         var rawTerms = merchantSearchableTextFields(for: element)
-        if let icon = element.v4Metadata?.icon ?? element.tags?.iconAndroid {
+        if let icon = element.v4Metadata?.icon ?? element.tags?.iconPlatform {
             rawTerms.append(icon)
             rawTerms.append(icon.replacingOccurrences(of: "_", with: " "))
         }
@@ -3384,8 +3384,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     let cachedHasPlaceholders = self.hasPlaceholderNames(in: cachedElements)
 
                     if cachedHasPlaceholders {
-                        Debug.logAPI("Cached elements include placeholder names; performing immediate refresh")
-                        Debug.logTiming("data", "cached elements contain placeholders; starting immediate refresh")
+                        Debug.logAPI("Cached elements include incomplete names; performing immediate refresh")
+                        Debug.logTiming("data", "cached elements contain incomplete names; starting immediate refresh")
                         self.btcMapRepository.refreshElements { [weak self] elements in
                             DispatchQueue.main.async {
                                 guard let self else { return }

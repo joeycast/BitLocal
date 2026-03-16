@@ -1,0 +1,42 @@
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -project bitlocal.xcodeproj \
+            -scheme bitlocal \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=26.2' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-simulator-build
+          path: build/DerivedData/Build/Products/Debug-iphonesimulator/*.app
+          retention-days: 1

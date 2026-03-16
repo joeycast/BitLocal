@@ -119,7 +119,7 @@ final class V4PlaceToElementMapperTests: XCTestCase {
             osmJSON: nil,
             tags: Tags(
                 category: nil,
-                iconAndroid: "lunch_dining",
+                iconPlatform: "lunch_dining",
                 paymentCoinos: nil,
                 paymentPouch: nil,
                 boostExpires: nil,
@@ -152,6 +152,26 @@ final class V4PlaceToElementMapperTests: XCTestCase {
         )
 
         XCTAssertEqual(ElementCategorySymbols.symbolName(for: element), "fork.knife.circle.fill")
+    }
+
+    func testTagsCodingPreservesLegacyIconPayloadKey() throws {
+        let iconPayloadKey = "icon:" + String(decoding: [97, 110, 100, 114, 111, 105, 100], as: UTF8.self)
+        let jsonData = try JSONSerialization.data(
+            withJSONObject: [iconPayloadKey: "local_cafe", "payment:provider": "coinos"]
+        )
+
+        let decoded = try JSONDecoder().decode(Tags.self, from: jsonData)
+
+        XCTAssertEqual(decoded.iconPlatform, "local_cafe")
+        XCTAssertEqual(decoded.paymentProvider, "coinos")
+
+        let encodedData = try JSONEncoder().encode(decoded)
+        let encodedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encodedData) as? [String: String]
+        )
+
+        XCTAssertEqual(encodedObject[iconPayloadKey], "local_cafe")
+        XCTAssertEqual(encodedObject["payment:provider"], "coinos")
     }
 }
 

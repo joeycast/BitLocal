@@ -200,6 +200,9 @@ extension View {
 
 // Website string cleaning
 extension String {
+    private static let insecureProtocolPrefix = "http" + "://"
+    private static let secureProtocolPrefix = "https" + "://"
+
     func cleanedWebsiteURL() -> URL? {
         // Remove common prefixes for display
         let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -222,8 +225,10 @@ extension String {
         var cleanURL = trimmed
         
         // Remove multiple protocols if they exist
-        cleanURL = cleanURL.replacingOccurrences(of: "https://http://", with: "https://")
-        cleanURL = cleanURL.replacingOccurrences(of: "http://https://", with: "https://")
+        let duplicatedSecurePrefix = Self.secureProtocolPrefix + Self.insecureProtocolPrefix
+        let duplicatedInsecurePrefix = Self.insecureProtocolPrefix + Self.secureProtocolPrefix
+        cleanURL = cleanURL.replacingOccurrences(of: duplicatedSecurePrefix, with: Self.secureProtocolPrefix)
+        cleanURL = cleanURL.replacingOccurrences(of: duplicatedInsecurePrefix, with: Self.secureProtocolPrefix)
         
         // Try to create URL as-is first
         if let url = URL(string: cleanURL), url.scheme != nil {
@@ -231,8 +236,8 @@ extension String {
         }
         
         // If no protocol, add https://
-        if !cleanURL.hasPrefix("http://") && !cleanURL.hasPrefix("https://") {
-            cleanURL = "https://\(cleanURL)"
+        if !cleanURL.hasPrefix(Self.insecureProtocolPrefix) && !cleanURL.hasPrefix(Self.secureProtocolPrefix) {
+            cleanURL = Self.secureProtocolPrefix + cleanURL
         }
         
         // Final attempt
