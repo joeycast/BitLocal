@@ -1,0 +1,19 @@
+appId: app.bitlocal.bitlocal
+tags:
+  - onboarding
+---
+- launchApp:
+    clearState: true
+- tapOn: Next
+- tapOn: Next
+- tapOn: Enable Location
+- tapOn: Allow While Using App
+- tapOn: Search city
+- inputText: Nashville
+- tapOn: Nashville, Nashville, Tennessee, United States
+- tapOn:
+    text: search
+    index: 1
+- tapOn: Turn On Alerts
+- tapOn: Allow
+- tapOn: Get Started
