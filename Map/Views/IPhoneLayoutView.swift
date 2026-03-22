@@ -23,6 +23,7 @@ struct IPhoneLayoutView: View {
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     @EnvironmentObject var appearanceManager: AppearanceManager
+    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
     
     private var appearance: Appearance { appearanceManager.appearance }
@@ -34,7 +35,9 @@ struct IPhoneLayoutView: View {
     private let collapsedSheetDetent: PresentationDetent = .fraction(0.11)
     private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
     private var shouldPresentBottomSheet: Bool {
-        didCompleteOnboarding && viewModel.isReadyForPostOnboardingPresentation
+        didCompleteOnboarding &&
+        viewModel.isReadyForPostOnboardingPresentation &&
+        !releaseNotesController.isPresenting
     }
 
     var body: some View {

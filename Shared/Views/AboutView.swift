@@ -4,6 +4,7 @@ struct AboutView: View {
     
     // For dismissing the SettingsView sheet
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
 
     @State private var showingLogs = false
     @State private var showingAddBusinessForm = false
@@ -211,6 +212,17 @@ struct AboutView: View {
                             Spacer()
                         }
                     }
+                    Button {
+                        releaseNotesController.presentCurrentReleaseNotes()
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkles")
+                                .aboutIconStyle(size: iconSize)
+                            Text("show_whats_new_button")
+                            Spacer()
+                        }
+                    }
                 }
             }
             // About page title
@@ -235,5 +247,6 @@ struct AboutView: View {
 struct AboutView_Previews: PreviewProvider {
     static var previews: some View {
         AboutView()
+            .environmentObject(ReleaseNotesController())
     }
 }
