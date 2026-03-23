@@ -16,6 +16,5 @@ struct CustomiPadNavigationStackTitleView: View {
                 .foregroundColor(.accentColor)
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .offset(x: -8)
     }
 }
