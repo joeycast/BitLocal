@@ -63,7 +63,7 @@ struct BusinessesListView: View {
 
             if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
                 categoryChipsView
-                    .padding(.bottom, 6)
+                    .padding(.bottom, categoryChipsBottomPadding)
                     .opacity(contentRevealProgress)
                     .offset(y: (1 - contentRevealProgress) * -8)
             }
@@ -200,7 +200,20 @@ struct BusinessesListView: View {
     }
 
     private var searchBarTopPadding: CGFloat {
-        horizontalSizeClass == .regular ? 10 : 20
+        if horizontalSizeClass == .regular {
+            return 10
+        }
+        if #available(iOS 26.0, *) {
+            return 20
+        }
+        return 16
+    }
+
+    private var categoryChipsBottomPadding: CGFloat {
+        if #available(iOS 26.0, *) {
+            return 6
+        }
+        return -8
     }
 
     // MARK: - Normal Mode (discovery hub)
@@ -517,8 +530,15 @@ struct BusinessesListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 6)
+            .padding(.top, categoryChipsTopPadding)
         }
+    }
+
+    private var categoryChipsTopPadding: CGFloat {
+        if #available(iOS 26.0, *) {
+            return 6
+        }
+        return 4
     }
 
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {

@@ -63,12 +63,8 @@ struct BottomSheetContentView: View {
 
     private func navigationStack(sheetHeight: CGFloat) -> some View {
         NavigationStack(path: $viewModel.path) {
-            sheetRootContent(sheetHeight: sheetHeight)
-                .toolbar(.visible, for: .navigationBar)
-                .toolbarBackground(.hidden, for: .navigationBar)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationTitle("")
-                .ignoresSafeArea(.container, edges: .top)
+            sheetRootContentWithSafeAreaBehavior(sheetHeight: sheetHeight)
+                .modifier(RootSheetNavigationBarModifier())
                 .navigationDestination(for: Element.self) { element in
                     businessDetailDestination(for: element)
                 }
@@ -76,6 +72,16 @@ struct BottomSheetContentView: View {
                     communityDetailDestination
                 }
                 .clearNavigationContainerBackgroundIfAvailable()
+        }
+    }
+
+    @ViewBuilder
+    private func sheetRootContentWithSafeAreaBehavior(sheetHeight: CGFloat) -> some View {
+        if #available(iOS 26.0, *) {
+            sheetRootContent(sheetHeight: sheetHeight)
+                .ignoresSafeArea(.container, edges: .top)
+        } else {
+            sheetRootContent(sheetHeight: sheetHeight)
         }
     }
 
@@ -138,6 +144,22 @@ struct BottomSheetContentView: View {
                 }
             }
         )
+    }
+}
+
+private struct RootSheetNavigationBarModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .toolbar(.visible, for: .navigationBar)
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("")
+        } else {
+            content
+                .toolbar(.hidden, for: .navigationBar)
+        }
     }
 }
 
@@ -256,7 +278,13 @@ struct CommunitiesListView: View {
     }
 
     private var searchBarTopPadding: CGFloat {
-        horizontalSizeClass == .regular ? 10 : 20
+        if horizontalSizeClass == .regular {
+            return 10
+        }
+        if #available(iOS 26.0, *) {
+            return 20
+        }
+        return 16
     }
 
     private var filteredCommunities: [V2AreaRecord] {
@@ -740,6 +768,7 @@ struct CommunityDetailView: View {
         .scrollContentBackground(.automatic)
         .navigationTitle(area.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
             .task(id: area.id) {
                 if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
                     viewModel.selectCommunity(area, presentDetail: false)
