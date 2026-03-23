@@ -42,6 +42,7 @@ struct AboutView: View {
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
     
     let iconSize: CGFloat = 20
+    private var usesPopoverStyling: Bool { onDone != nil }
     
     // Settings Page
     var body: some View {
@@ -221,8 +222,8 @@ struct AboutView: View {
                     }
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
+            .scrollContentBackground(usesPopoverStyling ? .hidden : .automatic)
+            .background(usesPopoverStyling ? Color.clear : nil)
             // About page title
             // TODO: Figure out how to use the appName constant here
             .navigationTitle(Text("about_title"))
@@ -235,7 +236,7 @@ struct AboutView: View {
                 }
             )
         }
-        .clearNavigationContainerBackgroundIfAvailable()
+        .modifier(AboutNavigationBackgroundModifier(enabled: usesPopoverStyling))
         .sheet(isPresented: $showingAddBusinessForm) {
             AddBusinessInfoView()
         }
@@ -246,6 +247,19 @@ struct AboutView: View {
             onDone()
         } else {
             dismiss()
+        }
+    }
+}
+
+private struct AboutNavigationBackgroundModifier: ViewModifier {
+    let enabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.clearNavigationContainerBackgroundIfAvailable()
+        } else {
+            content
         }
     }
 }
