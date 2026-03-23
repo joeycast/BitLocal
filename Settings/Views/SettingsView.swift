@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedMapType: MKMapType
     @Binding var currentDetent: PresentationDetent
+    var onDone: (() -> Void)? = nil
 
     @EnvironmentObject private var appearanceManager: AppearanceManager
     @EnvironmentObject private var featureHintsController: FeatureHintsController
@@ -13,10 +14,12 @@ struct SettingsView: View {
 
     init(
         selectedMapType: Binding<MKMapType>,
-        currentDetent: Binding<PresentationDetent> = .constant(.large)
+        currentDetent: Binding<PresentationDetent> = .constant(.large),
+        onDone: (() -> Void)? = nil
     ) {
         self._selectedMapType = selectedMapType
         self._currentDetent = currentDetent
+        self.onDone = onDone
     }
 
     var body: some View {
@@ -51,7 +54,13 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: { dismiss() }) {
+                Button(action: {
+                    if let onDone {
+                        onDone()
+                    } else {
+                        dismiss()
+                    }
+                }) {
                     Text("done_button")
                         .bold()
                 }

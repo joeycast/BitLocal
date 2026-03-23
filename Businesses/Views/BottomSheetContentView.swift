@@ -145,6 +145,7 @@ struct CommunitiesListView: View {
     private let resultsPageSize = 15
 
     @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject private var metadataStore = CommunityRowMetadataObservableStore.shared
     var currentDetent: PresentationDetent? = nil
     @State private var filterText = ""
@@ -158,7 +159,7 @@ struct CommunitiesListView: View {
 
         VStack(spacing: 0) {
             searchBar
-                .padding(.top, 20)
+                .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 2)
 
             List {
@@ -252,6 +253,10 @@ struct CommunitiesListView: View {
         .background(Color(.tertiarySystemFill))
         .clipShape(RoundedRectangle(cornerRadius: 40))
         .padding(.horizontal, 16)
+    }
+
+    private var searchBarTopPadding: CGFloat {
+        horizontalSizeClass == .regular ? 10 : 20
     }
 
     private var filteredCommunities: [V2AreaRecord] {

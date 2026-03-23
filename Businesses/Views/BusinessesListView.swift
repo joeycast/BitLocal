@@ -10,6 +10,7 @@ import UIKit
 struct BusinessesListView: View {
 
     @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     let maxListResults = 25
@@ -57,7 +58,7 @@ struct BusinessesListView: View {
         VStack(spacing: 0) {
             // Always-visible search bar
             searchBar
-                .padding(.top, 20)
+                .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 2)
 
             if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
@@ -196,6 +197,10 @@ struct BusinessesListView: View {
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
         .featureHintAnchor(.merchantSearch)
+    }
+
+    private var searchBarTopPadding: CGFloat {
+        horizontalSizeClass == .regular ? 10 : 20
     }
 
     // MARK: - Normal Mode (discovery hub)

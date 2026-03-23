@@ -18,6 +18,8 @@ struct IPadLayoutView: View {
     var selectedMapTypeBinding: Binding<MKMapType>
     
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+    private let settingsPopoverWidth: CGFloat = 420
+    private let settingsPopoverHeight: CGFloat = 520
     
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
@@ -51,17 +53,31 @@ struct IPadLayoutView: View {
                                 showingSettings = true
                             }
                         )
+                        .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                            NavigationStack {
+                                SettingsView(
+                                    selectedMapType: selectedMapTypeBinding,
+                                    onDone: {
+                                        showingSettings = false
+                                    }
+                                )
+                                    .environmentObject(MerchantAlertsManager.shared)
+                            }
+                            .frame(
+                                minWidth: settingsPopoverWidth,
+                                idealWidth: settingsPopoverWidth,
+                                minHeight: settingsPopoverHeight,
+                                idealHeight: settingsPopoverHeight
+                            )
+                        }
                         .opacity(1)
                     }
                 }
+                .navigationBarTitleDisplayMode(.inline)
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
-        }
-        .navigationDestination(isPresented: $showingSettings) {
-            SettingsView(selectedMapType: selectedMapTypeBinding)
-                .environmentObject(MerchantAlertsManager.shared)
         }
         .sheet(item: $viewModel.presentedCommunityArea) { area in
             NavigationStack {
@@ -112,9 +128,7 @@ struct IPadLayoutView: View {
                 isIPad: true
             )
             .padding(.trailing, 20)
-            .opacity(showingSettings ? 0 : 1)
-            .allowsHitTesting(!showingSettings)
-            .animation(.easeInOut(duration: 0.2), value: showingSettings),
+            .padding(.bottom, 28),
             alignment: .bottomTrailing
         )
     }
