@@ -201,7 +201,7 @@ struct BusinessesListView: View {
 
     private var searchBarTopPadding: CGFloat {
         if horizontalSizeClass == .regular {
-            return 10
+            return 2
         }
         if #available(iOS 26.0, *) {
             return 20

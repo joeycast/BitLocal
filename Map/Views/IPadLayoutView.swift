@@ -22,6 +22,8 @@ struct IPadLayoutView: View {
     private let aboutPopoverHeight: CGFloat = 640
     private let settingsPopoverWidth: CGFloat = 420
     private let settingsPopoverHeight: CGFloat = 520
+    private let headerVerticalOffset: CGFloat = 10
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
@@ -47,6 +49,7 @@ struct IPadLayoutView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         InfoButtonView(showingAbout: $showingAbout)
+                            .padding(.top, headerVerticalOffset)
                             .popover(isPresented: $showingAbout, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                                 AboutView(onDone: {
                                     showingAbout = false
@@ -61,6 +64,7 @@ struct IPadLayoutView: View {
                     }
                     ToolbarItem(placement: .principal) {
                         CustomiPadNavigationStackTitleView()
+                            .padding(.top, headerVerticalOffset)
                             .frame(maxWidth: .infinity)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
@@ -69,6 +73,7 @@ struct IPadLayoutView: View {
                                 showingSettings = true
                             }
                         )
+                        .padding(.top, headerVerticalOffset)
                         .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                             NavigationStack {
                                 SettingsView(
@@ -95,7 +100,8 @@ struct IPadLayoutView: View {
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
         }
-        .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
+        .toolbar(removing: .sidebarToggle)
+        .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 430)
     }
     
     private var mapPanel: some View {
@@ -134,9 +140,15 @@ struct IPadLayoutView: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidePanel
+        } detail: {
             mapPanel
+        }
+        .navigationSplitViewStyle(.balanced)
+        .onChange(of: columnVisibility) { _, newValue in
+            guard newValue != .all else { return }
+            columnVisibility = .all
         }
         .onChange(of: viewModel.path) { _, newPath in
             if newPath.last != nil {
@@ -153,14 +165,6 @@ struct IPadLayoutView: View {
         case .system: return nil
         case .light:  return .light
         case .dark:   return .dark
-        }
-    }
-    
-    private func calculateSidePanelWidth(screenWidth: CGFloat) -> CGFloat {
-        if screenWidth <= 744 {
-            return screenWidth * 0.4
-        } else {
-            return screenWidth * 0.35
         }
     }
 
