@@ -41,6 +41,9 @@ struct IPadLayoutView: View {
                         contentViewModel: viewModel
                     ).environmentObject(viewModel)
                 }
+                .navigationDestination(isPresented: communityDetailBindingIsPresented) {
+                    communityDetailDestination
+                }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         InfoButtonView(showingAbout: $showingAbout)
@@ -91,19 +94,6 @@ struct IPadLayoutView: View {
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
-        }
-        .sheet(item: $viewModel.presentedCommunityArea) { area in
-            NavigationStack {
-                CommunityDetailView(area: area)
-                    .environmentObject(viewModel)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button("Close") {
-                                viewModel.presentedCommunityArea = nil
-                            }
-                        }
-                    }
-            }
         }
         .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
     }
@@ -172,6 +162,26 @@ struct IPadLayoutView: View {
         } else {
             return screenWidth * 0.35
         }
+    }
+
+    @ViewBuilder
+    private var communityDetailDestination: some View {
+        if let area = viewModel.presentedCommunityArea {
+            CommunityDetailView(area: area)
+                .id(area.id)
+                .environmentObject(viewModel)
+        }
+    }
+
+    private var communityDetailBindingIsPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.presentedCommunityArea != nil },
+            set: { newValue in
+                if !newValue {
+                    viewModel.presentedCommunityArea = nil
+                }
+            }
+        )
     }
 }
 
