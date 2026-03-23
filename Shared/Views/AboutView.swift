@@ -5,6 +5,7 @@ struct AboutView: View {
     // For dismissing the SettingsView sheet
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject private var releaseNotesController: ReleaseNotesController
+    var onDone: (() -> Void)? = nil
 
     @State private var showingLogs = false
     @State private var showingAddBusinessForm = false
@@ -45,7 +46,7 @@ struct AboutView: View {
     // Settings Page
     var body: some View {
         
-        NavigationView {
+        NavigationStack {
             Form {
                 // Header section
                 Section {
@@ -198,12 +199,7 @@ struct AboutView: View {
                 Section {
                     Button {
                         UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")
-                        // Only dismiss the sheet if we're on an iPad
-                        #if os(iOS)
-                        if UIDevice.current.userInterfaceIdiom == .pad {
-                            dismiss()
-                        }
-                        #endif
+                        handleDone()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "rectangle.stack")
@@ -214,7 +210,7 @@ struct AboutView: View {
                     }
                     Button {
                         releaseNotesController.presentCurrentReleaseNotes()
-                        dismiss()
+                        handleDone()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "sparkles")
@@ -225,20 +221,31 @@ struct AboutView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
             // About page title
             // TODO: Figure out how to use the appName constant here
             .navigationTitle(Text("about_title"))
             
             // Dismiss sheet when tapping Done.
             .navigationBarItems(trailing:
-                Button(action: { dismiss() }) {
+                Button(action: { handleDone() }) {
                     Text("done_button")
                         .bold() // or .fontWeight(.bold)
                 }
             )
         }
+        .clearNavigationContainerBackgroundIfAvailable()
         .sheet(isPresented: $showingAddBusinessForm) {
             AddBusinessInfoView()
+        }
+    }
+
+    private func handleDone() {
+        if let onDone {
+            onDone()
+        } else {
+            dismiss()
         }
     }
 }

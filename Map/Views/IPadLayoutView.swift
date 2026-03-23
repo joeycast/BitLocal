@@ -18,6 +18,8 @@ struct IPadLayoutView: View {
     var selectedMapTypeBinding: Binding<MKMapType>
     
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+    private let aboutPopoverWidth: CGFloat = 420
+    private let aboutPopoverHeight: CGFloat = 640
     private let settingsPopoverWidth: CGFloat = 420
     private let settingsPopoverHeight: CGFloat = 520
     
@@ -42,6 +44,17 @@ struct IPadLayoutView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         InfoButtonView(showingAbout: $showingAbout)
+                            .popover(isPresented: $showingAbout, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                                AboutView(onDone: {
+                                    showingAbout = false
+                                })
+                                .frame(
+                                    minWidth: aboutPopoverWidth,
+                                    idealWidth: aboutPopoverWidth,
+                                    minHeight: aboutPopoverHeight,
+                                    idealHeight: aboutPopoverHeight
+                                )
+                            }
                     }
                     ToolbarItem(placement: .principal) {
                         CustomiPadNavigationStackTitleView()
@@ -91,9 +104,6 @@ struct IPadLayoutView: View {
                         }
                     }
             }
-        }
-        .sheet(isPresented: $showingAbout) {
-            AboutView()
         }
         .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
     }
