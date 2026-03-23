@@ -578,11 +578,19 @@ struct BusinessesListView: View {
         hidesTopSeparator: Bool = false
     ) -> some View {
         let cellVM = cellViewModel(for: element)
-        return NavigationLink {
-            businessDetailDestination(for: element)
+        return Button {
+            prepareListNavigation(for: element)
+            viewModel.path = [element]
         } label: {
-            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
         }
+        .buttonStyle(.plain)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -596,11 +604,19 @@ struct BusinessesListView: View {
         hidesTopSeparator: Bool = false
     ) -> some View {
         let cellVM = cellViewModel(for: element)
-        return NavigationLink {
-            businessDetailDestination(for: element)
+        return Button {
+            prepareListNavigation(for: element)
+            viewModel.path = [element]
         } label: {
-            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
         }
+        .buttonStyle(.plain)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -723,9 +739,6 @@ struct BusinessesListView: View {
             currentDetent: $currentDetent
         )
         .clearNavigationContainerBackgroundIfAvailable()
-        .onAppear {
-            prepareListNavigation(for: element)
-        }
     }
 
     private func prepareListNavigation(for element: Element) {

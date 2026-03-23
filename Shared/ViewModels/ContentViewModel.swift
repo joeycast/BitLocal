@@ -935,8 +935,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             ($0 as? Annotation)?.element?.id == element.id
         }) {
             let isClustered = isAnnotationClustered(annotation, on: mapView)
-            let hasDirectView = mapView.view(for: annotation) != nil
-            if !isClustered && hasDirectView {
+            if !isClustered {
                 if let coordinate = element.mapCoordinate {
                     centerMapWithoutZoom(to: coordinate, animated: false)
                 }
@@ -1001,7 +1000,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func selectAnnotationForListSelection(
         _ element: Element,
         animated: Bool = true,
-        allowCameraMovement: Bool = true
+        allowCameraMovement: Bool = true,
+        allowDirectSelectionRecentering: Bool = false
     ) {
         guard let mapView = mapView else { return }
 
@@ -1010,9 +1010,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                ($0 as? Annotation)?.element?.id == element.id
            }) {
             let isClustered = isAnnotationClustered(annotation, on: mapView)
-            let hasDirectView = mapView.view(for: annotation) != nil
-            if !isClustered && hasDirectView {
-                if allowCameraMovement {
+            if !isClustered {
+                if allowDirectSelectionRecentering {
                     centerMapWithoutZoom(to: coordinate, animated: animated)
                 }
                 mapView.selectAnnotation(annotation, animated: animated)
