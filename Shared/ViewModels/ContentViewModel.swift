@@ -140,6 +140,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var isLoading: Bool = false
     @Published var topPadding: CGFloat = 0
     @Published var bottomPadding: CGFloat = 0
+    @Published var liveBottomPadding: CGFloat = 0
     @Published var initialRegionSet = false // Track if initial region has been set
     @Published var forceMapRefresh = false // Flag to force map annotation refresh
     @Published var isReadyForPostOnboardingPresentation = true

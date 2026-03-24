@@ -43,6 +43,7 @@ struct BottomSheetContentView: View {
                 featureHintsController.markMainUIVisible()
             }
             .onChange(of: geometry.size.height) { _, newHeight in
+                viewModel.liveBottomPadding = newHeight
                 let normalizedHeight = (newHeight / Self.sheetHeightBucketSize).rounded() * Self.sheetHeightBucketSize
                 guard abs(viewModel.bottomPadding - normalizedHeight) >= Self.sheetHeightPublishThreshold else {
                     return

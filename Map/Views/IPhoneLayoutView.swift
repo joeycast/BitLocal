@@ -75,7 +75,7 @@ struct IPhoneLayoutView: View {
                     Spacer()
                 }
             }
-            .overlay(
+            .overlay(alignment: shouldPresentBottomSheet ? .bottomTrailing : .topTrailing) {
                 MapButtonsView(
                     viewModel: viewModel,
                     selectedMapTypeBinding: selectedMapTypeBinding,
@@ -83,12 +83,12 @@ struct IPhoneLayoutView: View {
                     isIPad: false
                 )
                 .padding(.trailing, 18)
-                .padding(.top, mapOverlayTopOffset(for: geometry.safeAreaInsets.top))
+                .padding(.bottom, shouldPresentBottomSheet ? mapButtonsBottomOffset(for: geometry.size.height, safeTopInset: geometry.safeAreaInsets.top) : 0)
+                .padding(.top, shouldPresentBottomSheet ? 0 : mapOverlayTopOffset(for: geometry.safeAreaInsets.top))
                 .opacity(showingSettings ? 0 : 1)
                 .allowsHitTesting(!showingSettings)
-                .animation(.easeInOut(duration: 0.2), value: showingSettings),
-                alignment: .topTrailing
-            )
+                .animation(.easeInOut(duration: 0.2), value: showingSettings)
+            }
 //            // Only show bottom sheet after onboarding is complete
 //            .bottomSheet(
 //                presentationDetents: [.fraction(0.3), .medium, .large],
@@ -251,6 +251,24 @@ struct IPhoneLayoutView: View {
         }
     }
 
+    private func mapButtonsBottomOffset(for mapHeight: CGFloat, safeTopInset: CGFloat) -> CGFloat {
+        let preferredInset = preferredBottomInsetForButtons(mapHeight: mapHeight) + 12
+        let maxInset = maxMapButtonsBottomInset(mapHeight: mapHeight, safeTopInset: safeTopInset)
+        return min(max(preferredInset, 0), maxInset)
+    }
+
+    private func preferredBottomInsetForButtons(mapHeight: CGFloat) -> CGFloat {
+        if shouldPresentBottomSheet, viewModel.liveBottomPadding > 1 {
+            return min(max(viewModel.liveBottomPadding, 0), mapHeight - 1)
+        }
+        return attributionBottomInset(for: mapHeight)
+    }
+
+    private func maxMapButtonsBottomInset(mapHeight: CGFloat, safeTopInset: CGFloat) -> CGFloat {
+        let visibleTopPadding = mapOverlayTopOffset(for: safeTopInset)
+        return max(0, mapHeight - visibleTopPadding - mapButtonsPillHeight)
+    }
+
     private func attributionBottomInset(for mapHeight: CGFloat) -> CGFloat {
         let estimatedInset = estimatedBottomInsetForDetent(mapHeight: mapHeight)
         if isDefaultLikeDetent(bottomSheetDetent), !hasAcceptedDefaultLiveMeasurement {
@@ -293,4 +311,6 @@ struct IPhoneLayoutView: View {
     private func isMediumDetent(_ detent: PresentationDetent) -> Bool {
         detentIdentifier(detent).contains("medium")
     }
+
+    private let mapButtonsPillHeight: CGFloat = 132
 }
