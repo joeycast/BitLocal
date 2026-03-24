@@ -279,7 +279,7 @@ struct CommunitiesListView: View {
 
     private var searchBarTopPadding: CGFloat {
         if horizontalSizeClass == .regular {
-            return 2
+            return 0
         }
         if #available(iOS 26.0, *) {
             return 20
@@ -768,25 +768,25 @@ struct CommunityDetailView: View {
         .scrollContentBackground(.automatic)
         .navigationTitle(area.displayName)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
-            .task(id: area.id) {
-                if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
-                    viewModel.selectCommunity(area, presentDetail: false)
-                }
-                updateMemberElements()
+        .bitLocalDetailNavigationChrome()
+        .task(id: area.id) {
+            if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
+                viewModel.selectCommunity(area, presentDetail: false)
             }
-            .onChange(of: area.id) { _, _ in
-                updateMemberElements()
-            }
-            .onChange(of: viewModel.selectedCommunityArea?.id) { _, _ in
-                updateMemberElements()
-            }
-            .onChange(of: viewModel.communityMemberElements) { _, _ in
-                updateMemberElements()
-            }
-            .onAppear {
-                updateMemberElements()
-            }
+            updateMemberElements()
+        }
+        .onChange(of: area.id) { _, _ in
+            updateMemberElements()
+        }
+        .onChange(of: viewModel.selectedCommunityArea?.id) { _, _ in
+            updateMemberElements()
+        }
+        .onChange(of: viewModel.communityMemberElements) { _, _ in
+            updateMemberElements()
+        }
+        .onAppear {
+            updateMemberElements()
+        }
         .alert("Tip This Community", isPresented: $showLightningAlert) {
             if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
                let payload = payableLightningPayload {

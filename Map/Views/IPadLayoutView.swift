@@ -22,26 +22,22 @@ struct IPadLayoutView: View {
     private let aboutPopoverHeight: CGFloat = 640
     private let settingsPopoverWidth: CGFloat = 420
     private let settingsPopoverHeight: CGFloat = 520
-    private let headerVerticalOffset: CGFloat = 10
+    private let toolbarContentTopPadding: CGFloat = 6
+    private let sidebarRootTopCompensation: CGFloat = 30
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
-            Group {
-                if viewModel.mapDisplayMode == .communities {
-                    CommunitiesListView()
-                        .environmentObject(viewModel)
-                } else {
-                    BusinessesListView(elements: visibleElements)
-                        .environmentObject(viewModel)
-                }
-            }
+            sidePanelRootContentWithSafeAreaBehavior
                 .navigationDestination(for: Element.self) { element in
                     BusinessDetailView(
                         element: element,
                         userLocation: viewModel.userLocation,
                         contentViewModel: viewModel
-                    ).environmentObject(viewModel)
+                    )
+                    .environmentObject(viewModel)
+                    .clearNavigationContainerBackgroundIfAvailable()
+                    .toolbar(removing: .sidebarToggle)
                 }
                 .navigationDestination(isPresented: communityDetailBindingIsPresented) {
                     communityDetailDestination
@@ -49,7 +45,7 @@ struct IPadLayoutView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         InfoButtonView(showingAbout: $showingAbout)
-                            .padding(.top, headerVerticalOffset)
+                            .padding(.top, toolbarContentTopPadding)
                             .popover(isPresented: $showingAbout, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                                 AboutView(onDone: {
                                     showingAbout = false
@@ -64,7 +60,7 @@ struct IPadLayoutView: View {
                     }
                     ToolbarItem(placement: .principal) {
                         CustomiPadNavigationStackTitleView()
-                            .padding(.top, headerVerticalOffset)
+                            .padding(.top, toolbarContentTopPadding)
                             .frame(maxWidth: .infinity)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
@@ -73,7 +69,7 @@ struct IPadLayoutView: View {
                                 showingSettings = true
                             }
                         )
-                        .padding(.top, headerVerticalOffset)
+                        .padding(.top, toolbarContentTopPadding)
                         .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                             NavigationStack {
                                 SettingsView(
@@ -82,7 +78,7 @@ struct IPadLayoutView: View {
                                         showingSettings = false
                                     }
                                 )
-                                    .environmentObject(MerchantAlertsManager.shared)
+                                .environmentObject(MerchantAlertsManager.shared)
                             }
                             .frame(
                                 minWidth: settingsPopoverWidth,
@@ -91,17 +87,43 @@ struct IPadLayoutView: View {
                                 idealHeight: settingsPopoverHeight
                             )
                         }
-                        .opacity(1)
                     }
                 }
+                .toolbarBackground(.hidden, for: .navigationBar)
                 .navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("")
+                .toolbar(removing: .sidebarToggle)
+                .clearNavigationContainerBackgroundIfAvailable()
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
         }
-        .toolbar(removing: .sidebarToggle)
         .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 430)
+    }
+
+    @ViewBuilder
+    private var sidePanelRootContentWithSafeAreaBehavior: some View {
+        if #available(iOS 26.0, *) {
+            sidePanelRootContent
+                // The iPadOS 26 transparent nav bar keeps the toolbar animation we want,
+                // but it also leaves extra visible space before our custom search row.
+                .padding(.top, sidebarRootTopCompensation)
+                .ignoresSafeArea(.container, edges: .top)
+        } else {
+            sidePanelRootContent
+        }
+    }
+
+    @ViewBuilder
+    private var sidePanelRootContent: some View {
+        if viewModel.mapDisplayMode == .communities {
+            CommunitiesListView()
+                .environmentObject(viewModel)
+        } else {
+            BusinessesListView(elements: visibleElements)
+                .environmentObject(viewModel)
+        }
     }
     
     private var mapPanel: some View {
@@ -174,6 +196,8 @@ struct IPadLayoutView: View {
             CommunityDetailView(area: area)
                 .id(area.id)
                 .environmentObject(viewModel)
+                .clearNavigationContainerBackgroundIfAvailable()
+                .toolbar(removing: .sidebarToggle)
         }
     }
 

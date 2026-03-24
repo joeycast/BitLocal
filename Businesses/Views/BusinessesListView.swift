@@ -201,7 +201,7 @@ struct BusinessesListView: View {
 
     private var searchBarTopPadding: CGFloat {
         if horizontalSizeClass == .regular {
-            return 2
+            return 0
         }
         if #available(iOS 26.0, *) {
             return 20
@@ -213,7 +213,14 @@ struct BusinessesListView: View {
         if #available(iOS 26.0, *) {
             return 6
         }
-        return -8
+        return shouldUseCompactChipSpacingBelow ? -8 : 6
+    }
+
+    private var shouldUseCompactChipSpacingBelow: Bool {
+        if isFilteringMerchants {
+            return !displayedFeaturedPrimaryResults.isEmpty
+        }
+        return !featuredTopSortedElements.isEmpty
     }
 
     // MARK: - Normal Mode (discovery hub)

@@ -191,7 +191,7 @@ struct BusinessDetailView: View {
         }
         .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
+        .bitLocalDetailNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 shareToolbarItem
