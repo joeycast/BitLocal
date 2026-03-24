@@ -16,11 +16,23 @@ final class ReleaseNotesControllerTests: XCTestCase {
     }
 
     func testShowsReleaseNotesForUnseenMeaningfulVersion() {
-        let controller = makeController(currentVersion: "3.0")
+        let defaults = testDefaults()
+        defaults.set("2.9", forKey: "lastSeenReleaseNotesVersion")
+        let controller = makeController(currentVersion: "3.0", defaults: defaults)
 
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
         XCTAssertEqual(controller.activeReleaseNotes?.version, "3.0")
+    }
+
+    func testSkipsReleaseNotesOnFirstLaunchAndMarksVersionSeen() {
+        let defaults = testDefaults()
+        let controller = makeController(currentVersion: "3.0", defaults: defaults)
+
+        controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
+
+        XCTAssertNil(controller.activeReleaseNotes)
+        XCTAssertEqual(defaults.string(forKey: "lastSeenReleaseNotesVersion"), "3.0")
     }
 
     func testSkipsReleaseNotesWhenVersionWasAlreadySeen() {

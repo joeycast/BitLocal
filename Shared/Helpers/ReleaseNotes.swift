@@ -100,7 +100,16 @@ final class ReleaseNotesController: ObservableObject {
         guard didCompleteOnboarding, isReadyForMainUI else { return }
         guard activeReleaseNotes == nil else { return }
         guard let entry = ReleaseNotesCatalog.entry(for: currentVersion) else { return }
-        guard userDefaults.string(forKey: StorageKey.lastSeenReleaseNotesVersion) != entry.version else { return }
+
+        // Fresh installs should not see release notes for the version they just installed.
+        // Mark the current version as seen the first time the app reaches a state where
+        // release notes could be presented, then wait for the next update.
+        guard let lastSeenVersion = userDefaults.string(forKey: StorageKey.lastSeenReleaseNotesVersion) else {
+            userDefaults.set(entry.version, forKey: StorageKey.lastSeenReleaseNotesVersion)
+            return
+        }
+
+        guard lastSeenVersion != entry.version else { return }
 
         activeReleaseNotes = entry
     }
