@@ -23,6 +23,7 @@
 		F7E200013B13000000000007 /* ReleaseNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E200013B1300000000000A /* ReleaseNotes.swift */; };
 		F7E200013B13000000000008 /* ReleaseNotesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E200013B1300000000000B /* ReleaseNotesSheetView.swift */; };
 		F7E200013B13000000000009 /* ReleaseNotesControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E200013B1300000000000C /* ReleaseNotesControllerTests.swift */; };
+		F7E300013B14000000000001 /* BottomSheetDetents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E300013B14000000000002 /* BottomSheetDetents.swift */; };
 		F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */; };
 		F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */; };
 		F63E807E2EFC301800ED1F00 /* AddBusinessFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */; };
@@ -117,6 +118,7 @@
 		F7E200013B1300000000000A /* ReleaseNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotes.swift; sourceTree = "<group>"; };
 		F7E200013B1300000000000B /* ReleaseNotesSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesSheetView.swift; sourceTree = "<group>"; };
 		F7E200013B1300000000000C /* ReleaseNotesControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesControllerTests.swift; sourceTree = "<group>"; };
+		F7E300013B14000000000002 /* BottomSheetDetents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheetDetents.swift; sourceTree = "<group>"; };
 		F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmission.swift; sourceTree = "<group>"; };
 		F63E807A2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmissionViewModel.swift; sourceTree = "<group>"; };
 		F63E807C2EFC301800ED1F00 /* AddBusinessFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBusinessFormView.swift; sourceTree = "<group>"; };
@@ -358,6 +360,7 @@
 				F7C0A3003A5B100100000200 /* MerchantAlerts.swift */,
 				F7E200013B13000000000002 /* FeatureHints.swift */,
 				F7E200013B1300000000000A /* ReleaseNotes.swift */,
+				F7E300013B14000000000002 /* BottomSheetDetents.swift */,
 				F7D100112DE33EF800D68897 /* CityIndexStore.swift */,
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
 				F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */,
@@ -658,6 +661,7 @@
 				F7E200013B13000000000003 /* FeatureHintsOverlay.swift in Sources */,
 				F7E200013B13000000000007 /* ReleaseNotes.swift in Sources */,
 				F7E200013B13000000000008 /* ReleaseNotesSheetView.swift in Sources */,
+				F7E300013B14000000000001 /* BottomSheetDetents.swift in Sources */,
 				F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */,
 				F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */,
 				F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */,

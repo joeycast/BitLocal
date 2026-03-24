@@ -1331,7 +1331,7 @@ struct CommunityDetailView: View {
 
     private var shouldShowCollapsedHeaderOnly: Bool {
         guard let detent = currentDetent else { return false }
-        return detentIdentifier(detent).contains("fraction 0.11")
+        return detent == BottomSheetDetents.collapsed || detentIdentifier(detent).contains("fraction 0.11")
     }
 
     private var isLargeSheet: Bool {

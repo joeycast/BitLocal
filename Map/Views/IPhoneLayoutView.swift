@@ -32,7 +32,7 @@ struct IPhoneLayoutView: View {
     @State private var hasLiveSheetMeasurement = false
     @State private var hasAcceptedDefaultLiveMeasurement = false
     @State private var pendingLaunchOutlier: CGFloat?
-    private let collapsedSheetDetent: PresentationDetent = .fraction(0.11)
+    private let collapsedSheetDetent: PresentationDetent = BottomSheetDetents.collapsed
     private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
     private var shouldPresentBottomSheet: Bool {
         didCompleteOnboarding &&
@@ -265,7 +265,7 @@ struct IPhoneLayoutView: View {
 
     private func estimatedBottomInsetForDetent(mapHeight: CGFloat) -> CGFloat {
         if isCollapsedLikeDetent(bottomSheetDetent) {
-            return mapHeight * 0.11
+            return BottomSheetDetents.collapsedHeight
         }
         if isDefaultLikeDetent(bottomSheetDetent) {
             return mapHeight * 0.30
@@ -282,8 +282,7 @@ struct IPhoneLayoutView: View {
     }
 
     private func isCollapsedLikeDetent(_ detent: PresentationDetent) -> Bool {
-        let id = detentIdentifier(detent)
-        return id.contains("fraction 0.11")
+        detent == BottomSheetDetents.collapsed || detentIdentifier(detent).contains("fraction 0.11")
     }
 
     private func isDefaultLikeDetent(_ detent: PresentationDetent) -> Bool {

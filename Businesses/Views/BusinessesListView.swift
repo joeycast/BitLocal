@@ -785,7 +785,7 @@ struct BusinessesListView: View {
     }
 
     private var collapsedSheetDetent: PresentationDetent {
-        .fraction(0.11)
+        BottomSheetDetents.collapsed
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
