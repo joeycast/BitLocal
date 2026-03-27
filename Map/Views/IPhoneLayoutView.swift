@@ -23,6 +23,7 @@ struct IPhoneLayoutView: View {
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     @EnvironmentObject var appearanceManager: AppearanceManager
+    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
     
     private var appearance: Appearance { appearanceManager.appearance }
@@ -31,10 +32,12 @@ struct IPhoneLayoutView: View {
     @State private var hasLiveSheetMeasurement = false
     @State private var hasAcceptedDefaultLiveMeasurement = false
     @State private var pendingLaunchOutlier: CGFloat?
-    private let collapsedSheetDetent: PresentationDetent = .fraction(0.11)
+    private let collapsedSheetDetent: PresentationDetent = BottomSheetDetents.collapsed
     private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
     private var shouldPresentBottomSheet: Bool {
-        didCompleteOnboarding && viewModel.isReadyForPostOnboardingPresentation
+        didCompleteOnboarding &&
+        viewModel.isReadyForPostOnboardingPresentation &&
+        !releaseNotesController.isPresenting
     }
 
     var body: some View {
@@ -72,7 +75,7 @@ struct IPhoneLayoutView: View {
                     Spacer()
                 }
             }
-            .overlay(
+            .overlay(alignment: shouldPresentBottomSheet ? .bottomTrailing : .topTrailing) {
                 MapButtonsView(
                     viewModel: viewModel,
                     selectedMapTypeBinding: selectedMapTypeBinding,
@@ -80,12 +83,12 @@ struct IPhoneLayoutView: View {
                     isIPad: false
                 )
                 .padding(.trailing, 18)
-                .padding(.top, mapOverlayTopOffset(for: geometry.safeAreaInsets.top))
+                .padding(.bottom, shouldPresentBottomSheet ? mapButtonsBottomOffset(for: geometry.size.height, safeTopInset: geometry.safeAreaInsets.top) : 0)
+                .padding(.top, shouldPresentBottomSheet ? 0 : mapOverlayTopOffset(for: geometry.safeAreaInsets.top))
                 .opacity(showingSettings ? 0 : 1)
                 .allowsHitTesting(!showingSettings)
-                .animation(.easeInOut(duration: 0.2), value: showingSettings),
-                alignment: .topTrailing
-            )
+                .animation(.easeInOut(duration: 0.2), value: showingSettings)
+            }
 //            // Only show bottom sheet after onboarding is complete
 //            .bottomSheet(
 //                presentationDetents: [.fraction(0.3), .medium, .large],
@@ -248,6 +251,24 @@ struct IPhoneLayoutView: View {
         }
     }
 
+    private func mapButtonsBottomOffset(for mapHeight: CGFloat, safeTopInset: CGFloat) -> CGFloat {
+        let preferredInset = preferredBottomInsetForButtons(mapHeight: mapHeight) + 12
+        let maxInset = maxMapButtonsBottomInset(mapHeight: mapHeight, safeTopInset: safeTopInset)
+        return min(max(preferredInset, 0), maxInset)
+    }
+
+    private func preferredBottomInsetForButtons(mapHeight: CGFloat) -> CGFloat {
+        if shouldPresentBottomSheet, viewModel.liveBottomPadding > 1 {
+            return min(max(viewModel.liveBottomPadding, 0), mapHeight - 1)
+        }
+        return attributionBottomInset(for: mapHeight)
+    }
+
+    private func maxMapButtonsBottomInset(mapHeight: CGFloat, safeTopInset: CGFloat) -> CGFloat {
+        let visibleTopPadding = mapOverlayTopOffset(for: safeTopInset)
+        return max(0, mapHeight - visibleTopPadding - mapButtonsPillHeight)
+    }
+
     private func attributionBottomInset(for mapHeight: CGFloat) -> CGFloat {
         let estimatedInset = estimatedBottomInsetForDetent(mapHeight: mapHeight)
         if isDefaultLikeDetent(bottomSheetDetent), !hasAcceptedDefaultLiveMeasurement {
@@ -262,7 +283,7 @@ struct IPhoneLayoutView: View {
 
     private func estimatedBottomInsetForDetent(mapHeight: CGFloat) -> CGFloat {
         if isCollapsedLikeDetent(bottomSheetDetent) {
-            return mapHeight * 0.11
+            return BottomSheetDetents.collapsedHeight
         }
         if isDefaultLikeDetent(bottomSheetDetent) {
             return mapHeight * 0.30
@@ -279,8 +300,7 @@ struct IPhoneLayoutView: View {
     }
 
     private func isCollapsedLikeDetent(_ detent: PresentationDetent) -> Bool {
-        let id = detentIdentifier(detent)
-        return id.contains("fraction 0.11")
+        detent == BottomSheetDetents.collapsed || detentIdentifier(detent).contains("fraction 0.11")
     }
 
     private func isDefaultLikeDetent(_ detent: PresentationDetent) -> Bool {
@@ -291,4 +311,6 @@ struct IPhoneLayoutView: View {
     private func isMediumDetent(_ detent: PresentationDetent) -> Bool {
         detentIdentifier(detent).contains("medium")
     }
+
+    private let mapButtonsPillHeight: CGFloat = 132
 }

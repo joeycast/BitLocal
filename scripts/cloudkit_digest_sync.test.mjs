@@ -6,6 +6,7 @@ import {
   digestRecordName,
   formatLocalDate,
   normalizePlace,
+  wasCreatedAfterAnchor,
   zonedDateParts,
   zonedLocalDateTimeToUtc
 } from "./cloudkit_digest_sync.mjs";
@@ -130,4 +131,20 @@ test("normalizePlace prefers address-based location ID over nearest-city fallbac
   }, reverseGeocoder);
 
   assert.equal(normalized.locationID, "geonames:5107464");
+});
+
+test("wasCreatedAfterAnchor only accepts merchants created after the sync anchor", () => {
+  assert.equal(
+    wasCreatedAfterAnchor(new Date("2025-06-18T14:11:57.765Z"), new Date("2026-03-20T23:44:08.715Z")),
+    false
+  );
+  assert.equal(
+    wasCreatedAfterAnchor(new Date("2026-03-21T00:14:33.640Z"), new Date("2026-03-20T23:44:08.715Z")),
+    true
+  );
+});
+
+test("wasCreatedAfterAnchor allows bootstrap-style runs without a parsed anchor date", () => {
+  assert.equal(wasCreatedAfterAnchor(new Date("2025-06-18T14:11:57.765Z"), null), true);
+  assert.equal(wasCreatedAfterAnchor(null, new Date("2026-03-20T23:44:08.715Z")), false);
 });

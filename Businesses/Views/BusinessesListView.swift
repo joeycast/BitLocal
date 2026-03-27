@@ -10,6 +10,7 @@ import UIKit
 struct BusinessesListView: View {
 
     @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     let maxListResults = 25
@@ -57,12 +58,12 @@ struct BusinessesListView: View {
         VStack(spacing: 0) {
             // Always-visible search bar
             searchBar
-                .padding(.top, 20)
+                .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 2)
 
             if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
                 categoryChipsView
-                    .padding(.bottom, 6)
+                    .padding(.bottom, categoryChipsBottomPadding)
                     .opacity(contentRevealProgress)
                     .offset(y: (1 - contentRevealProgress) * -8)
             }
@@ -196,6 +197,30 @@ struct BusinessesListView: View {
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
         .featureHintAnchor(.merchantSearch)
+    }
+
+    private var searchBarTopPadding: CGFloat {
+        if horizontalSizeClass == .regular {
+            return 0
+        }
+        if #available(iOS 26.0, *) {
+            return 20
+        }
+        return 16
+    }
+
+    private var categoryChipsBottomPadding: CGFloat {
+        if #available(iOS 26.0, *) {
+            return 6
+        }
+        return shouldUseCompactChipSpacingBelow ? -8 : 6
+    }
+
+    private var shouldUseCompactChipSpacingBelow: Bool {
+        if isFilteringMerchants {
+            return !displayedFeaturedPrimaryResults.isEmpty
+        }
+        return !featuredTopSortedElements.isEmpty
     }
 
     // MARK: - Normal Mode (discovery hub)
@@ -512,8 +537,15 @@ struct BusinessesListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 6)
+            .padding(.top, categoryChipsTopPadding)
         }
+    }
+
+    private var categoryChipsTopPadding: CGFloat {
+        if #available(iOS 26.0, *) {
+            return 6
+        }
+        return 4
     }
 
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {
@@ -553,11 +585,19 @@ struct BusinessesListView: View {
         hidesTopSeparator: Bool = false
     ) -> some View {
         let cellVM = cellViewModel(for: element)
-        return NavigationLink {
-            businessDetailDestination(for: element)
+        return Button {
+            prepareListNavigation(for: element)
+            viewModel.path = [element]
         } label: {
-            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
         }
+        .buttonStyle(.plain)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -571,11 +611,19 @@ struct BusinessesListView: View {
         hidesTopSeparator: Bool = false
     ) -> some View {
         let cellVM = cellViewModel(for: element)
-        return NavigationLink {
-            businessDetailDestination(for: element)
+        return Button {
+            prepareListNavigation(for: element)
+            viewModel.path = [element]
         } label: {
-            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+            ZStack(alignment: .trailing) {
+                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                    .padding(.trailing, 18)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.gray.opacity(0.6))
+            }
         }
+        .buttonStyle(.plain)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -698,9 +746,6 @@ struct BusinessesListView: View {
             currentDetent: $currentDetent
         )
         .clearNavigationContainerBackgroundIfAvailable()
-        .onAppear {
-            prepareListNavigation(for: element)
-        }
     }
 
     private func prepareListNavigation(for element: Element) {
@@ -740,7 +785,7 @@ struct BusinessesListView: View {
     }
 
     private var collapsedSheetDetent: PresentationDetent {
-        .fraction(0.11)
+        BottomSheetDetents.collapsed
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {

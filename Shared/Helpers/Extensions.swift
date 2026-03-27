@@ -149,6 +149,16 @@ extension View {
     func clearNavigationContainerBackgroundIfAvailable() -> some View {
         self.containerBackground(.clear, for: .navigation)
     }
+
+    @ViewBuilder
+    func bitLocalDetailNavigationChrome() -> some View {
+        self
+            .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar(removing: .sidebarToggle)
+            .clearNavigationContainerBackgroundIfAvailable()
+            .tint(.accentColor)
+    }
     
     @ViewBuilder
     func clearListRowBackground(if condition: Bool) -> some View {
