@@ -198,14 +198,13 @@ struct MapView: UIViewRepresentable {
         let currentAreaDataHash = viewModel.communityMapAreas.isEmpty
             ? viewModel.areaBrowserAreas.hashValue
             : viewModel.communityMapAreas.hashValue
-        let communityDataChanged = context.coordinator.lastCommunityAreasHash != currentAreaDataHash
-
-        if modeChanged || (currentMode == .communities && (viewModel.forceMapRefresh || communityDataChanged)) {
+        if modeChanged || currentMode == .communities {
             context.coordinator.lastDisplayMode = currentMode
 
             if currentMode == .communities {
                 context.coordinator.lastCommunityAreasHash = currentAreaDataHash
-                // Always keep community polygons visible while in community mode.
+                // On iPad we reuse the same MKMapView instance, so community overlays
+                // need to be reconciled on every update while this mode is active.
                 let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
                 let desiredOverlays = Set(viewModel.communityOverlays)
                 let toRemove = existingOverlays.subtracting(desiredOverlays)
