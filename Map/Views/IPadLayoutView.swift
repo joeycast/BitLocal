@@ -16,8 +16,11 @@ struct IPadLayoutView: View {
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
+    @EnvironmentObject private var appearanceManager: AppearanceManager
+    @Environment(\.colorScheme) private var systemColorScheme
     
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+    private var appearance: Appearance { appearanceManager.appearance }
     
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
@@ -62,6 +65,8 @@ struct IPadLayoutView: View {
         .navigationDestination(isPresented: $showingSettings) {
             SettingsView(selectedMapType: selectedMapTypeBinding)
                 .environmentObject(MerchantAlertsManager.shared)
+                .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
+                .preferredColorScheme(effectiveColorScheme)
         }
         .sheet(item: $viewModel.presentedCommunityArea) { area in
             NavigationStack {
@@ -78,6 +83,8 @@ struct IPadLayoutView: View {
         }
         .sheet(isPresented: $showingAbout) {
             AboutView()
+                .id("ipad-about-\(appearance.rawValue)-\(systemColorScheme)")
+                .preferredColorScheme(effectiveColorScheme)
         }
         .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
     }
@@ -134,9 +141,9 @@ struct IPadLayoutView: View {
         }
     }
     
-    private func colorSchemeFor(_ appearance: Appearance) -> ColorScheme? {
+    private var effectiveColorScheme: ColorScheme? {
         switch appearance {
-        case .system: return nil
+        case .system: return systemColorScheme
         case .light:  return .light
         case .dark:   return .dark
         }
