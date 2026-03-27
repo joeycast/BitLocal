@@ -191,7 +191,7 @@ struct BusinessDetailView: View {
         }
         .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
+        .bitLocalDetailNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 shareToolbarItem
@@ -272,7 +272,7 @@ extension BusinessDetailView {
 
     private var isCollapsedLikeDetent: Bool {
         guard let currentDetent else { return false }
-        return detentIdentifier(currentDetent).contains("fraction 0.11")
+        return currentDetent == BottomSheetDetents.collapsed || detentIdentifier(currentDetent).contains("fraction 0.11")
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {

@@ -20,13 +20,7 @@ struct MapButtonsView: View {
     @State private var shouldCenterOnLocation = false
     
     var body: some View {
-        Group {
-            if isIPad {
-                legacyStackButtons
-            } else {
-                iPhoneControlPill
-            }
-        }
+        controlPill
         // 🔄 FIXED: Watch for the first non-nil userLocation after tapping and use forced centering
         .onReceive(viewModel.$userLocation.compactMap { $0 }) { newLocation in
             guard shouldCenterOnLocation else { return }
@@ -38,58 +32,14 @@ struct MapButtonsView: View {
         }
     }
 
-    private var legacyStackButtons: some View {
-        VStack(spacing: 10) {
-            // Community / Merchants toggle
-            Button {
-                viewModel.toggleMapMode()
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 44, height: 44)
-                        .shadow(radius: 3)
-                    Image(systemName: viewModel.mapDisplayMode == .merchants
-                          ? "person.3.fill" : "mappin.and.ellipse")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-            }
-            .accessibilityLabel(viewModel.mapDisplayMode == .merchants
-                                ? "Show communities" : "Show merchants")
-            .featureHintAnchor(.communityToggle)
+    private var controlPill: some View {
+        let controlWidth: CGFloat = isIPad ? 52 : 46
+        let controlHeight: CGFloat = isIPad ? 46 : 42
 
-            Button(action: toggleMapType) {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 44, height: 44)
-                        .shadow(radius: 3)
-                    Image(systemName: selectedMapType == .standard ? "map.fill" : "globe.americas.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-            }
-
-            Button(action: handleRecenterTap) {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 44, height: 44)
-                        .shadow(radius: 3)
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-            }
-        }
-    }
-
-    private var iPhoneControlPill: some View {
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             Button(action: toggleMapType) {
                 mapTypeIcon
-                    .frame(width: 46, height: 42)
+                    .frame(width: controlWidth, height: controlHeight)
             }
             .accessibilityLabel(selectedMapType == .standard ? "Show satellite map" : "Show standard map")
 
@@ -100,7 +50,7 @@ struct MapButtonsView: View {
                 Image(systemName: "location.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.accentColor)
-                    .frame(width: 46, height: 42)
+                    .frame(width: controlWidth, height: controlHeight)
             }
             .accessibilityLabel("Center map on location")
 
@@ -113,13 +63,13 @@ struct MapButtonsView: View {
                 Debug.log("⏱ mapMode button action DONE")
             } label: {
                 mapModeIcon
-                    .frame(width: 46, height: 42)
+                    .frame(width: controlWidth, height: controlHeight)
             }
             .accessibilityLabel(viewModel.mapDisplayMode == .merchants
                                 ? "Show communities" : "Show merchants")
             .featureHintAnchor(.communityToggle)
         }
-        .frame(width: 46)
+        .frame(width: controlWidth)
         .modifier(GlassCapsuleBackground())
         .fixedSize()
     }
