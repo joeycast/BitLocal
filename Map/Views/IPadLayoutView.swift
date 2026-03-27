@@ -18,34 +18,54 @@ struct IPadLayoutView: View {
     var selectedMapTypeBinding: Binding<MKMapType>
     @EnvironmentObject private var appearanceManager: AppearanceManager
     @Environment(\.colorScheme) private var systemColorScheme
-    
+
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     private var appearance: Appearance { appearanceManager.appearance }
-    
+    private let aboutPopoverWidth: CGFloat = 420
+    private let aboutPopoverHeight: CGFloat = 640
+    private let settingsPopoverWidth: CGFloat = 420
+    private let settingsPopoverHeight: CGFloat = 520
+    private let toolbarContentTopPadding: CGFloat = 6
+    private let sidebarRootTopCompensation: CGFloat = 30
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
-            Group {
-                if viewModel.mapDisplayMode == .communities {
-                    CommunitiesListView()
-                        .environmentObject(viewModel)
-                } else {
-                    BusinessesListView(elements: visibleElements)
-                        .environmentObject(viewModel)
-                }
-            }
+            sidePanelRootContentWithSafeAreaBehavior
                 .navigationDestination(for: Element.self) { element in
                     BusinessDetailView(
                         element: element,
                         userLocation: viewModel.userLocation,
                         contentViewModel: viewModel
-                    ).environmentObject(viewModel)
+                    )
+                    .environmentObject(viewModel)
+                    .clearNavigationContainerBackgroundIfAvailable()
+                    .toolbar(removing: .sidebarToggle)
+                }
+                .navigationDestination(isPresented: communityDetailBindingIsPresented) {
+                    communityDetailDestination
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         InfoButtonView(showingAbout: $showingAbout)
+                            .padding(.top, toolbarContentTopPadding)
+                            .popover(isPresented: $showingAbout, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                                AboutView(onDone: {
+                                    showingAbout = false
+                                })
+                                .id("ipad-about-\(appearance.rawValue)-\(systemColorScheme)")
+                                .preferredColorScheme(effectiveColorScheme)
+                                .frame(
+                                    minWidth: aboutPopoverWidth,
+                                    idealWidth: aboutPopoverWidth,
+                                    minHeight: aboutPopoverHeight,
+                                    idealHeight: aboutPopoverHeight
+                                )
+                            }
                     }
                     ToolbarItem(placement: .principal) {
                         CustomiPadNavigationStackTitleView()
+                            .padding(.top, toolbarContentTopPadding)
                             .frame(maxWidth: .infinity)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
@@ -54,41 +74,65 @@ struct IPadLayoutView: View {
                                 showingSettings = true
                             }
                         )
-                        .opacity(1)
+                        .padding(.top, toolbarContentTopPadding)
+                        .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                            NavigationStack {
+                                SettingsView(
+                                    selectedMapType: selectedMapTypeBinding,
+                                    onDone: {
+                                        showingSettings = false
+                                    }
+                                )
+                                .environmentObject(MerchantAlertsManager.shared)
+                                .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
+                                .preferredColorScheme(effectiveColorScheme)
+                            }
+                            .frame(
+                                minWidth: settingsPopoverWidth,
+                                idealWidth: settingsPopoverWidth,
+                                minHeight: settingsPopoverHeight,
+                                idealHeight: settingsPopoverHeight
+                            )
+                        }
                     }
                 }
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("")
+                .toolbar(removing: .sidebarToggle)
+                .clearNavigationContainerBackgroundIfAvailable()
         }
         .onChange(of: viewModel.unifiedSearchText) { _, _ in
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
         }
-        .navigationDestination(isPresented: $showingSettings) {
-            SettingsView(selectedMapType: selectedMapTypeBinding)
-                .environmentObject(MerchantAlertsManager.shared)
-                .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
-                .preferredColorScheme(effectiveColorScheme)
-        }
-        .sheet(item: $viewModel.presentedCommunityArea) { area in
-            NavigationStack {
-                CommunityDetailView(area: area)
-                    .environmentObject(viewModel)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button("Close") {
-                                viewModel.presentedCommunityArea = nil
-                            }
-                        }
-                    }
-            }
-        }
-        .sheet(isPresented: $showingAbout) {
-            AboutView()
-                .id("ipad-about-\(appearance.rawValue)-\(systemColorScheme)")
-                .preferredColorScheme(effectiveColorScheme)
-        }
-        .frame(width: calculateSidePanelWidth(screenWidth: UIScreen.main.bounds.width))
+        .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 430)
     }
-    
+
+    @ViewBuilder
+    private var sidePanelRootContentWithSafeAreaBehavior: some View {
+        if #available(iOS 26.0, *) {
+            sidePanelRootContent
+                // The iPadOS 26 transparent nav bar keeps the toolbar animation we want,
+                // but it also leaves extra visible space before our custom search row.
+                .padding(.top, sidebarRootTopCompensation)
+                .ignoresSafeArea(.container, edges: .top)
+        } else {
+            sidePanelRootContent
+        }
+    }
+
+    @ViewBuilder
+    private var sidePanelRootContent: some View {
+        if viewModel.mapDisplayMode == .communities {
+            CommunitiesListView()
+                .environmentObject(viewModel)
+        } else {
+            BusinessesListView(elements: visibleElements)
+                .environmentObject(viewModel)
+        }
+    }
+
     private var mapPanel: some View {
         ZStack {
             if let elements = elements {
@@ -119,17 +163,21 @@ struct IPadLayoutView: View {
                 isIPad: true
             )
             .padding(.trailing, 20)
-            .opacity(showingSettings ? 0 : 1)
-            .allowsHitTesting(!showingSettings)
-            .animation(.easeInOut(duration: 0.2), value: showingSettings),
+            .padding(.bottom, 28),
             alignment: .bottomTrailing
         )
     }
-    
+
     var body: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidePanel
+        } detail: {
             mapPanel
+        }
+        .navigationSplitViewStyle(.balanced)
+        .onChange(of: columnVisibility) { _, newValue in
+            guard newValue != .all else { return }
+            columnVisibility = .all
         }
         .onChange(of: viewModel.path) { _, newPath in
             if newPath.last != nil {
@@ -140,7 +188,7 @@ struct IPadLayoutView: View {
             viewModel.selectedElement = newPath.last
         }
     }
-    
+
     private var effectiveColorScheme: ColorScheme? {
         switch appearance {
         case .system: return systemColorScheme
@@ -148,13 +196,27 @@ struct IPadLayoutView: View {
         case .dark:   return .dark
         }
     }
-    
-    private func calculateSidePanelWidth(screenWidth: CGFloat) -> CGFloat {
-        if screenWidth <= 744 {
-            return screenWidth * 0.4
-        } else {
-            return screenWidth * 0.35
+
+    @ViewBuilder
+    private var communityDetailDestination: some View {
+        if let area = viewModel.presentedCommunityArea {
+            CommunityDetailView(area: area)
+                .id(area.id)
+                .environmentObject(viewModel)
+                .clearNavigationContainerBackgroundIfAvailable()
+                .toolbar(removing: .sidebarToggle)
         }
+    }
+
+    private var communityDetailBindingIsPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.presentedCommunityArea != nil },
+            set: { newValue in
+                if !newValue {
+                    viewModel.presentedCommunityArea = nil
+                }
+            }
+        )
     }
 }
 
@@ -168,7 +230,7 @@ struct IPadLayoutView_Previews: PreviewProvider {
     @State static var headerHeight: CGFloat = 80
     @StateObject static var viewModel = ContentViewModel()
     @State static var mapType: MKMapType = .standard
-    
+
     static var previews: some View {
         IPadLayoutView(
             viewModel: viewModel,

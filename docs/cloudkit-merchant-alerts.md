@@ -109,14 +109,15 @@ Suggested install steps on the always-on Mac mini:
 
 1. Copy the plist into `~/Library/LaunchAgents/com.bitlocal.repo-keepalive.plist`.
 2. Ensure the local clone at `REPO_ROOT_PLACEHOLDER` has push access to `origin`.
-3. Load the job with:
+3. Replace every `REPO_ROOT_PLACEHOLDER` in the copied plist with the absolute path to the local clone.
+4. Load the job with:
 
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.bitlocal.repo-keepalive.plist 2>/dev/null || true
 launchctl load ~/Library/LaunchAgents/com.bitlocal.repo-keepalive.plist
 ```
 
-The job runs immediately on load, then every 30 days. It updates `.github/keepalive.md`, commits the timestamp, and pushes to `main`.
+The job runs immediately on load, then every 30 days. It fast-forwards `main`, updates `.github/keepalive.md` with the current UTC timestamp, commits only that file, and pushes back to `origin`.
 
 ## Notes
 

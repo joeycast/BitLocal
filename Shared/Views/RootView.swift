@@ -13,6 +13,7 @@ struct RootView: View {
     @EnvironmentObject var contentViewModel: ContentViewModel
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @StateObject private var featureHintsController = FeatureHintsController()
+    @StateObject private var releaseNotesController = ReleaseNotesController()
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
     
     var body: some View {
@@ -20,6 +21,7 @@ struct RootView: View {
             ContentView()
                 .environmentObject(contentViewModel)
                 .environmentObject(featureHintsController)
+                .environmentObject(releaseNotesController)
             
             if !didCompleteOnboarding {
                 OnboardingView()
@@ -38,6 +40,7 @@ struct RootView: View {
 
             featureHintsController.installOverlayWindow()
             triggerInitialFetchIfNeeded(source: "RootView.onAppear")
+            evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()
         }
         .onChange(of: didCompleteOnboarding) { _, completed in
@@ -53,11 +56,13 @@ struct RootView: View {
 
             // 2️⃣ If warmup never started, kick off the normal initial fetch now.
             triggerInitialFetchIfNeeded(source: "RootView.didCompleteOnboarding")
+            evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()
         }
         .onChange(of: contentViewModel.appState) { _, newState in
             guard newState == .active else { return }
             triggerInitialFetchIfNeeded(source: "RootView.appStateActive")
+            evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()
         }
         .onChange(of: contentViewModel.isReadyForPostOnboardingPresentation) { _, _ in
@@ -65,6 +70,7 @@ struct RootView: View {
                 "onboarding",
                 "main UI readiness changed -> ready=\(contentViewModel.isReadyForPostOnboardingPresentation), loaded=\(contentViewModel.hasLoadedInitialData), allElements=\(contentViewModel.allElements.count), visibleElements=\(contentViewModel.visibleElements.count), forceMapRefresh=\(contentViewModel.forceMapRefresh)"
             )
+            evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()
         }
         .onChange(of: contentViewModel.hasLoadedInitialData) { _, loaded in
@@ -88,6 +94,13 @@ struct RootView: View {
         .sheet(item: $contentViewModel.deepLinkUnavailableState) { state in
             DeepLinkUnavailableView(state: state)
                 .environmentObject(contentViewModel)
+        }
+        .sheet(item: $releaseNotesController.activeReleaseNotes) { entry in
+            ReleaseNotesSheetView(entry: entry) {
+                releaseNotesController.dismiss()
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .onChange(of: merchantAlertsManager.activeDigest?.id) { _, _ in
             guard let digest = merchantAlertsManager.activeDigest else { return }
@@ -122,7 +135,15 @@ struct RootView: View {
     }
 
     private func evaluateFeatureHintsPresentation() {
+        guard !releaseNotesController.isPresenting else { return }
         featureHintsController.evaluatePresentation(
+            didCompleteOnboarding: didCompleteOnboarding,
+            isReadyForMainUI: contentViewModel.isReadyForPostOnboardingPresentation
+        )
+    }
+
+    private func evaluateReleaseNotesPresentation() {
+        releaseNotesController.evaluatePresentation(
             didCompleteOnboarding: didCompleteOnboarding,
             isReadyForMainUI: contentViewModel.isReadyForPostOnboardingPresentation
         )

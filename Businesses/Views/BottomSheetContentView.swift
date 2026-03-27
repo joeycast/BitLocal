@@ -43,6 +43,7 @@ struct BottomSheetContentView: View {
                 featureHintsController.markMainUIVisible()
             }
             .onChange(of: geometry.size.height) { _, newHeight in
+                viewModel.liveBottomPadding = newHeight
                 let normalizedHeight = (newHeight / Self.sheetHeightBucketSize).rounded() * Self.sheetHeightBucketSize
                 guard abs(viewModel.bottomPadding - normalizedHeight) >= Self.sheetHeightPublishThreshold else {
                     return
@@ -63,12 +64,8 @@ struct BottomSheetContentView: View {
 
     private func navigationStack(sheetHeight: CGFloat) -> some View {
         NavigationStack(path: $viewModel.path) {
-            sheetRootContent(sheetHeight: sheetHeight)
-                .toolbar(.visible, for: .navigationBar)
-                .toolbarBackground(.hidden, for: .navigationBar)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationTitle("")
-                .ignoresSafeArea(.container, edges: .top)
+            sheetRootContentWithSafeAreaBehavior(sheetHeight: sheetHeight)
+                .modifier(RootSheetNavigationBarModifier())
                 .navigationDestination(for: Element.self) { element in
                     businessDetailDestination(for: element)
                 }
@@ -76,6 +73,16 @@ struct BottomSheetContentView: View {
                     communityDetailDestination
                 }
                 .clearNavigationContainerBackgroundIfAvailable()
+        }
+    }
+
+    @ViewBuilder
+    private func sheetRootContentWithSafeAreaBehavior(sheetHeight: CGFloat) -> some View {
+        if #available(iOS 26.0, *) {
+            sheetRootContent(sheetHeight: sheetHeight)
+                .ignoresSafeArea(.container, edges: .top)
+        } else {
+            sheetRootContent(sheetHeight: sheetHeight)
         }
     }
 
@@ -141,10 +148,27 @@ struct BottomSheetContentView: View {
     }
 }
 
+private struct RootSheetNavigationBarModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .toolbar(.visible, for: .navigationBar)
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("")
+        } else {
+            content
+                .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+}
+
 struct CommunitiesListView: View {
     private let resultsPageSize = 15
 
     @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject private var metadataStore = CommunityRowMetadataObservableStore.shared
     var currentDetent: PresentationDetent? = nil
     @State private var filterText = ""
@@ -158,7 +182,7 @@ struct CommunitiesListView: View {
 
         VStack(spacing: 0) {
             searchBar
-                .padding(.top, 20)
+                .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 2)
 
             List {
@@ -252,6 +276,16 @@ struct CommunitiesListView: View {
         .background(Color(.tertiarySystemFill))
         .clipShape(RoundedRectangle(cornerRadius: 40))
         .padding(.horizontal, 16)
+    }
+
+    private var searchBarTopPadding: CGFloat {
+        if horizontalSizeClass == .regular {
+            return 0
+        }
+        if #available(iOS 26.0, *) {
+            return 20
+        }
+        return 16
     }
 
     private var filteredCommunities: [V2AreaRecord] {
@@ -735,24 +769,25 @@ struct CommunityDetailView: View {
         .scrollContentBackground(.automatic)
         .navigationTitle(area.displayName)
         .navigationBarTitleDisplayMode(.inline)
-            .task(id: area.id) {
-                if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
-                    viewModel.selectCommunity(area, presentDetail: false)
-                }
-                updateMemberElements()
+        .bitLocalDetailNavigationChrome()
+        .task(id: area.id) {
+            if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
+                viewModel.selectCommunity(area, presentDetail: false)
             }
-            .onChange(of: area.id) { _, _ in
-                updateMemberElements()
-            }
-            .onChange(of: viewModel.selectedCommunityArea?.id) { _, _ in
-                updateMemberElements()
-            }
-            .onChange(of: viewModel.communityMemberElements) { _, _ in
-                updateMemberElements()
-            }
-            .onAppear {
-                updateMemberElements()
-            }
+            updateMemberElements()
+        }
+        .onChange(of: area.id) { _, _ in
+            updateMemberElements()
+        }
+        .onChange(of: viewModel.selectedCommunityArea?.id) { _, _ in
+            updateMemberElements()
+        }
+        .onChange(of: viewModel.communityMemberElements) { _, _ in
+            updateMemberElements()
+        }
+        .onAppear {
+            updateMemberElements()
+        }
         .alert("Tip This Community", isPresented: $showLightningAlert) {
             if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
                let payload = payableLightningPayload {
@@ -1297,7 +1332,7 @@ struct CommunityDetailView: View {
 
     private var shouldShowCollapsedHeaderOnly: Bool {
         guard let detent = currentDetent else { return false }
-        return detentIdentifier(detent).contains("fraction 0.11")
+        return detent == BottomSheetDetents.collapsed || detentIdentifier(detent).contains("fraction 0.11")
     }
 
     private var isLargeSheet: Bool {

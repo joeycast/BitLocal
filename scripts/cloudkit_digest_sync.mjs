@@ -94,6 +94,7 @@ async function main() {
   const deliveryNowUtc = parseDate(environment.nowUtcOverride) || runStartedAt;
   const syncState = await loadSyncState();
   const updatedSince = environment.updatedSinceOverride || syncState?.incrementalAnchorUpdatedSince || environment.initialUpdatedSince;
+  const createdSince = parseDate(updatedSince);
   const changes = await fetchBTCMapChanges(updatedSince);
 
   console.log(`Fetched ${changes.length} BTC Map place changes since ${updatedSince}.`);
@@ -112,7 +113,11 @@ async function main() {
   };
 
   for (const place of changes) {
-    const merchantOutcome = await syncMerchant(place, reverseGeocoder, { shouldQueuePending, forceReplayPending });
+    const merchantOutcome = await syncMerchant(place, reverseGeocoder, {
+      shouldQueuePending,
+      forceReplayPending,
+      createdSince
+    });
     if (merchantOutcome?.queuedPending) {
       syncSummary.queuedPending.push(merchantOutcome.queuedPending);
     }
@@ -244,7 +249,8 @@ async function syncMerchant(place, reverseGeocoder, options) {
     return null;
   }
 
-  const shouldMaintainPending = !existingMerchant || priorPendingRecord || options.forceReplayPending;
+  const isNewSinceAnchor = wasCreatedAfterAnchor(normalized.merchantCreatedAt, options.createdSince);
+  const shouldMaintainPending = priorPendingRecord || options.forceReplayPending || (!existingMerchant && isNewSinceAnchor);
   if (!shouldMaintainPending) {
     return null;
   }
@@ -685,6 +691,18 @@ function parseDate(value) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function wasCreatedAfterAnchor(createdAt, anchorDate) {
+  if (!createdAt) {
+    return false;
+  }
+
+  if (!anchorDate) {
+    return true;
+  }
+
+  return createdAt.getTime() > anchorDate.getTime();
 }
 
 function latestUpdatedAt(records) {
@@ -1250,6 +1268,7 @@ export {
   formatLocalDate,
   normalizePlace,
   pendingRecordName,
+  wasCreatedAfterAnchor,
   validTimeZoneID,
   zonedDateParts,
   zonedLocalDateTimeToUtc
