@@ -4,8 +4,12 @@ import assert from "node:assert/strict";
 import {
   buildDueDigestCandidateForCity,
   digestRecordName,
+  firstHeaderValue,
+  formatCloudKitResponseDetail,
   formatLocalDate,
+  logCloudKitFailure,
   normalizePlace,
+  parseJsonOrNull,
   wasCreatedAfterAnchor,
   zonedDateParts,
   zonedLocalDateTimeToUtc
@@ -147,4 +151,69 @@ test("wasCreatedAfterAnchor only accepts merchants created after the sync anchor
 test("wasCreatedAfterAnchor allows bootstrap-style runs without a parsed anchor date", () => {
   assert.equal(wasCreatedAfterAnchor(new Date("2025-06-18T14:11:57.765Z"), null), true);
   assert.equal(wasCreatedAfterAnchor(null, new Date("2026-03-20T23:44:08.715Z")), false);
+});
+
+test("parseJsonOrNull returns parsed objects for json bodies", () => {
+  assert.deepEqual(parseJsonOrNull("{\"ok\":true}"), { ok: true });
+  assert.deepEqual(parseJsonOrNull(""), {});
+});
+
+test("parseJsonOrNull returns null for non-json response bodies", () => {
+  assert.equal(parseJsonOrNull("<html><h1>502 Bad Gateway</h1></html>"), null);
+});
+
+test("formatCloudKitResponseDetail includes content type for non-json bodies", () => {
+  const response = {
+    headers: new Headers({
+      "content-type": "text/html; charset=utf-8"
+    })
+  };
+
+  assert.equal(
+    formatCloudKitResponseDetail(response, "<html>\n<h1>502 Bad Gateway</h1>\n</html>", null),
+    "text/html; charset=utf-8: <html> <h1>502 Bad Gateway</h1> </html>"
+  );
+});
+
+test("firstHeaderValue returns the first present header", () => {
+  const headers = new Headers({
+    "x-request-id": "fallback-id",
+    "x-apple-request-id": "apple-id"
+  });
+
+  assert.equal(
+    firstHeaderValue(headers, ["x-apple-request-uuid", "x-apple-request-id", "x-request-id"]),
+    "apple-id"
+  );
+});
+
+test("logCloudKitFailure writes a structured diagnostic line", () => {
+  const originalError = console.error;
+  const messages = [];
+  console.error = (message) => {
+    messages.push(message);
+  };
+
+  try {
+    logCloudKitFailure({
+      subpath: "/records/lookup",
+      status: 502,
+      attempt: 2,
+      maxAttempts: 4,
+      response: {
+        headers: new Headers({
+          "content-type": "text/html; charset=utf-8",
+          "x-request-id": "req-123"
+        })
+      },
+      errorDetail: "text/html; charset=utf-8: <html>bad gateway</html>"
+    });
+  } finally {
+    console.error = originalError;
+  }
+
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /CloudKit request failed:/);
+  assert.match(messages[0], /"subpath":"\/records\/lookup"/);
+  assert.match(messages[0], /"requestId":"req-123"/);
 });

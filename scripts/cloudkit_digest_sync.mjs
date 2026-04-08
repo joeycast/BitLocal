@@ -13,6 +13,8 @@ const CLOUDKIT_DEFAULT_ZONE = "_defaultZone";
 const BTCMAP_USER_AGENT = "BitLocal-CloudKitDigestSync/1.0 (GitHub Actions)";
 const BTCMAP_FETCH_MAX_ATTEMPTS = 4;
 const BTCMAP_FETCH_RETRY_BASE_DELAY_MS = 1000;
+const CLOUDKIT_FETCH_MAX_ATTEMPTS = 4;
+const CLOUDKIT_FETCH_RETRY_BASE_DELAY_MS = 1000;
 const UNITED_STATES_REGION_ALIASES = {
   al: "Alabama",
   ak: "Alaska",
@@ -933,29 +935,117 @@ async function cloudKitRequest(subpath, body) {
   const bodyHash = base64Sha256(bodyString);
   const signature = signMessage(`${isoDate}:${bodyHash}:${path}`);
 
-  const response = await fetch(`https://api.apple-cloudkit.com${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Apple-CloudKit-Request-KeyID": environment.serverKeyId,
-      "X-Apple-CloudKit-Request-ISO8601Date": isoDate,
-      "X-Apple-CloudKit-Request-SignatureV1": signature
-    },
-    body: bodyString
-  });
+  for (let attempt = 1; attempt <= CLOUDKIT_FETCH_MAX_ATTEMPTS; attempt += 1) {
+    const response = await fetch(`https://api.apple-cloudkit.com${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Apple-CloudKit-Request-KeyID": environment.serverKeyId,
+        "X-Apple-CloudKit-Request-ISO8601Date": isoDate,
+        "X-Apple-CloudKit-Request-SignatureV1": signature
+      },
+      body: bodyString
+    });
 
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : {};
+    const text = await response.text();
+    const payload = parseJsonOrNull(text);
+    const errorDetail = formatCloudKitResponseDetail(response, text, payload);
 
-  if (!response.ok) {
-    throw new Error(`CloudKit ${response.status}: ${JSON.stringify(payload)}`);
+    if (!response.ok) {
+      logCloudKitFailure({
+        subpath,
+        status: response.status,
+        attempt,
+        maxAttempts: CLOUDKIT_FETCH_MAX_ATTEMPTS,
+        response,
+        errorDetail
+      });
+
+      if (shouldRetryCloudKitFetch(response.status) && attempt < CLOUDKIT_FETCH_MAX_ATTEMPTS) {
+        const delayMs = CLOUDKIT_FETCH_RETRY_BASE_DELAY_MS * (2 ** (attempt - 1));
+        console.warn(
+          `CloudKit ${response.status} for ${subpath}; retrying in ${delayMs}ms `
+          + `(attempt ${attempt + 1}/${CLOUDKIT_FETCH_MAX_ATTEMPTS}).`
+        );
+        await sleep(delayMs);
+        continue;
+      }
+
+      throw new Error(`CloudKit ${response.status}: ${errorDetail}`);
+    }
+
+    if (payload === null) {
+      throw new Error(`CloudKit returned non-JSON response: ${errorDetail}`);
+    }
+
+    return payload;
   }
-
-  return payload;
 }
 
 function isCloudKitNotFound(error) {
   return /UNKNOWN_ITEM|NOT_FOUND|404|does not exist/i.test(String(error));
+}
+
+function shouldRetryCloudKitFetch(status) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function parseJsonOrNull(text) {
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function formatCloudKitResponseDetail(response, text, payload) {
+  if (payload !== null) {
+    return JSON.stringify(payload);
+  }
+
+  const contentType = response.headers.get("content-type") || "unknown";
+  const snippet = compactTextSnippet(text);
+  return `${contentType}: ${snippet || "(empty body)"}`;
+}
+
+function compactTextSnippet(value, maxLength = 200) {
+  const compacted = String(value || "").replace(/\s+/g, " ").trim();
+  if (compacted.length <= maxLength) {
+    return compacted;
+  }
+  return `${compacted.slice(0, maxLength)}...`;
+}
+
+function logCloudKitFailure({ subpath, status, attempt, maxAttempts, response, errorDetail }) {
+  const diagnostic = {
+    subpath,
+    status,
+    attempt,
+    maxAttempts,
+    contentType: response.headers.get("content-type") || "",
+    requestId: firstHeaderValue(response.headers, [
+      "x-apple-request-uuid",
+      "x-apple-request-id",
+      "x-request-id"
+    ]),
+    errorDetail
+  };
+
+  console.error(`CloudKit request failed: ${JSON.stringify(diagnostic)}`);
+}
+
+function firstHeaderValue(headers, names) {
+  for (const name of names) {
+    const value = headers.get(name);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
 }
 
 async function loadReverseGeocoder() {
@@ -1266,8 +1356,12 @@ export {
   buildDueDigestCandidates,
   digestRecordName,
   formatLocalDate,
+  formatCloudKitResponseDetail,
+  firstHeaderValue,
+  logCloudKitFailure,
   normalizePlace,
   pendingRecordName,
+  parseJsonOrNull,
   wasCreatedAfterAnchor,
   validTimeZoneID,
   zonedDateParts,
