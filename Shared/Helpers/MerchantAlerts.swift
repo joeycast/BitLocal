@@ -249,6 +249,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private let localNotificationKindKey = "merchant_alert_kind"
     private let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
     private let localNotificationKindDigest = "city_digest"
+    private let digestCatchUpLimit = 1
     private var hasRegisteredForRemoteNotifications = false
 
     var currentSubscription: CitySubscription? {
@@ -320,6 +321,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         }
 
         registerForRemoteNotificationsIfNeeded()
+        await catchUpMissedDigestIfNeeded()
     }
 
     func enableNotifications(for choice: MerchantAlertCityChoice) async {
@@ -499,6 +501,25 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         return try CityDigest(record: record)
     }
 
+    private func fetchLatestDigest(for subscription: CitySubscription) async throws -> CityDigest? {
+        let predicate = NSPredicate(
+            format: "locationID == %@ AND digestWindowEnd >= %@",
+            subscription.locationID,
+            subscription.createdAt as NSDate
+        )
+        let query = CKQuery(recordType: digestRecordType, predicate: predicate)
+        query.sortDescriptors = [
+            NSSortDescriptor(key: "digestWindowEnd", ascending: false)
+        ]
+
+        let records = try await publicDatabase.merchantAlertsRecords(
+            matching: query,
+            resultsLimit: digestCatchUpLimit
+        )
+
+        return try records.first.map(CityDigest.init(record:))
+    }
+
     private func digest(from userInfo: [AnyHashable: Any]) async throws -> CityDigest? {
         if let kind = userInfo[localNotificationKindKey] as? String,
            kind == localNotificationKindDigest,
@@ -531,6 +552,28 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         try await notificationCenter.merchantAlertsAdd(request)
+    }
+
+    private func catchUpMissedDigestIfNeeded() async {
+        guard isCloudKitAvailable else { return }
+        guard notificationsAuthorized else { return }
+        guard let subscription = currentSubscription else { return }
+
+        do {
+            guard let digest = try await fetchLatestDigest(for: subscription) else { return }
+            guard digest.id != lastDigest?.id else { return }
+
+            lastDigest = digest
+            persistLastDigest()
+
+            if UIApplication.shared.applicationState == .active {
+                activeDigest = digest
+            }
+
+            try await scheduleLocalNotification(for: digest)
+        } catch {
+            Debug.log("Merchant alerts: digest catch-up failed for \(subscription.locationID): \(error.localizedDescription)")
+        }
     }
 
     private func notificationTitle(for digest: CityDigest) -> String {
@@ -856,6 +899,40 @@ private extension CKDatabase {
                     continuation.resume(returning: subscriptions ?? [])
                 }
             }
+        }
+    }
+
+    func merchantAlertsRecords(matching query: CKQuery, resultsLimit: Int) async throws -> [CKRecord] {
+        try await withCheckedThrowingContinuation { continuation in
+            let operation = CKQueryOperation(query: query)
+            operation.resultsLimit = resultsLimit
+
+            var records: [CKRecord] = []
+            var operationError: Error?
+
+            operation.recordMatchedBlock = { _, result in
+                switch result {
+                case let .success(record):
+                    records.append(record)
+                case let .failure(error):
+                    operationError = error
+                }
+            }
+
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    if let operationError {
+                        continuation.resume(throwing: operationError)
+                    } else {
+                        continuation.resume(returning: records)
+                    }
+                case let .failure(error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            add(operation)
         }
     }
 }
