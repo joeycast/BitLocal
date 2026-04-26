@@ -249,7 +249,9 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private let localNotificationKindKey = "merchant_alert_kind"
     private let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
     private let localNotificationKindDigest = "city_digest"
+    private let digestCatchUpLimit = 1
     private var hasRegisteredForRemoteNotifications = false
+    private var isRegisteringForRemoteNotifications = false
 
     var currentSubscription: CitySubscription? {
         subscriptions.first(where: \.isEnabled)
@@ -320,6 +322,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         }
 
         registerForRemoteNotificationsIfNeeded()
+        await catchUpMissedDigestIfNeeded()
     }
 
     func enableNotifications(for choice: MerchantAlertCityChoice) async {
@@ -499,6 +502,30 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         return try CityDigest(record: record)
     }
 
+    private func fetchLatestDigest(for subscription: CitySubscription) async throws -> CityDigest? {
+        let predicate = NSPredicate(format: "locationID == %@", subscription.locationID)
+        let query = CKQuery(recordType: digestRecordType, predicate: predicate)
+        query.sortDescriptors = [
+            NSSortDescriptor(key: "digestWindowEnd", ascending: false)
+        ]
+
+        let records = try await publicDatabase.merchantAlertsRecords(
+            matching: query,
+            resultsLimit: digestCatchUpLimit
+        )
+
+        guard let record = records.first,
+              MerchantAlertsCatchUpPolicy.isEligible(
+                recordCreationDate: record.creationDate,
+                digestWindowEnd: record["digestWindowEnd"] as? Date,
+                subscriptionCreatedAt: subscription.createdAt
+              ) else {
+            return nil
+        }
+
+        return try CityDigest(record: record)
+    }
+
     private func digest(from userInfo: [AnyHashable: Any]) async throws -> CityDigest? {
         if let kind = userInfo[localNotificationKindKey] as? String,
            kind == localNotificationKindDigest,
@@ -531,6 +558,28 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         try await notificationCenter.merchantAlertsAdd(request)
+    }
+
+    private func catchUpMissedDigestIfNeeded() async {
+        guard isCloudKitAvailable else { return }
+        guard notificationsAuthorized else { return }
+        guard let subscription = currentSubscription else { return }
+
+        do {
+            guard let digest = try await fetchLatestDigest(for: subscription) else { return }
+            guard digest.id != lastDigest?.id else { return }
+
+            lastDigest = digest
+            persistLastDigest()
+
+            if UIApplication.shared.applicationState == .active {
+                activeDigest = digest
+            }
+
+            try await scheduleLocalNotification(for: digest)
+        } catch {
+            Debug.log("Merchant alerts: digest catch-up failed for \(subscription.locationID): \(error.localizedDescription)")
+        }
     }
 
     private func notificationTitle(for digest: CityDigest) -> String {
@@ -674,8 +723,37 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private func registerForRemoteNotificationsIfNeeded() {
         guard notificationsAuthorized else { return }
         guard !hasRegisteredForRemoteNotifications else { return }
-        hasRegisteredForRemoteNotifications = true
+        guard !isRegisteringForRemoteNotifications else { return }
+        isRegisteringForRemoteNotifications = true
         UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    func markRemoteNotificationRegistrationSucceeded() {
+        isRegisteringForRemoteNotifications = false
+        hasRegisteredForRemoteNotifications = true
+    }
+
+    func markRemoteNotificationRegistrationFailed() {
+        isRegisteringForRemoteNotifications = false
+        hasRegisteredForRemoteNotifications = false
+    }
+}
+
+enum MerchantAlertsCatchUpPolicy {
+    static func isEligible(
+        recordCreationDate: Date?,
+        digestWindowEnd: Date?,
+        subscriptionCreatedAt: Date
+    ) -> Bool {
+        if let recordCreationDate {
+            return recordCreationDate >= subscriptionCreatedAt
+        }
+
+        guard let digestWindowEnd else {
+            return false
+        }
+
+        return digestWindowEnd >= subscriptionCreatedAt
     }
 }
 
@@ -719,12 +797,17 @@ final class BitLocalAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         return true
     }
 
-    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Debug.log("Registered for remote notifications with token: \(token)")
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken _: Data) {
+        Task { @MainActor in
+            MerchantAlertsManager.shared.markRemoteNotificationRegistrationSucceeded()
+        }
+        Debug.log("Registered for remote notifications.")
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        Task { @MainActor in
+            MerchantAlertsManager.shared.markRemoteNotificationRegistrationFailed()
+        }
         Debug.log("Failed to register for remote notifications: \(error.localizedDescription)")
     }
 
@@ -856,6 +939,40 @@ private extension CKDatabase {
                     continuation.resume(returning: subscriptions ?? [])
                 }
             }
+        }
+    }
+
+    func merchantAlertsRecords(matching query: CKQuery, resultsLimit: Int) async throws -> [CKRecord] {
+        try await withCheckedThrowingContinuation { continuation in
+            let operation = CKQueryOperation(query: query)
+            operation.resultsLimit = resultsLimit
+
+            var records: [CKRecord] = []
+            var operationError: Error?
+
+            operation.recordMatchedBlock = { _, result in
+                switch result {
+                case let .success(record):
+                    records.append(record)
+                case let .failure(error):
+                    operationError = error
+                }
+            }
+
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    if let operationError {
+                        continuation.resume(throwing: operationError)
+                    } else {
+                        continuation.resume(returning: records)
+                    }
+                case let .failure(error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            add(operation)
         }
     }
 }

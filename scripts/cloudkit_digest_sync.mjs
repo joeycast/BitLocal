@@ -769,7 +769,7 @@ function createEnvironment() {
 
   return {
     containerId: requireEnv("CLOUDKIT_CONTAINER_ID"),
-    environment: process.env.CLOUDKIT_ENVIRONMENT || "development",
+    environment: requireCloudKitEnvironment(),
     database: (process.env.CLOUDKIT_DATABASE || "public").toLowerCase(),
     serverKeyId: requireEnv("CLOUDKIT_SERVER_KEY_ID"),
     serverPrivateKey: createSigningKey(requireEnv("CLOUDKIT_SERVER_PRIVATE_KEY")),
@@ -785,6 +785,14 @@ function createEnvironment() {
 
 function stringField(value) {
   return { value };
+}
+
+function requireCloudKitEnvironment() {
+  const value = requireEnv("CLOUDKIT_ENVIRONMENT").toLowerCase();
+  if (value !== "development" && value !== "production") {
+    throw new Error("CLOUDKIT_ENVIRONMENT must be either development or production.");
+  }
+  return value;
 }
 
 function int64Field(value) {
@@ -1362,6 +1370,7 @@ export {
   normalizePlace,
   pendingRecordName,
   parseJsonOrNull,
+  requireCloudKitEnvironment,
   wasCreatedAfterAnchor,
   validTimeZoneID,
   zonedDateParts,
