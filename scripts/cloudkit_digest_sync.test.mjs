@@ -10,6 +10,7 @@ import {
   logCloudKitFailure,
   normalizePlace,
   parseJsonOrNull,
+  requireCloudKitEnvironment,
   wasCreatedAfterAnchor,
   zonedDateParts,
   zonedLocalDateTimeToUtc
@@ -217,3 +218,42 @@ test("logCloudKitFailure writes a structured diagnostic line", () => {
   assert.match(messages[0], /"subpath":"\/records\/lookup"/);
   assert.match(messages[0], /"requestId":"req-123"/);
 });
+
+test("requireCloudKitEnvironment accepts explicit production environment", () => {
+  const original = process.env.CLOUDKIT_ENVIRONMENT;
+  process.env.CLOUDKIT_ENVIRONMENT = "production";
+
+  try {
+    assert.equal(requireCloudKitEnvironment(), "production");
+  } finally {
+    restoreEnv("CLOUDKIT_ENVIRONMENT", original);
+  }
+});
+
+test("requireCloudKitEnvironment rejects missing or invalid environment", () => {
+  const original = process.env.CLOUDKIT_ENVIRONMENT;
+
+  try {
+    delete process.env.CLOUDKIT_ENVIRONMENT;
+    assert.throws(
+      () => requireCloudKitEnvironment(),
+      /Missing required environment variable: CLOUDKIT_ENVIRONMENT/
+    );
+
+    process.env.CLOUDKIT_ENVIRONMENT = "staging";
+    assert.throws(
+      () => requireCloudKitEnvironment(),
+      /CLOUDKIT_ENVIRONMENT must be either development or production/
+    );
+  } finally {
+    restoreEnv("CLOUDKIT_ENVIRONMENT", original);
+  }
+});
+
+function restoreEnv(key, value) {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}

@@ -251,6 +251,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private let localNotificationKindDigest = "city_digest"
     private let digestCatchUpLimit = 1
     private var hasRegisteredForRemoteNotifications = false
+    private var isRegisteringForRemoteNotifications = false
 
     var currentSubscription: CitySubscription? {
         subscriptions.first(where: \.isEnabled)
@@ -502,11 +503,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     private func fetchLatestDigest(for subscription: CitySubscription) async throws -> CityDigest? {
-        let predicate = NSPredicate(
-            format: "locationID == %@ AND digestWindowEnd >= %@",
-            subscription.locationID,
-            subscription.createdAt as NSDate
-        )
+        let predicate = NSPredicate(format: "locationID == %@", subscription.locationID)
         let query = CKQuery(recordType: digestRecordType, predicate: predicate)
         query.sortDescriptors = [
             NSSortDescriptor(key: "digestWindowEnd", ascending: false)
@@ -517,7 +514,16 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             resultsLimit: digestCatchUpLimit
         )
 
-        return try records.first.map(CityDigest.init(record:))
+        guard let record = records.first,
+              MerchantAlertsCatchUpPolicy.isEligible(
+                recordCreationDate: record.creationDate,
+                digestWindowEnd: record["digestWindowEnd"] as? Date,
+                subscriptionCreatedAt: subscription.createdAt
+              ) else {
+            return nil
+        }
+
+        return try CityDigest(record: record)
     }
 
     private func digest(from userInfo: [AnyHashable: Any]) async throws -> CityDigest? {
@@ -717,8 +723,37 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     private func registerForRemoteNotificationsIfNeeded() {
         guard notificationsAuthorized else { return }
         guard !hasRegisteredForRemoteNotifications else { return }
-        hasRegisteredForRemoteNotifications = true
+        guard !isRegisteringForRemoteNotifications else { return }
+        isRegisteringForRemoteNotifications = true
         UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    func markRemoteNotificationRegistrationSucceeded() {
+        isRegisteringForRemoteNotifications = false
+        hasRegisteredForRemoteNotifications = true
+    }
+
+    func markRemoteNotificationRegistrationFailed() {
+        isRegisteringForRemoteNotifications = false
+        hasRegisteredForRemoteNotifications = false
+    }
+}
+
+enum MerchantAlertsCatchUpPolicy {
+    static func isEligible(
+        recordCreationDate: Date?,
+        digestWindowEnd: Date?,
+        subscriptionCreatedAt: Date
+    ) -> Bool {
+        if let recordCreationDate {
+            return recordCreationDate >= subscriptionCreatedAt
+        }
+
+        guard let digestWindowEnd else {
+            return false
+        }
+
+        return digestWindowEnd >= subscriptionCreatedAt
     }
 }
 
@@ -762,12 +797,17 @@ final class BitLocalAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         return true
     }
 
-    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Debug.log("Registered for remote notifications with token: \(token)")
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken _: Data) {
+        Task { @MainActor in
+            MerchantAlertsManager.shared.markRemoteNotificationRegistrationSucceeded()
+        }
+        Debug.log("Registered for remote notifications.")
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        Task { @MainActor in
+            MerchantAlertsManager.shared.markRemoteNotificationRegistrationFailed()
+        }
         Debug.log("Failed to register for remote notifications: \(error.localizedDescription)")
     }
 

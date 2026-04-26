@@ -74,4 +74,32 @@ final class MerchantAlertsModelsTests: XCTestCase {
         let decoded = try JSONDecoder().decode(CitySubscription.self, from: payload)
         XCTAssertEqual(decoded.locationID, "astoria|new york|united states")
     }
+
+    func testCatchUpPolicyAllowsDigestCreatedAfterSubscriptionEvenWhenWindowEndedEarlier() {
+        let subscriptionCreatedAt = ISO8601DateFormatter().date(from: "2026-04-26T13:05:00Z")!
+        let digestWindowEnd = ISO8601DateFormatter().date(from: "2026-04-26T13:00:00Z")!
+        let recordCreationDate = ISO8601DateFormatter().date(from: "2026-04-26T13:17:00Z")!
+
+        XCTAssertTrue(
+            MerchantAlertsCatchUpPolicy.isEligible(
+                recordCreationDate: recordCreationDate,
+                digestWindowEnd: digestWindowEnd,
+                subscriptionCreatedAt: subscriptionCreatedAt
+            )
+        )
+    }
+
+    func testCatchUpPolicyRejectsDigestCreatedBeforeSubscription() {
+        let subscriptionCreatedAt = ISO8601DateFormatter().date(from: "2026-04-26T14:00:00Z")!
+        let digestWindowEnd = ISO8601DateFormatter().date(from: "2026-04-26T13:00:00Z")!
+        let recordCreationDate = ISO8601DateFormatter().date(from: "2026-04-26T13:17:00Z")!
+
+        XCTAssertFalse(
+            MerchantAlertsCatchUpPolicy.isEligible(
+                recordCreationDate: recordCreationDate,
+                digestWindowEnd: digestWindowEnd,
+                subscriptionCreatedAt: subscriptionCreatedAt
+            )
+        )
+    }
 }
