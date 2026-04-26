@@ -36,7 +36,7 @@ struct AboutView: View {
     // Other section links
     let brink13LabsWebsite = URL(string: "https://brink13labs.com")!
     let bitlocalWebsite = URL(string: "https://www.bitlocal.app")!
-    let privacyPolicyURL = URL(string: "https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md")!
+    let privacyPolicyURL = URL(string: "https://www.bitlocal.app/privacy")!
     let btcMapURL = URL(string: "https://btcmap.org/")!
     let openStreetMapURL = URL(string: "https://openstreetmap.org/copyright")!
     let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!

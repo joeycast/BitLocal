@@ -567,7 +567,7 @@ Check Date: [YYYY-MM-DD]
 **6. Other:**
 - **BitLocal Website** → bitlocal.app
 - **Brink 13 Labs** → brink13labs.com
-- **Privacy Policy** → GitHub repository
+- **Privacy Policy** → https://www.bitlocal.app/privacy
 - **BTC Map** → btcmap.org
 - **OpenStreetMap** → openstreetmap.org/copyright
 - **Bitcoin Resources** → Jameson Lopp's resources
@@ -1019,7 +1019,8 @@ Update UI
 - Free and open
 
 **Privacy Policy:**
-- URL: https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md
+- Public URL: https://www.bitlocal.app/privacy
+- Repository copy: Privacy_Policy.md
 - Accessible from About page
 - Plain language
 - Transparent about data usage
@@ -2098,7 +2099,7 @@ Fetch all Bitcoin-accepting business elements.
 **Social Media:**
 - X/Twitter: @bitlocal_app
 
-**Privacy Policy:** https://github.com/joeycast/BitLocal.app/blob/main/Privacy_Policy.md
+**Privacy Policy:** https://www.bitlocal.app/privacy
 
 **Bug Reports:** support@bitlocal.app
 
