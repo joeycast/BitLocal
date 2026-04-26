@@ -1,0 +1,40 @@
+name: Deploy Website Privacy Policy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - Privacy_Policy.md
+      - .github/workflows/deploy-website-privacy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-website-privacy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Trigger Cloudflare Pages production build
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 043a4c8635a9c7cca09b8626102c45ef
+          CLOUDFLARE_PAGES_PROJECT: bitlocal-app
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "Missing CLOUDFLARE_API_TOKEN repository secret." >&2
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CLOUDFLARE_PAGES_PROJECT}/deployments" \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --form branch=main \
+            --form commit_hash="${GITHUB_SHA}" \
+            --form commit_message="Sync BitLocal app privacy policy"
