@@ -1,7 +1,10 @@
 import crypto from "node:crypto";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
+import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 
+const execFileAsync = promisify(execFile);
 const SYNC_STATE_RECORD_NAME = "sync-state";
 const DIGEST_RECORD_TYPE = "CityDigest";
 const DIGEST_PENDING_RECORD_TYPE = "CityDigestPending";
@@ -15,6 +18,7 @@ const BTCMAP_FETCH_MAX_ATTEMPTS = 4;
 const BTCMAP_FETCH_RETRY_BASE_DELAY_MS = 1000;
 const CLOUDKIT_FETCH_MAX_ATTEMPTS = 4;
 const CLOUDKIT_FETCH_RETRY_BASE_DELAY_MS = 1000;
+const DEFAULT_BUNDLED_CITY_SEARCH_FILE = "Settings/Resources/BundledCities.sqlite";
 const UNITED_STATES_REGION_ALIASES = {
   al: "Alabama",
   ak: "Alaska",
@@ -777,6 +781,7 @@ function createEnvironment() {
     geoNamesCitiesFile: process.env.GEONAMES_CITIES_FILE || "",
     geoNamesCountriesFile: process.env.GEONAMES_COUNTRIES_FILE || "",
     geoNamesAdmin1File: process.env.GEONAMES_ADMIN1_FILE || "",
+    geoNamesSqliteFile: process.env.GEONAMES_SQLITE_FILE || DEFAULT_BUNDLED_CITY_SEARCH_FILE,
     updatedSinceOverride: process.env.OVERRIDE_UPDATED_SINCE || "",
     nowUtcOverride: process.env.OVERRIDE_NOW_UTC || "",
     cityKeyFilter: process.env.CITY_KEY_FILTER || ""
@@ -1057,15 +1062,36 @@ function firstHeaderValue(headers, names) {
 }
 
 async function loadReverseGeocoder() {
-  if (!environment.geoNamesCitiesFile || !environment.geoNamesCountriesFile || !environment.geoNamesAdmin1File) {
-    console.log("GeoNames fallback disabled; city inference will use source address fields only.");
-    return null;
+  if (environment.geoNamesCitiesFile && environment.geoNamesCountriesFile && environment.geoNamesAdmin1File) {
+    return loadGeoNamesTextIndex(
+      environment.geoNamesCitiesFile,
+      environment.geoNamesCountriesFile,
+      environment.geoNamesAdmin1File
+    );
   }
 
+  if (environment.geoNamesSqliteFile && await fileExists(environment.geoNamesSqliteFile)) {
+    return loadBundledCitySearchIndex(environment.geoNamesSqliteFile);
+  }
+
+  console.log("GeoNames fallback disabled; city inference will use source address fields only.");
+  return null;
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function loadGeoNamesTextIndex(citiesFile, countriesFile, admin1File) {
   const [citiesRaw, countriesRaw, admin1Raw] = await Promise.all([
-    fs.readFile(environment.geoNamesCitiesFile, "utf8"),
-    fs.readFile(environment.geoNamesCountriesFile, "utf8"),
-    fs.readFile(environment.geoNamesAdmin1File, "utf8")
+    fs.readFile(citiesFile, "utf8"),
+    fs.readFile(countriesFile, "utf8"),
+    fs.readFile(admin1File, "utf8")
   ]);
 
   const countryNames = new Map();
@@ -1168,6 +1194,104 @@ async function loadReverseGeocoder() {
       return byCityKey.get(cityKey) || null;
     }
   };
+}
+
+async function loadBundledCitySearchIndex(sqliteFile) {
+  const hasMetadata = (await querySqlite(sqliteFile, "select name from sqlite_master where type = 'table' and name = 'city_metadata';")).trim() === "city_metadata";
+  const selectSql = hasMetadata
+    ? `select s.location_id, s.city, s.region, s.country, s.city_key,
+        coalesce(m.time_zone_id, ''), coalesce(m.population, 0), m.latitude, m.longitude
+      from city_search s
+      left join city_metadata m on m.location_id = s.location_id
+      where s.location_id <> '' and s.city_key <> ''
+      order by s.ord;`
+    : `select location_id, city, region, country, city_key, '', 0, null, null
+      from city_search
+      where location_id <> '' and city_key <> ''
+      order by ord;`;
+  const stdout = await querySqlite(sqliteFile, selectSql);
+
+  const byCityKey = new Map();
+  const cityKeyHasCoordinates = new Map();
+  const buckets = new Map();
+  let inserted = 0;
+
+  for (const line of stdout.split("\n")) {
+    if (!line) {
+      continue;
+    }
+
+    const [
+      locationID,
+      city,
+      region,
+      country,
+      cityKey,
+      timeZoneIDRaw,
+      populationRaw,
+      latitudeRaw,
+      longitudeRaw
+    ] = line.split("\t");
+    if (!locationID || !cityKey) {
+      continue;
+    }
+
+    const timeZoneID = validTimeZoneID(timeZoneIDRaw || "Etc/UTC");
+    const population = Number.parseInt(populationRaw, 10) || 0;
+    const latitude = Number.parseFloat(latitudeRaw);
+    const longitude = Number.parseFloat(longitudeRaw);
+    const hasCoordinates = !Number.isNaN(latitude) && !Number.isNaN(longitude);
+    const entry = {
+      locationID,
+      cityKey,
+      city,
+      region,
+      country,
+      timeZoneID,
+      population
+    };
+
+    const existing = byCityKey.get(cityKey);
+    if (!existing || (!cityKeyHasCoordinates.get(cityKey) && hasCoordinates)) {
+      byCityKey.set(cityKey, entry);
+      cityKeyHasCoordinates.set(cityKey, hasCoordinates);
+    }
+
+    if (hasCoordinates) {
+      const bucketKey = geoBucketKey(latitude, longitude);
+      const bucket = buckets.get(bucketKey) || [];
+      bucket.push({
+        ...entry,
+        latitude,
+        longitude
+      });
+      buckets.set(bucketKey, bucket);
+    }
+    inserted += 1;
+  }
+
+  console.log(`Loaded bundled city-search index with ${inserted} cities across ${buckets.size} buckets from ${sqliteFile}.`);
+  return {
+    lookup(lat, lon) {
+      return lookupNearestCity(buckets, lat, lon);
+    },
+    lookupByCityKey(cityKey) {
+      return byCityKey.get(cityKey) || null;
+    }
+  };
+}
+
+async function querySqlite(sqliteFile, sql) {
+  const { stdout } = await execFileAsync("sqlite3", [
+    "-batch",
+    "-separator",
+    "\t",
+    sqliteFile,
+    sql
+  ], {
+    maxBuffer: 128 * 1024 * 1024
+  });
+  return stdout;
 }
 
 function inferPlaceComponents(place, reverseGeocoder) {
@@ -1366,6 +1490,7 @@ export {
   formatLocalDate,
   formatCloudKitResponseDetail,
   firstHeaderValue,
+  loadBundledCitySearchIndex,
   logCloudKitFailure,
   normalizePlace,
   pendingRecordName,

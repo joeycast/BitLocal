@@ -7,6 +7,7 @@ import {
   firstHeaderValue,
   formatCloudKitResponseDetail,
   formatLocalDate,
+  loadBundledCitySearchIndex,
   logCloudKitFailure,
   normalizePlace,
   parseJsonOrNull,
@@ -136,6 +137,27 @@ test("normalizePlace prefers address-based location ID over nearest-city fallbac
   }, reverseGeocoder);
 
   assert.equal(normalized.locationID, "geonames:5107464");
+});
+
+test("loadBundledCitySearchIndex resolves canonical geonames IDs from the repo-local city database", async () => {
+  const index = await loadBundledCitySearchIndex("Settings/Resources/BundledCities.sqlite");
+
+  assert.deepEqual(index.lookup(36.1627, -86.7816), {
+    locationID: "geonames:4644585",
+    city: "Nashville",
+    region: "Tennessee",
+    country: "United States",
+    timeZoneID: "America/Chicago"
+  });
+  assert.deepEqual(index.lookupByCityKey("nashville|tennessee|united states"), {
+    locationID: "geonames:4644585",
+    cityKey: "nashville|tennessee|united states",
+    city: "Nashville",
+    region: "Tennessee",
+    country: "United States",
+    timeZoneID: "America/Chicago",
+    population: 530852
+  });
 });
 
 test("wasCreatedAfterAnchor only accepts merchants created after the sync anchor", () => {

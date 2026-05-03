@@ -78,6 +78,8 @@ Create these repository secrets:
 
 The workflow lives at [`.github/workflows/cloudkit-digest-sync.yml`](REPO_ROOT_PLACEHOLDER/.github/workflows/cloudkit-digest-sync.yml). It runs hourly at `:17`, supports manual dispatch with `updated_since`, `override_now_utc`, and `city_key_filter`, and keeps concurrency to one sync at a time.
 
+The hourly sync uses the repo-local [`Settings/Resources/BundledCities.sqlite`](REPO_ROOT_PLACEHOLDER/Settings/Resources/BundledCities.sqlite) city index through `GEONAMES_SQLITE_FILE`. Do not download GeoNames data in the scheduled workflow; that makes alert delivery depend on GeoNames uptime. Use [`scripts/build_bundled_cities_sqlite.py`](REPO_ROOT_PLACEHOLDER/scripts/build_bundled_cities_sqlite.py) only when intentionally refreshing the bundled city index.
+
 ## Server-to-server key setup
 
 For the GitHub sync job, use a CloudKit **server-to-server key**, not an API token. Apple’s web-services docs describe server-to-server keys as the right auth model for scripts that access the public database directly.
