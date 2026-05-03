@@ -38,15 +38,6 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Download GeoNames city dataset
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/geonames"
-          curl -fsSL -o "$RUNNER_TEMP/geonames/cities1000.zip" https://download.geonames.org/export/dump/cities1000.zip
-          curl -fsSL -o "$RUNNER_TEMP/geonames/countryInfo.txt" https://download.geonames.org/export/dump/countryInfo.txt
-          curl -fsSL -o "$RUNNER_TEMP/geonames/admin1CodesASCII.txt" https://download.geonames.org/export/dump/admin1CodesASCII.txt
-          unzip -o "$RUNNER_TEMP/geonames/cities1000.zip" -d "$RUNNER_TEMP/geonames"
-
       - name: Sync BTC Map digests into CloudKit
         env:
           CLOUDKIT_CONTAINER_ID: ${{ secrets.CLOUDKIT_CONTAINER_ID }}
@@ -55,9 +46,7 @@ jobs:
           CLOUDKIT_SERVER_KEY_ID: ${{ secrets.CLOUDKIT_SERVER_KEY_ID }}
           CLOUDKIT_SERVER_PRIVATE_KEY: ${{ secrets.CLOUDKIT_SERVER_PRIVATE_KEY }}
           BTCMAP_INITIAL_UPDATED_SINCE: ${{ secrets.BTCMAP_INITIAL_UPDATED_SINCE }}
-          GEONAMES_CITIES_FILE: ${{ runner.temp }}/geonames/cities1000.txt
-          GEONAMES_COUNTRIES_FILE: ${{ runner.temp }}/geonames/countryInfo.txt
-          GEONAMES_ADMIN1_FILE: ${{ runner.temp }}/geonames/admin1CodesASCII.txt
+          GEONAMES_SQLITE_FILE: Settings/Resources/BundledCities.sqlite
           OVERRIDE_UPDATED_SINCE: ${{ github.event.inputs.updated_since }}
           OVERRIDE_NOW_UTC: ${{ github.event.inputs.override_now_utc }}
           CITY_KEY_FILTER: ${{ github.event.inputs.city_key_filter }}

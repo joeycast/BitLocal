@@ -45,8 +45,20 @@ def main() -> None:
         )
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE city_metadata(
+            location_id TEXT PRIMARY KEY,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            population INTEGER NOT NULL,
+            time_zone_id TEXT NOT NULL
+        )
+        """
+    )
 
     rows: list[tuple[str, str, str, str, str, str, int]] = []
+    metadata_rows: list[tuple[str, float, float, int, str]] = []
     for raw_line in cities_data.splitlines():
         if not raw_line:
             continue
@@ -65,6 +77,9 @@ def main() -> None:
         region = admin1_names.get(f"{country_code}.{admin1_code}", admin1_code)
         country = country_names.get(country_code, country_code)
         population = int(columns[14] or "0")
+        latitude = float(columns[4])
+        longitude = float(columns[5])
+        time_zone_id = columns[17].strip() or "Etc/UTC"
 
         aliases = build_aliases(
             city=city,
@@ -85,6 +100,7 @@ def main() -> None:
                 population
             )
         )
+        metadata_rows.append((f"geonames:{geoname_id}", latitude, longitude, population, time_zone_id))
 
     rows.sort(
         key=lambda row: (
@@ -104,6 +120,8 @@ def main() -> None:
 
     if batched_rows:
         cursor.executemany("INSERT INTO city_search VALUES (?,?,?,?,?,?,?)", batched_rows)
+
+    cursor.executemany("INSERT INTO city_metadata VALUES (?,?,?,?,?)", metadata_rows)
 
     connection.commit()
     cursor.execute("VACUUM")
