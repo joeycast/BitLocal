@@ -65,8 +65,22 @@ struct MapButtonsView: View {
                 mapModeIcon
                     .frame(width: controlWidth, height: controlHeight)
             }
-            .accessibilityLabel(viewModel.mapDisplayMode == .merchants
-                                ? "Show communities" : "Show merchants")
+            .accessibilityLabel(
+                viewModel.mapDisplayMode == .merchants
+                    ? NSLocalizedString("Show communities", comment: "VoiceOver label to switch map to communities")
+                    : NSLocalizedString("Show merchants", comment: "VoiceOver label to switch map to merchants")
+            )
+            .accessibilityValue(
+                viewModel.mapDisplayMode == .merchants
+                    ? NSLocalizedString("Merchants map", comment: "VoiceOver current map mode value")
+                    : NSLocalizedString("Communities map", comment: "VoiceOver current map mode value")
+            )
+            .accessibilityHint(
+                NSLocalizedString(
+                    "Switches between merchant pins and community areas",
+                    comment: "VoiceOver hint for map mode toggle"
+                )
+            )
             .featureHintAnchor(.communityToggle)
         }
         .frame(width: controlWidth)

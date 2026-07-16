@@ -549,27 +549,66 @@ struct MapView: UIViewRepresentable {
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                 view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = "\(cluster.memberAnnotations.count)"
+                let count = cluster.memberAnnotations.count
+                view?.accessibilityLabel = String(
+                    format: NSLocalizedString(
+                        "%d Bitcoin merchants",
+                        comment: "VoiceOver label for a map cluster of merchants"
+                    ),
+                    count
+                )
+                view?.accessibilityTraits = .button
+                view?.accessibilityHint = NSLocalizedString(
+                    "Double tap to zoom into this cluster",
+                    comment: "VoiceOver hint for merchant map clusters"
+                )
             } else if let annotation = annotation as? Annotation {
-                // Handle individual annotations
-                if annotation.element == nil {
-                    fatalError("Failed to get element from annotation.")
+                // Handle individual annotations — never crash on missing element.
+                guard let element = annotation.element else {
+                    Debug.logMap("Skipping annotation view: element is nil")
+                    return nil
                 }
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                 view?.canShowCallout = true
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
-                if let element = annotation.element {
-                    view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
-                    let symbolName = ElementCategorySymbols.symbolName(for: element)
-                    Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
-                    view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
-                } else {
-                    view?.markerTintColor = UIColor(named: "MarkerColor")
-                }
+                view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
+                let symbolName = ElementCategorySymbols.symbolName(for: element)
+                Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
+                view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                view?.accessibilityLabel = Self.accessibilityLabel(for: element)
+                view?.accessibilityTraits = .button
+                view?.accessibilityHint = NSLocalizedString(
+                    "Double tap to open merchant details",
+                    comment: "VoiceOver hint for individual merchant map pins"
+                )
                 view?.displayPriority = .required
             }
             return view
+        }
+
+        private static func accessibilityLabel(for element: Element) -> String {
+            let name = element.displayName
+                ?? NSLocalizedString("Bitcoin merchant", comment: "Fallback VoiceOver name for unnamed merchant pin")
+            var parts = [name]
+            if element.isCurrentlyBoosted() {
+                parts.append(NSLocalizedString("Featured", comment: "VoiceOver flag for boosted merchants"))
+            }
+            var methods: [String] = []
+            if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
+                methods.append(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
+            }
+            if acceptsLightning(element: element) {
+                methods.append(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
+            }
+            if acceptsContactlessLightning(element: element) {
+                methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
+            }
+            if !methods.isEmpty {
+                parts.append(methods.joined(separator: ", "))
+            }
+            return parts.joined(separator: ". ")
         }
         
         // Handle annotation selection to update navigation path
