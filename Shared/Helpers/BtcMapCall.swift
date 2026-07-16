@@ -271,6 +271,8 @@ class APIManager {
 
 class LogManager {
     static let shared = LogManager()
+    /// Soft cap so high-churn API/cache logging cannot grow without bound.
+    private let maxEntries = 1_000
     private init() {}
     private(set) var logs: [String] = []
     private let dateFormatter: DateFormatter = {
@@ -283,6 +285,9 @@ class LogManager {
         let timestamp = dateFormatter.string(from: Date())
         let logMessage = "[\(timestamp)] \(message)"
         logs.append(logMessage)
+        if logs.count > maxEntries {
+            logs.removeFirst(logs.count - maxEntries)
+        }
     }
     
     func allLogs() -> String {
