@@ -63,9 +63,11 @@ extension UIViewController {
     }
 }
 
-extension Element: Equatable {
+// Element identity is place id (Equatable + Hashable). Hash is defined on Element;
+// equality lives here to keep the model file focused on decoding.
+extension Element {
     static func == (lhs: Element, rhs: Element) -> Bool {
-        return lhs.id == rhs.id
+        lhs.id == rhs.id
     }
 }
 

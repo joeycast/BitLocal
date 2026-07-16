@@ -129,11 +129,8 @@ struct Element: Codable, Identifiable, Hashable {
         }
     }
 
-    /// Identity is place ID. Content may differ across store updates with the same id.
-    static func == (lhs: Element, rhs: Element) -> Bool {
-        lhs.id == rhs.id
-    }
-
+    /// Identity is place ID (see `Equatable` in Extensions + hash below).
+    /// Content may differ across store updates with the same id.
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
