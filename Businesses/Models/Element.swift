@@ -188,14 +188,14 @@ struct Element: Codable, Identifiable, Hashable {
 
 extension Array where Element == bitlocal.Element {
     /// Content-aware signature for map invalidation (IDs alone are not enough).
+    /// Uses stored boost tokens rather than live date checks so full-catalog
+    /// hashing stays cheap; become-active force-refresh covers expiry re-tint.
     var mapAnnotationsContentHash: Int {
         var hasher = Hasher()
         hasher.combine(count)
         for element in self {
             hasher.combine(element.id)
             hasher.combine(element.mapAnnotationContentSignature)
-            // Include live boost state so expiry can invalidate without a data write.
-            hasher.combine(element.isCurrentlyBoosted())
         }
         return hasher.finalize()
     }
