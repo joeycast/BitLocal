@@ -720,6 +720,19 @@ struct ElementCategorySymbols {
         }
     }
 
+    /// Human-readable category for snapshot bootstrap places that lack real names.
+    /// Prefer the primary merchant category chip label; fall back to a title-cased OSM tag.
+    static func friendlyCategoryLabel(forIcon icon: String?) -> String? {
+        if let group = merchantCategoryGroups(forCategoryIcon: icon).first {
+            return group.localizedLabel
+        }
+        guard let assignment = osmTagAssignment(forCategoryIcon: icon) else { return nil }
+        let raw = assignment.tagValue.replacingOccurrences(of: "_", with: " ")
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.localizedCapitalized
+    }
+
     static func merchantCategoryDescriptor(for group: MerchantCategoryGroup) -> MerchantCategoryDescriptor {
         merchantCategoryDescriptors[group]!
     }

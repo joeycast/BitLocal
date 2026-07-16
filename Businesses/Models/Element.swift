@@ -153,6 +153,17 @@ struct Element: Codable, Identifiable, Hashable {
             return operatorName
         }
 
+        // CDN snapshot bootstrap only includes id/lat/lon/icon (no place names).
+        // Surface a localized category label so first paint is readable while
+        // placeholder names continue to drive hydration/backfill.
+        if Self.isPlaceholderName(name) || name.isEmpty {
+            if let categoryLabel = ElementCategorySymbols.friendlyCategoryLabel(
+                forIcon: v4Metadata?.icon ?? tags?.iconPlatform
+            ) {
+                return categoryLabel
+            }
+        }
+
         return nil
     }
 

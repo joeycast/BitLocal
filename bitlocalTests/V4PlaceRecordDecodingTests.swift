@@ -12,6 +12,41 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
         XCTAssertEqual(records.first?.id, 123)
         XCTAssertEqual(records.first?.icon, "cafe")
         XCTAssertEqual(records.first?.comments, 2)
+        XCTAssertNil(records.first?.preferredName)
+    }
+
+    func testDecodesSnapshotRecordWithOptionalNameFields() throws {
+        let data = Data("""
+        [{"id":5,"lat":1.0,"lon":2.0,"icon":"hotel","name":"  Sea Lodge  ","display_name":"Sea Lodge Display"}]
+        """.utf8)
+
+        let record = try JSONDecoder().decode([V4PlaceSnapshotRecord].self, from: data).first
+        XCTAssertEqual(record?.preferredName, "Sea Lodge")
+        let element = V4PlaceToElementMapper.snapshotRecordToElement(
+            try XCTUnwrap(record),
+            fallbackTimestamp: "2026-01-01T00:00:00Z"
+        )
+        XCTAssertEqual(element.displayName, "Sea Lodge")
+        XCTAssertFalse(Element.isPlaceholderName(element.osmJSON?.tags?.name ?? ""))
+    }
+
+    func testSnapshotWithoutNameUsesCategoryDisplayNameWhileKeepingPlaceholderTag() {
+        let record = V4PlaceSnapshotRecord(
+            id: 9,
+            lat: 1,
+            lon: 2,
+            icon: "local_cafe",
+            comments: nil,
+            boostedUntil: nil,
+            name: nil,
+            displayName: nil
+        )
+        let element = V4PlaceToElementMapper.snapshotRecordToElement(
+            record,
+            fallbackTimestamp: "2026-01-01T00:00:00Z"
+        )
+        XCTAssertTrue(Element.isPlaceholderName(element.osmJSON?.tags?.name ?? ""))
+        XCTAssertEqual(element.displayName, MerchantCategoryGroup.coffee.localizedLabel)
     }
 
     func testDecodesFullPlaceRecordWithOptionalFields() throws {
