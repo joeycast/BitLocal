@@ -121,7 +121,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
     @Published var isUpdatingLocation = false
-    @Published var geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 1_000)
+    /// Reverse-geocode results. Intentionally not `@Published` — cache writes
+    /// must not invalidate the entire `ContentViewModel` observation graph.
+    let geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 1_000)
     /// Coarse spatial cache mapping ~11km regions to ISO country codes.
     /// Populated as a side effect of reverse geocoding; used to assign country
     /// codes to merchants that already have complete addresses without needing
