@@ -138,6 +138,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var visibleElements: [Element] = []
     @Published private(set) var activeMerchantAlertDigest: CityDigest?
     @Published var isLoading: Bool = false
+    /// Last successful merchant dataset sync (from repository sync state).
+    @Published private(set) var lastSuccessfulSyncAt: Date?
+    /// True when the most recent repository refresh returned no usable data while the store was empty.
+    @Published private(set) var merchantSyncFailed = false
+    @Published private(set) var merchantSyncStatusMessage: String?
     @Published var topPadding: CGFloat = 0
     @Published var bottomPadding: CGFloat = 0
     @Published var liveBottomPadding: CGFloat = 0
@@ -298,6 +303,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func configureBindings() {
         loadGeocodingCache()
+        refreshLastSuccessfulSyncAtFromRepository()
         locationManager.delegate = self
         setupCenterMapSubscription()
         visibleElementsSubject
@@ -3356,11 +3362,38 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         raw.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
     }
 
+    /// User-initiated merchant refresh (pull-to-refresh / empty-state retry).
+    /// Reuses repository in-flight coalescing.
+    func refreshMerchantData(userInitiated: Bool = true, completion: (() -> Void)? = nil) {
+        if userInitiated {
+            merchantSyncFailed = false
+            merchantSyncStatusMessage = nil
+        }
+        fetchElements(warmupOnly: false, forceNetworkRefresh: userInitiated, completion: completion)
+    }
+
+    @MainActor
+    func refreshMerchantData() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            refreshMerchantData(userInitiated: true) {
+                continuation.resume()
+            }
+        }
+    }
+
+    var lastSuccessfulSyncRelativeDescription: String? {
+        guard let lastSuccessfulSyncAt else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: lastSuccessfulSyncAt, relativeTo: Date())
+    }
+
     // Fetch elements using the APIManager and update the published elements property.
     // `warmupOnly` preloads merchant data without triggering onboarding-hostile side effects.
-    func fetchElements(warmupOnly: Bool = false, completion: (() -> Void)? = nil) {
-        Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly)")
-        Debug.logTiming("data", "fetchElements invoked (warmupOnly=\(warmupOnly), allElements=\(allElements.count), isLoading=\(isLoading))")
+    // `forceNetworkRefresh` skips the "cache only" early return so pull-to-refresh always hits the network path.
+    func fetchElements(warmupOnly: Bool = false, forceNetworkRefresh: Bool = false, completion: (() -> Void)? = nil) {
+        Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh)")
+        Debug.logTiming("data", "fetchElements invoked (warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh), allElements=\(allElements.count), isLoading=\(isLoading))")
         
         // Prevent concurrent calls - use main queue for thread safety
         DispatchQueue.main.async { [weak self] in
@@ -3375,12 +3408,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.isLoading = true
             
             // IMPORTANT: Load from cache into memory first if allElements is empty
-            if self.allElements.isEmpty {
+            if self.allElements.isEmpty, !forceNetworkRefresh {
                 if let cachedElements = self.btcMapRepository.loadCachedElements(), !cachedElements.isEmpty {
                     Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
                     Debug.logTiming("data", "loaded \(cachedElements.count) cached elements into memory")
                     self.allElements = cachedElements
                     self.hasLoadedInitialData = true
+                    self.merchantSyncFailed = false
+                    self.refreshLastSuccessfulSyncAtFromRepository()
                     let cachedHasPlaceholders = self.hasPlaceholderNames(in: cachedElements)
 
                     if cachedHasPlaceholders {
@@ -3394,6 +3429,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                                 if !refreshedElements.isEmpty {
                                     self.allElements = refreshedElements
                                     self.forceMapRefresh = true
+                                    self.noteMerchantSyncSucceeded()
+                                } else {
+                                    self.noteMerchantSyncOutcome(receivedCount: 0, hadCache: true, storeEmpty: self.allElements.isEmpty)
                                 }
                                 self.isLoading = false
                                 self.scheduleCommunityPrefetchIfNeeded()
@@ -3438,7 +3476,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 }
             }
 
-            let hadAnyCache = self.btcMapRepository.hasCachedData()
+            let hadAnyCache = self.btcMapRepository.hasCachedData() || !self.allElements.isEmpty
             let currentElementsEmpty = self.allElements.isEmpty
             Debug.logCache("Repository cache available before refresh: \(hadAnyCache)")
             Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
@@ -3457,10 +3495,22 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                         self.allElements = refreshedElements
                         self.hasLoadedInitialData = true
                         self.forceMapRefresh = true
+                        self.noteMerchantSyncSucceeded()
                     } else if currentElementsEmpty && !hadAnyCache {
                         Debug.log("Repository returned no data and no cache was available")
+                        self.hasLoadedInitialData = true
+                        self.noteMerchantSyncOutcome(receivedCount: 0, hadCache: false, storeEmpty: true)
                     } else {
                         Debug.log("Repository returned no updates - keeping existing \(self.allElements.count) elements")
+                        // Empty payload with existing cache usually means "no changes", not failure.
+                        self.noteMerchantSyncOutcome(
+                            receivedCount: 0,
+                            hadCache: hadAnyCache,
+                            storeEmpty: self.allElements.isEmpty
+                        )
+                        if !self.allElements.isEmpty {
+                            self.refreshLastSuccessfulSyncAtFromRepository()
+                        }
                     }
                     
                     self.isLoading = false
@@ -3473,6 +3523,35 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
                 }
             }
+        }
+    }
+
+    private func noteMerchantSyncSucceeded() {
+        merchantSyncFailed = false
+        merchantSyncStatusMessage = nil
+        lastSuccessfulSyncAt = Date()
+        refreshLastSuccessfulSyncAtFromRepository()
+    }
+
+    private func noteMerchantSyncOutcome(receivedCount: Int, hadCache: Bool, storeEmpty: Bool) {
+        if storeEmpty && receivedCount == 0 && !hadCache {
+            merchantSyncFailed = true
+            merchantSyncStatusMessage = NSLocalizedString(
+                "Couldn’t update merchants. Check your connection and try again.",
+                comment: "Empty-state message when merchant sync fails with no cache"
+            )
+        } else {
+            merchantSyncFailed = false
+            if storeEmpty {
+                merchantSyncStatusMessage = nil
+            }
+        }
+    }
+
+    private func refreshLastSuccessfulSyncAtFromRepository() {
+        guard let iso = btcMapRepository.lastSuccessfulSyncAtISO8601() else { return }
+        if let parsed = BTCMapDateParser.parse(iso) {
+            lastSuccessfulSyncAt = parsed
         }
     }
 
@@ -3511,8 +3590,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     Debug.logMap("Background update: Repository returned \(refreshedElements.count) elements")
                     self.allElements = refreshedElements
                     self.forceMapRefresh = true
+                    self.noteMerchantSyncSucceeded()
                 } else {
                     Debug.log("Background update: No new data available")
+                    self.refreshLastSuccessfulSyncAtFromRepository()
                 }
             }
         }

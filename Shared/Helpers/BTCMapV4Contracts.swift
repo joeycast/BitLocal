@@ -384,6 +384,8 @@ protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
     func loadCachedElements() -> [Element]?
     func hasCachedData() -> Bool
     func refreshElements(completion: @escaping ([Element]?) -> Void)
+    /// ISO-8601 timestamp of the last successful merchant sync, when known.
+    func lastSuccessfulSyncAtISO8601() -> String?
     func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void)
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void)
     func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void)
