@@ -235,6 +235,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var latestCommunitySelectionRequestID = UUID()
     private var hasScheduledCommunityPrefetch = false
     private var communityPrefetchWorkItem: DispatchWorkItem?
+    private var didRestorePersistedMerchantCategory = false
     private var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
     private var shouldReleasePostOnboardingPresentationAfterNextMapRender = false
     private var postOnboardingPresentationFallbackTask: Task<Void, Never>?
@@ -1447,11 +1448,55 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func performUnifiedSearch() {
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty {
+            MerchantSearchPersistence.clear()
+        } else if let group = ElementCategorySymbols.resolvedCategoryGroup(
+            forNormalizedQuery: SearchTextNormalizer.normalize(query)
+        ), group.localizedLabel.compare(query, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+            // Only persist exact category chip labels — never free-text.
+            MerchantSearchPersistence.saveCategoryGroup(group)
+        }
         if merchantSearchV2HybridEnabled {
             performUnifiedSearchHybrid(query: query)
         } else {
             performUnifiedSearchLegacyRemotePrimary(query: query)
         }
+    }
+
+    /// Applies a category chip and persists the selection for return visits.
+    func applyMerchantCategoryChip(_ chip: MerchantCategoryChip) {
+        isSearchActive = true
+        MerchantSearchPersistence.saveCategoryGroup(chip.group)
+        unifiedSearchText = chip.localizedLabel
+        performUnifiedSearch()
+    }
+
+    /// Clears search text and forgets any persisted category chip.
+    func clearMerchantSearch(userInitiated: Bool = true) {
+        if userInitiated {
+            MerchantSearchPersistence.clear()
+        }
+        unifiedSearchText = ""
+        isSearchActive = false
+        performUnifiedSearch()
+    }
+
+    /// Restores the last category chip once after initial merchant data is ready.
+    /// Free-text is intentionally not restored (avoids surprise worldwide queries).
+    func restorePersistedMerchantCategoryIfNeeded() {
+        guard !didRestorePersistedMerchantCategory else { return }
+        guard mapDisplayMode == .merchants else { return }
+        guard hasLoadedInitialData, !allElements.isEmpty else { return }
+        guard unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            didRestorePersistedMerchantCategory = true
+            return
+        }
+        didRestorePersistedMerchantCategory = true
+        guard let group = MerchantSearchPersistence.loadCategoryGroup() else { return }
+        isSearchActive = true
+        unifiedSearchText = group.localizedLabel
+        performUnifiedSearch()
+        Debug.logAPI("Restored persisted merchant category chip: \(group.rawValue)")
     }
 
     private func refreshMerchantSearchFromVisibleElementsIfNeeded() {

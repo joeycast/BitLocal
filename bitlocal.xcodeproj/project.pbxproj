@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F7E600013B19000000000003 /* MerchantSearchPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E600013B19000000000004 /* MerchantSearchPersistenceTests.swift */; };
+		F7E600013B19000000000001 /* MerchantSearchPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E600013B19000000000002 /* MerchantSearchPersistence.swift */; };
 		F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */; };
 		F6004F962DED3F43001183AE /* Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F952DED3F43001183AE /* Debug.swift */; };
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
@@ -104,6 +106,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F7E600013B19000000000004 /* MerchantSearchPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchPersistenceTests.swift; sourceTree = "<group>"; };
+		F7E600013B19000000000002 /* MerchantSearchPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchPersistence.swift; sourceTree = "<group>"; };
 		F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCategorySymbols.swift; sourceTree = "<group>"; };
 		F6004F952DED3F43001183AE /* Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug.swift; sourceTree = "<group>"; };
 		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
@@ -357,6 +361,7 @@
 				F66E0B932DE33F1200D68897 /* BtcMapCall.swift */,
 				F66E0B942DE33F1200D68897 /* Extensions.swift */,
 				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
+				F7E600013B19000000000002 /* MerchantSearchPersistence.swift */,
 				F7C0A3003A5B100100000200 /* MerchantAlerts.swift */,
 				F7E200013B13000000000002 /* FeatureHints.swift */,
 				F7E200013B1300000000000A /* ReleaseNotes.swift */,
@@ -488,6 +493,7 @@
 				F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */,
 				F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */,
 				F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */,
+				F7E600013B19000000000004 /* MerchantSearchPersistenceTests.swift */,
 				F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */,
 			);
 			path = bitlocalTests;
@@ -650,6 +656,7 @@
 				F7C0A1263A5B100100000008 /* AllRegionsListView.swift in Sources */,
 				F63E807B2EFC2FEA00ED1F00 /* BusinessSubmissionViewModel.swift in Sources */,
 				F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */,
+				F7E600013B19000000000001 /* MerchantSearchPersistence.swift in Sources */,
 				F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */,
 				F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */,
 				F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */,
@@ -684,6 +691,7 @@
 				F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */,
 				F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */,
 				F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */,
+				F7E600013B19000000000003 /* MerchantSearchPersistenceTests.swift in Sources */,
 				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
 				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
 				F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */,
