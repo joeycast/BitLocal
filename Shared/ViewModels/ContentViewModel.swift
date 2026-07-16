@@ -81,31 +81,6 @@ struct DeepLinkUnavailableState: Identifiable {
     let message: String
 }
 
-private struct MerchantSearchDocument {
-    let names: [String]
-    let brandOperators: [String]
-    let addresses: [String]
-    let categoryTerms: [String]
-    let rawTerms: [String]
-    let allTerms: [String]
-    let groups: [MerchantCategoryGroup]
-}
-
-private struct MerchantSearchMatch {
-    let score: Int
-    let matchedGroup: MerchantCategoryGroup?
-    let exactLiteralHit: Bool
-
-    var isStrong: Bool {
-        score >= 700 || exactLiteralHit
-    }
-}
-
-private struct MerchantRemoteSearchPlan: Hashable {
-    let query: V4SearchQuery
-    let source: String
-}
-
 private struct VisibleCommunityListCacheKey: Equatable {
     let areasHash: Int
     let mapMode: MapDisplayMode
@@ -1473,33 +1448,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         in source: [Element],
         normalizedQuery: String
     ) -> [Element] {
-        guard !normalizedQuery.isEmpty else { return [] }
-        let resolvedGroup = ElementCategorySymbols.resolvedCategoryGroup(forNormalizedQuery: normalizedQuery)
-        let matched = source.compactMap { element -> (element: Element, match: MerchantSearchMatch)? in
-            let document = merchantSearchDocument(for: element)
-            guard let match = merchantSearchMatch(
-                for: document,
-                normalizedQuery: normalizedQuery,
-                resolvedGroup: resolvedGroup
-            ) else {
-                return nil
+        let result = MerchantSearchEngine.filterElements(
+            source,
+            normalizedQuery: normalizedQuery,
+            documentProvider: { [weak self] element in
+                self?.merchantSearchDocument(for: element) ?? MerchantSearchEngine.document(for: element)
             }
-            return (element, match)
-        }
-
-        merchantSearchLocalMatchScoreByID = Dictionary(
-            uniqueKeysWithValues: matched.map { ($0.element.id, $0.match.score) }
         )
-        merchantSearchStrongLocalHitCount = matched.filter(\.match.isStrong).count
+        merchantSearchLocalMatchScoreByID = result.scoresByID
+        merchantSearchStrongLocalHitCount = result.strongHitCount
 
-        return matched
-            .sorted { lhs, rhs in
-                merchantElementSearchSortOrder(
-                    lhs.element,
-                    rhs.element
-                )
-            }
-            .map(\.element)
+        return result.elements.sorted(by: merchantElementSearchSortOrder)
     }
 
     private func performUnifiedSearchHybrid(query: String) {
@@ -1630,45 +1589,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func merchantSearchDocument(for element: Element) -> MerchantSearchDocument {
-        let rawFields = merchantSearchableTextFields(for: element)
-        let signature = rawFields.joined(separator: "|")
+        let signature = MerchantSearchEngine.documentSignature(for: element)
         if merchantSearchDocumentSignatureByID[element.id] == signature,
            let cached = merchantSearchDocumentByID[element.id] {
             return cached
         }
 
-        let groups = ElementCategorySymbols.merchantCategoryGroups(for: element)
-        let groupTerms = groups.flatMap { group in
-            ElementCategorySymbols.searchTerms(for: group)
-        }
-
-        let names = normalizedSearchFields([
-            element.osmJSON?.tags?.name,
-            element.displayName
-        ])
-        let brandOperators = normalizedSearchFields([
-            element.osmJSON?.tags?.brand,
-            element.osmJSON?.tags?.operator
-        ])
-        let addresses = normalizedSearchFields([
-            merchantSearchAddressText(for: element),
-            element.v4Metadata?.rawAddress
-        ])
-        let categoryTerms = normalizedSearchFields(groupTerms)
-        let rawTerms = normalizedSearchFields(
-            merchantSearchRawTerms(for: element)
-        )
-
-        let document = MerchantSearchDocument(
-            names: names,
-            brandOperators: brandOperators,
-            addresses: addresses,
-            categoryTerms: categoryTerms,
-            rawTerms: rawTerms,
-            allTerms: Array(Set(names + brandOperators + addresses + categoryTerms + rawTerms)),
-            groups: groups
-        )
-
+        let document = MerchantSearchEngine.document(for: element)
         merchantSearchDocumentSignatureByID[element.id] = signature
         merchantSearchDocumentByID[element.id] = document
         return document
@@ -1712,212 +1639,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    private func merchantSearchableTextFields(for element: Element) -> [String] {
-        let tagValues = element.osmTagsDict?.values.flatMap {
-            $0.components(separatedBy: ";")
-        } ?? []
-        let iconValues = [element.v4Metadata?.icon, element.tags?.iconPlatform]
-            .compactMap { $0 }
-            .flatMap { [$0, $0.replacingOccurrences(of: "_", with: " ")] }
-        let groupValues = ElementCategorySymbols.merchantCategoryGroups(for: element).flatMap {
-            ElementCategorySymbols.searchTerms(for: $0)
-        }
-
-        return (
-            [
-                element.osmJSON?.tags?.name,
-                element.osmJSON?.tags?.brand,
-                element.osmJSON?.tags?.operator,
-                element.displayName,
-                merchantSearchAddressText(for: element),
-                element.v4Metadata?.rawAddress
-            ].compactMap { $0 } +
-            tagValues +
-            iconValues +
-            groupValues
-        )
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-    }
-
-    private func merchantSearchRawTerms(for element: Element) -> [String] {
-        var rawTerms = merchantSearchableTextFields(for: element)
-        if let icon = element.v4Metadata?.icon ?? element.tags?.iconPlatform {
-            rawTerms.append(icon)
-            rawTerms.append(icon.replacingOccurrences(of: "_", with: " "))
-        }
-        return rawTerms
-    }
-
-    private func merchantSearchAddressText(for element: Element) -> String? {
-        let components = [
-            element.address?.streetNumber,
-            element.address?.streetName,
-            element.address?.cityOrTownName,
-            element.address?.regionOrStateName,
-            element.address?.postalCode,
-            element.address?.countryName
-        ]
-        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-
-        guard !components.isEmpty else { return nil }
-        return components.joined(separator: " ")
-    }
-
-    private func normalizedSearchFields(_ values: [String?]) -> [String] {
-        values
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .map(SearchTextNormalizer.normalize)
-            .filter { !$0.isEmpty }
-    }
-
-    private func normalizedSearchFields(_ values: [String]) -> [String] {
-        normalizedSearchFields(values.map(Optional.some))
-    }
-
     private func merchantSearchDocument(for record: V4PlaceRecord) -> MerchantSearchDocument {
-        let element = V4PlaceToElementMapper.placeRecordToElement(record)
-        let groups = ElementCategorySymbols.merchantCategoryGroups(for: element)
-        let groupTerms = groups.flatMap { ElementCategorySymbols.searchTerms(for: $0) }
-        let iconTerms = [record.icon].compactMap { $0 }.flatMap { [$0, $0.replacingOccurrences(of: "_", with: " ")] }
-
-        let names = normalizedSearchFields([record.name, record.displayName])
-        let brandOperators = normalizedSearchFields([record.osmBrand, record.osmOperator])
-        let addresses = normalizedSearchFields([record.address])
-        let categoryTerms = normalizedSearchFields(groupTerms)
-        let rawTerms = normalizedSearchFields(
-            (element.osmTagsDict?.values.flatMap { $0.components(separatedBy: ";") } ?? []) +
-            iconTerms +
-            [record.description].compactMap { $0 }
-        )
-
-        return MerchantSearchDocument(
-            names: names,
-            brandOperators: brandOperators,
-            addresses: addresses,
-            categoryTerms: categoryTerms,
-            rawTerms: rawTerms,
-            allTerms: Array(Set(names + brandOperators + addresses + categoryTerms + rawTerms)),
-            groups: groups
-        )
-    }
-
-    private func merchantSearchMatch(
-        for document: MerchantSearchDocument,
-        normalizedQuery: String,
-        resolvedGroup: MerchantCategoryGroup?
-    ) -> MerchantSearchMatch? {
-        guard !normalizedQuery.isEmpty else { return nil }
-
-        let queryTokens = normalizedQuery.split(separator: " ").map(String.init)
-        guard !queryTokens.isEmpty else { return nil }
-
-        var score = 0
-        var matchedGroup: MerchantCategoryGroup?
-        let exactNameHit = containsPhrase(normalizedQuery, in: document.names)
-        let exactBrandHit = containsPhrase(normalizedQuery, in: document.brandOperators)
-
-        if exactNameHit {
-            score = max(score, 1000)
-        }
-        if exactBrandHit {
-            score = max(score, 920)
-        }
-        if tokenPrefixMatch(queryTokens, in: document.names) {
-            score = max(score, 840)
-        }
-
-        if let resolvedGroup, document.groups.contains(resolvedGroup) {
-            score = max(score, 780)
-            matchedGroup = resolvedGroup
-        }
-
-        if containsPhrase(normalizedQuery, in: document.categoryTerms) {
-            score = max(score, 720)
-            matchedGroup = matchedGroup ?? document.groups.first
-        } else if tokenPrefixMatch(queryTokens, in: document.categoryTerms) {
-            score = max(score, 680)
-            matchedGroup = matchedGroup ?? document.groups.first
-        }
-
-        if containsPhrase(normalizedQuery, in: document.rawTerms) {
-            score = max(score, 620)
-        }
-
-        if tokenPrefixMatch(queryTokens, in: document.allTerms) {
-            score = max(score, 560)
-        } else if fuzzyTokenMatch(queryTokens, in: document.allTerms) {
-            score = max(score, 520)
-        }
-
-        guard score > 0 else { return nil }
-        return MerchantSearchMatch(
-            score: score,
-            matchedGroup: matchedGroup,
-            exactLiteralHit: exactNameHit || exactBrandHit
-        )
-    }
-
-    private func containsPhrase(_ normalizedQuery: String, in fields: [String]) -> Bool {
-        fields.contains { $0.contains(normalizedQuery) }
-    }
-
-    private func tokenPrefixMatch(_ queryTokens: [String], in fields: [String]) -> Bool {
-        guard !queryTokens.isEmpty else { return false }
-        return queryTokens.allSatisfy { queryToken in
-            fields.contains { field in
-                field.split(separator: " ").contains { String($0).hasPrefix(queryToken) }
-            }
-        }
-    }
-
-    private func fuzzyTokenMatch(_ queryTokens: [String], in fields: [String]) -> Bool {
-        guard !queryTokens.isEmpty else { return false }
-        let candidateTokens = Set(fields.flatMap { $0.split(separator: " ").map(String.init) })
-        return queryTokens.allSatisfy { queryToken in
-            candidateTokens.contains(where: { candidate in
-                candidate.hasPrefix(queryToken) || isOneEditAway(queryToken, candidate)
-            })
-        }
-    }
-
-    private func isOneEditAway(_ lhs: String, _ rhs: String) -> Bool {
-        if lhs == rhs { return true }
-        let lhsChars = Array(lhs)
-        let rhsChars = Array(rhs)
-        guard abs(lhsChars.count - rhsChars.count) <= 1 else { return false }
-
-        var i = 0
-        var j = 0
-        var edits = 0
-
-        while i < lhsChars.count && j < rhsChars.count {
-            if lhsChars[i] == rhsChars[j] {
-                i += 1
-                j += 1
-                continue
-            }
-
-            edits += 1
-            if edits > 1 { return false }
-
-            if lhsChars.count > rhsChars.count {
-                i += 1
-            } else if rhsChars.count > lhsChars.count {
-                j += 1
-            } else {
-                i += 1
-                j += 1
-            }
-        }
-
-        if i < lhsChars.count || j < rhsChars.count {
-            edits += 1
-        }
-
-        return edits <= 1
+        MerchantSearchEngine.document(for: record)
     }
 
     private func pruneFreshResultsAgainstPrimary() {
@@ -3108,24 +2831,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         _ records: [V4PlaceRecord],
         normalizedQuery: String
     ) -> [V4PlaceRecord] {
-        let resolvedGroup = ElementCategorySymbols.resolvedCategoryGroup(forNormalizedQuery: normalizedQuery)
-        var deduplicatedByID: [String: V4PlaceRecord] = [:]
-        for record in records where deduplicatedByID[record.idString] == nil {
-            deduplicatedByID[record.idString] = record
-        }
-
-        return deduplicatedByID.values
-            .compactMap { record -> (record: V4PlaceRecord, score: Int)? in
-                let document = merchantSearchDocument(for: record)
-                guard let match = merchantSearchMatch(
-                    for: document,
-                    normalizedQuery: normalizedQuery,
-                    resolvedGroup: resolvedGroup
-                ) else {
-                    return nil
-                }
-                return (record, match.score)
-            }
+        MerchantSearchEngine.filterRecords(records, normalizedQuery: normalizedQuery)
             .sorted { lhs, rhs in
                 if lhs.score != rhs.score {
                     return lhs.score > rhs.score
