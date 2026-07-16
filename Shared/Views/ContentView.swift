@@ -12,6 +12,7 @@ struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var featureHintsController: FeatureHintsController
     @Environment(\.colorScheme) private var systemColorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var appearanceManager = AppearanceManager()
 
     @State public var showingAbout = false
@@ -26,8 +27,6 @@ struct ContentView: View {
     @AppStorage("selectedMapType") private var storedMapType: Int = 0
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
-    let apiManager = APIManager()
-
     var selectedMapTypeBinding: Binding<MKMapType> {
         Binding<MKMapType>(
             get: { MKMapType.from(int: storedMapType) },
@@ -36,12 +35,18 @@ struct ContentView: View {
     }
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
-    var body: some View {
-        GeometryReader { geometry in
-            let screenWidth = geometry.size.width
-            let screenHeight = geometry.size.height
+    /// Prefer idiom + size class over hard-coded pixel thresholds so iPad
+    /// multitasking and large phones don't flip the wrong layout shell.
+    private var usesIPadLayout: Bool {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return horizontalSizeClass != .compact
+        }
+        return false
+    }
 
-            if screenWidth > 768 || screenHeight > 1024 {
+    var body: some View {
+        Group {
+            if usesIPadLayout {
                 IPadLayoutView(
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
