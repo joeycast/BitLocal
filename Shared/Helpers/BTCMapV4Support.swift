@@ -1144,7 +1144,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     static func mergeElements(existing: [Element], incoming: [Element]) -> [Element] {
-        var dictionary = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+        var dictionary = IdentifiableIndex.byID(existing)
         for element in incoming {
             let isDeleted = !(element.deletedAt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
             if isDeleted {

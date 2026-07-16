@@ -501,7 +501,7 @@ struct MapView: UIViewRepresentable {
             let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
             mapView.addAnnotations(newAnnotations)
 
-            let latestByID = Dictionary(uniqueKeysWithValues: sourceElements.map { ($0.id, $0) })
+            let latestByID = IdentifiableIndex.byID(sourceElements)
             let visibleIDs = visibleElements.map(\.id)
             let refreshedVisibleElements = visibleIDs.compactMap { id in
                 latestByID[id] ?? newByID[id]
@@ -691,7 +691,7 @@ struct MapView: UIViewRepresentable {
             let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
             let visibleAnnotations = mapView.annotations(in: visibleRect)
             let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-            let latestByID = Dictionary(uniqueKeysWithValues: self.viewModel.allElements.map { ($0.id, $0) })
+            let latestByID = IdentifiableIndex.byID(self.viewModel.allElements)
             let refreshed = visibleElements.compactMap { latestByID[$0.id] ?? $0 }
 
             self.viewModel.visibleElementsSubject.send(refreshed)
