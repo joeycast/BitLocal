@@ -74,13 +74,6 @@ enum SearchTextNormalizer {
     }
 }
 
-struct DeepLinkUnavailableState: Identifiable {
-    let id = UUID()
-    let placeID: String
-    let title: String
-    let message: String
-}
-
 private struct MerchantSearchDocument {
     let names: [String]
     let brandOperators: [String]
@@ -203,6 +196,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let geocoder = Geocoder.shared
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
     private let btcMapRepository: BTCMapRepositoryProtocol
+    private lazy var placeDeepLinkResolver = PlaceDeepLinkResolver(repository: btcMapRepository)
     
     // Startup state tracking
     @Published var isInitialStartup = true
@@ -487,29 +481,24 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func handlePlaceDeepLink(placeID: String) {
-        guard PlaceShareLinkBuilder.isValidPlaceID(placeID) else {
-            presentDeepLinkUnavailable(placeID: placeID, reason: NSLocalizedString("Invalid place identifier.", comment: "Reason shown when a shared place ID is malformed"))
-            return
-        }
-
         mapDisplayMode = .merchants
         isSearchActive = false
 
-        btcMapRepository.fetchPlace(id: placeID) { [weak self] result in
+        placeDeepLinkResolver.resolve(placeID: placeID) { [weak self] resolution in
             DispatchQueue.main.async {
                 guard let self else { return }
-
-                switch result {
-                case .success(let record):
-                    if let deletedAt = record.deletedAt, !deletedAt.isEmpty {
-                        self.presentDeepLinkUnavailable(
-                            placeID: placeID,
-                            reason: NSLocalizedString("This place is no longer available.", comment: "Reason shown when a shared place has been removed")
-                        )
-                        return
-                    }
-
-                    let element = V4PlaceToElementMapper.placeRecordToElement(record)
+                switch resolution {
+                case .invalidIdentifier:
+                    self.presentDeepLinkUnavailable(
+                        placeID: placeID,
+                        reason: PlaceDeepLinkResolver.invalidIdentifierReason()
+                    )
+                case .deleted:
+                    self.presentDeepLinkUnavailable(
+                        placeID: placeID,
+                        reason: PlaceDeepLinkResolver.deletedPlaceReason()
+                    )
+                case .success(let element):
                     self.upsertElementIntoStore(element)
                     if let coordinate = element.mapCoordinate {
                         self.centerMap(to: coordinate, force: true)
@@ -518,9 +507,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     self.selectedElement = element
                     self.path = [element]
                     self.deepLinkUnavailableState = nil
-
-                case .failure(let error):
-                    self.presentDeepLinkUnavailable(placeID: placeID, reason: error.localizedDescription)
+                case .failure(let message):
+                    self.presentDeepLinkUnavailable(placeID: placeID, reason: message)
                 }
             }
         }
@@ -528,11 +516,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func presentDeepLinkUnavailable(placeID: String, reason: String) {
         Debug.log("Deep link place unavailable: id=\(placeID), reason=\(reason)")
-        deepLinkUnavailableState = DeepLinkUnavailableState(
-            placeID: placeID,
-            title: NSLocalizedString("Place unavailable", comment: "Title for unavailable deep-linked place screen"),
-            message: NSLocalizedString("We could not open this BitLocal place. It may have been removed or is temporarily unavailable.", comment: "Message for unavailable deep-linked place screen")
-        )
+        deepLinkUnavailableState = PlaceDeepLinkResolver.unavailableState(placeID: placeID, reason: reason)
     }
 
     func scheduleGeocodingCacheSave() {
@@ -1968,7 +1952,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         hasLoadedCommunityMapAreas = true
         communityMapAreasIsLoading = true
-        loadCommunityMapAreasV2Paginated(anchor: "2022-01-01T00:00:00.000Z", page: 1, accumulated: [:])
+        loadCommunityMapAreasV2()
     }
 
     var mapElementsForCurrentDisplay: [Element] {
@@ -2115,45 +2099,22 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         communityMapAreas.first { $0.id == id }
     }
 
-    private func loadCommunityMapAreasV2Paginated(anchor: String, page: Int, accumulated: [String: V2AreaRecord]) {
-        let pageLimit = 500
-        let maxPages = 20
-        btcMapRepository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                switch result {
-                case .failure(let error):
-                    self.communityMapAreasIsLoading = false
-                    self.hasLoadedCommunityMapAreas = false
-                    Debug.logAPI("loadCommunityMapAreasV2 page \(page) failed: \(error.localizedDescription)")
+    private func loadCommunityMapAreasV2() {
+        let loader = CommunityAreasLoader(repository: btcMapRepository)
+        loader.loadAll(initialAnchor: "2022-01-01T00:00:00.000Z") { [weak self] areas, isComplete, error in
+            guard let self else { return }
+            if let error {
+                self.communityMapAreasIsLoading = false
+                self.hasLoadedCommunityMapAreas = false
+                Debug.logAPI("loadCommunityMapAreasV2 failed: \(error.localizedDescription)")
+                return
+            }
 
-                case .success(let areas):
-                    var merged = accumulated
-                    for area in areas {
-                        if area.isDeleted {
-                            merged.removeValue(forKey: area.id)
-                        } else {
-                            merged[area.id] = area
-                        }
-                    }
-
-                    // Publish progressively so visible communities can appear immediately.
-                    self.communityMapAreas = Array(merged.values)
-                    self.forceMapRefresh = true
-
-                    let nextAnchor = areas.last?.updatedAt
-                    let shouldContinue = areas.count == pageLimit &&
-                        page < maxPages &&
-                        nextAnchor != nil &&
-                        nextAnchor != anchor
-
-                    if shouldContinue, let nextAnchor {
-                        self.loadCommunityMapAreasV2Paginated(anchor: nextAnchor, page: page + 1, accumulated: merged)
-                        return
-                    }
-
-                    self.communityMapAreasIsLoading = false
-                }
+            // Publish progressively so visible communities can appear immediately.
+            self.communityMapAreas = areas
+            self.forceMapRefresh = true
+            if isComplete {
+                self.communityMapAreasIsLoading = false
             }
         }
     }
