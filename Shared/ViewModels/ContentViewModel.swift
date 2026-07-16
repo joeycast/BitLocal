@@ -195,6 +195,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var lastVisibleCommunityListCacheKey: VisibleCommunityListCacheKey?
     private var communityGeoJSONHydrationInFlight = false
     private var requestedCommunityAreaDetailIDs = Set<Int>()
+    /// Spatial index over merchant coordinates for community polygon membership.
+    private var merchantSpatialIndex = MerchantSpatialIndex()
+    private var merchantSpatialIndexSignature: Int = 0
 
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -2507,16 +2510,73 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let polygons = geoJSONPolygons(from: geoJSON)
         guard !polygons.isEmpty else { return nil }
 
-        return allElements.filter { element in
-            guard let coordinate = element.mapCoordinate else { return false }
-            return polygons.contains { polygon in
-                coordinateInPolygon(
+        ensureMerchantSpatialIndex()
+
+        let candidates: [MerchantSpatialIndex.Entry]
+        if let box = MerchantPolygonGeometry.boundingBox(for: polygons) {
+            candidates = merchantSpatialIndex.candidates(
+                minLatitude: box.minLat,
+                maxLatitude: box.maxLat,
+                minLongitude: box.minLon,
+                maxLongitude: box.maxLon
+            )
+        } else {
+            // Degenerate geometry — fall back to scanning everything that has coordinates.
+            candidates = allElements.compactMap { element in
+                guard let coordinate = element.mapCoordinate else { return nil }
+                return MerchantSpatialIndex.Entry(
+                    id: element.id,
                     latitude: coordinate.latitude,
-                    longitude: coordinate.longitude,
-                    rings: polygon
+                    longitude: coordinate.longitude
                 )
             }
         }
+
+        let byID = Dictionary(allElements.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+        var members: [Element] = []
+        members.reserveCapacity(min(candidates.count, 256))
+
+        for candidate in candidates {
+            guard polygons.contains(where: { polygon in
+                coordinateInPolygon(
+                    latitude: candidate.latitude,
+                    longitude: candidate.longitude,
+                    rings: polygon
+                )
+            }) else { continue }
+            if let element = byID[candidate.id] {
+                members.append(element)
+            }
+        }
+        return members
+    }
+
+    private func ensureMerchantSpatialIndex() {
+        let signature = merchantStoreSignature(for: allElements)
+        guard signature != merchantSpatialIndexSignature || merchantSpatialIndex.isEmpty else { return }
+        let start = CFAbsoluteTimeGetCurrent()
+        merchantSpatialIndex.rebuild(from: allElements, sourceSignature: signature)
+        merchantSpatialIndexSignature = signature
+        Debug.logTiming(
+            "map",
+            "merchant spatial index rebuilt entries=\(merchantSpatialIndex.entryCount) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - start) * 1000))ms"
+        )
+    }
+
+    private func merchantStoreSignature(for elements: [Element]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(elements.count)
+        if let first = elements.first?.id {
+            hasher.combine(first)
+        }
+        if let last = elements.last?.id {
+            hasher.combine(last)
+        }
+        // Cheap sample so wholesale replacements invalidate even with equal counts.
+        if elements.count > 2 {
+            hasher.combine(elements[elements.count / 2].id)
+        }
+        return hasher.finalize()
     }
 
     private func geoJSONPolygons(from collection: GeoJSONFeatureCollection) -> [[[[Double]]]] {
