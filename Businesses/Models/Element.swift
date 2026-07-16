@@ -11,7 +11,6 @@ import Foundation
 // MARK: - Element
 struct Element: Codable, Identifiable, Hashable {
     let id: String
-    let uuid: UUID
     let osmJSON: OsmJSON?
     let tags: Tags?
     let createdAt: String
@@ -64,7 +63,6 @@ struct Element: Codable, Identifiable, Hashable {
     
     enum CodingKeys: String, CodingKey {
         case id
-        case uuid
         case osmJSON = "osm_json"
         case tags
         case createdAt = "created_at"
@@ -76,7 +74,6 @@ struct Element: Codable, Identifiable, Hashable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
-        uuid = UUID()
         osmJSON = try container.decodeIfPresent(OsmJSON.self, forKey: .osmJSON)
         tags = try container.decodeIfPresent(Tags.self, forKey: .tags)
         createdAt = try container.decode(String.self, forKey: .createdAt)
@@ -109,7 +106,6 @@ struct Element: Codable, Identifiable, Hashable {
         v4Metadata: ElementV4Metadata? = nil
     ) {
         self.id = id
-        self.uuid = UUID()
         self.osmJSON = osmJSON
         self.tags = tags
         self.createdAt = createdAt
@@ -132,7 +128,12 @@ struct Element: Codable, Identifiable, Hashable {
             self.address = nil
         }
     }
-    
+
+    /// Identity is place ID. Content may differ across store updates with the same id.
+    static func == (lhs: Element, rhs: Element) -> Bool {
+        lhs.id == rhs.id
+    }
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
@@ -156,6 +157,14 @@ struct Element: Codable, Identifiable, Hashable {
         return nil
     }
 
+    /// Content that should force map annotation view refresh when it changes.
+    var mapAnnotationContentSignature: String {
+        let name = displayName ?? osmJSON?.tags?.name ?? ""
+        let boostToken = v4Metadata?.boostedUntil ?? tags?.boostExpires ?? ""
+        let icon = v4Metadata?.icon ?? tags?.iconPlatform ?? ""
+        return "\(updatedAt ?? "")|\(name)|\(boostToken)|\(icon)"
+    }
+
     static func isInvalidPrimaryName(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return true }
@@ -174,6 +183,21 @@ struct Element: Codable, Identifiable, Hashable {
     func isCurrentlyBoosted(referenceDate: Date = Date()) -> Bool {
         guard let boostExpirationDate else { return false }
         return boostExpirationDate > referenceDate
+    }
+}
+
+extension Array where Element == bitlocal.Element {
+    /// Content-aware signature for map invalidation (IDs alone are not enough).
+    var mapAnnotationsContentHash: Int {
+        var hasher = Hasher()
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element.id)
+            hasher.combine(element.mapAnnotationContentSignature)
+            // Include live boost state so expiry can invalidate without a data write.
+            hasher.combine(element.isCurrentlyBoosted())
+        }
+        return hasher.finalize()
     }
 }
 

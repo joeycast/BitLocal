@@ -160,7 +160,8 @@ struct MapView: UIViewRepresentable {
         var refreshElementsHash: Int?
         var refreshForce = false
         if let elements = elements, !elements.isEmpty {
-            let elementsHash = elements.hashValue
+            // Content-aware hash so name/boost/icon updates invalidate pins even when IDs are unchanged.
+            let elementsHash = elements.mapAnnotationsContentHash
             let shouldForceUpdate = viewModel.forceMapRefresh
             let hashChanged = context.coordinator.lastElementsHash != elementsHash
             
@@ -489,11 +490,24 @@ struct MapView: UIViewRepresentable {
                 newByID[element.id] = element
             }
 
-            let annotationsToRemove = existingByID.compactMap { id, annotation in
-                newByID[id] == nil ? annotation : nil
+            // Drop pins that left the viewport, and pins whose map-facing content changed
+            // (name, boost, icon) so marker tint/title stay current.
+            let annotationsToRemove = existingByID.compactMap { id, annotation -> Annotation? in
+                guard let latest = newByID[id] else { return annotation }
+                let existingSignature = annotation.element?.mapAnnotationContentSignature
+                let latestSignature = latest.mapAnnotationContentSignature
+                let boostChanged = (annotation.element?.isCurrentlyBoosted() ?? false) != latest.isCurrentlyBoosted()
+                if existingSignature != latestSignature || boostChanged {
+                    return annotation
+                }
+                return nil
             }
-            let elementsToAdd = newByID.compactMap { id, element in
-                existingByID[id] == nil ? element : nil
+            let removedIDs = Set(annotationsToRemove.compactMap { $0.element?.id })
+            let elementsToAdd = newByID.compactMap { id, element -> Element? in
+                if existingByID[id] == nil || removedIDs.contains(id) {
+                    return element
+                }
+                return nil
             }
 
             mapView.removeAnnotations(annotationsToRemove)
@@ -501,7 +515,7 @@ struct MapView: UIViewRepresentable {
             let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
             mapView.addAnnotations(newAnnotations)
 
-            let latestByID = Dictionary(uniqueKeysWithValues: sourceElements.map { ($0.id, $0) })
+            let latestByID = Dictionary(sourceElements.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
             let visibleIDs = visibleElements.map(\.id)
             let refreshedVisibleElements = visibleIDs.compactMap { id in
                 latestByID[id] ?? newByID[id]
@@ -656,7 +670,7 @@ struct MapView: UIViewRepresentable {
                     self.updateAnnotations(
                         mapView: mapView,
                         elements: all,
-                        elementsHash: all.hashValue,
+                        elementsHash: all.mapAnnotationsContentHash,
                         force: false
                     )
                 }
@@ -691,7 +705,7 @@ struct MapView: UIViewRepresentable {
             let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
             let visibleAnnotations = mapView.annotations(in: visibleRect)
             let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-            let latestByID = Dictionary(uniqueKeysWithValues: self.viewModel.allElements.map { ($0.id, $0) })
+            let latestByID = Dictionary(self.viewModel.allElements.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
             let refreshed = visibleElements.compactMap { latestByID[$0.id] ?? $0 }
 
             self.viewModel.visibleElementsSubject.send(refreshed)

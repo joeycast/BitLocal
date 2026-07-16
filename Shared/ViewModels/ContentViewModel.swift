@@ -439,6 +439,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.appState = .active
             self.hasBeenInactive = false
             self.resolvePendingDeepLinkIfNeeded()
+
+            // Re-evaluate boost styling / annotation content after background time.
+            if wasInactive {
+                self.forceMapRefresh = true
+            }
             
             // Only fetch if we were previously inactive/background and don't have data
             if wasInactive && (self.allElements.isEmpty || self.shouldRefreshAfterInactive()) {
