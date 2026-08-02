@@ -34,6 +34,16 @@ final class MerchantElementStoreTests: XCTestCase {
         XCTAssertEqual(store.elements(ids: ["3", "1", "missing"]).map(\.id), ["3", "1"])
     }
 
+    func testSnapshotIsDeterministicallyOrderedByID() {
+        let store = MerchantElementStore()
+        store.replaceAll([
+            makeElement(id: "b", name: "B"),
+            makeElement(id: "a", name: "A"),
+            makeElement(id: "c", name: "C")
+        ])
+        XCTAssertEqual(store.snapshot().map(\.id), ["a", "b", "c"])
+    }
+
     func testDuplicateIDsInReplaceKeepLast() {
         let store = MerchantElementStore()
         store.replaceAll([

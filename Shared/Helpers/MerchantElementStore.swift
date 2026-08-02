@@ -16,9 +16,11 @@ final class MerchantElementStore {
         byID[id]
     }
 
-    /// Current catalog snapshot for UI / map. Builds an array of values.
+    /// Current catalog snapshot for UI / map, ordered by id so repeated
+    /// snapshots are stable — dictionary order would shuffle between rebuilds,
+    /// defeating downstream change detection (e.g. map content hashing).
     func snapshot() -> [Element] {
-        Array(byID.values)
+        byID.values.sorted { $0.id < $1.id }
     }
 
     /// O(1) index access for bulk operations that already hold the store.
