@@ -2563,6 +2563,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         )
     }
 
+    /// Sampled signature (count + first/mid/last IDs). Intentionally misses
+    /// in-place coordinate edits with identical IDs and count — merchants
+    /// essentially never move, and a full-catalog hash per membership query
+    /// would cost more than the stale-index risk.
     private func merchantStoreSignature(for elements: [Element]) -> Int {
         var hasher = Hasher()
         hasher.combine(elements.count)
