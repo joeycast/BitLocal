@@ -192,7 +192,12 @@ extension Array where Element == bitlocal.Element {
         hasher.combine(count)
         for element in self {
             hasher.combine(element.id)
-            hasher.combine(element.mapAnnotationContentSignature)
+            // Same components as mapAnnotationContentSignature, hashed directly
+            // to avoid building a string per element on every map update.
+            hasher.combine(element.updatedAt ?? "")
+            hasher.combine(element.displayName ?? element.osmJSON?.tags?.name ?? "")
+            hasher.combine(element.v4Metadata?.boostedUntil ?? element.tags?.boostExpires ?? "")
+            hasher.combine(element.v4Metadata?.icon ?? element.tags?.iconPlatform ?? "")
         }
         return hasher.finalize()
     }
