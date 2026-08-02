@@ -57,7 +57,9 @@ final class PlaceDeepLinkResolver {
         }
     }
 
-    static func unavailableState(placeID: String, reason: String) -> DeepLinkUnavailableState {
+    /// The user-facing message is intentionally generic; the specific reason
+    /// is only logged by the caller.
+    static func unavailableState(placeID: String) -> DeepLinkUnavailableState {
         DeepLinkUnavailableState(
             placeID: placeID,
             title: NSLocalizedString("Place unavailable", comment: "Title for unavailable deep-linked place screen"),

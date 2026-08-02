@@ -481,6 +481,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func handlePlaceDeepLink(placeID: String) {
+        // Validate before touching map mode so a malformed link doesn't
+        // yank the user out of communities view (resolver re-checks too).
+        guard PlaceShareLinkBuilder.isValidPlaceID(placeID.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            presentDeepLinkUnavailable(
+                placeID: placeID,
+                reason: PlaceDeepLinkResolver.invalidIdentifierReason()
+            )
+            return
+        }
+
         mapDisplayMode = .merchants
         isSearchActive = false
 
@@ -516,7 +526,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func presentDeepLinkUnavailable(placeID: String, reason: String) {
         Debug.log("Deep link place unavailable: id=\(placeID), reason=\(reason)")
-        deepLinkUnavailableState = PlaceDeepLinkResolver.unavailableState(placeID: placeID, reason: reason)
+        deepLinkUnavailableState = PlaceDeepLinkResolver.unavailableState(placeID: placeID)
     }
 
     func scheduleGeocodingCacheSave() {

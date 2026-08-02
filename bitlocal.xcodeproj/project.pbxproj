@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F7E900013B1C000000000005 /* PlaceDeepLinkResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */; };
+		F7E900013B1C000000000007 /* CommunityAreasLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */; };
 		F7E900013B1C000000000003 /* CommunityAreasLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E900013B1C000000000004 /* CommunityAreasLoader.swift */; };
 		F7E900013B1C000000000001 /* PlaceDeepLinkResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E900013B1C000000000002 /* PlaceDeepLinkResolver.swift */; };
 		F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */; };
@@ -108,6 +109,7 @@
 
 /* Begin PBXFileReference section */
 		F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDeepLinkResolverTests.swift; sourceTree = "<group>"; };
+		F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityAreasLoaderTests.swift; sourceTree = "<group>"; };
 		F7E900013B1C000000000004 /* CommunityAreasLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityAreasLoader.swift; sourceTree = "<group>"; };
 		F7E900013B1C000000000002 /* PlaceDeepLinkResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDeepLinkResolver.swift; sourceTree = "<group>"; };
 		F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCategorySymbols.swift; sourceTree = "<group>"; };
@@ -497,6 +499,7 @@
 				F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */,
 				F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */,
 				F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */,
+				F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */,
 				F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */,
 			);
 			path = bitlocalTests;
@@ -696,6 +699,7 @@
 				F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */,
 				F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */,
 				F7E900013B1C000000000005 /* PlaceDeepLinkResolverTests.swift in Sources */,
+				F7E900013B1C000000000007 /* CommunityAreasLoaderTests.swift in Sources */,
 				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
 				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
 				F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */,

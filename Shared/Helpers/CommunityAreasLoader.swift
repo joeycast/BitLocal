@@ -31,8 +31,12 @@ final class CommunityAreasLoader {
         accumulated: [String: V2AreaRecord],
         onPage: @escaping (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
     ) {
-        repository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { [weak self] result in
-            guard let self else { return }
+        // Deliberately capture self strongly: callers create this loader as a
+        // local, so the in-flight completion is the only thing keeping it (and
+        // the pagination) alive. A weak capture would deallocate the loader as
+        // soon as the calling scope returns and onPage would never fire. The
+        // retain resolves when the network completion runs.
+        repository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .failure(let error):
