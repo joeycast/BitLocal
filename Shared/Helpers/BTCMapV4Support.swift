@@ -850,9 +850,13 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         let storedVersion = userDefaults.string(forKey: lastAppVersionKey)
         guard storedVersion != currentVersion else { return }
 
-        Debug.logCache(
-            "App version changed from \(storedVersion ?? "unknown") to \(currentVersion); clearing v4 merchant cache"
-        )
+        // storedVersion == nil covers both fresh installs (clear is a no-op) and
+        // upgrades from builds that predate version tracking (clear is required).
+        if let storedVersion {
+            Debug.logCache("App version changed from \(storedVersion) to \(currentVersion); clearing v4 merchant cache")
+        } else {
+            Debug.logCache("Recording app version \(currentVersion); clearing any pre-tracking v4 merchant cache")
+        }
         try? FileManager.default.removeItem(at: v4ElementsFileURL)
         try? FileManager.default.removeItem(at: v4SyncStateFileURL)
         userDefaults.set(currentVersion, forKey: lastAppVersionKey)
