@@ -274,27 +274,35 @@ class LogManager {
     /// Soft cap so high-churn API/cache logging cannot grow without bound.
     private let maxEntries = 1_000
     private init() {}
-    private(set) var logs: [String] = []
+    /// Callers log from URLSession completion queues; serialize all access.
+    private let lock = NSLock()
+    private var logs: [String] = []
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
         return formatter
     }()
-    
+
     func log(_ message: String) {
         let timestamp = dateFormatter.string(from: Date())
         let logMessage = "[\(timestamp)] \(message)"
+        lock.lock()
+        defer { lock.unlock() }
         logs.append(logMessage)
         if logs.count > maxEntries {
             logs.removeFirst(logs.count - maxEntries)
         }
     }
-    
+
     func allLogs() -> String {
+        lock.lock()
+        defer { lock.unlock() }
         return logs.joined(separator: "\n")
     }
-    
+
     func clearLogs() {
+        lock.lock()
+        defer { lock.unlock() }
         logs.removeAll()
     }
 }
