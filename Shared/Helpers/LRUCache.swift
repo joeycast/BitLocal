@@ -31,24 +31,7 @@ class LRUCache<Key: Hashable, Value> {
     func setValue(_ value: Value, forKey key: Key) {
         lock.lock()
         defer { lock.unlock() }
-
-        if cache[key] != nil {
-            cache[key] = CacheItem(value: value)
-            if let index = lruKeys.firstIndex(of: key) {
-                lruKeys.remove(at: index)
-            }
-            lruKeys.append(key)
-            return
-        }
-
-        // Evict the least recently used item if the cache is full
-        if cache.count >= maxSize, let lruKey = lruKeys.first {
-            cache.removeValue(forKey: lruKey)
-            lruKeys.removeFirst()
-        }
-
-        cache[key] = CacheItem(value: value)
-        lruKeys.append(key)
+        setValueUnlocked(value, forKey: key)
     }
 
     func allValues() -> [Key: Value] {
