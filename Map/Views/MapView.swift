@@ -550,8 +550,9 @@ struct MapView: UIViewRepresentable {
                 view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = "\(cluster.memberAnnotations.count)"
                 let count = cluster.memberAnnotations.count
-                view?.accessibilityLabel = String(
-                    format: NSLocalizedString(
+                // localizedStringWithFormat resolves the catalog's plural variations.
+                view?.accessibilityLabel = String.localizedStringWithFormat(
+                    NSLocalizedString(
                         "%d Bitcoin merchants",
                         comment: "VoiceOver label for a map cluster of merchants"
                     ),
