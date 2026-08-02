@@ -1491,6 +1491,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         guard !didRestorePersistedMerchantCategory else { return }
         guard mapDisplayMode == .merchants else { return }
         guard hasLoadedInitialData, !allElements.isEmpty else { return }
+        // Local search filters the viewport (visibleElements); restoring before
+        // any pins are on screen guarantees an empty "no results" takeover on
+        // cold launch. Wait until the map has settled somewhere with merchants.
+        guard !visibleElements.isEmpty else { return }
         guard unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             didRestorePersistedMerchantCategory = true
             return

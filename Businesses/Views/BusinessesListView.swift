@@ -152,6 +152,9 @@ struct BusinessesListView: View {
         .onChange(of: viewModel.allElements.count) { _, _ in
             viewModel.restorePersistedMerchantCategoryIfNeeded()
         }
+        .onChange(of: viewModel.visibleElements.count) { _, _ in
+            viewModel.restorePersistedMerchantCategoryIfNeeded()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
             guard isSearchFieldFocused else { return }
             withAnimation(keyboardAnimation(for: notification)) {
