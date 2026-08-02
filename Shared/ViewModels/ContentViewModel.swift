@@ -1501,6 +1501,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         didRestorePersistedMerchantCategory = true
         guard let group = MerchantSearchPersistence.loadCategoryGroup() else { return }
+        // Only take over the sheet when the category actually has matches in
+        // the current viewport — an empty "no results" search on launch is
+        // worse than no restore. The chip stays persisted for a later launch.
+        let hasVisibleMatch = visibleElements.contains {
+            ElementCategorySymbols.merchantCategoryGroups(for: $0).contains(group)
+        }
+        guard hasVisibleMatch else {
+            Debug.logAPI("Skipped category chip restore (\(group.rawValue)): no visible matches in viewport")
+            return
+        }
         isSearchActive = true
         unifiedSearchText = group.localizedLabel
         performUnifiedSearch()
