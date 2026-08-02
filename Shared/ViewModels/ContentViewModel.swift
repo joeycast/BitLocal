@@ -1476,8 +1476,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         if userInitiated {
             MerchantSearchPersistence.clear()
         }
+        // Setting isSearchActive = false re-enters this method via the
+        // bottom sheet's onChange; skip the redundant second search pass.
+        let wasCleared = unifiedSearchText.isEmpty && !isSearchActive
         unifiedSearchText = ""
         isSearchActive = false
+        guard !wasCleared else { return }
         performUnifiedSearch()
     }
 
