@@ -135,6 +135,9 @@ struct Element: Codable, Identifiable, Hashable {
         hasher.combine(id)
     }
 
+    /// Canonical identity for search, ranking, and equality-facing labels.
+    /// Intentionally excludes category bootstrap labels so every unhydrated
+    /// cafe does not score as an exact name match for "Coffee".
     var displayName: String? {
         let name = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !Self.isInvalidPrimaryName(name) {
@@ -163,6 +166,15 @@ struct Element: Codable, Identifiable, Hashable {
         return Self.isPlaceholderName(rawName)
     }
 
+    /// List/map title for first paint. CDN snapshots often lack real names;
+    /// fall back to a localized category while placeholder tags still drive hydration.
+    var displayNameForUI: String? {
+        if let displayName { return displayName }
+        return ElementCategorySymbols.friendlyCategoryLabel(
+            forIcon: v4Metadata?.icon ?? tags?.iconPlatform
+        )
+    }
+
     /// Content that should force map annotation view refresh when it changes.
     var mapAnnotationContentSignature: String {
         let name = displayName ?? osmJSON?.tags?.name ?? ""
@@ -170,6 +182,7 @@ struct Element: Codable, Identifiable, Hashable {
         let icon = v4Metadata?.icon ?? tags?.iconPlatform ?? ""
         return "\(updatedAt ?? "")|\(name)|\(boostToken)|\(icon)"
     }
+
 
     static func isInvalidPrimaryName(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -27,7 +27,9 @@ final class BTCMapV4SyncTests: XCTestCase {
                     lon: 2,
                     icon: "local_cafe",
                     comments: 3,
-                    boostedUntil: nil
+                    boostedUntil: nil,
+                    name: nil,
+                    displayName: nil
                 )
             ],
             lastModified: "Wed, 11 Jun 2025 00:00:00 GMT"
