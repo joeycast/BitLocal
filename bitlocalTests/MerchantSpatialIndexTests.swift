@@ -52,6 +52,28 @@ final class MerchantSpatialIndexTests: XCTestCase {
         XCTAssertEqual(box?.maxLon, -86.0)
     }
 
+    func testCandidatesAcrossAntimeridianUseShortArc() {
+        // Points near ±180; naive min/max lon span is huge and would cover the wrong ocean.
+        let elements = [
+            makeElement(id: "pacific-west", lat: 0, lon: 179.5),
+            makeElement(id: "pacific-east", lat: 0, lon: -179.5),
+            makeElement(id: "atlantic", lat: 0, lon: 0)
+        ]
+        var index = MerchantSpatialIndex(cellSizeDegrees: 0.5)
+        index.rebuild(from: elements, sourceSignature: 1)
+
+        let hits = index.candidates(
+            minLatitude: -1,
+            maxLatitude: 1,
+            minLongitude: -179.8,
+            maxLongitude: 179.8
+        )
+        let ids = Set(hits.map(\.id))
+        XCTAssertTrue(ids.contains("pacific-west"))
+        XCTAssertTrue(ids.contains("pacific-east"))
+        XCTAssertFalse(ids.contains("atlantic"))
+    }
+
     private func makeElement(id: String, lat: Double, lon: Double) -> Element {
         let osmJSON = OsmJSON(
             changeset: nil,

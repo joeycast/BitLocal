@@ -2563,22 +2563,31 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         )
     }
 
-    /// Sampled signature (count + first/mid/last IDs). Intentionally misses
-    /// in-place coordinate edits with identical IDs and count — merchants
-    /// essentially never move, and a full-catalog hash per membership query
-    /// would cost more than the stale-index risk.
+    /// Sampled signature over id + coarse coordinates at several positions.
+    /// Cheap enough for every membership query; catches wholesale replacements
+    /// and sampled coordinate moves without hashing the full catalog.
     private func merchantStoreSignature(for elements: [Element]) -> Int {
         var hasher = Hasher()
         hasher.combine(elements.count)
-        if let first = elements.first?.id {
-            hasher.combine(first)
-        }
-        if let last = elements.last?.id {
-            hasher.combine(last)
-        }
-        // Cheap sample so wholesale replacements invalidate even with equal counts.
-        if elements.count > 2 {
-            hasher.combine(elements[elements.count / 2].id)
+        guard !elements.isEmpty else { return hasher.finalize() }
+
+        let lastIndex = elements.count - 1
+        let sampleIndexes: [Int] = [
+            0,
+            lastIndex / 4,
+            lastIndex / 2,
+            (3 * lastIndex) / 4,
+            lastIndex
+        ]
+        var seen = Set<Int>()
+        for index in sampleIndexes where seen.insert(index).inserted {
+            let element = elements[index]
+            hasher.combine(element.id)
+            if let coordinate = element.mapCoordinate {
+                // ~100m precision — enough to invalidate on real moves, cheap to hash.
+                hasher.combine(Int((coordinate.latitude * 1_000).rounded()))
+                hasher.combine(Int((coordinate.longitude * 1_000).rounded()))
+            }
         }
         return hasher.finalize()
     }

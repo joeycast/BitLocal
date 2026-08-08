@@ -42,6 +42,8 @@ struct MerchantSpatialIndex {
     }
 
     /// Returns indexed merchants whose coordinates fall inside the inclusive bounding box.
+    /// Handles antimeridian-spanning boxes (lon span > 180°) by querying the short arc
+    /// as the union of `[maxLon, 180]` and `[-180, minLon]`.
     func candidates(
         minLatitude: Double,
         maxLatitude: Double,
@@ -55,10 +57,27 @@ struct MerchantSpatialIndex {
         let minLon = min(minLongitude, maxLongitude)
         let maxLon = max(minLongitude, maxLongitude)
 
+        // Naive min/max across the date line yields a huge span that covers the wrong ocean.
+        if maxLon - minLon > 180 {
+            return candidatesInBox(minLat: minLat, maxLat: maxLat, minLon: maxLon, maxLon: 180)
+                + candidatesInBox(minLat: minLat, maxLat: maxLat, minLon: -180, maxLon: minLon)
+        }
+
+        return candidatesInBox(minLat: minLat, maxLat: maxLat, minLon: minLon, maxLon: maxLon)
+    }
+
+    private func candidatesInBox(
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ) -> [Entry] {
         let minX = cellIndex(minLon)
         let maxX = cellIndex(maxLon)
         let minY = cellIndex(minLat)
         let maxY = cellIndex(maxLat)
+
+        guard minX <= maxX, minY <= maxY else { return [] }
 
         var results: [Entry] = []
         results.reserveCapacity(64)
@@ -96,6 +115,10 @@ struct MerchantSpatialIndex {
 enum MerchantPolygonGeometry {
     /// Axis-aligned bounding box for a GeoJSON-style polygon rings collection.
     /// Outer ring coordinates are [lon, lat] pairs.
+    ///
+    /// When the lon span exceeds 180°, the polygon is assumed to cross the
+    /// antimeridian; callers of `MerchantSpatialIndex.candidates` treat that
+    /// span as the short arc across ±180 rather than the long way through 0°.
     static func boundingBox(for polygons: [[[[Double]]]]) -> (
         minLat: Double,
         maxLat: Double,
