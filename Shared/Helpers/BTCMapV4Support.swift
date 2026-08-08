@@ -830,6 +830,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     private let v4Client: BTCMapV4ClientProtocol
     private let userDefaults: UserDefaults
     private let modeKey = "btcmap_data_source_mode"
+    private let lastAppVersionKey = "btcmap_last_app_version"
     private let cacheWriteQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-writes", qos: .utility)
     private let refreshStateQueue = DispatchQueue(label: "app.bitlocal.btcmap-refresh-state", qos: .userInitiated)
     private var isV4RefreshInFlight = false
@@ -838,6 +839,28 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     init(v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(), userDefaults: UserDefaults = .standard) {
         self.v4Client = v4Client
         self.userDefaults = userDefaults
+        // Ensure v2 version-change side effects still run (APIManager.init).
+        _ = APIManager.shared
+        clearV4CacheIfAppVersionChanged()
+    }
+
+    /// Clears v4 on-disk cache when the app marketing version changes so
+    /// migrations / mapping changes are not stuck on stale JSON.
+    private func clearV4CacheIfAppVersionChanged() {
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let storedVersion = userDefaults.string(forKey: lastAppVersionKey)
+        guard storedVersion != currentVersion else { return }
+
+        // storedVersion == nil covers both fresh installs (clear is a no-op) and
+        // upgrades from builds that predate version tracking (clear is required).
+        if let storedVersion {
+            Debug.logCache("App version changed from \(storedVersion) to \(currentVersion); clearing v4 merchant cache")
+        } else {
+            Debug.logCache("Recording app version \(currentVersion); clearing any pre-tracking v4 merchant cache")
+        }
+        try? FileManager.default.removeItem(at: v4ElementsFileURL)
+        try? FileManager.default.removeItem(at: v4SyncStateFileURL)
+        userDefaults.set(currentVersion, forKey: lastAppVersionKey)
     }
 
     private var v4ElementsFileURL: URL {
