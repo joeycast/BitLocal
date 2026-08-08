@@ -13,6 +13,9 @@
 		F7E500013B18000000000001 /* MerchantSpatialIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E500013B18000000000002 /* MerchantSpatialIndex.swift */; };
 		F7E800013B1B000000000003 /* MerchantSearchEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E800013B1B000000000004 /* MerchantSearchEngineTests.swift */; };
 		F7E800013B1B000000000001 /* MerchantSearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E800013B1B000000000002 /* MerchantSearchEngine.swift */; };
+		F7E700013B1A000000000005 /* MerchantElementStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */; };
+		F7E700013B1A000000000003 /* BTCMapAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000004 /* BTCMapAsync.swift */; };
+		F7E700013B1A000000000001 /* MerchantElementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000002 /* MerchantElementStore.swift */; };
 		F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */; };
 		F6004F962DED3F43001183AE /* Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6004F952DED3F43001183AE /* Debug.swift */; };
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
@@ -117,6 +120,9 @@
 		F7E500013B18000000000002 /* MerchantSpatialIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSpatialIndex.swift; sourceTree = "<group>"; };
 		F7E800013B1B000000000004 /* MerchantSearchEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchEngineTests.swift; sourceTree = "<group>"; };
 		F7E800013B1B000000000002 /* MerchantSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchEngine.swift; sourceTree = "<group>"; };
+		F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantElementStoreTests.swift; sourceTree = "<group>"; };
+		F7E700013B1A000000000004 /* BTCMapAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapAsync.swift; sourceTree = "<group>"; };
+		F7E700013B1A000000000002 /* MerchantElementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantElementStore.swift; sourceTree = "<group>"; };
 		F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCategorySymbols.swift; sourceTree = "<group>"; };
 		F6004F952DED3F43001183AE /* Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug.swift; sourceTree = "<group>"; };
 		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
@@ -374,6 +380,8 @@
 				F7E500013B18000000000002 /* MerchantSpatialIndex.swift */,
 				F7E600013B19000000000002 /* MerchantSearchPersistence.swift */,
 				F7E800013B1B000000000002 /* MerchantSearchEngine.swift */,
+				F7E700013B1A000000000004 /* BTCMapAsync.swift */,
+				F7E700013B1A000000000002 /* MerchantElementStore.swift */,
 				F7C0A3003A5B100100000200 /* MerchantAlerts.swift */,
 				F7E200013B13000000000002 /* FeatureHints.swift */,
 				F7E200013B1300000000000A /* ReleaseNotes.swift */,
@@ -509,6 +517,7 @@
 				F7E500013B18000000000004 /* MerchantSpatialIndexTests.swift */,
 				F7E600013B19000000000004 /* MerchantSearchPersistenceTests.swift */,
 				F7E800013B1B000000000004 /* MerchantSearchEngineTests.swift */,
+				F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */,
 				F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */,
 			);
 			path = bitlocalTests;
@@ -674,6 +683,8 @@
 				F7E500013B18000000000001 /* MerchantSpatialIndex.swift in Sources */,
 				F7E600013B19000000000001 /* MerchantSearchPersistence.swift in Sources */,
 				F7E800013B1B000000000001 /* MerchantSearchEngine.swift in Sources */,
+				F7E700013B1A000000000003 /* BTCMapAsync.swift in Sources */,
+				F7E700013B1A000000000001 /* MerchantElementStore.swift in Sources */,
 				F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */,
 				F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */,
 				F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */,
@@ -712,6 +723,7 @@
 				F7E500013B18000000000003 /* MerchantSpatialIndexTests.swift in Sources */,
 				F7E600013B19000000000003 /* MerchantSearchPersistenceTests.swift in Sources */,
 				F7E800013B1B000000000003 /* MerchantSearchEngineTests.swift in Sources */,
+				F7E700013B1A000000000005 /* MerchantElementStoreTests.swift in Sources */,
 				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
 				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
 				F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */,

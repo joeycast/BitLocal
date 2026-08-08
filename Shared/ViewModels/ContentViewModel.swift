@@ -111,7 +111,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var selectedElement: Element?
     @Published var deepLinkUnavailableState: DeepLinkUnavailableState?
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
+    /// Published merchant catalog snapshot. Mutations go through `merchantElementStore`.
     @Published private(set) var allElements: [Element] = []
+    /// Bumps when the merchant store mutates (for index invalidation / observers).
+    @Published private(set) var merchantStoreRevision: UInt64 = 0
     @Published var visibleElements: [Element] = []
     @Published private(set) var activeMerchantAlertDigest: CityDigest?
     @Published var isLoading: Bool = false
@@ -188,6 +191,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let geocoder = Geocoder.shared
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
     private let btcMapRepository: BTCMapRepositoryProtocol
+    /// Identity-keyed merchant catalog (first extraction from ContentViewModel god-object).
+    private let merchantElementStore = MerchantElementStore()
     
     // Startup state tracking
     @Published var isInitialStartup = true
@@ -381,16 +386,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         placeholderNameHydrationPendingResults.removeAll(keepingCapacity: true)
         placeholderNameHydrationApplyWorkItem = nil
 
-        var byID = IdentifiableIndex.byID(allElements)
-        for (id, element) in pending {
-            byID[id] = element
-        }
-        allElements = Array(byID.values)
+        upsertMerchants(Array(pending.values), forceMapRefresh: true)
 
         if let selectedID = selectedElement?.id, let updated = pending[selectedID] {
             selectedElement = updated
         }
-        forceMapRefresh = true
         Debug.logTiming("data", "applied \(pending.count) placeholder name hydrations in one store update")
     }
 
@@ -901,8 +901,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let ids = digest.merchantIDs
         guard !ids.isEmpty else { return [] }
 
-        let byID = IdentifiableIndex.byID(allElements)
-        return ids.compactMap { byID[$0] }
+        return merchantElementStore.elements(ids: ids)
     }
 
     private func merchantAlertMissingIDs(for digest: CityDigest) -> [String] {
@@ -1930,7 +1929,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
 #if DEBUG
     func setAllElementsForTesting(_ elements: [Element]) {
-        allElements = elements
+        replaceMerchantCatalog(elements, forceMapRefresh: false)
     }
 #endif
 
@@ -2629,11 +2628,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.communityMemberElements = Array(byID.values)
 
             if !hydratedMembers.isEmpty {
-                var allByID = IdentifiableIndex.byID(self.allElements)
-                for member in hydratedMembers {
-                    allByID[member.id] = member
-                }
-                self.allElements = Array(allByID.values)
+                self.upsertMerchants(hydratedMembers, forceMapRefresh: false)
             }
 
             self.communityMembersIsLoading = false
@@ -3205,10 +3200,53 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func upsertElementIntoStore(_ element: Element) {
-        var dictionary = IdentifiableIndex.byID(allElements)
-        dictionary[element.id] = element
-        allElements = Array(dictionary.values)
-        forceMapRefresh = true
+        replaceOrUpsertMerchant(element, forceMapRefresh: true)
+    }
+
+    // MARK: - Merchant catalog (MerchantElementStore)
+
+    private func replaceMerchantCatalog(_ elements: [Element], forceMapRefresh: Bool) {
+        merchantStoreRevision = merchantElementStore.replaceAll(elements)
+        allElements = merchantElementStore.snapshot()
+        if forceMapRefresh {
+            self.forceMapRefresh = true
+        }
+    }
+
+    private func replaceOrUpsertMerchant(_ element: Element, forceMapRefresh: Bool) {
+        let isNew = merchantElementStore.element(id: element.id) == nil
+        merchantStoreRevision = merchantElementStore.upsert(element)
+        // Avoid re-materializing the full catalog on single-element updates.
+        if isNew {
+            allElements.append(element)
+        } else if let index = allElements.firstIndex(where: { $0.id == element.id }) {
+            allElements[index] = element
+        } else {
+            allElements = merchantElementStore.snapshot()
+        }
+        if forceMapRefresh {
+            self.forceMapRefresh = true
+        }
+    }
+
+    private func upsertMerchants(_ elements: [Element], forceMapRefresh: Bool) {
+        guard !elements.isEmpty else { return }
+        merchantStoreRevision = merchantElementStore.upsertMany(elements)
+        // Small batches patch the published array in place; large ones snapshot once.
+        if elements.count <= 32 {
+            for element in elements {
+                if let index = allElements.firstIndex(where: { $0.id == element.id }) {
+                    allElements[index] = element
+                } else {
+                    allElements.append(element)
+                }
+            }
+        } else {
+            allElements = merchantElementStore.snapshot()
+        }
+        if forceMapRefresh {
+            self.forceMapRefresh = true
+        }
     }
 
     private func merchantElementSearchSortOrder(_ lhs: Element, _ rhs: Element) -> Bool {
@@ -3362,7 +3400,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                !cachedElements.isEmpty {
                 Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
                 Debug.logTiming("data", "loaded \(cachedElements.count) cached elements into memory")
-                self.allElements = cachedElements
+                self.replaceMerchantCatalog(cachedElements, forceMapRefresh: false)
                 self.hasLoadedInitialData = true
                 self.merchantSyncFailed = false
                 self.refreshLastSuccessfulSyncAtFromRepository()
@@ -3444,9 +3482,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         if !refreshedElements.isEmpty {
             Debug.logMap("Setting allElements to repository snapshot (\(refreshedElements.count) elements)")
-            allElements = refreshedElements
+            replaceMerchantCatalog(refreshedElements, forceMapRefresh: true)
             hasLoadedInitialData = true
-            forceMapRefresh = true
             noteMerchantSyncSucceeded()
         } else if currentElementsEmpty && !hadAnyCache {
             Debug.log("Repository returned no data and no cache was available")
@@ -3534,9 +3571,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
                 if !refreshedElements.isEmpty {
                     Debug.logMap("Background update: Repository returned \(refreshedElements.count) elements")
-                    self.allElements = refreshedElements
-                    self.forceMapRefresh = true
-                    self.noteMerchantSyncSucceeded()
+                    self.replaceMerchantCatalog(refreshedElements, forceMapRefresh: true)
                 } else {
                     Debug.log("Background update: No new data available")
                     self.refreshLastSuccessfulSyncAtFromRepository()
