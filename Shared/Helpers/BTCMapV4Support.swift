@@ -226,7 +226,8 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             completion(.failure(BTCMapV4Error.invalidURL))
             return
         }
-        session.dataTask(with: url) { data, response, error in
+        let request = makeRequest(url: url)
+        session.dataTask(with: request) { data, response, error in
             if let error {
                 completion(.failure(error))
                 return

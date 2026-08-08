@@ -550,9 +550,11 @@ struct MapView: UIViewRepresentable {
                 view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = "\(cluster.memberAnnotations.count)"
             } else if let annotation = annotation as? Annotation {
-                // Handle individual annotations
-                if annotation.element == nil {
-                    fatalError("Failed to get element from annotation.")
+                // Handle individual annotations. Never crash on a missing element —
+                // skip malformed annotations so the rest of the map keeps rendering.
+                guard annotation.element != nil else {
+                    Debug.logMap("Skipping annotation view: element is nil")
+                    return nil
                 }
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
