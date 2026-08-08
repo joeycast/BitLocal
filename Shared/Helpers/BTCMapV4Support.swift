@@ -1097,8 +1097,16 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
 
     private func loadV4Elements() -> [Element]? {
         do {
+            let start = CFAbsoluteTimeGetCurrent()
             let data = try Data(contentsOf: v4ElementsFileURL)
+            let readMS = (CFAbsoluteTimeGetCurrent() - start) * 1000
+            let decodeStart = CFAbsoluteTimeGetCurrent()
             let elements = try JSONDecoder().decode([Element].self, from: data)
+            let decodeMS = (CFAbsoluteTimeGetCurrent() - decodeStart) * 1000
+            Debug.logTiming(
+                "sync",
+                "loadV4Elements count=\(elements.count) bytes=\(data.count) readMS=\(String(format: "%.1f", readMS)) decodeMS=\(String(format: "%.1f", decodeMS))"
+            )
             return elements.isEmpty ? nil : elements
         } catch {
             return nil
@@ -1108,10 +1116,19 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     private func saveV4Elements(_ elements: [Element], reason: String = "unspecified") {
         cacheWriteQueue.async {
             do {
+                let start = CFAbsoluteTimeGetCurrent()
                 let data = try JSONEncoder().encode(elements)
+                let encodeMS = (CFAbsoluteTimeGetCurrent() - start) * 1000
+                let writeStart = CFAbsoluteTimeGetCurrent()
                 try data.write(to: self.v4ElementsFileURL, options: .atomic)
-                Debug.logCache("Saved \(elements.count) v4 elements to \(self.v4ElementsFileURL.lastPathComponent) [reason=\(reason)]")
-                Debug.logTiming("sync", "saved \(elements.count) v4 elements [reason=\(reason)]")
+                let writeMS = (CFAbsoluteTimeGetCurrent() - writeStart) * 1000
+                Debug.logCache(
+                    "Saved \(elements.count) v4 elements (\(data.count) bytes) to \(self.v4ElementsFileURL.lastPathComponent) [reason=\(reason)] encodeMS=\(String(format: "%.1f", encodeMS)) writeMS=\(String(format: "%.1f", writeMS))"
+                )
+                Debug.logTiming(
+                    "sync",
+                    "saveV4Elements count=\(elements.count) bytes=\(data.count) encodeMS=\(String(format: "%.1f", encodeMS)) writeMS=\(String(format: "%.1f", writeMS)) reason=\(reason)"
+                )
             } catch {
                 Debug.logCache("Failed to save v4 elements: \(error.localizedDescription)")
             }
