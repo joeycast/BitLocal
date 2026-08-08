@@ -135,6 +135,7 @@ struct IPhoneLayoutView: View {
                     .presentationBackgroundInteraction(.enabled)
                     .sheet(isPresented: $showingAbout) {
                         AboutView()
+                            .environmentObject(viewModel)
                     }
                     .sheet(isPresented: $showingSettings) {
                         NavigationStack {

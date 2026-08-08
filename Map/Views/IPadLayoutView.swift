@@ -53,6 +53,7 @@ struct IPadLayoutView: View {
                                 AboutView(onDone: {
                                     showingAbout = false
                                 })
+                                .environmentObject(viewModel)
                                 .id("ipad-about-\(appearance.rawValue)-\(systemColorScheme)")
                                 .preferredColorScheme(effectiveColorScheme)
                                 .frame(

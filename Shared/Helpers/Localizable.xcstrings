@@ -27250,59 +27250,6 @@
         }
       }
     },
-    "BitLocal is downloading the latest Bitcoin merchants. Pull down to retry if this takes too long.": {
-      "comment": "Message while waiting for first merchant sync",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal lädt die neuesten Bitcoin-Händler. Zieh nach unten, um es erneut zu versuchen, falls es zu lange dauert."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal está descargando los comercios de Bitcoin más recientes. Desliza hacia abajo para reintentar si tarda demasiado."
-          }
-        },
-        "es-419": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal está descargando los comercios de Bitcoin más recientes. Desliza hacia abajo para reintentar si tarda demasiado."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal télécharge les commerces Bitcoin les plus récents. Tirez vers le bas pour réessayer si cela prend trop de temps."
-          }
-        },
-        "fr-CA": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal télécharge les commerces Bitcoin les plus récents. Tirez vers le bas pour réessayer si cela prend trop de temps."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal sta scaricando le attività Bitcoin più recenti. Trascina verso il basso per riprovare se l'operazione richiede troppo tempo."
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal downloadt de nieuwste Bitcoin-bedrijven. Trek omlaag om het opnieuw te proberen als dit te lang duurt."
-          }
-        },
-        "th": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BitLocal กำลังดาวน์โหลดร้านค้า Bitcoin ล่าสุด ดึงลงเพื่อลองอีกครั้งหากใช้เวลานานเกินไป"
-          }
-        }
-      }
-    },
     "No Bitcoin merchants in this map area. Pan or zoom to explore nearby places.": {
       "comment": "Empty state when the viewport has no merchants but the catalog is loaded",
       "localizations": {
@@ -28205,6 +28152,79 @@
           }
         }
       }
+    },
+    "Refresh Merchants": {
+      "comment": "Settings action to refresh BTC Map merchant catalog",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Updating…": {
+      "comment": "Status while merchant catalog refresh is in progress",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Download the latest Bitcoin merchants from BTC Map.": {
+      "comment": "Settings subtitle when no successful sync time is known",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "BitLocal is downloading the latest Bitcoin merchants. Use Try Again if this takes too long, or refresh merchants in About.": {
+      "comment": "Message while waiting for first merchant sync",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal lädt die neuesten Bitcoin-Händler. Zieh nach unten, um es erneut zu versuchen, falls es zu lange dauert."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal está descargando los comercios de Bitcoin más recientes. Desliza hacia abajo para reintentar si tarda demasiado."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal está descargando los comercios de Bitcoin más recientes. Desliza hacia abajo para reintentar si tarda demasiado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal télécharge les commerces Bitcoin les plus récents. Tirez vers le bas pour réessayer si cela prend trop de temps."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal télécharge les commerces Bitcoin les plus récents. Tirez vers le bas pour réessayer si cela prend trop de temps."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal sta scaricando le attività Bitcoin più recenti. Trascina verso il basso per riprovare se l'operazione richiede troppo tempo."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal downloadt de nieuwste Bitcoin-bedrijven. Trek omlaag om het opnieuw te proberen als dit te lang duurt."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BitLocal กำลังดาวน์โหลดร้านค้า Bitcoin ล่าสุด ดึงลงเพื่อลองอีกครั้งหากใช้เวลานานเกินไป"
+          }
+        }
+      }
+    },
+    "Fetch new and changed merchants since the last sync.": {
+      "comment": "About subtitle explaining incremental merchant refresh",
+      "extractionState": "manual",
+      "localizations": {}
     }
   }
 }

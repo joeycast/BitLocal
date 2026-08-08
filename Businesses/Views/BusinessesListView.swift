@@ -56,7 +56,6 @@ struct BusinessesListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Always-visible search bar
             searchBar
                 .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 2)
@@ -100,9 +99,6 @@ struct BusinessesListView: View {
             .offset(y: (1 - contentRevealProgress) * 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .refreshable {
-            await viewModel.refreshMerchantData()
-        }
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
             refreshDiscoveryCache()
@@ -303,9 +299,6 @@ struct BusinessesListView: View {
         .background(Color.clear)
         .environment(\.defaultMinListRowHeight, 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .refreshable {
-            await viewModel.refreshMerchantData()
-        }
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: topSortedElements)
         }
@@ -373,7 +366,7 @@ struct BusinessesListView: View {
         }
         if viewModel.allElements.isEmpty {
             return NSLocalizedString(
-                "BitLocal is downloading the latest Bitcoin merchants. Pull down to retry if this takes too long.",
+                "BitLocal is downloading the latest Bitcoin merchants. Use Try Again if this takes too long, or refresh merchants in About.",
                 comment: "Message while waiting for first merchant sync"
             )
         }
