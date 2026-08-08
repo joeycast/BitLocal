@@ -1,29 +1,57 @@
 import Foundation
 import CoreLocation
 
-// Address caching to prevent geocoding rate limiting 
+// Address caching to prevent geocoding rate limiting.
+// Thread-safe: all mutations and reads are serialized with an internal lock.
 class LRUCache<Key: Hashable, Value> {
     private let maxSize: Int
     private var cache: [Key: CacheItem] = [:]
     private var lruKeys: [Key] = []
-    
+    private let lock = NSLock()
+
     init(maxSize: Int) {
         self.maxSize = maxSize
-    } 
-    
+    }
+
     func getValue(forKey key: Key) -> Value? {
+        lock.lock()
+        defer { lock.unlock() }
+
         guard let item = cache[key] else { return nil }
-        
+
         // Move the accessed key to the end (most recently used)
         if let index = lruKeys.firstIndex(of: key) {
             lruKeys.remove(at: index)
             lruKeys.append(key)
         }
-        
+
         return item.value
     }
-    
+
     func setValue(_ value: Value, forKey key: Key) {
+        lock.lock()
+        defer { lock.unlock() }
+        setValueUnlocked(value, forKey: key)
+    }
+
+    func allValues() -> [Key: Value] {
+        lock.lock()
+        defer { lock.unlock() }
+        return cache.mapValues { $0.value }
+    }
+
+    func setValues(_ values: [Key: Value]) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        cache.removeAll(keepingCapacity: true)
+        lruKeys.removeAll(keepingCapacity: true)
+        for (key, value) in values {
+            setValueUnlocked(value, forKey: key)
+        }
+    }
+
+    private func setValueUnlocked(_ value: Value, forKey key: Key) {
         if cache[key] != nil {
             cache[key] = CacheItem(value: value)
             if let index = lruKeys.firstIndex(of: key) {
@@ -33,28 +61,15 @@ class LRUCache<Key: Hashable, Value> {
             return
         }
 
-        // Evict the least recently used item if the cache is full
         if cache.count >= maxSize, let lruKey = lruKeys.first {
             cache.removeValue(forKey: lruKey)
             lruKeys.removeFirst()
         }
-        
+
         cache[key] = CacheItem(value: value)
         lruKeys.append(key)
     }
 
-    func allValues() -> [Key: Value] {
-        return cache.mapValues { $0.value }
-    }
-
-    func setValues(_ values: [Key: Value]) {
-        cache.removeAll()
-        lruKeys.removeAll()
-        for (key, value) in values {
-            setValue(value, forKey: key)
-        }
-    }
-    
     private struct CacheItem {
         let value: Value
     }

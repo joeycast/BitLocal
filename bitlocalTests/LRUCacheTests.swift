@@ -25,4 +25,30 @@ final class LRUCacheTests: XCTestCase {
         XCTAssertNil(cache.getValue(forKey: "b"))
         XCTAssertEqual(cache.getValue(forKey: "c"), 3)
     }
+
+    func testConcurrentAccessDoesNotCrash() {
+        let cache = LRUCache<String, Int>(maxSize: 50)
+        let group = DispatchGroup()
+        let iterations = 200
+
+        for worker in 0..<8 {
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                for i in 0..<iterations {
+                    let key = "k\(i % 40)"
+                    if worker % 2 == 0 {
+                        cache.setValue(i, forKey: key)
+                    } else {
+                        _ = cache.getValue(forKey: key)
+                    }
+                }
+                group.leave()
+            }
+        }
+
+        let result = group.wait(timeout: .now() + 5)
+        XCTAssertEqual(result, .success)
+        // Snapshot is well-formed after concurrent traffic
+        XCTAssertLessThanOrEqual(cache.allValues().count, 50)
+    }
 }
