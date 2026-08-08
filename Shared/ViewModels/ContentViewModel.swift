@@ -197,6 +197,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var lastVisibleCommunityListCacheKey: VisibleCommunityListCacheKey?
     private var communityGeoJSONHydrationInFlight = false
     private var requestedCommunityAreaDetailIDs = Set<Int>()
+    /// Spatial index over merchant coordinates for community polygon membership.
+    private var merchantSpatialIndex = MerchantSpatialIndex()
+    private var merchantSpatialIndexSignature: Int = 0
 
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -2583,16 +2586,86 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let polygons = geoJSONPolygons(from: geoJSON)
         guard !polygons.isEmpty else { return nil }
 
-        return allElements.filter { element in
-            guard let coordinate = element.mapCoordinate else { return false }
-            return polygons.contains { polygon in
-                coordinateInPolygon(
+        ensureMerchantSpatialIndex()
+
+        let candidates: [MerchantSpatialIndex.Entry]
+        if let box = MerchantPolygonGeometry.boundingBox(for: polygons) {
+            candidates = merchantSpatialIndex.candidates(
+                minLatitude: box.minLat,
+                maxLatitude: box.maxLat,
+                minLongitude: box.minLon,
+                maxLongitude: box.maxLon
+            )
+        } else {
+            // Degenerate geometry — fall back to scanning everything that has coordinates.
+            candidates = allElements.compactMap { element in
+                guard let coordinate = element.mapCoordinate else { return nil }
+                return MerchantSpatialIndex.Entry(
+                    id: element.id,
                     latitude: coordinate.latitude,
-                    longitude: coordinate.longitude,
-                    rings: polygon
+                    longitude: coordinate.longitude
                 )
             }
         }
+
+        let byID = Dictionary(allElements.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+        var members: [Element] = []
+        members.reserveCapacity(min(candidates.count, 256))
+
+        for candidate in candidates {
+            guard polygons.contains(where: { polygon in
+                coordinateInPolygon(
+                    latitude: candidate.latitude,
+                    longitude: candidate.longitude,
+                    rings: polygon
+                )
+            }) else { continue }
+            if let element = byID[candidate.id] {
+                members.append(element)
+            }
+        }
+        return members
+    }
+
+    private func ensureMerchantSpatialIndex() {
+        let signature = merchantStoreSignature(for: allElements)
+        guard signature != merchantSpatialIndexSignature || merchantSpatialIndex.isEmpty else { return }
+        let start = CFAbsoluteTimeGetCurrent()
+        merchantSpatialIndex.rebuild(from: allElements, sourceSignature: signature)
+        merchantSpatialIndexSignature = signature
+        Debug.logTiming(
+            "map",
+            "merchant spatial index rebuilt entries=\(merchantSpatialIndex.entryCount) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - start) * 1000))ms"
+        )
+    }
+
+    /// Sampled signature over id + coarse coordinates at several positions.
+    /// Cheap enough for every membership query; catches wholesale replacements
+    /// and sampled coordinate moves without hashing the full catalog.
+    private func merchantStoreSignature(for elements: [Element]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(elements.count)
+        guard !elements.isEmpty else { return hasher.finalize() }
+
+        let lastIndex = elements.count - 1
+        let sampleIndexes: [Int] = [
+            0,
+            lastIndex / 4,
+            lastIndex / 2,
+            (3 * lastIndex) / 4,
+            lastIndex
+        ]
+        var seen = Set<Int>()
+        for index in sampleIndexes where seen.insert(index).inserted {
+            let element = elements[index]
+            hasher.combine(element.id)
+            if let coordinate = element.mapCoordinate {
+                // ~100m precision — enough to invalidate on real moves, cheap to hash.
+                hasher.combine(Int((coordinate.latitude * 1_000).rounded()))
+                hasher.combine(Int((coordinate.longitude * 1_000).rounded()))
+            }
+        }
+        return hasher.finalize()
     }
 
     private func geoJSONPolygons(from collection: GeoJSONFeatureCollection) -> [[[[Double]]]] {
