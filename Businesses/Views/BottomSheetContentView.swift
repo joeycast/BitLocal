@@ -33,8 +33,8 @@ struct BottomSheetContentView: View {
                 .onChange(of: viewModel.isSearchActive) { _, isActive in
                     guard viewModel.mapDisplayMode != .communities else { return }
                     if !isActive {
-                        viewModel.unifiedSearchText = ""
-                        viewModel.performUnifiedSearch()
+                        // Clearing search dismisses any persisted category chip.
+                        viewModel.clearMerchantSearch(userInitiated: true)
                     }
                 }
             }

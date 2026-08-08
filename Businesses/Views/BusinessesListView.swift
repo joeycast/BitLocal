@@ -147,6 +147,13 @@ struct BusinessesListView: View {
         }
         .onChange(of: viewModel.hasLoadedInitialData) { _, _ in
             refreshEmptyStateVisibility()
+            viewModel.restorePersistedMerchantCategoryIfNeeded()
+        }
+        .onChange(of: viewModel.allElements.count) { _, _ in
+            viewModel.restorePersistedMerchantCategoryIfNeeded()
+        }
+        .onChange(of: viewModel.visibleElements.count) { _, _ in
+            viewModel.restorePersistedMerchantCategoryIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
             guard isSearchFieldFocused else { return }
@@ -175,7 +182,7 @@ struct BusinessesListView: View {
                 .submitLabel(.search)
             if !viewModel.unifiedSearchText.isEmpty {
                 Button {
-                    viewModel.unifiedSearchText = ""
+                    viewModel.clearMerchantSearch(userInitiated: true)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -185,7 +192,7 @@ struct BusinessesListView: View {
             if viewModel.isSearchActive {
                 Button("Cancel") {
                     isSearchFieldFocused = false
-                    viewModel.isSearchActive = false
+                    viewModel.clearMerchantSearch(userInitiated: true)
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
@@ -636,8 +643,7 @@ struct BusinessesListView: View {
     }
 
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {
-        viewModel.isSearchActive = true
-        viewModel.unifiedSearchText = chip.localizedLabel
+        viewModel.applyMerchantCategoryChip(chip)
     }
 
     private func refreshDiscoveryCache() {

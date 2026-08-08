@@ -245,6 +245,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var latestCommunitySelectionRequestID = UUID()
     private var hasScheduledCommunityPrefetch = false
     private var communityPrefetchWorkItem: DispatchWorkItem?
+    private var didRestorePersistedMerchantCategory = false
     /// Fires when the next boosted merchant expires so pin tints update while the app stays active.
     private var boostExpiryRefreshWorkItem: DispatchWorkItem?
     private var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
@@ -1532,11 +1533,81 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func performUnifiedSearch() {
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty {
+            MerchantSearchPersistence.clear()
+        } else if let group = ElementCategorySymbols.resolvedCategoryGroup(
+            forNormalizedQuery: SearchTextNormalizer.normalize(query)
+        ), group.localizedLabel.compare(query, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+            // Only persist exact category chip labels — never free-text.
+            MerchantSearchPersistence.saveCategoryGroup(group)
+        }
         if merchantSearchV2HybridEnabled {
             performUnifiedSearchHybrid(query: query)
         } else {
             performUnifiedSearchLegacyRemotePrimary(query: query)
         }
+    }
+
+    /// Applies a category chip and persists the selection for return visits.
+    func applyMerchantCategoryChip(_ chip: MerchantCategoryChip) {
+        isSearchActive = true
+        MerchantSearchPersistence.saveCategoryGroup(chip.group)
+        unifiedSearchText = chip.localizedLabel
+        performUnifiedSearch()
+    }
+
+    /// Clears search text and forgets any persisted category chip.
+    func clearMerchantSearch(userInitiated: Bool = true) {
+        if userInitiated {
+            MerchantSearchPersistence.clear()
+        }
+        // Setting isSearchActive = false re-enters this method via the
+        // bottom sheet's onChange; skip the redundant second search pass.
+        let wasCleared = unifiedSearchText.isEmpty && !isSearchActive
+        unifiedSearchText = ""
+        isSearchActive = false
+        guard !wasCleared else { return }
+        performUnifiedSearch()
+    }
+
+    /// Restores the last category chip once after initial merchant data is ready.
+    /// Free-text is intentionally not restored (avoids surprise worldwide queries).
+    ///
+    /// When the current viewport has no matches, keep trying on later map/list
+    /// updates (do not set `didRestore…`) so cold-start over empty ocean can
+    /// still restore after the user pans into a populated area.
+    func restorePersistedMerchantCategoryIfNeeded() {
+        guard !didRestorePersistedMerchantCategory else { return }
+        guard mapDisplayMode == .merchants else { return }
+        guard hasLoadedInitialData, !allElements.isEmpty else { return }
+        // Local search filters the viewport (visibleElements); restoring before
+        // any pins are on screen guarantees an empty "no results" takeover on
+        // cold launch. Wait until the map has settled somewhere with merchants.
+        guard !visibleElements.isEmpty else { return }
+        guard unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            // User already typed or selected something — never auto-restore over it.
+            didRestorePersistedMerchantCategory = true
+            return
+        }
+        guard let group = MerchantSearchPersistence.loadCategoryGroup() else {
+            // Nothing to restore (missing/expired) — stop rechecking.
+            didRestorePersistedMerchantCategory = true
+            return
+        }
+        // Only take over the sheet when the category actually has matches in
+        // the current viewport. Leave the flag false so a later pan/zoom can retry.
+        let hasVisibleMatch = visibleElements.contains {
+            ElementCategorySymbols.merchantCategoryGroups(for: $0).contains(group)
+        }
+        guard hasVisibleMatch else {
+            Debug.logAPI("Deferred category chip restore (\(group.rawValue)): no visible matches in viewport")
+            return
+        }
+        didRestorePersistedMerchantCategory = true
+        isSearchActive = true
+        unifiedSearchText = group.localizedLabel
+        performUnifiedSearch()
+        Debug.logAPI("Restored persisted merchant category chip: \(group.rawValue)")
     }
 
     private func refreshMerchantSearchFromVisibleElementsIfNeeded() {
