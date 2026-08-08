@@ -203,6 +203,23 @@ struct Element: Codable, Identifiable, Hashable {
         guard let boostExpirationDate else { return false }
         return boostExpirationDate > referenceDate
     }
+
+    /// Bitcoin ATMs (not banks or exchanges). Used by the Settings filter so
+    /// cash machines do not crowd the map and nearby list.
+    var isATM: Bool {
+        let amenity = osmJSON?.tags?.amenity?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if amenity == "atm" { return true }
+
+        let icon = (v4Metadata?.icon ?? tags?.iconPlatform)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        // Material/BTC Map icons used for ATM pins (not bank / exchange).
+        if icon == "local_atm" || icon == "atm" { return true }
+
+        return false
+    }
 }
 
 extension Array where Element == bitlocal.Element {

@@ -119,6 +119,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     /// True when the most recent repository refresh returned no usable data while the store was empty.
     @Published private(set) var merchantSyncFailed = false
     @Published private(set) var merchantSyncStatusMessage: String?
+    /// When true, Bitcoin ATMs are omitted from the merchant map and nearby list.
+    @Published private(set) var hideATMsFromMapAndList: Bool =
+        UserDefaults.standard.bool(forKey: ContentViewModel.hideATMsFromMapAndListKey)
     @Published var topPadding: CGFloat = 0
     @Published var bottomPadding: CGFloat = 0
     @Published var liveBottomPadding: CGFloat = 0
@@ -264,6 +267,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         case list
         case unknown
     }
+
+    private static let hideATMsFromMapAndListKey = "hideATMsFromMapAndList"
     
     override init() {
         self.btcMapRepository = BTCMapRepository.shared
@@ -296,13 +301,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         visibleElementsSubject
             .receive(on: RunLoop.main)
             .sink { [weak self] elements in
-                Debug.logTiming("map", "visibleElementsSubject received -> count=\(elements.count)")
-                self?.visibleElements = elements
-                self?.hydratePlaceholderNamesIfNeeded(in: elements)
-                self?.refreshMerchantSearchFromVisibleElementsIfNeeded()
-                self?.pruneTransientMerchantCachesIfNeeded()
+                guard let self else { return }
+                let displayElements = self.elementsForDisplay(elements)
+                Debug.logTiming("map", "visibleElementsSubject received -> count=\(displayElements.count) (raw=\(elements.count))")
+                self.visibleElements = displayElements
+                self.hydratePlaceholderNamesIfNeeded(in: displayElements)
+                self.refreshMerchantSearchFromVisibleElementsIfNeeded()
+                self.pruneTransientMerchantCachesIfNeeded()
                 // Visible pins only — off-screen expired boosts re-tint when recreated on pan.
-                self?.scheduleBoostExpiryMapRefreshIfNeeded(for: elements)
+                self.scheduleBoostExpiryMapRefreshIfNeeded(for: displayElements)
             }
             .store(in: &cancellables)
         mapStoppedMovingSubject
@@ -1610,7 +1617,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         merchantSearchLocalMatchScoreByID = result.scoresByID
         merchantSearchStrongLocalHitCount = result.strongHitCount
 
-        return result.elements.sorted(by: merchantElementSearchSortOrder)
+        return elementsForDisplay(result.elements.sorted(by: merchantElementSearchSortOrder))
     }
 
     private func performUnifiedSearchHybrid(query: String) {
@@ -1850,23 +1857,48 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         switch mapDisplayMode {
         case .merchants:
             if let digest = activeMerchantAlertDigest {
-                return merchantAlertElements(for: digest)
+                return elementsForDisplay(merchantAlertElements(for: digest))
             }
             let trimmedQuery = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedQuery.count >= 2 {
-                return merchantSearchMapResults
+                return elementsForDisplay(merchantSearchMapResults)
             }
-            return allElements
+            return elementsForDisplay(allElements)
         case .communities:
-            return selectedCommunityArea == nil ? [] : communityMemberElements
+            return selectedCommunityArea == nil ? [] : elementsForDisplay(communityMemberElements)
         }
     }
 
     var listElementsForCurrentDisplay: [Element] {
         if let digest = activeMerchantAlertDigest, mapDisplayMode == .merchants {
-            return merchantAlertElements(for: digest)
+            return elementsForDisplay(merchantAlertElements(for: digest))
         }
         return visibleElements
+    }
+
+    /// Applies user display preferences (currently: optional ATM hiding).
+    func elementsForDisplay(_ elements: [Element]) -> [Element] {
+        guard hideATMsFromMapAndList else { return elements }
+        return elements.filter { !$0.isATM }
+    }
+
+    func setHideATMsFromMapAndList(_ hide: Bool) {
+        guard hideATMsFromMapAndList != hide else { return }
+        hideATMsFromMapAndList = hide
+        UserDefaults.standard.set(hide, forKey: Self.hideATMsFromMapAndListKey)
+
+        if hide {
+            visibleElements = visibleElements.filter { !$0.isATM }
+            localFilteredMerchants = localFilteredMerchants.filter { !$0.isATM }
+            merchantSearchPrimaryResults = merchantSearchPrimaryResults.filter { !$0.isATM }
+            merchantSearchMapResults = merchantSearchMapResults.filter { !$0.isATM }
+            communityMemberElements = communityMemberElements.filter { !$0.isATM }
+        } else if !unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Re-run search so ATMs can reappear in results without a map pan.
+            performUnifiedSearch()
+        }
+
+        forceMapRefresh = true
     }
 
     var isShowingMerchantAlertDigest: Bool {
@@ -1874,10 +1906,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func setMerchantSearchMapResults(_ results: [Element]) {
+        let filtered = elementsForDisplay(results)
         let currentIDs = merchantSearchMapResults.map(\.id)
-        let newIDs = results.map(\.id)
+        let newIDs = filtered.map(\.id)
         guard currentIDs != newIDs else { return }
-        merchantSearchMapResults = results
+        merchantSearchMapResults = filtered
     }
 
     func clearMerchantSearchMapResults() {

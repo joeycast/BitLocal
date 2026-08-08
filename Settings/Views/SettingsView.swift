@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Binding var currentDetent: PresentationDetent
     var onDone: (() -> Void)? = nil
 
+    @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var appearanceManager: AppearanceManager
     @EnvironmentObject private var featureHintsController: FeatureHintsController
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
@@ -40,6 +41,11 @@ struct SettingsView: View {
                 Text("Miles").tag(DistanceUnit.miles)
                 Text("Km").tag(DistanceUnit.kilometers)
             }
+
+            Divider()
+                .padding(.top, 4)
+
+            hideATMsToggle
 
             Divider()
                 .padding(.top, 4)
@@ -88,6 +94,33 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
         }
+    }
+
+    // MARK: - Map & list filters
+
+    private var hideATMsToggle: some View {
+        Toggle(isOn: hideATMsBinding) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(NSLocalizedString("Hide ATMs", comment: "Settings toggle to hide Bitcoin ATMs from map and list"))
+                    .font(.headline)
+                Text(NSLocalizedString(
+                    "Show shops and services only. Bitcoin ATMs stay hidden on the map and nearby list.",
+                    comment: "Settings subtitle for Hide ATMs toggle"
+                ))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(.accentColor)
+        .padding(.vertical, 4)
+    }
+
+    private var hideATMsBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.hideATMsFromMapAndList },
+            set: { viewModel.setHideATMsFromMapAndList($0) }
+        )
     }
 
     // MARK: - Merchant Alerts

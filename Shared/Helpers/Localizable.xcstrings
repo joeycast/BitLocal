@@ -28225,6 +28225,16 @@
       "comment": "About subtitle explaining incremental merchant refresh",
       "extractionState": "manual",
       "localizations": {}
+    },
+    "Hide ATMs": {
+      "comment": "Settings toggle to hide Bitcoin ATMs from map and list",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Show shops and services only. Bitcoin ATMs stay hidden on the map and nearby list.": {
+      "comment": "Settings subtitle for Hide ATMs toggle",
+      "extractionState": "manual",
+      "localizations": {}
     }
   }
 }

@@ -84,6 +84,7 @@ struct IPadLayoutView: View {
                                         showingSettings = false
                                     }
                                 )
+                                .environmentObject(viewModel)
                                 .environmentObject(MerchantAlertsManager.shared)
                                 .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
                                 .preferredColorScheme(effectiveColorScheme)

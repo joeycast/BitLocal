@@ -143,6 +143,7 @@ struct IPhoneLayoutView: View {
                                 selectedMapType: selectedMapTypeBinding,
                                 currentDetent: $settingsSheetDetent
                             )
+                            .environmentObject(viewModel)
                             .environmentObject(MerchantAlertsManager.shared)
                         }
                         .id("settings-sheet-\(appearance.rawValue)-\(systemColorScheme)")

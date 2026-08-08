@@ -37,7 +37,33 @@ final class ElementMapVisibilityTests: XCTestCase {
         XCTAssertFalse(element.hasMapRenderableIdentity)
     }
 
-    private func makeElement(name: String?, brand: String?, operatorName: String?) -> Element {
+    func testAmenityATMIsDetected() {
+        let element = makeElement(name: "BTC ATM", brand: nil, operatorName: nil, amenity: "atm")
+        XCTAssertTrue(element.isATM)
+    }
+
+    func testLocalATMIconIsDetected() {
+        let element = makeElement(name: "Cash Point", brand: nil, operatorName: nil, icon: "local_atm")
+        XCTAssertTrue(element.isATM)
+    }
+
+    func testCafeIsNotATM() {
+        let element = makeElement(name: "Cafe", brand: nil, operatorName: nil, amenity: "cafe", icon: "local_cafe")
+        XCTAssertFalse(element.isATM)
+    }
+
+    func testBankIsNotATM() {
+        let element = makeElement(name: "Bank", brand: nil, operatorName: nil, amenity: "bank")
+        XCTAssertFalse(element.isATM)
+    }
+
+    private func makeElement(
+        name: String?,
+        brand: String?,
+        operatorName: String?,
+        amenity: String? = nil,
+        icon: String? = nil
+    ) -> Element {
         let tags = OsmTags(
             addrCity: nil,
             addrHousenumber: nil,
@@ -66,7 +92,7 @@ final class ElementMapVisibilityTests: XCTestCase {
             tourism: nil,
             healthcare: nil,
             craft: nil,
-            amenity: nil,
+            amenity: amenity,
             place: nil,
             leisure: nil,
             office: nil,
@@ -89,7 +115,7 @@ final class ElementMapVisibilityTests: XCTestCase {
             nodes: nil,
             members: nil
         )
-        return Element(
+        var element = Element(
             id: "test",
             osmJSON: osmJSON,
             tags: nil,
@@ -97,5 +123,26 @@ final class ElementMapVisibilityTests: XCTestCase {
             updatedAt: nil,
             deletedAt: nil
         )
+        if let icon {
+            element.v4Metadata = ElementV4Metadata(
+                icon: icon,
+                commentsCount: nil,
+                verifiedAt: nil,
+                boostedUntil: nil,
+                osmID: nil,
+                osmURL: nil,
+                email: nil,
+                twitter: nil,
+                facebook: nil,
+                instagram: nil,
+                telegram: nil,
+                line: nil,
+                requiredAppURL: nil,
+                imageURL: nil,
+                paymentProvider: nil,
+                rawAddress: nil
+            )
+        }
+        return element
     }
 }
