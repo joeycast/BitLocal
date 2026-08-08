@@ -12,6 +12,7 @@
 		F60AC73D2DE50E9D007863F6 /* Fredoka-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */; };
 		F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */; };
 		F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */; };
+		F7E400013B15000000000001 /* ElementMapVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E400013B15000000000002 /* ElementMapVisibilityTests.swift */; };
 		F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */; };
 		F62AA0013B1F000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F62AA0013B1F000000000002 /* PrivacyInfo.xcprivacy */; };
 		F7C0A3013A5B100100000201 /* MerchantAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A3003A5B100100000200 /* MerchantAlerts.swift */; };
@@ -108,6 +109,7 @@
 		F6004F952DED3F43001183AE /* Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug.swift; sourceTree = "<group>"; };
 		F60AC73C2DE50E9D007863F6 /* Fredoka-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-Medium.ttf"; sourceTree = "<group>"; };
 		F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchBehaviorTests.swift; sourceTree = "<group>"; };
+		F7E400013B15000000000002 /* ElementMapVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementMapVisibilityTests.swift; sourceTree = "<group>"; };
 		F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTextNormalizerTests.swift; sourceTree = "<group>"; };
 		F7C0A3003A5B100100000200 /* MerchantAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlerts.swift; sourceTree = "<group>"; };
 		F7C0A3023A5B100100000202 /* MerchantAlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantAlertsView.swift; sourceTree = "<group>"; };
@@ -488,6 +490,7 @@
 				F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */,
 				F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */,
 				F60F81C12F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift */,
+				F7E400013B15000000000002 /* ElementMapVisibilityTests.swift */,
 				F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */,
 			);
 			path = bitlocalTests;
@@ -684,6 +687,7 @@
 				F7C0A3053A5B100100000205 /* MerchantAlertsModelsTests.swift in Sources */,
 				F7C0A2023A5B100100000102 /* V4PlaceRecordDecodingTests.swift in Sources */,
 				F60F81C22F571D6600FD7D36 /* MerchantSearchBehaviorTests.swift in Sources */,
+				F7E400013B15000000000001 /* ElementMapVisibilityTests.swift in Sources */,
 				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
 				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
 				F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */,

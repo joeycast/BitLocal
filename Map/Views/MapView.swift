@@ -458,7 +458,7 @@ struct MapView: UIViewRepresentable {
             let visibleElements = sourceElements.filter { element in
                 // 1. Cheapest checks first — pure string comparisons
                 guard (element.deletedAt == nil || element.deletedAt == ""),
-                      (element.osmJSON?.tags?.name != nil || element.osmJSON?.tags?.operator != nil),
+                      element.hasMapRenderableIdentity,
                       let coordinate = element.mapCoordinate else { return false }
 
                 // 2. Rect containment — cheap math, eliminates most elements

@@ -156,6 +156,15 @@ struct Element: Codable, Identifiable, Hashable {
         return nil
     }
 
+    /// Whether this merchant has enough identity to render as a map pin.
+    /// Matches list/search labeling: valid display name (name, brand, or operator),
+    /// plus snapshot placeholder names so cold-start pins still appear before hydration.
+    var hasMapRenderableIdentity: Bool {
+        if displayName != nil { return true }
+        let rawName = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return Self.isPlaceholderName(rawName)
+    }
+
     static func isInvalidPrimaryName(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return true }
