@@ -1444,24 +1444,49 @@ class ElementCellViewModel: ObservableObject {
 // Payment icons
 struct PaymentIcons: View {
     let element: Element
-    
+
     var body: some View {
         HStack(spacing: 6) {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
                     .foregroundColor(.accentColor)
+                    .accessibilityLabel(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
             }
-            
+
             if acceptsLightning(element: element) {
                 Image(systemName: "bolt.circle.fill")
                     .foregroundColor(.accentColor)
+                    .accessibilityLabel(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
             }
-            
+
             if acceptsContactlessLightning(element: element) {
                 Image(systemName: "wave.3.right.circle.fill")
                     .foregroundColor(.accentColor)
+                    .accessibilityLabel(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
             }
         }
         .font(.subheadline)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(paymentMethodsAccessibilityLabel)
+    }
+
+    private var paymentMethodsAccessibilityLabel: String {
+        var methods: [String] = []
+        if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
+            methods.append(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
+        }
+        if acceptsLightning(element: element) {
+            methods.append(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
+        }
+        if acceptsContactlessLightning(element: element) {
+            methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
+        }
+        if methods.isEmpty {
+            return NSLocalizedString("Payment methods unavailable", comment: "VoiceOver when no payment method icons are shown")
+        }
+        return String(
+            format: NSLocalizedString("Accepts %@", comment: "VoiceOver summary of accepted payment methods"),
+            methods.joined(separator: ", ")
+        )
     }
 }
