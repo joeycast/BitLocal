@@ -3284,16 +3284,36 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func replaceOrUpsertMerchant(_ element: Element, forceMapRefresh: Bool) {
+        let isNew = merchantElementStore.element(id: element.id) == nil
         merchantStoreRevision = merchantElementStore.upsert(element)
-        allElements = merchantElementStore.snapshot()
+        // Avoid re-materializing the full catalog on single-element updates.
+        if isNew {
+            allElements.append(element)
+        } else if let index = allElements.firstIndex(where: { $0.id == element.id }) {
+            allElements[index] = element
+        } else {
+            allElements = merchantElementStore.snapshot()
+        }
         if forceMapRefresh {
             self.forceMapRefresh = true
         }
     }
 
     private func upsertMerchants(_ elements: [Element], forceMapRefresh: Bool) {
+        guard !elements.isEmpty else { return }
         merchantStoreRevision = merchantElementStore.upsertMany(elements)
-        allElements = merchantElementStore.snapshot()
+        // Small batches patch the published array in place; large ones snapshot once.
+        if elements.count <= 32 {
+            for element in elements {
+                if let index = allElements.firstIndex(where: { $0.id == element.id }) {
+                    allElements[index] = element
+                } else {
+                    allElements.append(element)
+                }
+            }
+        } else {
+            allElements = merchantElementStore.snapshot()
+        }
         if forceMapRefresh {
             self.forceMapRefresh = true
         }

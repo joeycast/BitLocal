@@ -34,24 +34,39 @@ final class MerchantElementStoreTests: XCTestCase {
         XCTAssertEqual(store.elements(ids: ["3", "1", "missing"]).map(\.id), ["3", "1"])
     }
 
-    func testSnapshotIsDeterministicallyOrderedByID() {
+    func testSnapshotPreservesFirstSeenOrderWithoutSorting() {
         let store = MerchantElementStore()
         store.replaceAll([
             makeElement(id: "b", name: "B"),
             makeElement(id: "a", name: "A"),
             makeElement(id: "c", name: "C")
         ])
-        XCTAssertEqual(store.snapshot().map(\.id), ["a", "b", "c"])
+        // Stable first-seen order — sorting ~25k ids on every upsert is too expensive.
+        XCTAssertEqual(store.snapshot().map(\.id), ["b", "a", "c"])
     }
 
-    func testDuplicateIDsInReplaceKeepLast() {
+    func testUpsertKeepsExistingPositionAndAppendsNewIDs() {
+        let store = MerchantElementStore()
+        store.replaceAll([
+            makeElement(id: "b", name: "B"),
+            makeElement(id: "a", name: "A")
+        ])
+        store.upsert(makeElement(id: "b", name: "B2"))
+        store.upsert(makeElement(id: "z", name: "Z"))
+        XCTAssertEqual(store.snapshot().map(\.id), ["b", "a", "z"])
+        XCTAssertEqual(store.element(id: "b")?.osmJSON?.tags?.name, "B2")
+    }
+
+    func testDuplicateIDsInReplaceKeepLastAtFirstPosition() {
         let store = MerchantElementStore()
         store.replaceAll([
             makeElement(id: "1", name: "first"),
+            makeElement(id: "2", name: "two"),
             makeElement(id: "1", name: "second")
         ])
-        XCTAssertEqual(store.count, 1)
+        XCTAssertEqual(store.count, 2)
         XCTAssertEqual(store.element(id: "1")?.osmJSON?.tags?.name, "second")
+        XCTAssertEqual(store.snapshot().map(\.id), ["1", "2"])
     }
 
     private func makeElement(id: String, name: String) -> Element {
