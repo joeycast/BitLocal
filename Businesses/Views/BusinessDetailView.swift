@@ -189,7 +189,7 @@ struct BusinessDetailView: View {
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
             elementCellViewModel.onCellAppear()
         }
-        .navigationTitle(element.displayName ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
+        .navigationTitle(element.displayNameForUI ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
         .navigationBarTitleDisplayMode(.inline)
         .bitLocalDetailNavigationChrome()
         .toolbar {

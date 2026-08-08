@@ -22,7 +22,7 @@ class Annotation: NSObject, Identifiable, MKAnnotation {
     }
     
     var title: String? {
-        element?.displayName
+        element?.displayNameForUI
     }
     
     init(element: Element) {

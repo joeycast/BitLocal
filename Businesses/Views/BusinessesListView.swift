@@ -671,8 +671,8 @@ struct BusinessesListView: View {
 
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
         if let vm = viewModel.cellViewModels[element.id] {
-            let currentName = vm.element.displayName ?? ""
-            let nextName = element.displayName ?? ""
+            let currentName = vm.element.displayNameForUI ?? ""
+            let nextName = element.displayNameForUI ?? ""
             let currentUpdated = vm.element.updatedAt ?? ""
             let nextUpdated = element.updatedAt ?? ""
             if currentName != nextName || currentUpdated != nextUpdated {
@@ -829,7 +829,7 @@ struct ElementCell: View {
             
             HStack {
                 Text(
-                    viewModel.element.displayName ??
+                    viewModel.element.displayNameForUI ??
                     NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
                 )
                     .foregroundColor(.primary)

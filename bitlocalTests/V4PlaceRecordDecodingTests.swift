@@ -46,7 +46,9 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
             fallbackTimestamp: "2026-01-01T00:00:00Z"
         )
         XCTAssertTrue(Element.isPlaceholderName(element.osmJSON?.tags?.name ?? ""))
-        XCTAssertEqual(element.displayName, MerchantCategoryGroup.coffee.localizedLabel)
+        // Category labels are UI-only — must not pollute displayName/search scoring.
+        XCTAssertNil(element.displayName)
+        XCTAssertEqual(element.displayNameForUI, MerchantCategoryGroup.coffee.localizedLabel)
     }
 
     func testDecodesFullPlaceRecordWithOptionalFields() throws {

@@ -570,7 +570,8 @@ struct V4PlaceToElementMapper {
     static func snapshotRecordToElement(_ record: V4PlaceSnapshotRecord, fallbackTimestamp: String) -> Element {
         // Prefer a real name when the CDN snapshot includes one; otherwise keep the
         // stable placeholder so incremental backfill / place hydration can still find it.
-        // UI display falls back to a category label via `Element.displayName`.
+        // UI display falls back to a category label via `Element.displayNameForUI`
+        // (not `displayName`, which feeds search scoring).
         let placeholderName = "BTC Map Place #\(record.id)"
         let resolvedName = record.preferredName ?? placeholderName
         let osmTags = makeOsmTags(

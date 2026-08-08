@@ -137,6 +137,9 @@ struct Element: Codable, Identifiable, Hashable {
         hasher.combine(id)
     }
 
+    /// Canonical identity for search, ranking, and equality-facing labels.
+    /// Intentionally excludes category bootstrap labels so every unhydrated
+    /// cafe does not score as an exact name match for "Coffee".
     var displayName: String? {
         let name = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !Self.isInvalidPrimaryName(name) {
@@ -153,18 +156,16 @@ struct Element: Codable, Identifiable, Hashable {
             return operatorName
         }
 
-        // CDN snapshot bootstrap only includes id/lat/lon/icon (no place names).
-        // Surface a localized category label so first paint is readable while
-        // placeholder names continue to drive hydration/backfill.
-        if Self.isPlaceholderName(name) || name.isEmpty {
-            if let categoryLabel = ElementCategorySymbols.friendlyCategoryLabel(
-                forIcon: v4Metadata?.icon ?? tags?.iconPlatform
-            ) {
-                return categoryLabel
-            }
-        }
-
         return nil
+    }
+
+    /// List/map title for first paint. CDN snapshots often lack real names;
+    /// fall back to a localized category while placeholder tags still drive hydration.
+    var displayNameForUI: String? {
+        if let displayName { return displayName }
+        return ElementCategorySymbols.friendlyCategoryLabel(
+            forIcon: v4Metadata?.icon ?? tags?.iconPlatform
+        )
     }
 
     static func isInvalidPrimaryName(_ value: String) -> Bool {
