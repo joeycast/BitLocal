@@ -244,6 +244,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var postOnboardingPresentationFallbackTask: Task<Void, Never>?
     private var placeholderNameHydrationInFlight = Set<String>()
     private var placeholderNameHydrationAttempted = Set<String>()
+    private var placeholderNameHydrationPendingResults: [String: Element] = [:]
+    private var placeholderNameHydrationApplyWorkItem: DispatchWorkItem?
     private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
     private var merchantSearchDocumentSignatureByID: [String: String] = [:]
     private var merchantSearchLocalMatchScoreByID: [String: Int] = [:]
@@ -356,19 +358,55 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     guard let self else { return }
                     self.placeholderNameHydrationInFlight.remove(id)
 
-                    guard case .success(let record) = result else { return }
-                    let hydrated = V4PlaceToElementMapper.placeRecordToElement(record)
-
-                    var byID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
-                    byID[id] = hydrated
-                    self.allElements = Array(byID.values)
-                    if self.selectedElement?.id == id {
-                        self.selectedElement = hydrated
+                    guard case .success(let record) = result else {
+                        // Still flush any other pending results when the batch drains.
+                        if self.placeholderNameHydrationInFlight.isEmpty {
+                            self.applyPendingPlaceholderNameHydrations()
+                        }
+                        return
                     }
-                    self.forceMapRefresh = true
+                    let hydrated = V4PlaceToElementMapper.placeRecordToElement(record)
+                    self.placeholderNameHydrationPendingResults[id] = hydrated
+
+                    // Apply immediately when the batch finishes; otherwise coalesce
+                    // rapid completions so we don't rebuild allElements per place.
+                    if self.placeholderNameHydrationInFlight.isEmpty {
+                        self.placeholderNameHydrationApplyWorkItem?.cancel()
+                        self.applyPendingPlaceholderNameHydrations()
+                    } else {
+                        self.schedulePlaceholderNameHydrationApply()
+                    }
                 }
             }
         }
+    }
+
+    private func schedulePlaceholderNameHydrationApply() {
+        placeholderNameHydrationApplyWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.applyPendingPlaceholderNameHydrations()
+        }
+        placeholderNameHydrationApplyWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
+    }
+
+    private func applyPendingPlaceholderNameHydrations() {
+        guard !placeholderNameHydrationPendingResults.isEmpty else { return }
+        let pending = placeholderNameHydrationPendingResults
+        placeholderNameHydrationPendingResults.removeAll(keepingCapacity: true)
+        placeholderNameHydrationApplyWorkItem = nil
+
+        var byID = IdentifiableIndex.byID(allElements)
+        for (id, element) in pending {
+            byID[id] = element
+        }
+        allElements = Array(byID.values)
+
+        if let selectedID = selectedElement?.id, let updated = pending[selectedID] {
+            selectedElement = updated
+        }
+        forceMapRefresh = true
+        Debug.logTiming("data", "applied \(pending.count) placeholder name hydrations in one store update")
     }
 
     func requestPlaceholderNameHydration(for elements: [Element]) {
@@ -878,7 +916,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let ids = digest.merchantIDs
         guard !ids.isEmpty else { return [] }
 
-        let byID = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
+        let byID = IdentifiableIndex.byID(allElements)
         return ids.compactMap { byID[$0] }
     }
 
@@ -1525,8 +1563,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return (element, match)
         }
 
-        merchantSearchLocalMatchScoreByID = Dictionary(
-            uniqueKeysWithValues: matched.map { ($0.element.id, $0.match.score) }
+        merchantSearchLocalMatchScoreByID = IdentifiableIndex.dictionary(
+            matched.map { ($0.element.id, $0.match.score) }
         )
         merchantSearchStrongLocalHitCount = matched.filter(\.match.isStrong).count
 
@@ -2229,7 +2267,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         // While v2 is still loading, keep fallback communities visible and layer in v2 progressively.
         if communityMapAreasIsLoading {
-            var merged = Dictionary(uniqueKeysWithValues: fallbackAreas.map { ($0.id, $0) })
+            var merged = IdentifiableIndex.byID(fallbackAreas)
             for area in v2Areas { merged[area.id] = area }
             return Array(merged.values)
         }
@@ -2711,14 +2749,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             guard let self else { return }
             guard self.latestCommunitySelectionRequestID == requestID else { return }
 
-            var byID = Dictionary(uniqueKeysWithValues: seedMembers.map { ($0.id, $0) })
+            var byID = IdentifiableIndex.byID(seedMembers)
             for member in hydratedMembers {
                 byID[member.id] = member
             }
             self.communityMemberElements = Array(byID.values)
 
             if !hydratedMembers.isEmpty {
-                var allByID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
+                var allByID = IdentifiableIndex.byID(self.allElements)
                 for member in hydratedMembers {
                     allByID[member.id] = member
                 }
@@ -2928,7 +2966,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.communityGeoJSONHydrationInFlight = false
 
             if !hydrated.isEmpty {
-                var byID = Dictionary(uniqueKeysWithValues: self.areaBrowserAreas.map { ($0.id, $0) })
+                var byID = IdentifiableIndex.byID(self.areaBrowserAreas)
                 for area in hydrated {
                     byID[area.id] = area
                 }
@@ -3311,7 +3349,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func upsertElementIntoStore(_ element: Element) {
-        var dictionary = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
+        var dictionary = IdentifiableIndex.byID(allElements)
         dictionary[element.id] = element
         allElements = Array(dictionary.values)
         forceMapRefresh = true

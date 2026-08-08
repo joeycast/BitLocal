@@ -147,7 +147,7 @@ class APIManager {
     private func updateCacheWithFetchedElements(fetchedElements: [Element]) {
         DispatchQueue.global(qos: .utility).async {
             let cachedElements = self.loadElementsFromFile() ?? []
-            var elementsDictionary = Dictionary(uniqueKeysWithValues: cachedElements.map { ($0.id, $0) })
+            var elementsDictionary = IdentifiableIndex.byID(cachedElements)
             fetchedElements.forEach { element in
                 elementsDictionary[element.id] = element
             }
