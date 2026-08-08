@@ -1487,6 +1487,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     /// Restores the last category chip once after initial merchant data is ready.
     /// Free-text is intentionally not restored (avoids surprise worldwide queries).
+    ///
+    /// When the current viewport has no matches, keep trying on later map/list
+    /// updates (do not set `didRestore…`) so cold-start over empty ocean can
+    /// still restore after the user pans into a populated area.
     func restorePersistedMerchantCategoryIfNeeded() {
         guard !didRestorePersistedMerchantCategory else { return }
         guard mapDisplayMode == .merchants else { return }
@@ -1496,21 +1500,25 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         // cold launch. Wait until the map has settled somewhere with merchants.
         guard !visibleElements.isEmpty else { return }
         guard unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            // User already typed or selected something — never auto-restore over it.
             didRestorePersistedMerchantCategory = true
             return
         }
-        didRestorePersistedMerchantCategory = true
-        guard let group = MerchantSearchPersistence.loadCategoryGroup() else { return }
+        guard let group = MerchantSearchPersistence.loadCategoryGroup() else {
+            // Nothing to restore (missing/expired) — stop rechecking.
+            didRestorePersistedMerchantCategory = true
+            return
+        }
         // Only take over the sheet when the category actually has matches in
-        // the current viewport — an empty "no results" search on launch is
-        // worse than no restore. The chip stays persisted for a later launch.
+        // the current viewport. Leave the flag false so a later pan/zoom can retry.
         let hasVisibleMatch = visibleElements.contains {
             ElementCategorySymbols.merchantCategoryGroups(for: $0).contains(group)
         }
         guard hasVisibleMatch else {
-            Debug.logAPI("Skipped category chip restore (\(group.rawValue)): no visible matches in viewport")
+            Debug.logAPI("Deferred category chip restore (\(group.rawValue)): no visible matches in viewport")
             return
         }
+        didRestorePersistedMerchantCategory = true
         isSearchActive = true
         unifiedSearchText = group.localizedLabel
         performUnifiedSearch()
