@@ -82,10 +82,7 @@ struct BusinessesListView: View {
                     LoadingScreenView()
                 } else if elements.isEmpty {
                     if shouldShowEmptyState {
-                        Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
-                            .foregroundStyle(.gray)
-                            .font(.title3)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        merchantEmptyStateView
                     } else {
                         Spacer(minLength: 0)
                     }
@@ -103,6 +100,9 @@ struct BusinessesListView: View {
             .offset(y: (1 - contentRevealProgress) * 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .refreshable {
+            await viewModel.refreshMerchantData()
+        }
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
             refreshDiscoveryCache()
@@ -296,9 +296,96 @@ struct BusinessesListView: View {
         .background(Color.clear)
         .environment(\.defaultMinListRowHeight, 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .refreshable {
+            await viewModel.refreshMerchantData()
+        }
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: topSortedElements)
         }
+    }
+
+    private var merchantEmptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: emptyStateSystemImage)
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(emptyStateTitle)
+                .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+            Text(emptyStateMessage)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            if shouldShowEmptyStateRetry {
+                Button {
+                    viewModel.refreshMerchantData(userInitiated: true)
+                } label: {
+                    Text(NSLocalizedString("Try Again", comment: "Retry button when merchant sync fails"))
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 4)
+            }
+
+            if let syncLine = lastSyncedFooterLine {
+                Text(syncLine)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.horizontal, 16)
+    }
+
+    private var emptyStateSystemImage: String {
+        if viewModel.merchantSyncFailed && viewModel.allElements.isEmpty {
+            return "wifi.exclamationmark"
+        }
+        if viewModel.allElements.isEmpty {
+            return "arrow.triangle.2.circlepath"
+        }
+        return "mappin.slash"
+    }
+
+    private var emptyStateTitle: String {
+        if viewModel.merchantSyncFailed && viewModel.allElements.isEmpty {
+            return NSLocalizedString("Couldn't load merchants", comment: "Title when merchant dataset failed to load")
+        }
+        if viewModel.allElements.isEmpty {
+            return NSLocalizedString("Updating merchants…", comment: "Title while waiting for first merchant sync")
+        }
+        return NSLocalizedString("no_locations_found", comment: "Empty state for no locations found")
+    }
+
+    private var emptyStateMessage: String {
+        if let message = viewModel.merchantSyncStatusMessage, !message.isEmpty {
+            return message
+        }
+        if viewModel.allElements.isEmpty {
+            return NSLocalizedString(
+                "BitLocal is downloading the latest Bitcoin merchants. Pull down to retry if this takes too long.",
+                comment: "Message while waiting for first merchant sync"
+            )
+        }
+        return NSLocalizedString(
+            "No Bitcoin merchants in this map area. Pan or zoom to explore nearby places.",
+            comment: "Empty state when the viewport has no merchants but the catalog is loaded"
+        )
+    }
+
+    private var shouldShowEmptyStateRetry: Bool {
+        viewModel.merchantSyncFailed || (viewModel.hasLoadedInitialData && viewModel.allElements.isEmpty)
+    }
+
+    private var lastSyncedFooterLine: String? {
+        guard let relative = viewModel.lastSuccessfulSyncRelativeDescription else { return nil }
+        return String(
+            format: NSLocalizedString("Updated %@", comment: "Relative last-synced label, e.g. Updated 5 minutes ago"),
+            relative
+        )
     }
 
     private var digestResultsView: some View {
@@ -699,15 +786,21 @@ struct BusinessesListView: View {
     }
 
     private var footerView: some View {
-        Text(
-            String(
-                format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
-                topSortedElements.count,
-                elements.count
+        VStack(alignment: .leading, spacing: 4) {
+            Text(
+                String(
+                    format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
+                    topSortedElements.count,
+                    elements.count
+                )
             )
-        )
+            if let syncLine = lastSyncedFooterLine {
+                Text(syncLine)
+            }
+        }
         .font(.footnote)
         .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func merchantSectionHeader(

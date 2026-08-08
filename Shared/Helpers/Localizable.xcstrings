@@ -27036,6 +27036,377 @@
           }
         }
       }
+    },
+    "Try Again" : {
+      "comment" : "Retry button when merchant sync fails",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut versuchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riprova"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnieuw proberen"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ลองอีกครั้ง"
+          }
+        }
+      }
+    },
+    "Couldn't load merchants" : {
+      "comment" : "Title when merchant dataset failed to load",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Händler konnten nicht geladen werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron cargar los comercios"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron cargar los comercios"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger les commerces"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger les commerces"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile caricare le attività"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kan bedrijven niet laden"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "โหลดร้านค้าไม่สำเร็จ"
+          }
+        }
+      }
+    },
+    "Updating merchants…" : {
+      "comment" : "Title while waiting for first merchant sync",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Händler werden aktualisiert …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizando comercios…"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizando comercios…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise à jour des commerces…"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise à jour des commerces…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamento delle attività…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bedrijven bijwerken…"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "กำลังอัปเดตร้านค้า…"
+          }
+        }
+      }
+    },
+    "Updated %@" : {
+      "comment" : "Relative last-synced label, e.g. Updated 5 minutes ago",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualisiert %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizado %@"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizado %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis à jour %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis à jour %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornato %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bijgewerkt %@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "อัปเดต %@"
+          }
+        }
+      }
+    },
+    "BitLocal is downloading the latest Bitcoin merchants. Pull down to retry if this takes too long." : {
+      "comment" : "Message while waiting for first merchant sync",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal lädt die neuesten Bitcoin-Händler. Zieh nach unten, um es erneut zu versuchen, falls es zu lange dauert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal está descargando los comercios de Bitcoin más recientes. Desliza hacia abajo para reintentar si tarda demasiado."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal está descargando los comercios de Bitcoin más recientes. Desliza hacia abajo para reintentar si tarda demasiado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal télécharge les commerces Bitcoin les plus récents. Tirez vers le bas pour réessayer si cela prend trop de temps."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal télécharge les commerces Bitcoin les plus récents. Tirez vers le bas pour réessayer si cela prend trop de temps."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal sta scaricando le attività Bitcoin più recenti. Trascina verso il basso per riprovare se l'operazione richiede troppo tempo."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal downloadt de nieuwste Bitcoin-bedrijven. Trek omlaag om het opnieuw te proberen als dit te lang duurt."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BitLocal กำลังดาวน์โหลดร้านค้า Bitcoin ล่าสุด ดึงลงเพื่อลองอีกครั้งหากใช้เวลานานเกินไป"
+          }
+        }
+      }
+    },
+    "No Bitcoin merchants in this map area. Pan or zoom to explore nearby places." : {
+      "comment" : "Empty state when the viewport has no merchants but the catalog is loaded",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Bitcoin-Händler in diesem Kartenausschnitt. Verschiebe oder zoome die Karte, um Orte in der Nähe zu entdecken."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay comercios de Bitcoin en esta zona del mapa. Desplázate o haz zoom para explorar lugares cercanos."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay comercios de Bitcoin en esta zona del mapa. Desplázate o haz zoom para explorar lugares cercanos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun commerce Bitcoin dans cette zone de la carte. Déplacez ou zoomez la carte pour explorer les lieux à proximité."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun commerce Bitcoin dans cette zone de la carte. Déplacez ou zoomez la carte pour explorer les lieux à proximité."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna attività Bitcoin in quest'area della mappa. Sposta o ingrandisci la mappa per esplorare i luoghi vicini."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen Bitcoin-bedrijven in dit kaartgebied. Versleep of zoom de kaart om plekken in de buurt te verkennen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่มีร้านค้า Bitcoin ในบริเวณแผนที่นี้ เลื่อนหรือซูมแผนที่เพื่อสำรวจสถานที่ใกล้เคียง"
+          }
+        }
+      }
+    },
+    "Couldn’t update merchants. Check your connection and try again." : {
+      "comment" : "Empty-state message when merchant sync fails with no cache",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Händler konnten nicht aktualisiert werden. Überprüfe deine Verbindung und versuche es erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron actualizar los comercios. Comprueba tu conexión e inténtalo de nuevo."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron actualizar los comercios. Revisa tu conexión e inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de mettre à jour les commerces. Vérifiez votre connexion et réessayez."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de mettre à jour les commerces. Vérifiez votre connexion et réessayez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile aggiornare le attività. Controlla la connessione e riprova."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kan bedrijven niet bijwerken. Controleer je verbinding en probeer het opnieuw."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "อัปเดตร้านค้าไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

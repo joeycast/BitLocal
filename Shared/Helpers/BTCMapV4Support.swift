@@ -895,6 +895,21 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         }
     }
 
+    func lastSuccessfulSyncAtISO8601() -> String? {
+        let state = loadV4SyncState()
+        if let value = state.lastSuccessfulSyncAt?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty {
+            return value
+        }
+        // Fall back to incremental anchor / snapshot time when lastSuccessfulSyncAt
+        // was not recorded (older caches).
+        if let anchor = state.incrementalAnchorUpdatedSince?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !anchor.isEmpty {
+            return anchor
+        }
+        return Self.rfc1123ToISO8601(state.snapshotLastModifiedRFC1123)
+    }
+
     func refreshElements(completion: @escaping ([Element]?) -> Void) {
         switch dataSourceMode {
         case .v2Legacy:
