@@ -235,6 +235,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var latestCommunitySelectionRequestID = UUID()
     private var hasScheduledCommunityPrefetch = false
     private var communityPrefetchWorkItem: DispatchWorkItem?
+    /// Fires when the next boosted merchant expires so pin tints update while the app stays active.
+    private var boostExpiryRefreshWorkItem: DispatchWorkItem?
     private var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
     private var shouldReleasePostOnboardingPresentationAfterNextMapRender = false
     private var postOnboardingPresentationFallbackTask: Task<Void, Never>?
@@ -308,6 +310,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self?.hydratePlaceholderNamesIfNeeded(in: elements)
                 self?.refreshMerchantSearchFromVisibleElementsIfNeeded()
                 self?.pruneTransientMerchantCachesIfNeeded()
+                // Visible pins only — off-screen expired boosts re-tint when recreated on pan.
+                self?.scheduleBoostExpiryMapRefreshIfNeeded(for: elements)
             }
             .store(in: &cancellables)
         mapStoppedMovingSubject
@@ -444,6 +448,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             if wasInactive {
                 self.forceMapRefresh = true
             }
+            self.scheduleBoostExpiryMapRefreshIfNeeded()
             
             // Only fetch if we were previously inactive/background and don't have data
             if wasInactive && (self.allElements.isEmpty || self.shouldRefreshAfterInactive()) {
@@ -451,6 +456,32 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self.refreshAfterInactive()
             }
         }
+    }
+
+    /// Schedules a map annotation refresh at the soonest future boost expiry so
+    /// orange pins re-tint without requiring the app to go inactive first.
+    /// Caps the delay at 1 hour and re-evaluates so long-lived boosts still get covered.
+    private func scheduleBoostExpiryMapRefreshIfNeeded(for elements: [Element]? = nil) {
+        boostExpiryRefreshWorkItem?.cancel()
+        boostExpiryRefreshWorkItem = nil
+
+        let source = elements ?? visibleElements
+        let now = Date()
+        let soonestExpiry = source
+            .compactMap(\.boostExpirationDate)
+            .filter { $0 > now }
+            .min()
+        guard let soonestExpiry else { return }
+
+        let delay = min(max(soonestExpiry.timeIntervalSince(now) + 0.25, 0.1), 3_600)
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            Debug.logMap("Boost expiry timer fired — refreshing map annotations")
+            self.forceMapRefresh = true
+            self.scheduleBoostExpiryMapRefreshIfNeeded()
+        }
+        boostExpiryRefreshWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     func handleAppBecameInactive() {
