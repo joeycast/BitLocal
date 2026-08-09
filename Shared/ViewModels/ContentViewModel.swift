@@ -74,37 +74,8 @@ enum SearchTextNormalizer {
     }
 }
 
-struct DeepLinkUnavailableState: Identifiable {
-    let id = UUID()
-    let placeID: String
-    let title: String
-    let message: String
-}
-
-private struct MerchantSearchDocument {
-    let names: [String]
-    let brandOperators: [String]
-    let addresses: [String]
-    let categoryTerms: [String]
-    let rawTerms: [String]
-    let allTerms: [String]
-    let groups: [MerchantCategoryGroup]
-}
-
-private struct MerchantSearchMatch {
-    let score: Int
-    let matchedGroup: MerchantCategoryGroup?
-    let exactLiteralHit: Bool
-
-    var isStrong: Bool {
-        score >= 700 || exactLiteralHit
-    }
-}
-
-private struct MerchantRemoteSearchPlan: Hashable {
-    let query: V4SearchQuery
-    let source: String
-}
+// DeepLinkUnavailableState lives in PlaceDeepLinkResolver.swift.
+// MerchantSearchDocument/Match/Plan live in MerchantSearchEngine.swift.
 
 private struct VisibleCommunityListCacheKey: Equatable {
     let areasHash: Int
@@ -121,7 +92,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
     @Published var isUpdatingLocation = false
-    @Published var geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 1_000)
+    /// Reverse-geocode results. Intentionally not `@Published` — cache writes
+    /// must not invalidate the entire `ContentViewModel` observation graph.
+    let geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 1_000)
     /// Coarse spatial cache mapping ~11km regions to ISO country codes.
     /// Populated as a side effect of reverse geocoding; used to assign country
     /// codes to merchants that already have complete addresses without needing
@@ -134,10 +107,21 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var selectedElement: Element?
     @Published var deepLinkUnavailableState: DeepLinkUnavailableState?
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
+    /// Published merchant catalog snapshot. Mutations go through `merchantElementStore`.
     @Published private(set) var allElements: [Element] = []
+    /// Bumps when the merchant store mutates (for index invalidation / observers).
+    @Published private(set) var merchantStoreRevision: UInt64 = 0
     @Published var visibleElements: [Element] = []
     @Published private(set) var activeMerchantAlertDigest: CityDigest?
     @Published var isLoading: Bool = false
+    /// Last successful merchant dataset sync (from repository sync state).
+    @Published private(set) var lastSuccessfulSyncAt: Date?
+    /// True when the most recent repository refresh returned no usable data while the store was empty.
+    @Published private(set) var merchantSyncFailed = false
+    @Published private(set) var merchantSyncStatusMessage: String?
+    /// When true, Bitcoin ATMs are omitted from the merchant map and nearby list.
+    @Published private(set) var hideATMsFromMapAndList: Bool =
+        UserDefaults.standard.bool(forKey: ContentViewModel.hideATMsFromMapAndListKey)
     @Published var topPadding: CGFloat = 0
     @Published var bottomPadding: CGFloat = 0
     @Published var liveBottomPadding: CGFloat = 0
@@ -195,6 +179,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var lastVisibleCommunityListCacheKey: VisibleCommunityListCacheKey?
     private var communityGeoJSONHydrationInFlight = false
     private var requestedCommunityAreaDetailIDs = Set<Int>()
+    /// Spatial index over merchant coordinates for community polygon membership.
+    private var merchantSpatialIndex = MerchantSpatialIndex()
+    private var merchantSpatialIndexSignature: Int = 0
 
     let locationManager = CLLocationManager()
     let userLocationSubject = PassthroughSubject<CLLocation?, Never>()
@@ -203,6 +190,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     let geocoder = Geocoder.shared
     let centerMapToCoordinateSubject = PassthroughSubject<CLLocationCoordinate2D, Never>()     // Publisher to center map to a coordinate
     private let btcMapRepository: BTCMapRepositoryProtocol
+    /// Identity-keyed merchant catalog (first extraction from ContentViewModel god-object).
+    private let merchantElementStore = MerchantElementStore()
+    private lazy var placeDeepLinkResolver = PlaceDeepLinkResolver(repository: btcMapRepository)
     
     // Startup state tracking
     @Published var isInitialStartup = true
@@ -235,11 +225,16 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     private var latestCommunitySelectionRequestID = UUID()
     private var hasScheduledCommunityPrefetch = false
     private var communityPrefetchWorkItem: DispatchWorkItem?
+    private var didRestorePersistedMerchantCategory = false
+    /// Fires when the next boosted merchant expires so pin tints update while the app stays active.
+    private var boostExpiryRefreshWorkItem: DispatchWorkItem?
     private var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
     private var shouldReleasePostOnboardingPresentationAfterNextMapRender = false
     private var postOnboardingPresentationFallbackTask: Task<Void, Never>?
     private var placeholderNameHydrationInFlight = Set<String>()
     private var placeholderNameHydrationAttempted = Set<String>()
+    private var placeholderNameHydrationPendingResults: [String: Element] = [:]
+    private var placeholderNameHydrationApplyWorkItem: DispatchWorkItem?
     private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
     private var merchantSearchDocumentSignatureByID: [String: String] = [:]
     private var merchantSearchLocalMatchScoreByID: [String: Int] = [:]
@@ -272,6 +267,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         case list
         case unknown
     }
+
+    private static let hideATMsFromMapAndListKey = "hideATMsFromMapAndList"
     
     override init() {
         self.btcMapRepository = BTCMapRepository.shared
@@ -298,16 +295,21 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func configureBindings() {
         loadGeocodingCache()
+        refreshLastSuccessfulSyncAtFromRepository()
         locationManager.delegate = self
         setupCenterMapSubscription()
         visibleElementsSubject
             .receive(on: RunLoop.main)
             .sink { [weak self] elements in
-                Debug.logTiming("map", "visibleElementsSubject received -> count=\(elements.count)")
-                self?.visibleElements = elements
-                self?.hydratePlaceholderNamesIfNeeded(in: elements)
-                self?.refreshMerchantSearchFromVisibleElementsIfNeeded()
-                self?.pruneTransientMerchantCachesIfNeeded()
+                guard let self else { return }
+                let displayElements = self.elementsForDisplay(elements)
+                Debug.logTiming("map", "visibleElementsSubject received -> count=\(displayElements.count) (raw=\(elements.count))")
+                self.visibleElements = displayElements
+                self.hydratePlaceholderNamesIfNeeded(in: displayElements)
+                self.refreshMerchantSearchFromVisibleElementsIfNeeded()
+                self.pruneTransientMerchantCachesIfNeeded()
+                // Visible pins only — off-screen expired boosts re-tint when recreated on pan.
+                self.scheduleBoostExpiryMapRefreshIfNeeded(for: displayElements)
             }
             .store(in: &cancellables)
         mapStoppedMovingSubject
@@ -350,19 +352,50 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     guard let self else { return }
                     self.placeholderNameHydrationInFlight.remove(id)
 
-                    guard case .success(let record) = result else { return }
-                    let hydrated = V4PlaceToElementMapper.placeRecordToElement(record)
-
-                    var byID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
-                    byID[id] = hydrated
-                    self.allElements = Array(byID.values)
-                    if self.selectedElement?.id == id {
-                        self.selectedElement = hydrated
+                    guard case .success(let record) = result else {
+                        // Still flush any other pending results when the batch drains.
+                        if self.placeholderNameHydrationInFlight.isEmpty {
+                            self.applyPendingPlaceholderNameHydrations()
+                        }
+                        return
                     }
-                    self.forceMapRefresh = true
+                    let hydrated = V4PlaceToElementMapper.placeRecordToElement(record)
+                    self.placeholderNameHydrationPendingResults[id] = hydrated
+
+                    // Apply immediately when the batch finishes; otherwise coalesce
+                    // rapid completions so we don't rebuild allElements per place.
+                    if self.placeholderNameHydrationInFlight.isEmpty {
+                        self.placeholderNameHydrationApplyWorkItem?.cancel()
+                        self.applyPendingPlaceholderNameHydrations()
+                    } else {
+                        self.schedulePlaceholderNameHydrationApply()
+                    }
                 }
             }
         }
+    }
+
+    private func schedulePlaceholderNameHydrationApply() {
+        placeholderNameHydrationApplyWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.applyPendingPlaceholderNameHydrations()
+        }
+        placeholderNameHydrationApplyWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
+    }
+
+    private func applyPendingPlaceholderNameHydrations() {
+        guard !placeholderNameHydrationPendingResults.isEmpty else { return }
+        let pending = placeholderNameHydrationPendingResults
+        placeholderNameHydrationPendingResults.removeAll(keepingCapacity: true)
+        placeholderNameHydrationApplyWorkItem = nil
+
+        upsertMerchants(Array(pending.values), forceMapRefresh: true)
+
+        if let selectedID = selectedElement?.id, let updated = pending[selectedID] {
+            selectedElement = updated
+        }
+        Debug.logTiming("data", "applied \(pending.count) placeholder name hydrations in one store update")
     }
 
     func requestPlaceholderNameHydration(for elements: [Element]) {
@@ -439,6 +472,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.appState = .active
             self.hasBeenInactive = false
             self.resolvePendingDeepLinkIfNeeded()
+
+            // Re-evaluate boost styling / annotation content after background time.
+            if wasInactive {
+                self.forceMapRefresh = true
+            }
+            self.scheduleBoostExpiryMapRefreshIfNeeded()
             
             // Only fetch if we were previously inactive/background and don't have data
             if wasInactive && (self.allElements.isEmpty || self.shouldRefreshAfterInactive()) {
@@ -446,6 +485,32 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 self.refreshAfterInactive()
             }
         }
+    }
+
+    /// Schedules a map annotation refresh at the soonest future boost expiry so
+    /// orange pins re-tint without requiring the app to go inactive first.
+    /// Caps the delay at 1 hour and re-evaluates so long-lived boosts still get covered.
+    private func scheduleBoostExpiryMapRefreshIfNeeded(for elements: [Element]? = nil) {
+        boostExpiryRefreshWorkItem?.cancel()
+        boostExpiryRefreshWorkItem = nil
+
+        let source = elements ?? visibleElements
+        let now = Date()
+        let soonestExpiry = source
+            .compactMap(\.boostExpirationDate)
+            .filter { $0 > now }
+            .min()
+        guard let soonestExpiry else { return }
+
+        let delay = min(max(soonestExpiry.timeIntervalSince(now) + 0.25, 0.1), 3_600)
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            Debug.logMap("Boost expiry timer fired — refreshing map annotations")
+            self.forceMapRefresh = true
+            self.scheduleBoostExpiryMapRefreshIfNeeded()
+        }
+        boostExpiryRefreshWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     func handleAppBecameInactive() {
@@ -487,29 +552,34 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func handlePlaceDeepLink(placeID: String) {
-        guard PlaceShareLinkBuilder.isValidPlaceID(placeID) else {
-            presentDeepLinkUnavailable(placeID: placeID, reason: NSLocalizedString("Invalid place identifier.", comment: "Reason shown when a shared place ID is malformed"))
+        // Validate before touching map mode so a malformed link doesn't
+        // yank the user out of communities view (resolver re-checks too).
+        guard PlaceShareLinkBuilder.isValidPlaceID(placeID.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            presentDeepLinkUnavailable(
+                placeID: placeID,
+                reason: PlaceDeepLinkResolver.invalidIdentifierReason()
+            )
             return
         }
 
         mapDisplayMode = .merchants
         isSearchActive = false
 
-        btcMapRepository.fetchPlace(id: placeID) { [weak self] result in
+        placeDeepLinkResolver.resolve(placeID: placeID) { [weak self] resolution in
             DispatchQueue.main.async {
                 guard let self else { return }
-
-                switch result {
-                case .success(let record):
-                    if let deletedAt = record.deletedAt, !deletedAt.isEmpty {
-                        self.presentDeepLinkUnavailable(
-                            placeID: placeID,
-                            reason: NSLocalizedString("This place is no longer available.", comment: "Reason shown when a shared place has been removed")
-                        )
-                        return
-                    }
-
-                    let element = V4PlaceToElementMapper.placeRecordToElement(record)
+                switch resolution {
+                case .invalidIdentifier:
+                    self.presentDeepLinkUnavailable(
+                        placeID: placeID,
+                        reason: PlaceDeepLinkResolver.invalidIdentifierReason()
+                    )
+                case .deleted:
+                    self.presentDeepLinkUnavailable(
+                        placeID: placeID,
+                        reason: PlaceDeepLinkResolver.deletedPlaceReason()
+                    )
+                case .success(let element):
                     self.upsertElementIntoStore(element)
                     if let coordinate = element.mapCoordinate {
                         self.centerMap(to: coordinate, force: true)
@@ -518,9 +588,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     self.selectedElement = element
                     self.path = [element]
                     self.deepLinkUnavailableState = nil
-
-                case .failure(let error):
-                    self.presentDeepLinkUnavailable(placeID: placeID, reason: error.localizedDescription)
+                case .failure(let message):
+                    self.presentDeepLinkUnavailable(placeID: placeID, reason: message)
                 }
             }
         }
@@ -528,11 +597,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func presentDeepLinkUnavailable(placeID: String, reason: String) {
         Debug.log("Deep link place unavailable: id=\(placeID), reason=\(reason)")
-        deepLinkUnavailableState = DeepLinkUnavailableState(
-            placeID: placeID,
-            title: NSLocalizedString("Place unavailable", comment: "Title for unavailable deep-linked place screen"),
-            message: NSLocalizedString("We could not open this BitLocal place. It may have been removed or is temporarily unavailable.", comment: "Message for unavailable deep-linked place screen")
-        )
+        deepLinkUnavailableState = PlaceDeepLinkResolver.unavailableState(placeID: placeID)
     }
 
     func scheduleGeocodingCacheSave() {
@@ -840,8 +905,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let ids = digest.merchantIDs
         guard !ids.isEmpty else { return [] }
 
-        let byID = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
-        return ids.compactMap { byID[$0] }
+        return merchantElementStore.elements(ids: ids)
     }
 
     private func merchantAlertMissingIDs(for digest: CityDigest) -> [String] {
@@ -1447,11 +1511,81 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func performUnifiedSearch() {
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty {
+            MerchantSearchPersistence.clear()
+        } else if let group = ElementCategorySymbols.resolvedCategoryGroup(
+            forNormalizedQuery: SearchTextNormalizer.normalize(query)
+        ), group.localizedLabel.compare(query, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+            // Only persist exact category chip labels — never free-text.
+            MerchantSearchPersistence.saveCategoryGroup(group)
+        }
         if merchantSearchV2HybridEnabled {
             performUnifiedSearchHybrid(query: query)
         } else {
             performUnifiedSearchLegacyRemotePrimary(query: query)
         }
+    }
+
+    /// Applies a category chip and persists the selection for return visits.
+    func applyMerchantCategoryChip(_ chip: MerchantCategoryChip) {
+        isSearchActive = true
+        MerchantSearchPersistence.saveCategoryGroup(chip.group)
+        unifiedSearchText = chip.localizedLabel
+        performUnifiedSearch()
+    }
+
+    /// Clears search text and forgets any persisted category chip.
+    func clearMerchantSearch(userInitiated: Bool = true) {
+        if userInitiated {
+            MerchantSearchPersistence.clear()
+        }
+        // Setting isSearchActive = false re-enters this method via the
+        // bottom sheet's onChange; skip the redundant second search pass.
+        let wasCleared = unifiedSearchText.isEmpty && !isSearchActive
+        unifiedSearchText = ""
+        isSearchActive = false
+        guard !wasCleared else { return }
+        performUnifiedSearch()
+    }
+
+    /// Restores the last category chip once after initial merchant data is ready.
+    /// Free-text is intentionally not restored (avoids surprise worldwide queries).
+    ///
+    /// When the current viewport has no matches, keep trying on later map/list
+    /// updates (do not set `didRestore…`) so cold-start over empty ocean can
+    /// still restore after the user pans into a populated area.
+    func restorePersistedMerchantCategoryIfNeeded() {
+        guard !didRestorePersistedMerchantCategory else { return }
+        guard mapDisplayMode == .merchants else { return }
+        guard hasLoadedInitialData, !allElements.isEmpty else { return }
+        // Local search filters the viewport (visibleElements); restoring before
+        // any pins are on screen guarantees an empty "no results" takeover on
+        // cold launch. Wait until the map has settled somewhere with merchants.
+        guard !visibleElements.isEmpty else { return }
+        guard unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            // User already typed or selected something — never auto-restore over it.
+            didRestorePersistedMerchantCategory = true
+            return
+        }
+        guard let group = MerchantSearchPersistence.loadCategoryGroup() else {
+            // Nothing to restore (missing/expired) — stop rechecking.
+            didRestorePersistedMerchantCategory = true
+            return
+        }
+        // Only take over the sheet when the category actually has matches in
+        // the current viewport. Leave the flag false so a later pan/zoom can retry.
+        let hasVisibleMatch = visibleElements.contains {
+            ElementCategorySymbols.merchantCategoryGroups(for: $0).contains(group)
+        }
+        guard hasVisibleMatch else {
+            Debug.logAPI("Deferred category chip restore (\(group.rawValue)): no visible matches in viewport")
+            return
+        }
+        didRestorePersistedMerchantCategory = true
+        isSearchActive = true
+        unifiedSearchText = group.localizedLabel
+        performUnifiedSearch()
+        Debug.logAPI("Restored persisted merchant category chip: \(group.rawValue)")
     }
 
     private func refreshMerchantSearchFromVisibleElementsIfNeeded() {
@@ -1473,33 +1607,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         in source: [Element],
         normalizedQuery: String
     ) -> [Element] {
-        guard !normalizedQuery.isEmpty else { return [] }
-        let resolvedGroup = ElementCategorySymbols.resolvedCategoryGroup(forNormalizedQuery: normalizedQuery)
-        let matched = source.compactMap { element -> (element: Element, match: MerchantSearchMatch)? in
-            let document = merchantSearchDocument(for: element)
-            guard let match = merchantSearchMatch(
-                for: document,
-                normalizedQuery: normalizedQuery,
-                resolvedGroup: resolvedGroup
-            ) else {
-                return nil
+        let result = MerchantSearchEngine.filterElements(
+            source,
+            normalizedQuery: normalizedQuery,
+            documentProvider: { [weak self] element in
+                self?.merchantSearchDocument(for: element) ?? MerchantSearchEngine.document(for: element)
             }
-            return (element, match)
-        }
-
-        merchantSearchLocalMatchScoreByID = Dictionary(
-            uniqueKeysWithValues: matched.map { ($0.element.id, $0.match.score) }
         )
-        merchantSearchStrongLocalHitCount = matched.filter(\.match.isStrong).count
+        merchantSearchLocalMatchScoreByID = result.scoresByID
+        merchantSearchStrongLocalHitCount = result.strongHitCount
 
-        return matched
-            .sorted { lhs, rhs in
-                merchantElementSearchSortOrder(
-                    lhs.element,
-                    rhs.element
-                )
-            }
-            .map(\.element)
+        return elementsForDisplay(result.elements.sorted(by: merchantElementSearchSortOrder))
     }
 
     private func performUnifiedSearchHybrid(query: String) {
@@ -1630,45 +1748,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func merchantSearchDocument(for element: Element) -> MerchantSearchDocument {
-        let rawFields = merchantSearchableTextFields(for: element)
-        let signature = rawFields.joined(separator: "|")
+        let signature = MerchantSearchEngine.documentSignature(for: element)
         if merchantSearchDocumentSignatureByID[element.id] == signature,
            let cached = merchantSearchDocumentByID[element.id] {
             return cached
         }
 
-        let groups = ElementCategorySymbols.merchantCategoryGroups(for: element)
-        let groupTerms = groups.flatMap { group in
-            ElementCategorySymbols.searchTerms(for: group)
-        }
-
-        let names = normalizedSearchFields([
-            element.osmJSON?.tags?.name,
-            element.displayName
-        ])
-        let brandOperators = normalizedSearchFields([
-            element.osmJSON?.tags?.brand,
-            element.osmJSON?.tags?.operator
-        ])
-        let addresses = normalizedSearchFields([
-            merchantSearchAddressText(for: element),
-            element.v4Metadata?.rawAddress
-        ])
-        let categoryTerms = normalizedSearchFields(groupTerms)
-        let rawTerms = normalizedSearchFields(
-            merchantSearchRawTerms(for: element)
-        )
-
-        let document = MerchantSearchDocument(
-            names: names,
-            brandOperators: brandOperators,
-            addresses: addresses,
-            categoryTerms: categoryTerms,
-            rawTerms: rawTerms,
-            allTerms: Array(Set(names + brandOperators + addresses + categoryTerms + rawTerms)),
-            groups: groups
-        )
-
+        let document = MerchantSearchEngine.document(for: element)
         merchantSearchDocumentSignatureByID[element.id] = signature
         merchantSearchDocumentByID[element.id] = document
         return document
@@ -1712,212 +1798,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
     }
 
-    private func merchantSearchableTextFields(for element: Element) -> [String] {
-        let tagValues = element.osmTagsDict?.values.flatMap {
-            $0.components(separatedBy: ";")
-        } ?? []
-        let iconValues = [element.v4Metadata?.icon, element.tags?.iconPlatform]
-            .compactMap { $0 }
-            .flatMap { [$0, $0.replacingOccurrences(of: "_", with: " ")] }
-        let groupValues = ElementCategorySymbols.merchantCategoryGroups(for: element).flatMap {
-            ElementCategorySymbols.searchTerms(for: $0)
-        }
-
-        return (
-            [
-                element.osmJSON?.tags?.name,
-                element.osmJSON?.tags?.brand,
-                element.osmJSON?.tags?.operator,
-                element.displayName,
-                merchantSearchAddressText(for: element),
-                element.v4Metadata?.rawAddress
-            ].compactMap { $0 } +
-            tagValues +
-            iconValues +
-            groupValues
-        )
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-    }
-
-    private func merchantSearchRawTerms(for element: Element) -> [String] {
-        var rawTerms = merchantSearchableTextFields(for: element)
-        if let icon = element.v4Metadata?.icon ?? element.tags?.iconPlatform {
-            rawTerms.append(icon)
-            rawTerms.append(icon.replacingOccurrences(of: "_", with: " "))
-        }
-        return rawTerms
-    }
-
-    private func merchantSearchAddressText(for element: Element) -> String? {
-        let components = [
-            element.address?.streetNumber,
-            element.address?.streetName,
-            element.address?.cityOrTownName,
-            element.address?.regionOrStateName,
-            element.address?.postalCode,
-            element.address?.countryName
-        ]
-        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-
-        guard !components.isEmpty else { return nil }
-        return components.joined(separator: " ")
-    }
-
-    private func normalizedSearchFields(_ values: [String?]) -> [String] {
-        values
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .map(SearchTextNormalizer.normalize)
-            .filter { !$0.isEmpty }
-    }
-
-    private func normalizedSearchFields(_ values: [String]) -> [String] {
-        normalizedSearchFields(values.map(Optional.some))
-    }
-
     private func merchantSearchDocument(for record: V4PlaceRecord) -> MerchantSearchDocument {
-        let element = V4PlaceToElementMapper.placeRecordToElement(record)
-        let groups = ElementCategorySymbols.merchantCategoryGroups(for: element)
-        let groupTerms = groups.flatMap { ElementCategorySymbols.searchTerms(for: $0) }
-        let iconTerms = [record.icon].compactMap { $0 }.flatMap { [$0, $0.replacingOccurrences(of: "_", with: " ")] }
-
-        let names = normalizedSearchFields([record.name, record.displayName])
-        let brandOperators = normalizedSearchFields([record.osmBrand, record.osmOperator])
-        let addresses = normalizedSearchFields([record.address])
-        let categoryTerms = normalizedSearchFields(groupTerms)
-        let rawTerms = normalizedSearchFields(
-            (element.osmTagsDict?.values.flatMap { $0.components(separatedBy: ";") } ?? []) +
-            iconTerms +
-            [record.description].compactMap { $0 }
-        )
-
-        return MerchantSearchDocument(
-            names: names,
-            brandOperators: brandOperators,
-            addresses: addresses,
-            categoryTerms: categoryTerms,
-            rawTerms: rawTerms,
-            allTerms: Array(Set(names + brandOperators + addresses + categoryTerms + rawTerms)),
-            groups: groups
-        )
-    }
-
-    private func merchantSearchMatch(
-        for document: MerchantSearchDocument,
-        normalizedQuery: String,
-        resolvedGroup: MerchantCategoryGroup?
-    ) -> MerchantSearchMatch? {
-        guard !normalizedQuery.isEmpty else { return nil }
-
-        let queryTokens = normalizedQuery.split(separator: " ").map(String.init)
-        guard !queryTokens.isEmpty else { return nil }
-
-        var score = 0
-        var matchedGroup: MerchantCategoryGroup?
-        let exactNameHit = containsPhrase(normalizedQuery, in: document.names)
-        let exactBrandHit = containsPhrase(normalizedQuery, in: document.brandOperators)
-
-        if exactNameHit {
-            score = max(score, 1000)
-        }
-        if exactBrandHit {
-            score = max(score, 920)
-        }
-        if tokenPrefixMatch(queryTokens, in: document.names) {
-            score = max(score, 840)
-        }
-
-        if let resolvedGroup, document.groups.contains(resolvedGroup) {
-            score = max(score, 780)
-            matchedGroup = resolvedGroup
-        }
-
-        if containsPhrase(normalizedQuery, in: document.categoryTerms) {
-            score = max(score, 720)
-            matchedGroup = matchedGroup ?? document.groups.first
-        } else if tokenPrefixMatch(queryTokens, in: document.categoryTerms) {
-            score = max(score, 680)
-            matchedGroup = matchedGroup ?? document.groups.first
-        }
-
-        if containsPhrase(normalizedQuery, in: document.rawTerms) {
-            score = max(score, 620)
-        }
-
-        if tokenPrefixMatch(queryTokens, in: document.allTerms) {
-            score = max(score, 560)
-        } else if fuzzyTokenMatch(queryTokens, in: document.allTerms) {
-            score = max(score, 520)
-        }
-
-        guard score > 0 else { return nil }
-        return MerchantSearchMatch(
-            score: score,
-            matchedGroup: matchedGroup,
-            exactLiteralHit: exactNameHit || exactBrandHit
-        )
-    }
-
-    private func containsPhrase(_ normalizedQuery: String, in fields: [String]) -> Bool {
-        fields.contains { $0.contains(normalizedQuery) }
-    }
-
-    private func tokenPrefixMatch(_ queryTokens: [String], in fields: [String]) -> Bool {
-        guard !queryTokens.isEmpty else { return false }
-        return queryTokens.allSatisfy { queryToken in
-            fields.contains { field in
-                field.split(separator: " ").contains { String($0).hasPrefix(queryToken) }
-            }
-        }
-    }
-
-    private func fuzzyTokenMatch(_ queryTokens: [String], in fields: [String]) -> Bool {
-        guard !queryTokens.isEmpty else { return false }
-        let candidateTokens = Set(fields.flatMap { $0.split(separator: " ").map(String.init) })
-        return queryTokens.allSatisfy { queryToken in
-            candidateTokens.contains(where: { candidate in
-                candidate.hasPrefix(queryToken) || isOneEditAway(queryToken, candidate)
-            })
-        }
-    }
-
-    private func isOneEditAway(_ lhs: String, _ rhs: String) -> Bool {
-        if lhs == rhs { return true }
-        let lhsChars = Array(lhs)
-        let rhsChars = Array(rhs)
-        guard abs(lhsChars.count - rhsChars.count) <= 1 else { return false }
-
-        var i = 0
-        var j = 0
-        var edits = 0
-
-        while i < lhsChars.count && j < rhsChars.count {
-            if lhsChars[i] == rhsChars[j] {
-                i += 1
-                j += 1
-                continue
-            }
-
-            edits += 1
-            if edits > 1 { return false }
-
-            if lhsChars.count > rhsChars.count {
-                i += 1
-            } else if rhsChars.count > lhsChars.count {
-                j += 1
-            } else {
-                i += 1
-                j += 1
-            }
-        }
-
-        if i < lhsChars.count || j < rhsChars.count {
-            edits += 1
-        }
-
-        return edits <= 1
+        MerchantSearchEngine.document(for: record)
     }
 
     private func pruneFreshResultsAgainstPrimary() {
@@ -1943,8 +1825,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         performUnifiedSearch()
     }
 
-    /// Lazy-load events on first list appearance
+    /// Lazy-load events on first list appearance (no-op while events UI is disabled).
     func ensureEventsLoaded() {
+        guard FeatureFlags.isEventsUIEnabled else { return }
         guard !hasLoadedEvents else { return }
         hasLoadedEvents = true
         loadBTCMapEvents()
@@ -1968,30 +1851,55 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
         hasLoadedCommunityMapAreas = true
         communityMapAreasIsLoading = true
-        loadCommunityMapAreasV2Paginated(anchor: "2022-01-01T00:00:00.000Z", page: 1, accumulated: [:])
+        loadCommunityMapAreasV2()
     }
 
     var mapElementsForCurrentDisplay: [Element] {
         switch mapDisplayMode {
         case .merchants:
             if let digest = activeMerchantAlertDigest {
-                return merchantAlertElements(for: digest)
+                return elementsForDisplay(merchantAlertElements(for: digest))
             }
             let trimmedQuery = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedQuery.count >= 2 {
-                return merchantSearchMapResults
+                return elementsForDisplay(merchantSearchMapResults)
             }
-            return allElements
+            return elementsForDisplay(allElements)
         case .communities:
-            return selectedCommunityArea == nil ? [] : communityMemberElements
+            return selectedCommunityArea == nil ? [] : elementsForDisplay(communityMemberElements)
         }
     }
 
     var listElementsForCurrentDisplay: [Element] {
         if let digest = activeMerchantAlertDigest, mapDisplayMode == .merchants {
-            return merchantAlertElements(for: digest)
+            return elementsForDisplay(merchantAlertElements(for: digest))
         }
         return visibleElements
+    }
+
+    /// Applies user display preferences (currently: optional ATM hiding).
+    func elementsForDisplay(_ elements: [Element]) -> [Element] {
+        guard hideATMsFromMapAndList else { return elements }
+        return elements.filter { !$0.isATM }
+    }
+
+    func setHideATMsFromMapAndList(_ hide: Bool) {
+        guard hideATMsFromMapAndList != hide else { return }
+        hideATMsFromMapAndList = hide
+        UserDefaults.standard.set(hide, forKey: Self.hideATMsFromMapAndListKey)
+
+        if hide {
+            visibleElements = visibleElements.filter { !$0.isATM }
+            localFilteredMerchants = localFilteredMerchants.filter { !$0.isATM }
+            merchantSearchPrimaryResults = merchantSearchPrimaryResults.filter { !$0.isATM }
+            merchantSearchMapResults = merchantSearchMapResults.filter { !$0.isATM }
+            communityMemberElements = communityMemberElements.filter { !$0.isATM }
+        } else if !unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Re-run search so ATMs can reappear in results without a map pan.
+            performUnifiedSearch()
+        }
+
+        forceMapRefresh = true
     }
 
     var isShowingMerchantAlertDigest: Bool {
@@ -1999,10 +1907,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func setMerchantSearchMapResults(_ results: [Element]) {
+        let filtered = elementsForDisplay(results)
         let currentIDs = merchantSearchMapResults.map(\.id)
-        let newIDs = results.map(\.id)
+        let newIDs = filtered.map(\.id)
         guard currentIDs != newIDs else { return }
-        merchantSearchMapResults = results
+        merchantSearchMapResults = filtered
     }
 
     func clearMerchantSearchMapResults() {
@@ -2051,7 +1960,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
 #if DEBUG
     func setAllElementsForTesting(_ elements: [Element]) {
-        allElements = elements
+        replaceMerchantCatalog(elements, forceMapRefresh: false)
     }
 #endif
 
@@ -2115,45 +2024,22 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         communityMapAreas.first { $0.id == id }
     }
 
-    private func loadCommunityMapAreasV2Paginated(anchor: String, page: Int, accumulated: [String: V2AreaRecord]) {
-        let pageLimit = 500
-        let maxPages = 20
-        btcMapRepository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                switch result {
-                case .failure(let error):
-                    self.communityMapAreasIsLoading = false
-                    self.hasLoadedCommunityMapAreas = false
-                    Debug.logAPI("loadCommunityMapAreasV2 page \(page) failed: \(error.localizedDescription)")
+    private func loadCommunityMapAreasV2() {
+        let loader = CommunityAreasLoader(repository: btcMapRepository)
+        loader.loadAll(initialAnchor: "2022-01-01T00:00:00.000Z") { [weak self] areas, isComplete, error in
+            guard let self else { return }
+            if let error {
+                self.communityMapAreasIsLoading = false
+                self.hasLoadedCommunityMapAreas = false
+                Debug.logAPI("loadCommunityMapAreasV2 failed: \(error.localizedDescription)")
+                return
+            }
 
-                case .success(let areas):
-                    var merged = accumulated
-                    for area in areas {
-                        if area.isDeleted {
-                            merged.removeValue(forKey: area.id)
-                        } else {
-                            merged[area.id] = area
-                        }
-                    }
-
-                    // Publish progressively so visible communities can appear immediately.
-                    self.communityMapAreas = Array(merged.values)
-                    self.forceMapRefresh = true
-
-                    let nextAnchor = areas.last?.updatedAt
-                    let shouldContinue = areas.count == pageLimit &&
-                        page < maxPages &&
-                        nextAnchor != nil &&
-                        nextAnchor != anchor
-
-                    if shouldContinue, let nextAnchor {
-                        self.loadCommunityMapAreasV2Paginated(anchor: nextAnchor, page: page + 1, accumulated: merged)
-                        return
-                    }
-
-                    self.communityMapAreasIsLoading = false
-                }
+            // Publish progressively so visible communities can appear immediately.
+            self.communityMapAreas = areas
+            self.forceMapRefresh = true
+            if isComplete {
+                self.communityMapAreasIsLoading = false
             }
         }
     }
@@ -2191,7 +2077,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         // While v2 is still loading, keep fallback communities visible and layer in v2 progressively.
         if communityMapAreasIsLoading {
-            var merged = Dictionary(uniqueKeysWithValues: fallbackAreas.map { ($0.id, $0) })
+            var merged = IdentifiableIndex.byID(fallbackAreas)
             for area in v2Areas { merged[area.id] = area }
             return Array(merged.values)
         }
@@ -2507,16 +2393,86 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let polygons = geoJSONPolygons(from: geoJSON)
         guard !polygons.isEmpty else { return nil }
 
-        return allElements.filter { element in
-            guard let coordinate = element.mapCoordinate else { return false }
-            return polygons.contains { polygon in
-                coordinateInPolygon(
+        ensureMerchantSpatialIndex()
+
+        let candidates: [MerchantSpatialIndex.Entry]
+        if let box = MerchantPolygonGeometry.boundingBox(for: polygons) {
+            candidates = merchantSpatialIndex.candidates(
+                minLatitude: box.minLat,
+                maxLatitude: box.maxLat,
+                minLongitude: box.minLon,
+                maxLongitude: box.maxLon
+            )
+        } else {
+            // Degenerate geometry — fall back to scanning everything that has coordinates.
+            candidates = allElements.compactMap { element in
+                guard let coordinate = element.mapCoordinate else { return nil }
+                return MerchantSpatialIndex.Entry(
+                    id: element.id,
                     latitude: coordinate.latitude,
-                    longitude: coordinate.longitude,
-                    rings: polygon
+                    longitude: coordinate.longitude
                 )
             }
         }
+
+        let byID = Dictionary(allElements.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+        var members: [Element] = []
+        members.reserveCapacity(min(candidates.count, 256))
+
+        for candidate in candidates {
+            guard polygons.contains(where: { polygon in
+                coordinateInPolygon(
+                    latitude: candidate.latitude,
+                    longitude: candidate.longitude,
+                    rings: polygon
+                )
+            }) else { continue }
+            if let element = byID[candidate.id] {
+                members.append(element)
+            }
+        }
+        return members
+    }
+
+    private func ensureMerchantSpatialIndex() {
+        let signature = merchantStoreSignature(for: allElements)
+        guard signature != merchantSpatialIndexSignature || merchantSpatialIndex.isEmpty else { return }
+        let start = CFAbsoluteTimeGetCurrent()
+        merchantSpatialIndex.rebuild(from: allElements, sourceSignature: signature)
+        merchantSpatialIndexSignature = signature
+        Debug.logTiming(
+            "map",
+            "merchant spatial index rebuilt entries=\(merchantSpatialIndex.entryCount) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - start) * 1000))ms"
+        )
+    }
+
+    /// Sampled signature over id + coarse coordinates at several positions.
+    /// Cheap enough for every membership query; catches wholesale replacements
+    /// and sampled coordinate moves without hashing the full catalog.
+    private func merchantStoreSignature(for elements: [Element]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(elements.count)
+        guard !elements.isEmpty else { return hasher.finalize() }
+
+        let lastIndex = elements.count - 1
+        let sampleIndexes: [Int] = [
+            0,
+            lastIndex / 4,
+            lastIndex / 2,
+            (3 * lastIndex) / 4,
+            lastIndex
+        ]
+        var seen = Set<Int>()
+        for index in sampleIndexes where seen.insert(index).inserted {
+            let element = elements[index]
+            hasher.combine(element.id)
+            if let coordinate = element.mapCoordinate {
+                // ~100m precision — enough to invalidate on real moves, cheap to hash.
+                hasher.combine(Int((coordinate.latitude * 1_000).rounded()))
+                hasher.combine(Int((coordinate.longitude * 1_000).rounded()))
+            }
+        }
+        return hasher.finalize()
     }
 
     private func geoJSONPolygons(from collection: GeoJSONFeatureCollection) -> [[[[Double]]]] {
@@ -2673,18 +2629,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             guard let self else { return }
             guard self.latestCommunitySelectionRequestID == requestID else { return }
 
-            var byID = Dictionary(uniqueKeysWithValues: seedMembers.map { ($0.id, $0) })
+            var byID = IdentifiableIndex.byID(seedMembers)
             for member in hydratedMembers {
                 byID[member.id] = member
             }
             self.communityMemberElements = Array(byID.values)
 
             if !hydratedMembers.isEmpty {
-                var allByID = Dictionary(uniqueKeysWithValues: self.allElements.map { ($0.id, $0) })
-                for member in hydratedMembers {
-                    allByID[member.id] = member
-                }
-                self.allElements = Array(allByID.values)
+                self.upsertMerchants(hydratedMembers, forceMapRefresh: false)
             }
 
             self.communityMembersIsLoading = false
@@ -2890,7 +2842,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.communityGeoJSONHydrationInFlight = false
 
             if !hydrated.isEmpty {
-                var byID = Dictionary(uniqueKeysWithValues: self.areaBrowserAreas.map { ($0.id, $0) })
+                var byID = IdentifiableIndex.byID(self.areaBrowserAreas)
                 for area in hydrated {
                     byID[area.id] = area
                 }
@@ -3108,24 +3060,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         _ records: [V4PlaceRecord],
         normalizedQuery: String
     ) -> [V4PlaceRecord] {
-        let resolvedGroup = ElementCategorySymbols.resolvedCategoryGroup(forNormalizedQuery: normalizedQuery)
-        var deduplicatedByID: [String: V4PlaceRecord] = [:]
-        for record in records where deduplicatedByID[record.idString] == nil {
-            deduplicatedByID[record.idString] = record
-        }
-
-        return deduplicatedByID.values
-            .compactMap { record -> (record: V4PlaceRecord, score: Int)? in
-                let document = merchantSearchDocument(for: record)
-                guard let match = merchantSearchMatch(
-                    for: document,
-                    normalizedQuery: normalizedQuery,
-                    resolvedGroup: resolvedGroup
-                ) else {
-                    return nil
-                }
-                return (record, match.score)
-            }
+        MerchantSearchEngine.filterRecords(records, normalizedQuery: normalizedQuery)
             .sorted { lhs, rhs in
                 if lhs.score != rhs.score {
                     return lhs.score > rhs.score
@@ -3273,10 +3208,53 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func upsertElementIntoStore(_ element: Element) {
-        var dictionary = Dictionary(uniqueKeysWithValues: allElements.map { ($0.id, $0) })
-        dictionary[element.id] = element
-        allElements = Array(dictionary.values)
-        forceMapRefresh = true
+        replaceOrUpsertMerchant(element, forceMapRefresh: true)
+    }
+
+    // MARK: - Merchant catalog (MerchantElementStore)
+
+    private func replaceMerchantCatalog(_ elements: [Element], forceMapRefresh: Bool) {
+        merchantStoreRevision = merchantElementStore.replaceAll(elements)
+        allElements = merchantElementStore.snapshot()
+        if forceMapRefresh {
+            self.forceMapRefresh = true
+        }
+    }
+
+    private func replaceOrUpsertMerchant(_ element: Element, forceMapRefresh: Bool) {
+        let isNew = merchantElementStore.element(id: element.id) == nil
+        merchantStoreRevision = merchantElementStore.upsert(element)
+        // Avoid re-materializing the full catalog on single-element updates.
+        if isNew {
+            allElements.append(element)
+        } else if let index = allElements.firstIndex(where: { $0.id == element.id }) {
+            allElements[index] = element
+        } else {
+            allElements = merchantElementStore.snapshot()
+        }
+        if forceMapRefresh {
+            self.forceMapRefresh = true
+        }
+    }
+
+    private func upsertMerchants(_ elements: [Element], forceMapRefresh: Bool) {
+        guard !elements.isEmpty else { return }
+        merchantStoreRevision = merchantElementStore.upsertMany(elements)
+        // Small batches patch the published array in place; large ones snapshot once.
+        if elements.count <= 32 {
+            for element in elements {
+                if let index = allElements.firstIndex(where: { $0.id == element.id }) {
+                    allElements[index] = element
+                } else {
+                    allElements.append(element)
+                }
+            }
+        } else {
+            allElements = merchantElementStore.snapshot()
+        }
+        if forceMapRefresh {
+            self.forceMapRefresh = true
+        }
     }
 
     private func merchantElementSearchSortOrder(_ lhs: Element, _ rhs: Element) -> Bool {
@@ -3356,56 +3334,89 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         raw.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
     }
 
+    /// User-initiated merchant refresh (pull-to-refresh / empty-state retry).
+    /// Reuses repository in-flight coalescing.
+    func refreshMerchantData(userInitiated: Bool = true, completion: (() -> Void)? = nil) {
+        if userInitiated {
+            merchantSyncFailed = false
+            merchantSyncStatusMessage = nil
+        }
+        fetchElements(warmupOnly: false, forceNetworkRefresh: userInitiated, completion: completion)
+    }
+
+    @MainActor
+    func refreshMerchantData() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            refreshMerchantData(userInitiated: true) {
+                continuation.resume()
+            }
+        }
+    }
+
+    var lastSuccessfulSyncRelativeDescription: String? {
+        guard let lastSuccessfulSyncAt else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: lastSuccessfulSyncAt, relativeTo: Date())
+    }
+
     // Fetch elements using the APIManager and update the published elements property.
     // `warmupOnly` preloads merchant data without triggering onboarding-hostile side effects.
-    func fetchElements(warmupOnly: Bool = false, completion: (() -> Void)? = nil) {
-        Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly)")
-        Debug.logTiming("data", "fetchElements invoked (warmupOnly=\(warmupOnly), allElements=\(allElements.count), isLoading=\(isLoading))")
+    // `forceNetworkRefresh` always joins a repository network refresh (pull-to-refresh /
+    // retry) and never takes the "warm cache only" early return.
+    func fetchElements(warmupOnly: Bool = false, forceNetworkRefresh: Bool = false, completion: (() -> Void)? = nil) {
+        Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh)")
+        Debug.logTiming("data", "fetchElements invoked (warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh), allElements=\(allElements.count), isLoading=\(isLoading))")
         
         // Prevent concurrent calls - use main queue for thread safety
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            guard !self.isLoading else {
-                Debug.log("Already loading, skipping duplicate call")
-                completion?()
+
+            // User-initiated pull joins any in-flight repository refresh via coalescing
+            // instead of dismissing the spinner immediately.
+            if self.isLoading {
+                if forceNetworkRefresh {
+                    Debug.log("Already loading; joining in-flight repository refresh for user pull")
+                    self.btcMapRepository.refreshElements { [weak self] elements in
+                        DispatchQueue.main.async {
+                            guard let self else {
+                                completion?()
+                                return
+                            }
+                            self.applyRepositoryRefreshResult(
+                                elements: elements,
+                                hadAnyCache: self.btcMapRepository.hasCachedData() || !self.allElements.isEmpty,
+                                currentElementsEmpty: self.allElements.isEmpty
+                            )
+                            // Do not clear isLoading here — the original owner owns that flag.
+                            completion?()
+                        }
+                    }
+                } else {
+                    Debug.log("Already loading, skipping duplicate call")
+                    completion?()
+                }
                 return
             }
             
             self.isLoading = true
-            
-            // IMPORTANT: Load from cache into memory first if allElements is empty
-            if self.allElements.isEmpty {
-                if let cachedElements = self.btcMapRepository.loadCachedElements(), !cachedElements.isEmpty {
-                    Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
-                    Debug.logTiming("data", "loaded \(cachedElements.count) cached elements into memory")
-                    self.allElements = cachedElements
-                    self.hasLoadedInitialData = true
-                    let cachedHasPlaceholders = self.hasPlaceholderNames(in: cachedElements)
 
-                    if cachedHasPlaceholders {
-                        Debug.logAPI("Cached elements include incomplete names; performing immediate refresh")
-                        Debug.logTiming("data", "cached elements contain incomplete names; starting immediate refresh")
-                        self.btcMapRepository.refreshElements { [weak self] elements in
-                            DispatchQueue.main.async {
-                                guard let self else { return }
-                                let refreshedElements = elements ?? []
-                                Debug.logTiming("data", "immediate refresh completed with \(refreshedElements.count) elements")
-                                if !refreshedElements.isEmpty {
-                                    self.allElements = refreshedElements
-                                    self.forceMapRefresh = true
-                                }
-                                self.isLoading = false
-                                self.scheduleCommunityPrefetchIfNeeded()
-                                if self.isInitialStartup {
-                                    self.isInitialStartup = false
-                                }
-                                completion?()
-                            }
-                        }
-                        return
-                    }
+            // Prefer showing cache immediately when memory is empty, even on forced
+            // network refresh, so pull-to-refresh does not blank the list.
+            if self.allElements.isEmpty,
+               let cachedElements = self.btcMapRepository.loadCachedElements(),
+               !cachedElements.isEmpty {
+                Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
+                Debug.logTiming("data", "loaded \(cachedElements.count) cached elements into memory")
+                self.replaceMerchantCatalog(cachedElements, forceMapRefresh: false)
+                self.hasLoadedInitialData = true
+                self.merchantSyncFailed = false
+                self.refreshLastSuccessfulSyncAtFromRepository()
+                let cachedHasPlaceholders = self.hasPlaceholderNames(in: cachedElements)
 
+                // Warm cache without placeholders: only skip the network when this is
+                // NOT a user-forced refresh (launch / warmup path).
+                if !forceNetworkRefresh, !cachedHasPlaceholders {
                     self.isLoading = false
                     self.scheduleCommunityPrefetchIfNeeded()
                     completion?()
@@ -3415,7 +3426,6 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                         return
                     }
 
-                    // Center map for returning users who have cached data
                     if let userLoc = self.userLocation {
                         Debug.logMap("Centering map to user location for returning user")
                         self.centerMap(to: userLoc.coordinate)
@@ -3423,56 +3433,116 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                         Debug.logMap("No user location yet - requesting location for returning user")
                         self.requestWhenInUseLocationPermission()
                     }
-                    
-                    // For initial startup, delay background updates to avoid immediate API call
+
                     if self.isInitialStartup {
                         Debug.log("Initial startup - delaying background updates by 5 seconds")
                         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                             self.checkForUpdatesInBackground()
                         }
                     } else {
-                        // Still check for updates, but don't block UI
                         self.checkForUpdatesInBackground()
                     }
                     return
                 }
+
+                if cachedHasPlaceholders {
+                    Debug.logAPI("Cached elements include incomplete names; performing immediate refresh")
+                    Debug.logTiming("data", "cached elements contain incomplete names; starting immediate refresh")
+                } else {
+                    Debug.logAPI("User-forced refresh with warm cache; hitting repository network path")
+                }
             }
 
-            let hadAnyCache = self.btcMapRepository.hasCachedData()
+            let hadAnyCache = self.btcMapRepository.hasCachedData() || !self.allElements.isEmpty
             let currentElementsEmpty = self.allElements.isEmpty
             Debug.logCache("Repository cache available before refresh: \(hadAnyCache)")
             Debug.logCache("Current allElements empty: \(currentElementsEmpty)")
-            Debug.logTiming("data", "starting repository refresh (hadCache=\(hadAnyCache), currentEmpty=\(currentElementsEmpty), warmupOnly=\(warmupOnly))")
+            Debug.logTiming("data", "starting repository refresh (hadCache=\(hadAnyCache), currentEmpty=\(currentElementsEmpty), warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh))")
 
             self.btcMapRepository.refreshElements { [weak self] elements in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
-                    
-                    let refreshedElements = elements ?? []
-                    Debug.logAPI("Repository refresh returned \(refreshedElements.count) elements")
-                    Debug.logTiming("data", "repository refresh completed with \(refreshedElements.count) elements")
-
-                    if !refreshedElements.isEmpty {
-                        Debug.logMap("Setting allElements to repository snapshot (\(refreshedElements.count) elements)")
-                        self.allElements = refreshedElements
-                        self.hasLoadedInitialData = true
-                        self.forceMapRefresh = true
-                    } else if currentElementsEmpty && !hadAnyCache {
-                        Debug.log("Repository returned no data and no cache was available")
-                    } else {
-                        Debug.log("Repository returned no updates - keeping existing \(self.allElements.count) elements")
-                    }
-                    
+                    self.applyRepositoryRefreshResult(
+                        elements: elements,
+                        hadAnyCache: hadAnyCache,
+                        currentElementsEmpty: currentElementsEmpty
+                    )
                     self.isLoading = false
                     self.scheduleCommunityPrefetchIfNeeded()
                     completion?()
                     
-                    // Mark initial startup as complete
                     if self.isInitialStartup {
                         self.isInitialStartup = false
                     }
                 }
             }
+        }
+    }
+
+    private func applyRepositoryRefreshResult(
+        elements: [Element]?,
+        hadAnyCache: Bool,
+        currentElementsEmpty: Bool
+    ) {
+        let refreshedElements = elements ?? []
+        Debug.logAPI("Repository refresh returned \(refreshedElements.count) elements")
+        Debug.logTiming("data", "repository refresh completed with \(refreshedElements.count) elements")
+
+        if !refreshedElements.isEmpty {
+            Debug.logMap("Setting allElements to repository snapshot (\(refreshedElements.count) elements)")
+            replaceMerchantCatalog(refreshedElements, forceMapRefresh: true)
+            hasLoadedInitialData = true
+            noteMerchantSyncSucceeded()
+        } else if currentElementsEmpty && !hadAnyCache {
+            Debug.log("Repository returned no data and no cache was available")
+            hasLoadedInitialData = true
+            noteMerchantSyncOutcome(receivedCount: 0, hadCache: false, storeEmpty: true)
+        } else {
+            Debug.log("Repository returned no updates - keeping existing \(allElements.count) elements")
+            // Empty payload with existing cache usually means "no changes", not failure.
+            noteMerchantSyncOutcome(
+                receivedCount: 0,
+                hadCache: hadAnyCache,
+                storeEmpty: allElements.isEmpty
+            )
+            if !allElements.isEmpty {
+                refreshLastSuccessfulSyncAtFromRepository()
+            }
+        }
+    }
+
+    private func noteMerchantSyncSucceeded() {
+        merchantSyncFailed = false
+        merchantSyncStatusMessage = nil
+        // Prefer the repository's just-written sync timestamp when present; fall
+        // back to wall-clock so the footer never rewinds to a stale cached value.
+        if let iso = btcMapRepository.lastSuccessfulSyncAtISO8601(),
+           let parsed = BTCMapDateParser.parse(iso) {
+            lastSuccessfulSyncAt = parsed
+        } else {
+            lastSuccessfulSyncAt = Date()
+        }
+    }
+
+    private func noteMerchantSyncOutcome(receivedCount: Int, hadCache: Bool, storeEmpty: Bool) {
+        if storeEmpty && receivedCount == 0 && !hadCache {
+            merchantSyncFailed = true
+            merchantSyncStatusMessage = NSLocalizedString(
+                "Couldn’t update merchants. Check your connection and try again.",
+                comment: "Empty-state message when merchant sync fails with no cache"
+            )
+        } else {
+            merchantSyncFailed = false
+            if storeEmpty {
+                merchantSyncStatusMessage = nil
+            }
+        }
+    }
+
+    private func refreshLastSuccessfulSyncAtFromRepository() {
+        guard let iso = btcMapRepository.lastSuccessfulSyncAtISO8601() else { return }
+        if let parsed = BTCMapDateParser.parse(iso) {
+            lastSuccessfulSyncAt = parsed
         }
     }
 
@@ -3509,10 +3579,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
                 if !refreshedElements.isEmpty {
                     Debug.logMap("Background update: Repository returned \(refreshedElements.count) elements")
-                    self.allElements = refreshedElements
-                    self.forceMapRefresh = true
+                    self.replaceMerchantCatalog(refreshedElements, forceMapRefresh: true)
                 } else {
                     Debug.log("Background update: No new data available")
+                    self.refreshLastSuccessfulSyncAtFromRepository()
                 }
             }
         }

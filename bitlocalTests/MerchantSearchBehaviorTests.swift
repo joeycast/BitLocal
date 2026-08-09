@@ -405,6 +405,7 @@ private final class MockBTCMapRepository: BTCMapRepositoryProtocol {
     func loadCachedElements() -> [Element]? { [] }
     func hasCachedData() -> Bool { false }
     func refreshElements(completion: @escaping ([Element]?) -> Void) { completion([]) }
+    func lastSuccessfulSyncAtISO8601() -> String? { nil }
     func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) { completion(.success([])) }
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) { completion(.success([])) }
     func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) { completion(.failure(MockError.network)) }

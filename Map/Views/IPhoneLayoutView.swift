@@ -135,6 +135,7 @@ struct IPhoneLayoutView: View {
                     .presentationBackgroundInteraction(.enabled)
                     .sheet(isPresented: $showingAbout) {
                         AboutView()
+                            .environmentObject(viewModel)
                     }
                     .sheet(isPresented: $showingSettings) {
                         NavigationStack {
@@ -142,6 +143,7 @@ struct IPhoneLayoutView: View {
                                 selectedMapType: selectedMapTypeBinding,
                                 currentDetent: $settingsSheetDetent
                             )
+                            .environmentObject(viewModel)
                             .environmentObject(MerchantAlertsManager.shared)
                         }
                         .id("settings-sheet-\(appearance.rawValue)-\(systemColorScheme)")

@@ -66,6 +66,10 @@ private enum BTCMapDateParsers {
     }()
 }
 
+/// CDN snapshot payload (`cdn.static.btcmap.org/api/v4/places.json`).
+/// As of 2026 the file is intentionally thin: `id`, coordinates, `icon`,
+/// optional `comments` / `boosted_until`. Optional name fields are decoded if
+/// present so a richer future snapshot is adopted automatically.
 struct V4PlaceSnapshotRecord: Codable, Hashable {
     let id: Int
     let lat: Double?
@@ -73,6 +77,8 @@ struct V4PlaceSnapshotRecord: Codable, Hashable {
     let icon: String?
     let comments: Int?
     let boostedUntil: String?
+    let name: String?
+    let displayName: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -81,6 +87,17 @@ struct V4PlaceSnapshotRecord: Codable, Hashable {
         case icon
         case comments
         case boostedUntil = "boosted_until"
+        case name
+        case displayName = "display_name"
+    }
+
+    /// Best available explicit name from the snapshot, if the CDN ever includes one.
+    var preferredName: String? {
+        for candidate in [name, displayName] {
+            let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return nil
     }
 }
 
@@ -384,6 +401,8 @@ protocol BTCMapRepositoryProtocol: BTCMapSearchServiceProtocol {
     func loadCachedElements() -> [Element]?
     func hasCachedData() -> Bool
     func refreshElements(completion: @escaping ([Element]?) -> Void)
+    /// ISO-8601 timestamp of the last successful merchant sync, when known.
+    func lastSuccessfulSyncAtISO8601() -> String?
     func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void)
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void)
     func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void)

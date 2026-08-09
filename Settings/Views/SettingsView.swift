@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Binding var currentDetent: PresentationDetent
     var onDone: (() -> Void)? = nil
 
+    @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var appearanceManager: AppearanceManager
     @EnvironmentObject private var featureHintsController: FeatureHintsController
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
@@ -39,6 +40,13 @@ struct SettingsView: View {
                 Text("Auto").tag(DistanceUnit.auto)
                 Text("Miles").tag(DistanceUnit.miles)
                 Text("Km").tag(DistanceUnit.kilometers)
+            }
+
+            pickerRow(label: "ATMs", selection: atmVisibilityBinding) {
+                Text(NSLocalizedString("Show", comment: "Settings: show ATMs on map and list"))
+                    .tag(false)
+                Text(NSLocalizedString("Hide", comment: "Settings: hide ATMs on map and list"))
+                    .tag(true)
             }
 
             Divider()
@@ -88,6 +96,14 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
         }
+    }
+
+    /// `true` = hide ATMs (matches view model storage).
+    private var atmVisibilityBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.hideATMsFromMapAndList },
+            set: { viewModel.setHideATMsFromMapAndList($0) }
+        )
     }
 
     // MARK: - Merchant Alerts

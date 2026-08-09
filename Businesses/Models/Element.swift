@@ -11,7 +11,6 @@ import Foundation
 // MARK: - Element
 struct Element: Codable, Identifiable, Hashable {
     let id: String
-    let uuid: UUID
     let osmJSON: OsmJSON?
     let tags: Tags?
     let createdAt: String
@@ -64,7 +63,6 @@ struct Element: Codable, Identifiable, Hashable {
     
     enum CodingKeys: String, CodingKey {
         case id
-        case uuid
         case osmJSON = "osm_json"
         case tags
         case createdAt = "created_at"
@@ -76,7 +74,6 @@ struct Element: Codable, Identifiable, Hashable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
-        uuid = UUID()
         osmJSON = try container.decodeIfPresent(OsmJSON.self, forKey: .osmJSON)
         tags = try container.decodeIfPresent(Tags.self, forKey: .tags)
         createdAt = try container.decode(String.self, forKey: .createdAt)
@@ -109,7 +106,6 @@ struct Element: Codable, Identifiable, Hashable {
         v4Metadata: ElementV4Metadata? = nil
     ) {
         self.id = id
-        self.uuid = UUID()
         self.osmJSON = osmJSON
         self.tags = tags
         self.createdAt = createdAt
@@ -132,11 +128,16 @@ struct Element: Codable, Identifiable, Hashable {
             self.address = nil
         }
     }
-    
+
+    /// Identity is place ID (see `Equatable` in Extensions + hash below).
+    /// Content may differ across store updates with the same id.
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
 
+    /// Canonical identity for search, ranking, and equality-facing labels.
+    /// Intentionally excludes category bootstrap labels so every unhydrated
+    /// cafe does not score as an exact name match for "Coffee".
     var displayName: String? {
         let name = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !Self.isInvalidPrimaryName(name) {
@@ -156,6 +157,33 @@ struct Element: Codable, Identifiable, Hashable {
         return nil
     }
 
+    /// Whether this merchant has enough identity to render as a map pin.
+    /// Matches list/search labeling: valid display name (name, brand, or operator),
+    /// plus snapshot placeholder names so cold-start pins still appear before hydration.
+    var hasMapRenderableIdentity: Bool {
+        if displayName != nil { return true }
+        let rawName = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return Self.isPlaceholderName(rawName)
+    }
+
+    /// List/map title for first paint. CDN snapshots often lack real names;
+    /// fall back to a localized category while placeholder tags still drive hydration.
+    var displayNameForUI: String? {
+        if let displayName { return displayName }
+        return ElementCategorySymbols.friendlyCategoryLabel(
+            forIcon: v4Metadata?.icon ?? tags?.iconPlatform
+        )
+    }
+
+    /// Content that should force map annotation view refresh when it changes.
+    var mapAnnotationContentSignature: String {
+        let name = displayName ?? osmJSON?.tags?.name ?? ""
+        let boostToken = v4Metadata?.boostedUntil ?? tags?.boostExpires ?? ""
+        let icon = v4Metadata?.icon ?? tags?.iconPlatform ?? ""
+        return "\(updatedAt ?? "")|\(name)|\(boostToken)|\(icon)"
+    }
+
+
     static func isInvalidPrimaryName(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return true }
@@ -174,6 +202,43 @@ struct Element: Codable, Identifiable, Hashable {
     func isCurrentlyBoosted(referenceDate: Date = Date()) -> Bool {
         guard let boostExpirationDate else { return false }
         return boostExpirationDate > referenceDate
+    }
+
+    /// Bitcoin ATMs (not banks or exchanges). Used by the Settings filter so
+    /// cash machines do not crowd the map and nearby list.
+    var isATM: Bool {
+        let amenity = osmJSON?.tags?.amenity?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if amenity == "atm" { return true }
+
+        let icon = (v4Metadata?.icon ?? tags?.iconPlatform)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        // Material/BTC Map icons used for ATM pins (not bank / exchange).
+        if icon == "local_atm" || icon == "atm" { return true }
+
+        return false
+    }
+}
+
+extension Array where Element == bitlocal.Element {
+    /// Content-aware signature for map invalidation (IDs alone are not enough).
+    /// Uses stored boost tokens rather than live date checks so full-catalog
+    /// hashing stays cheap; become-active force-refresh covers expiry re-tint.
+    var mapAnnotationsContentHash: Int {
+        var hasher = Hasher()
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element.id)
+            // Same components as mapAnnotationContentSignature, hashed directly
+            // to avoid building a string per element on every map update.
+            hasher.combine(element.updatedAt ?? "")
+            hasher.combine(element.displayName ?? element.osmJSON?.tags?.name ?? "")
+            hasher.combine(element.v4Metadata?.boostedUntil ?? element.tags?.boostExpires ?? "")
+            hasher.combine(element.v4Metadata?.icon ?? element.tags?.iconPlatform ?? "")
+        }
+        return hasher.finalize()
     }
 }
 

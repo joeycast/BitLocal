@@ -147,7 +147,7 @@ class APIManager {
     private func updateCacheWithFetchedElements(fetchedElements: [Element]) {
         DispatchQueue.global(qos: .utility).async {
             let cachedElements = self.loadElementsFromFile() ?? []
-            var elementsDictionary = Dictionary(uniqueKeysWithValues: cachedElements.map { ($0.id, $0) })
+            var elementsDictionary = IdentifiableIndex.byID(cachedElements)
             fetchedElements.forEach { element in
                 elementsDictionary[element.id] = element
             }
@@ -271,25 +271,54 @@ class APIManager {
 
 class LogManager {
     static let shared = LogManager()
-    private init() {}
-    private(set) var logs: [String] = []
+    /// Soft cap so high-churn API/cache logging cannot grow without bound.
+    private let maxEntries = 1_000
+    private init() {
+        buffer = Array(repeating: nil, count: maxEntries)
+    }
+    /// Callers log from URLSession completion queues; serialize all access.
+    private let lock = NSLock()
+    /// Fixed-size ring buffer — O(1) append without `removeFirst` shifts.
+    private var buffer: [String?]
+    private var writeIndex = 0
+    private var count = 0
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
         return formatter
     }()
-    
+
     func log(_ message: String) {
         let timestamp = dateFormatter.string(from: Date())
         let logMessage = "[\(timestamp)] \(message)"
-        logs.append(logMessage)
+        lock.lock()
+        defer { lock.unlock() }
+        buffer[writeIndex] = logMessage
+        writeIndex = (writeIndex + 1) % maxEntries
+        count = min(count + 1, maxEntries)
     }
-    
+
     func allLogs() -> String {
-        return logs.joined(separator: "\n")
+        lock.lock()
+        defer { lock.unlock() }
+        guard count > 0 else { return "" }
+        var parts: [String] = []
+        parts.reserveCapacity(count)
+        let start = count < maxEntries ? 0 : writeIndex
+        for offset in 0..<count {
+            let index = (start + offset) % maxEntries
+            if let entry = buffer[index] {
+                parts.append(entry)
+            }
+        }
+        return parts.joined(separator: "\n")
     }
-    
+
     func clearLogs() {
-        logs.removeAll()
+        lock.lock()
+        defer { lock.unlock() }
+        buffer = Array(repeating: nil, count: maxEntries)
+        writeIndex = 0
+        count = 0
     }
 }

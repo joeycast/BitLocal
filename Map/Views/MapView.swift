@@ -160,7 +160,8 @@ struct MapView: UIViewRepresentable {
         var refreshElementsHash: Int?
         var refreshForce = false
         if let elements = elements, !elements.isEmpty {
-            let elementsHash = elements.hashValue
+            // Content-aware hash so name/boost/icon updates invalidate pins even when IDs are unchanged.
+            let elementsHash = elements.mapAnnotationsContentHash
             let shouldForceUpdate = viewModel.forceMapRefresh
             let hashChanged = context.coordinator.lastElementsHash != elementsHash
             
@@ -458,7 +459,7 @@ struct MapView: UIViewRepresentable {
             let visibleElements = sourceElements.filter { element in
                 // 1. Cheapest checks first — pure string comparisons
                 guard (element.deletedAt == nil || element.deletedAt == ""),
-                      (element.osmJSON?.tags?.name != nil || element.osmJSON?.tags?.operator != nil),
+                      element.hasMapRenderableIdentity,
                       let coordinate = element.mapCoordinate else { return false }
 
                 // 2. Rect containment — cheap math, eliminates most elements
@@ -489,11 +490,24 @@ struct MapView: UIViewRepresentable {
                 newByID[element.id] = element
             }
 
-            let annotationsToRemove = existingByID.compactMap { id, annotation in
-                newByID[id] == nil ? annotation : nil
+            // Drop pins that left the viewport, and pins whose map-facing content changed
+            // (name, boost, icon) so marker tint/title stay current.
+            let annotationsToRemove = existingByID.compactMap { id, annotation -> Annotation? in
+                guard let latest = newByID[id] else { return annotation }
+                let existingSignature = annotation.element?.mapAnnotationContentSignature
+                let latestSignature = latest.mapAnnotationContentSignature
+                let boostChanged = (annotation.element?.isCurrentlyBoosted() ?? false) != latest.isCurrentlyBoosted()
+                if existingSignature != latestSignature || boostChanged {
+                    return annotation
+                }
+                return nil
             }
-            let elementsToAdd = newByID.compactMap { id, element in
-                existingByID[id] == nil ? element : nil
+            let removedIDs = Set(annotationsToRemove.compactMap { $0.element?.id })
+            let elementsToAdd = newByID.compactMap { id, element -> Element? in
+                if existingByID[id] == nil || removedIDs.contains(id) {
+                    return element
+                }
+                return nil
             }
 
             mapView.removeAnnotations(annotationsToRemove)
@@ -501,7 +515,7 @@ struct MapView: UIViewRepresentable {
             let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
             mapView.addAnnotations(newAnnotations)
 
-            let latestByID = Dictionary(uniqueKeysWithValues: sourceElements.map { ($0.id, $0) })
+            let latestByID = IdentifiableIndex.byID(sourceElements)
             let visibleIDs = visibleElements.map(\.id)
             let refreshedVisibleElements = visibleIDs.compactMap { id in
                 latestByID[id] ?? newByID[id]
@@ -549,27 +563,68 @@ struct MapView: UIViewRepresentable {
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                 view?.markerTintColor = UIColor(named: "MarkerColor")
                 view?.glyphText = "\(cluster.memberAnnotations.count)"
+                let count = cluster.memberAnnotations.count
+                // localizedStringWithFormat resolves the catalog's plural variations.
+                view?.accessibilityLabel = String.localizedStringWithFormat(
+                    NSLocalizedString(
+                        "%d Bitcoin merchants",
+                        comment: "VoiceOver label for a map cluster of merchants"
+                    ),
+                    count
+                )
+                view?.accessibilityTraits = .button
+                view?.accessibilityHint = NSLocalizedString(
+                    "Double tap to zoom into this cluster",
+                    comment: "VoiceOver hint for merchant map clusters"
+                )
             } else if let annotation = annotation as? Annotation {
-                // Handle individual annotations
-                if annotation.element == nil {
-                    fatalError("Failed to get element from annotation.")
+                // Handle individual annotations — never crash on missing element.
+                guard let element = annotation.element else {
+                    Debug.logMap("Skipping annotation view: element is nil")
+                    return nil
                 }
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                 view?.canShowCallout = true
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
-                if let element = annotation.element {
-                    view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
-                    let symbolName = ElementCategorySymbols.symbolName(for: element)
-                    Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
-                    view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
-                } else {
-                    view?.markerTintColor = UIColor(named: "MarkerColor")
-                }
+                view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
+                let symbolName = ElementCategorySymbols.symbolName(for: element)
+                Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
+                view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
+                view?.accessibilityLabel = Self.accessibilityLabel(for: element)
+                view?.accessibilityTraits = .button
+                view?.accessibilityHint = NSLocalizedString(
+                    "Double tap to open merchant details",
+                    comment: "VoiceOver hint for individual merchant map pins"
+                )
                 view?.displayPriority = .required
             }
             return view
+        }
+
+        private static func accessibilityLabel(for element: Element) -> String {
+            let name = element.displayNameForUI
+                ?? element.displayName
+                ?? NSLocalizedString("Bitcoin merchant", comment: "Fallback VoiceOver name for unnamed merchant pin")
+            var parts = [name]
+            if element.isCurrentlyBoosted() {
+                parts.append(NSLocalizedString("Featured", comment: "VoiceOver flag for boosted merchants"))
+            }
+            var methods: [String] = []
+            if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
+                methods.append(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
+            }
+            if acceptsLightning(element: element) {
+                methods.append(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
+            }
+            if acceptsContactlessLightning(element: element) {
+                methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
+            }
+            if !methods.isEmpty {
+                parts.append(methods.joined(separator: ", "))
+            }
+            return parts.joined(separator: ". ")
         }
         
         // Handle annotation selection to update navigation path
@@ -656,7 +711,7 @@ struct MapView: UIViewRepresentable {
                     self.updateAnnotations(
                         mapView: mapView,
                         elements: all,
-                        elementsHash: all.hashValue,
+                        elementsHash: all.mapAnnotationsContentHash,
                         force: false
                     )
                 }
@@ -691,7 +746,7 @@ struct MapView: UIViewRepresentable {
             let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
             let visibleAnnotations = mapView.annotations(in: visibleRect)
             let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-            let latestByID = Dictionary(uniqueKeysWithValues: self.viewModel.allElements.map { ($0.id, $0) })
+            let latestByID = IdentifiableIndex.byID(self.viewModel.allElements)
             let refreshed = visibleElements.compactMap { latestByID[$0.id] ?? $0 }
 
             self.viewModel.visibleElementsSubject.send(refreshed)

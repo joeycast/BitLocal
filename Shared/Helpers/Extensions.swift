@@ -3,6 +3,27 @@ import Foundation // for Debug logging
 import MapKit
 import CoreLocation
 
+// MARK: - Safe ID indexing
+
+enum IdentifiableIndex {
+    /// Builds an id→value dictionary without trapping on duplicate IDs.
+    /// Default policy keeps the later value (last wins).
+    static func byID<T: Identifiable>(
+        _ items: [T],
+        uniquingKeysWith combine: (T, T) -> T = { _, new in new }
+    ) -> [T.ID: T] where T.ID: Hashable {
+        Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: combine)
+    }
+
+    /// Same as `byID` for arbitrary Hashable keys (e.g. string IDs that are not `Identifiable.id`).
+    static func dictionary<Key: Hashable, Value>(
+        _ pairs: [(Key, Value)],
+        uniquingKeysWith combine: (Value, Value) -> Value = { _, new in new }
+    ) -> [Key: Value] {
+        Dictionary(pairs, uniquingKeysWith: combine)
+    }
+}
+
 // Bottom Sheet
 //extension View {
 //    @ViewBuilder
@@ -63,9 +84,11 @@ extension UIViewController {
     }
 }
 
-extension Element: Equatable {
+// Element identity is place id (Equatable + Hashable). Hash is defined on Element;
+// equality lives here to keep the model file focused on decoding.
+extension Element {
     static func == (lhs: Element, rhs: Element) -> Bool {
-        return lhs.id == rhs.id
+        lhs.id == rhs.id
     }
 }
 
@@ -343,6 +366,10 @@ extension String {
 enum FeatureFlags {
     static let sharePlaceLinksKey = "share_place_links_enabled"
     static let featureHintsKey = "feature_hints_enabled"
+
+    /// Events discovery UI and network fetch. Off until the product is ready.
+    /// Keep `EventsDiscoverySection`, `AllEventsListView`, and v4 events API code for later.
+    static let isEventsUIEnabled = false
 
     static var isSharePlaceLinksEnabled: Bool {
         if UserDefaults.standard.object(forKey: sharePlaceLinksKey) == nil {

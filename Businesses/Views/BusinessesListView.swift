@@ -56,7 +56,6 @@ struct BusinessesListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Always-visible search bar
             searchBar
                 .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 2)
@@ -82,10 +81,7 @@ struct BusinessesListView: View {
                     LoadingScreenView()
                 } else if elements.isEmpty {
                     if shouldShowEmptyState {
-                        Text(NSLocalizedString("no_locations_found", comment: "Empty state for no locations found"))
-                            .foregroundStyle(.gray)
-                            .font(.title3)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        merchantEmptyStateView
                     } else {
                         Spacer(minLength: 0)
                     }
@@ -136,7 +132,9 @@ struct BusinessesListView: View {
             refreshEmptyStateVisibility()
         }
         .onAppear {
-            viewModel.ensureEventsLoaded()
+            if FeatureFlags.isEventsUIEnabled {
+                viewModel.ensureEventsLoaded()
+            }
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
             refreshDiscoveryCache()
             syncDisplayedSearchResultsToMap()
@@ -147,6 +145,13 @@ struct BusinessesListView: View {
         }
         .onChange(of: viewModel.hasLoadedInitialData) { _, _ in
             refreshEmptyStateVisibility()
+            viewModel.restorePersistedMerchantCategoryIfNeeded()
+        }
+        .onChange(of: viewModel.allElements.count) { _, _ in
+            viewModel.restorePersistedMerchantCategoryIfNeeded()
+        }
+        .onChange(of: viewModel.visibleElements.count) { _, _ in
+            viewModel.restorePersistedMerchantCategoryIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
             guard isSearchFieldFocused else { return }
@@ -175,7 +180,7 @@ struct BusinessesListView: View {
                 .submitLabel(.search)
             if !viewModel.unifiedSearchText.isEmpty {
                 Button {
-                    viewModel.unifiedSearchText = ""
+                    viewModel.clearMerchantSearch(userInitiated: true)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -185,7 +190,7 @@ struct BusinessesListView: View {
             if viewModel.isSearchActive {
                 Button("Cancel") {
                     isSearchFieldFocused = false
-                    viewModel.isSearchActive = false
+                    viewModel.clearMerchantSearch(userInitiated: true)
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
@@ -227,13 +232,15 @@ struct BusinessesListView: View {
 
     private var normalListView: some View {
         List {
-            // Events carousel (only renders if events exist)
-            Section {
-                EventsDiscoverySection()
-                    .environmentObject(viewModel)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .clearListRowBackground(if: shouldUseGlassyRows)
+            // Kept behind FeatureFlags.isEventsUIEnabled until product is ready.
+            if FeatureFlags.isEventsUIEnabled {
+                Section {
+                    EventsDiscoverySection()
+                        .environmentObject(viewModel)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .clearListRowBackground(if: shouldUseGlassyRows)
+                }
             }
 
             if !featuredTopSortedElements.isEmpty {
@@ -299,6 +306,90 @@ struct BusinessesListView: View {
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: topSortedElements)
         }
+    }
+
+    private var merchantEmptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: emptyStateSystemImage)
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(emptyStateTitle)
+                .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+            Text(emptyStateMessage)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            if shouldShowEmptyStateRetry {
+                Button {
+                    viewModel.refreshMerchantData(userInitiated: true)
+                } label: {
+                    Text(NSLocalizedString("Try Again", comment: "Retry button when merchant sync fails"))
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 4)
+            }
+
+            if let syncLine = lastSyncedFooterLine {
+                Text(syncLine)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.horizontal, 16)
+    }
+
+    private var emptyStateSystemImage: String {
+        if viewModel.merchantSyncFailed && viewModel.allElements.isEmpty {
+            return "wifi.exclamationmark"
+        }
+        if viewModel.allElements.isEmpty {
+            return "arrow.triangle.2.circlepath"
+        }
+        return "mappin.slash"
+    }
+
+    private var emptyStateTitle: String {
+        if viewModel.merchantSyncFailed && viewModel.allElements.isEmpty {
+            return NSLocalizedString("Couldn't load merchants", comment: "Title when merchant dataset failed to load")
+        }
+        if viewModel.allElements.isEmpty {
+            return NSLocalizedString("Updating merchants…", comment: "Title while waiting for first merchant sync")
+        }
+        return NSLocalizedString("no_locations_found", comment: "Empty state for no locations found")
+    }
+
+    private var emptyStateMessage: String {
+        if let message = viewModel.merchantSyncStatusMessage, !message.isEmpty {
+            return message
+        }
+        if viewModel.allElements.isEmpty {
+            return NSLocalizedString(
+                "BitLocal is downloading the latest Bitcoin merchants. Use Try Again if this takes too long, or refresh merchants in About.",
+                comment: "Message while waiting for first merchant sync"
+            )
+        }
+        return NSLocalizedString(
+            "No Bitcoin merchants in this map area. Pan or zoom to explore nearby places.",
+            comment: "Empty state when the viewport has no merchants but the catalog is loaded"
+        )
+    }
+
+    private var shouldShowEmptyStateRetry: Bool {
+        viewModel.merchantSyncFailed || (viewModel.hasLoadedInitialData && viewModel.allElements.isEmpty)
+    }
+
+    private var lastSyncedFooterLine: String? {
+        guard let relative = viewModel.lastSuccessfulSyncRelativeDescription else { return nil }
+        return String(
+            format: NSLocalizedString("Updated %@", comment: "Relative last-synced label, e.g. Updated 5 minutes ago"),
+            relative
+        )
     }
 
     private var digestResultsView: some View {
@@ -549,8 +640,7 @@ struct BusinessesListView: View {
     }
 
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {
-        viewModel.isSearchActive = true
-        viewModel.unifiedSearchText = chip.localizedLabel
+        viewModel.applyMerchantCategoryChip(chip)
     }
 
     private func refreshDiscoveryCache() {
@@ -671,8 +761,8 @@ struct BusinessesListView: View {
 
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
         if let vm = viewModel.cellViewModels[element.id] {
-            let currentName = vm.element.displayName ?? ""
-            let nextName = element.displayName ?? ""
+            let currentName = vm.element.displayNameForUI ?? ""
+            let nextName = element.displayNameForUI ?? ""
             let currentUpdated = vm.element.updatedAt ?? ""
             let nextUpdated = element.updatedAt ?? ""
             if currentName != nextName || currentUpdated != nextUpdated {
@@ -699,15 +789,21 @@ struct BusinessesListView: View {
     }
 
     private var footerView: some View {
-        Text(
-            String(
-                format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
-                topSortedElements.count,
-                elements.count
+        VStack(alignment: .leading, spacing: 4) {
+            Text(
+                String(
+                    format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
+                    topSortedElements.count,
+                    elements.count
+                )
             )
-        )
+            if let syncLine = lastSyncedFooterLine {
+                Text(syncLine)
+            }
+        }
         .font(.footnote)
         .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func merchantSectionHeader(
@@ -829,7 +925,7 @@ struct ElementCell: View {
             
             HStack {
                 Text(
-                    viewModel.element.displayName ??
+                    viewModel.element.displayNameForUI ??
                     NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
                 )
                     .foregroundColor(.primary)
@@ -1351,24 +1447,49 @@ class ElementCellViewModel: ObservableObject {
 // Payment icons
 struct PaymentIcons: View {
     let element: Element
-    
+
     var body: some View {
         HStack(spacing: 6) {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
                     .foregroundColor(.accentColor)
+                    .accessibilityLabel(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
             }
-            
+
             if acceptsLightning(element: element) {
                 Image(systemName: "bolt.circle.fill")
                     .foregroundColor(.accentColor)
+                    .accessibilityLabel(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
             }
-            
+
             if acceptsContactlessLightning(element: element) {
                 Image(systemName: "wave.3.right.circle.fill")
                     .foregroundColor(.accentColor)
+                    .accessibilityLabel(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
             }
         }
         .font(.subheadline)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(paymentMethodsAccessibilityLabel)
+    }
+
+    private var paymentMethodsAccessibilityLabel: String {
+        var methods: [String] = []
+        if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
+            methods.append(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
+        }
+        if acceptsLightning(element: element) {
+            methods.append(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
+        }
+        if acceptsContactlessLightning(element: element) {
+            methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
+        }
+        if methods.isEmpty {
+            return NSLocalizedString("Payment methods unavailable", comment: "VoiceOver when no payment method icons are shown")
+        }
+        return String(
+            format: NSLocalizedString("Accepts %@", comment: "VoiceOver summary of accepted payment methods"),
+            methods.joined(separator: ", ")
+        )
     }
 }

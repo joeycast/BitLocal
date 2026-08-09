@@ -4,11 +4,13 @@ struct AboutView: View {
     
     // For dismissing the SettingsView sheet
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     var onDone: (() -> Void)? = nil
 
     @State private var showingLogs = false
     @State private var showingAddBusinessForm = false
+    @State private var isRefreshingMerchants = false
     
     // App name
     let appName = "BitLocal"
@@ -220,6 +222,27 @@ struct AboutView: View {
                             Spacer()
                         }
                     }
+                    Button {
+                        refreshMerchantsFromAbout()
+                    } label: {
+                        HStack(spacing: 10) {
+                            if isRefreshingMerchants || viewModel.isLoading {
+                                ProgressView()
+                                    .frame(width: iconSize, height: iconSize)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .aboutIconStyle(size: iconSize)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(NSLocalizedString("Refresh Merchants", comment: "About action to refresh BTC Map merchant catalog"))
+                                Text(merchantRefreshSubtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .disabled(isRefreshingMerchants || viewModel.isLoading)
                 }
             }
             .scrollContentBackground(usesPopoverStyling ? .hidden : .automatic)
@@ -247,6 +270,30 @@ struct AboutView: View {
             onDone()
         } else {
             dismiss()
+        }
+    }
+
+    private var merchantRefreshSubtitle: String {
+        if isRefreshingMerchants || viewModel.isLoading {
+            return NSLocalizedString("Updating…", comment: "Status while merchant catalog refresh is in progress")
+        }
+        if let relative = viewModel.lastSuccessfulSyncRelativeDescription {
+            return String(
+                format: NSLocalizedString("Updated %@", comment: "Relative last-synced label, e.g. Updated 5 minutes ago"),
+                relative
+            )
+        }
+        return NSLocalizedString(
+            "Fetch new and changed merchants since the last sync.",
+            comment: "About subtitle explaining incremental merchant refresh"
+        )
+    }
+
+    private func refreshMerchantsFromAbout() {
+        guard !isRefreshingMerchants else { return }
+        isRefreshingMerchants = true
+        viewModel.refreshMerchantData(userInitiated: true) {
+            isRefreshingMerchants = false
         }
     }
 }
