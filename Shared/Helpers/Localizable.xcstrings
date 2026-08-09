@@ -28156,17 +28156,164 @@
     "Refresh Merchants": {
       "comment": "Settings action to refresh BTC Map merchant catalog",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Händler aktualisieren"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar comercios"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar comercios"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser les commerces"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser les commerces"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna esercenti"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handelaars vernieuwen"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "รีเฟรชร้านค้า"
+          }
+        }
+      }
     },
     "Updating…": {
       "comment": "Status while merchant catalog refresh is in progress",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird aktualisiert…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizando…"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizando…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mise à jour…"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mise à jour…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamento…"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bezig met bijwerken…"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กำลังอัปเดต…"
+          }
+        }
+      }
     },
     "Download the latest Bitcoin merchants from BTC Map.": {
       "comment": "Settings subtitle when no successful sync time is known",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lade die neuesten Bitcoin-Händler von BTC Map herunter."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descarga los comercios de Bitcoin más recientes de BTC Map."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descarga los comercios de Bitcoin más recientes de BTC Map."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargez les commerces Bitcoin les plus récents depuis BTC Map."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargez les commerces Bitcoin les plus récents depuis BTC Map."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica gli esercenti Bitcoin più recenti da BTC Map."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download de nieuwste Bitcoin-handelaars van BTC Map."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ดาวน์โหลดร้านค้า Bitcoin ล่าสุดจาก BTC Map"
+          }
+        }
+      }
     },
     "BitLocal is downloading the latest Bitcoin merchants. Use Try Again if this takes too long, or refresh merchants in About.": {
       "comment": "Message while waiting for first merchant sync",
@@ -28224,32 +28371,326 @@
     "Fetch new and changed merchants since the last sync.": {
       "comment": "About subtitle explaining incremental merchant refresh",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neue und geänderte Händler seit der letzten Synchronisierung abrufen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obtén los comercios nuevos y modificados desde la última sincronización."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obtén los comercios nuevos y modificados desde la última sincronización."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Récupérez les commerces nouveaux et modifiés depuis la dernière synchronisation."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Récupérez les commerces nouveaux et modifiés depuis la dernière synchronisation."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica gli esercenti nuovi e modificati dall’ultima sincronizzazione."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haal nieuwe en gewijzigde handelaars op sinds de laatste synchronisatie."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ดึงข้อมูลร้านค้าใหม่และร้านค้าที่เปลี่ยนแปลงนับจากการซิงค์ครั้งล่าสุด"
+          }
+        }
+      }
     },
     "Hide ATMs": {
       "comment": "Settings toggle to hide Bitcoin ATMs from map and list",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitcoin-Geldautomaten ausblenden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar cajeros de Bitcoin"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar cajeros de Bitcoin"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer les distributeurs de Bitcoin"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer les guichets Bitcoin"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nascondi gli ATM Bitcoin"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitcoin-geldautomaten verbergen"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ซ่อนตู้ ATM Bitcoin"
+          }
+        }
+      }
     },
     "Show shops and services only. Bitcoin ATMs stay hidden on the map and nearby list.": {
       "comment": "Settings subtitle for Hide ATMs toggle",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur Geschäfte und Dienstleistungen anzeigen. Bitcoin-Geldautomaten bleiben auf der Karte und in der Liste in der Nähe ausgeblendet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muestra solo tiendas y servicios. Los cajeros de Bitcoin permanecen ocultos en el mapa y en la lista de lugares cercanos."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muestra solo comercios y servicios. Los cajeros de Bitcoin permanecen ocultos en el mapa y en la lista de lugares cercanos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affiche uniquement les commerces et services. Les distributeurs de Bitcoin restent masqués sur la carte et dans la liste à proximité."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affiche uniquement les commerces et services. Les guichets Bitcoin restent masqués sur la carte et dans la liste à proximité."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra solo negozi e servizi. Gli ATM Bitcoin restano nascosti sulla mappa e nell’elenco dei luoghi vicini."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toon alleen winkels en diensten. Bitcoin-geldautomaten blijven verborgen op de kaart en in de lijst met locaties in de buurt."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "แสดงเฉพาะร้านค้าและบริการ โดยตู้ ATM Bitcoin จะยังคงซ่อนอยู่บนแผนที่และในรายการสถานที่ใกล้เคียง"
+          }
+        }
+      }
     },
     "Show": {
       "comment": "Settings: show ATMs on map and list",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anzeigen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonen"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "แสดง"
+          }
+        }
+      }
     },
     "Hide": {
       "comment": "Settings: hide ATMs on map and list",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausblenden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nascondi"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbergen"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ซ่อน"
+          }
+        }
+      }
     },
     "ATMs": {
       "comment": "Settings row label for ATM visibility",
       "extractionState": "manual",
-      "localizations": {}
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATMs"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cajeros"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cajeros"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DAB"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GAB"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATM"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATM's"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ตู้ ATM"
+          }
+        }
+      }
     }
   }
 }
