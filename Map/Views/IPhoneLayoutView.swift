@@ -7,7 +7,9 @@
 
 import SwiftUI
 import MapKit
+import Combine
 import Foundation // for Debug logging
+import UIKit
 
 struct IPhoneLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
@@ -56,6 +58,8 @@ struct IPhoneLayoutView: View {
                     .onAppear {
                         viewModel.locationManager.startUpdatingLocation()
                     }
+                    // Attribution observes settled padding only (via this layout's
+                    // onChange of bottomPadding / detent), not live drag height.
                     .overlay(
                         OpenStreetMapAttributionView()
                             .padding(.bottom, attributionBottomInset(for: geometry.size.height) + 1)
@@ -75,19 +79,20 @@ struct IPhoneLayoutView: View {
                     Spacer()
                 }
             }
+            // Map buttons live in a child that observes `sheetGeometry` only, so
+            // continuous drag height does not rebuild MapView / this ZStack.
             .overlay(alignment: shouldPresentBottomSheet ? .bottomTrailing : .topTrailing) {
-                MapButtonsView(
+                IPhoneMapButtonsChrome(
                     viewModel: viewModel,
+                    sheetGeometry: viewModel.sheetGeometry,
                     selectedMapTypeBinding: selectedMapTypeBinding,
-                    userLocation: viewModel.userLocation,
-                    isIPad: false
+                    mapHeight: geometry.size.height,
+                    safeTopInset: geometry.safeAreaInsets.top,
+                    safeBottomInset: geometry.safeAreaInsets.bottom,
+                    headerHeight: headerHeight,
+                    shouldPresentBottomSheet: shouldPresentBottomSheet,
+                    showingSettings: showingSettings
                 )
-                .padding(.trailing, 18)
-                .padding(.bottom, shouldPresentBottomSheet ? mapButtonsBottomOffset(for: geometry.size.height, safeTopInset: geometry.safeAreaInsets.top) : 0)
-                .padding(.top, shouldPresentBottomSheet ? 0 : mapOverlayTopOffset(for: geometry.safeAreaInsets.top))
-                .opacity(showingSettings ? 0 : 1)
-                .allowsHitTesting(!showingSettings)
-                .animation(.easeInOut(duration: 0.2), value: showingSettings)
             }
 //            // Only show bottom sheet after onboarding is complete
 //            .bottomSheet(
@@ -156,6 +161,10 @@ struct IPhoneLayoutView: View {
                 hasLiveSheetMeasurement = false
                 hasAcceptedDefaultLiveMeasurement = false
                 pendingLaunchOutlier = nil
+                if shouldPresentBottomSheet {
+                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
+                }
                 let inset = attributionBottomInset(for: geometry.size.height)
                 Debug.logMap(
                     "Attribution launch: detent=\(bottomSheetDetent), " +
@@ -164,6 +173,10 @@ struct IPhoneLayoutView: View {
                 )
             }
             .onChange(of: shouldPresentBottomSheet) { _, isPresented in
+                if isPresented {
+                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
+                }
                 Debug.logTiming(
                     "onboarding",
                     "bottom sheet eligibility changed -> presented=\(isPresented), ready=\(viewModel.isReadyForPostOnboardingPresentation), onboarding=\(didCompleteOnboarding), visibleElements=\(visibleElements.count), selected=\(viewModel.selectedElement?.id ?? "nil")"
@@ -215,6 +228,10 @@ struct IPhoneLayoutView: View {
                     // Once the user leaves the default/large viewport, always trust live geometry.
                     hasAcceptedDefaultLiveMeasurement = true
                 }
+                // The selection changes at the start of UIKit's snap animation.
+                // Defer map padding publication until the measured card stops moving.
+                let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                viewModel.prepareForSheetDetentTransition(estimatedHeight: settledHeight)
                 let inset = attributionBottomInset(for: geometry.size.height)
                 Debug.logMap(
                     "Attribution detent changed: detent=\(newDetent), " +
@@ -253,30 +270,12 @@ struct IPhoneLayoutView: View {
         }
     }
 
-    private func mapButtonsBottomOffset(for mapHeight: CGFloat, safeTopInset: CGFloat) -> CGFloat {
-        let preferredInset = preferredBottomInsetForButtons(mapHeight: mapHeight) + 12
-        let maxInset = maxMapButtonsBottomInset(mapHeight: mapHeight, safeTopInset: safeTopInset)
-        return min(max(preferredInset, 0), maxInset)
-    }
-
-    private func preferredBottomInsetForButtons(mapHeight: CGFloat) -> CGFloat {
-        if shouldPresentBottomSheet, viewModel.liveBottomPadding > 1 {
-            return min(max(viewModel.liveBottomPadding, 0), mapHeight - 1)
-        }
-        return attributionBottomInset(for: mapHeight)
-    }
-
-    private func maxMapButtonsBottomInset(mapHeight: CGFloat, safeTopInset: CGFloat) -> CGFloat {
-        let visibleTopPadding = mapOverlayTopOffset(for: safeTopInset)
-        return max(0, mapHeight - visibleTopPadding - mapButtonsPillHeight)
-    }
-
     private func attributionBottomInset(for mapHeight: CGFloat) -> CGFloat {
         let estimatedInset = estimatedBottomInsetForDetent(mapHeight: mapHeight)
         if isDefaultLikeDetent(bottomSheetDetent), !hasAcceptedDefaultLiveMeasurement {
             return estimatedInset
         }
-        // Prefer live bottom-sheet geometry for accurate tracking while dragging.
+        // Settled geometry only — continuous drag tracking lives on map buttons chrome.
         if hasLiveSheetMeasurement, viewModel.bottomPadding > 1 {
             return min(max(viewModel.bottomPadding, 0), mapHeight - 1)
         }
@@ -313,6 +312,245 @@ struct IPhoneLayoutView: View {
     private func isMediumDetent(_ detent: PresentationDetent) -> Bool {
         detentIdentifier(detent).contains("medium")
     }
+}
+
+/// Map control chrome that stays at a fixed SwiftUI anchor. Continuous sheet
+/// motion is applied directly to its UIKit host view below.
+private struct IPhoneMapButtonsChrome: View {
+    @ObservedObject var viewModel: ContentViewModel
+    /// Not observed — continuous height arrives via Combine subject.
+    var sheetGeometry: SheetGeometryModel
+    var selectedMapTypeBinding: Binding<MKMapType>
+    var mapHeight: CGFloat
+    var safeTopInset: CGFloat
+    var safeBottomInset: CGFloat
+    var headerHeight: CGFloat
+    var shouldPresentBottomSheet: Bool
+    var showingSettings: Bool
 
     private let mapButtonsPillHeight: CGFloat = 132
+    /// Gap between the top of the sheet card and the bottom of the control pill.
+    private let sheetClearance: CGFloat = 12
+
+    var body: some View {
+        IPhoneMapButtonsUIKitHost(
+            viewModel: viewModel,
+            sheetGeometry: sheetGeometry,
+            selectedMapTypeBinding: selectedMapTypeBinding,
+            fallbackSheetHeight: fallbackSheetHeight,
+            safeBottomInset: safeBottomInset,
+            maximumBottomOffset: maxMapButtonsBottomInset,
+            sheetClearance: sheetClearance,
+            tracksSheet: shouldPresentBottomSheet
+        )
+        .fixedSize()
+        .padding(.trailing, 18)
+        .padding(.top, shouldPresentBottomSheet ? 0 : mapOverlayTopOffset)
+        .opacity(showingSettings ? 0 : 1)
+        .allowsHitTesting(!showingSettings)
+        .transaction { $0.animation = nil }
+        .animation(.easeInOut(duration: 0.2), value: showingSettings)
+    }
+
+    private var fallbackSheetHeight: CGFloat {
+        viewModel.bottomPadding > 1 ? viewModel.bottomPadding : mapHeight * 0.30
+    }
+
+    private var maxMapButtonsBottomInset: CGFloat {
+        max(0, mapHeight - mapOverlayTopOffset - mapButtonsPillHeight)
+    }
+
+    private var mapOverlayTopOffset: CGFloat {
+        let isNotch = safeTopInset >= 40
+        if isNotch {
+            return headerHeight - 28
+        } else {
+            return headerHeight - 5
+        }
+    }
+}
+
+/// Hosts the SwiftUI button pill in UIKit so display-link updates only change a
+/// layer transform. This avoids a SwiftUI state write and layout pass per frame.
+private struct IPhoneMapButtonsUIKitHost: UIViewControllerRepresentable {
+    var viewModel: ContentViewModel
+    var sheetGeometry: SheetGeometryModel
+    var selectedMapTypeBinding: Binding<MKMapType>
+    var fallbackSheetHeight: CGFloat
+    var safeBottomInset: CGFloat
+    var maximumBottomOffset: CGFloat
+    var sheetClearance: CGFloat
+    var tracksSheet: Bool
+
+    func makeUIViewController(context: Context) -> SheetTrackingMapButtonsController {
+        let controller = SheetTrackingMapButtonsController(rootView: hostedContent)
+        controller.update(
+            rootView: hostedContent,
+            geometry: sheetGeometry,
+            fallbackSheetHeight: fallbackSheetHeight,
+            safeBottomInset: safeBottomInset,
+            maximumBottomOffset: maximumBottomOffset,
+            sheetClearance: sheetClearance,
+            tracksSheet: tracksSheet
+        )
+        return controller
+    }
+
+    func updateUIViewController(
+        _ uiViewController: SheetTrackingMapButtonsController,
+        context: Context
+    ) {
+        uiViewController.update(
+            rootView: hostedContent,
+            geometry: sheetGeometry,
+            fallbackSheetHeight: fallbackSheetHeight,
+            safeBottomInset: safeBottomInset,
+            maximumBottomOffset: maximumBottomOffset,
+            sheetClearance: sheetClearance,
+            tracksSheet: tracksSheet
+        )
+    }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        uiViewController: SheetTrackingMapButtonsController,
+        context: Context
+    ) -> CGSize? {
+        uiViewController.hostingController.sizeThatFits(
+            in: CGSize(
+                width: proposal.width ?? 10_000,
+                height: proposal.height ?? 10_000
+            )
+        )
+    }
+
+    static func dismantleUIViewController(
+        _ uiViewController: SheetTrackingMapButtonsController,
+        coordinator: Void
+    ) {
+        uiViewController.cancel()
+    }
+
+    private var hostedContent: MapButtonsView {
+        MapButtonsView(
+            viewModel: viewModel,
+            selectedMapTypeBinding: selectedMapTypeBinding,
+            userLocation: viewModel.userLocation,
+            isIPad: false
+        )
+    }
+}
+
+@MainActor
+private final class SheetTrackingMapButtonsController: UIViewController {
+    let hostingController: UIHostingController<MapButtonsView>
+
+    private var cancellable: AnyCancellable?
+    private weak var geometry: SheetGeometryModel?
+    private var fallbackSheetHeight: CGFloat = 0
+    private var safeBottomInset: CGFloat = 0
+    private var maximumBottomOffset: CGFloat = 0
+    private var sheetClearance: CGFloat = 0
+    private var tracksSheet = false
+
+    init(rootView: MapButtonsView) {
+        hostingController = UIHostingController(rootView: rootView)
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        view = SheetTrackingHitContainerView()
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        hostingController.view.backgroundColor = .clear
+        addChild(hostingController)
+        view.addSubview(hostingController.view)
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hostingController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        hostingController.didMove(toParent: self)
+        (view as? SheetTrackingHitContainerView)?.transformedView = hostingController.view
+    }
+
+    func update(
+        rootView: MapButtonsView,
+        geometry: SheetGeometryModel,
+        fallbackSheetHeight: CGFloat,
+        safeBottomInset: CGFloat,
+        maximumBottomOffset: CGFloat,
+        sheetClearance: CGFloat,
+        tracksSheet: Bool
+    ) {
+        loadViewIfNeeded()
+        hostingController.rootView = rootView
+        self.fallbackSheetHeight = fallbackSheetHeight
+        self.safeBottomInset = safeBottomInset
+        self.maximumBottomOffset = maximumBottomOffset
+        self.sheetClearance = sheetClearance
+        self.tracksSheet = tracksSheet
+
+        if self.geometry !== geometry {
+            cancellable?.cancel()
+            self.geometry = geometry
+            cancellable = geometry.continuousHeightPublisher
+                .sink { [weak self] height in
+                    self?.applyTransform(for: height)
+                }
+        }
+
+        applyTransform(for: geometry.continuousHeight)
+    }
+
+    func cancel() {
+        cancellable?.cancel()
+        cancellable = nil
+    }
+
+    private func applyTransform(for height: CGFloat) {
+        let translationY: CGFloat
+        if tracksSheet {
+            let resolvedHeight = height > 1 ? height : fallbackSheetHeight
+            let sheetInset = max(resolvedHeight - safeBottomInset, 0)
+            let targetBottomOffset = min(
+                max(sheetInset + sheetClearance, 0),
+                maximumBottomOffset
+            )
+            translationY = -targetBottomOffset
+        } else {
+            translationY = 0
+        }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        hostingController.view.transform = CGAffineTransform(
+            translationX: 0,
+            y: translationY
+        )
+        CATransaction.commit()
+    }
+}
+
+private final class SheetTrackingHitContainerView: UIView {
+    weak var transformedView: UIView?
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        if super.point(inside: point, with: event) {
+            return true
+        }
+        guard let transformedView else { return false }
+        let transformedPoint = transformedView.convert(point, from: self)
+        return transformedView.point(inside: transformedPoint, with: event)
+    }
 }

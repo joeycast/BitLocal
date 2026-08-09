@@ -180,10 +180,11 @@ struct BusinessDetailView: View {
         .listStyle(.insetGrouped)
         .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.automatic)
-        .opacity(shouldHideCollapsedSheetContent ? 0 : contentRevealProgress)
-        .offset(y: shouldHideCollapsedSheetContent ? 0 : (1 - contentRevealProgress) * 10)
-        .allowsHitTesting(!shouldHideCollapsedSheetContent)
-        .accessibilityHidden(shouldHideCollapsedSheetContent)
+        // Only observes live height while collapsed-like; expanded detail is free of drag churn.
+        .sheetCollapsedReveal(
+            geometry: contentViewModel.sheetGeometry,
+            isCollapsedLike: isCollapsedLikeDetent
+        )
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
@@ -234,40 +235,9 @@ extension BusinessDetailView {
         false
     }
 
-    private var shouldHideCollapsedSheetContent: Bool {
-        guard hasLiveSheetMeasurement else {
-            return isCollapsedLikeDetent
-        }
-        return contentViewModel.bottomPadding <= collapsedContentRevealHeight
-    }
-
-    private var collapsedContentRevealHeight: CGFloat {
-        140
-    }
-
-    private var contentRevealProgress: CGFloat {
-        guard hasLiveSheetMeasurement else {
-            return isCollapsedLikeDetent ? 0 : 1
-        }
-
-        if contentViewModel.bottomPadding > (collapsedContentRevealHeight + revealRange) {
-            return 1
-        }
-
-        let rawProgress = (contentViewModel.bottomPadding - collapsedContentRevealHeight) / revealRange
-        return min(max(rawProgress, 0), 1)
-    }
-
     private var shouldShowFeaturedBadgeInExpandedContent: Bool {
-        element.isCurrentlyBoosted() && !shouldHideCollapsedSheetContent
-    }
-
-    private var hasLiveSheetMeasurement: Bool {
-        contentViewModel.bottomPadding > 1
-    }
-
-    private var revealRange: CGFloat {
-        36
+        // Detent-based only so featured chrome does not thrash during drag.
+        element.isCurrentlyBoosted() && !isCollapsedLikeDetent
     }
 
     private var isCollapsedLikeDetent: Bool {

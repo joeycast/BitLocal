@@ -123,8 +123,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var hideATMsFromMapAndList: Bool =
         UserDefaults.standard.bool(forKey: ContentViewModel.hideATMsFromMapAndListKey)
     @Published var topPadding: CGFloat = 0
+    /// Settled sheet bottom inset for map edge padding / camera math.
+    /// Updated only when a detent selection settles — not during drag sampling.
     @Published var bottomPadding: CGFloat = 0
-    @Published var liveBottomPadding: CGFloat = 0
+    /// Live sheet geometry isolated from this object so detent drag does not
+    /// invalidate every `@EnvironmentObject` / `@ObservedObject` subscriber.
+    let sheetGeometry = SheetGeometryModel()
+    /// Non-published target used to defer map invalidation until the system sheet
+    /// finishes its release-to-detent animation.
+    private var pendingSheetDetentHeight: CGFloat?
     @Published var initialRegionSet = false // Track if initial region has been set
     @Published var forceMapRefresh = false // Flag to force map annotation refresh
     @Published var isReadyForPostOnboardingPresentation = true
@@ -862,6 +869,44 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return defaultInset
         }
         return min(liveInset, mapHeight - 1)
+    }
+
+    /// Continuous sheet height while the bottom sheet is dragged.
+    /// Publishes only through `sheetGeometry`, never through this object.
+    func reportSheetHeight(_ height: CGFloat) {
+        sheetGeometry.reportMeasuredHeight(height)
+    }
+
+    /// Snap settled map padding when a presentation detent selection settles.
+    /// `estimatedHeight` is only used when no live sheet measurement exists yet.
+    func reportSheetDetentSettled(estimatedHeight: CGFloat) {
+        pendingSheetDetentHeight = nil
+        sheetGeometry.reportDetentSettledHeight(estimatedHeight)
+        syncBottomPaddingFromSettledGeometry()
+    }
+
+    /// Records the selected target without publishing through this view model.
+    /// SwiftUI updates the detent binding at the start of the snap animation.
+    func prepareForSheetDetentTransition(estimatedHeight: CGFloat) {
+        guard estimatedHeight > 1 else { return }
+        pendingSheetDetentHeight = estimatedHeight
+    }
+
+    /// Commits map padding only after the measured sheet edge stops moving.
+    func reportSheetMotionSettled(_ measuredHeight: CGFloat) {
+        guard let estimatedHeight = pendingSheetDetentHeight else { return }
+        pendingSheetDetentHeight = nil
+
+        let resolvedHeight = measuredHeight > 1 ? measuredHeight : estimatedHeight
+        sheetGeometry.reportMeasuredHeight(resolvedHeight)
+        sheetGeometry.reportDetentSettledHeight(resolvedHeight)
+        syncBottomPaddingFromSettledGeometry()
+    }
+
+    private func syncBottomPaddingFromSettledGeometry() {
+        let settled = sheetGeometry.settledHeight
+        guard settled > 1, abs(bottomPadding - settled) >= 0.5 else { return }
+        bottomPadding = settled
     }
 
     func mapListViewportInsets(for mapView: MKMapView) -> UIEdgeInsets {
@@ -1868,6 +1913,34 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         case .communities:
             return selectedCommunityArea == nil ? [] : elementsForDisplay(communityMemberElements)
         }
+    }
+
+    /// Cheap invalidation key for merchant annotations. MapView uses this to
+    /// distinguish actual map-content changes from unrelated parent updates such
+    /// as a sheet detent selection. Full element hashing remains the correctness
+    /// check when this signature changes.
+    var merchantMapAnnotationInputSignature: Int {
+        var hasher = Hasher()
+        hasher.combine(hideATMsFromMapAndList)
+
+        if let digest = activeMerchantAlertDigest {
+            hasher.combine(0)
+            hasher.combine(digest)
+            hasher.combine(merchantStoreRevision)
+            return hasher.finalize()
+        }
+
+        let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.count >= 2 {
+            hasher.combine(1)
+            // Search result sets are small; their content-aware hash keeps same-ID
+            // metadata changes correct without scanning the full merchant catalog.
+            hasher.combine(merchantSearchMapResults.mapAnnotationsContentHash)
+        } else {
+            hasher.combine(2)
+            hasher.combine(merchantStoreRevision)
+        }
+        return hasher.finalize()
     }
 
     var listElementsForCurrentDisplay: [Element] {

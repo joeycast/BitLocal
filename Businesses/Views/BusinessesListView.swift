@@ -16,7 +16,6 @@ struct BusinessesListView: View {
     let maxListResults = 25
     var elements: [Element]
     var userLocation: CLLocation?
-    var liveSheetHeight: CGFloat = 0
     @Binding private var currentDetent: PresentationDetent?
 
     @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
@@ -33,12 +32,10 @@ struct BusinessesListView: View {
     init(
         elements: [Element],
         userLocation: CLLocation? = nil,
-        currentDetent: Binding<PresentationDetent?> = .constant(nil),
-        liveSheetHeight: CGFloat = 0
+        currentDetent: Binding<PresentationDetent?> = .constant(nil)
     ) {
         self.elements = elements
         self.userLocation = userLocation
-        self.liveSheetHeight = liveSheetHeight
         self._currentDetent = currentDetent
     }
 
@@ -63,16 +60,17 @@ struct BusinessesListView: View {
             if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
                 categoryChipsView
                     .padding(.bottom, categoryChipsBottomPadding)
-                    .opacity(contentRevealProgress)
-                    .offset(y: (1 - contentRevealProgress) * -8)
+                    .sheetCollapsedReveal(
+                        geometry: viewModel.sheetGeometry,
+                        isCollapsedLike: isCollapsedSheet,
+                        forceRevealed: showFocusedSearchCategoryChips
+                    )
             }
 
             ZStack {
                 if isShowingInitialLoadingState {
                     Color.clear
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if shouldHideCollapsedSheetContent {
-                    Spacer(minLength: 0)
                 } else if isFilteringMerchants {
                     searchResultsView
                 } else if viewModel.activeMerchantAlertDigest != nil {
@@ -95,8 +93,13 @@ struct BusinessesListView: View {
                         .background(Color.clear)
                 }
             }
-            .opacity(contentRevealProgress)
-            .offset(y: (1 - contentRevealProgress) * 10)
+            // Keep list identity stable while collapsed; only the reveal modifier
+            // observes live sheet height (avoids recreating List on every drag tick).
+            .sheetCollapsedReveal(
+                geometry: viewModel.sheetGeometry,
+                isCollapsedLike: isCollapsedSheet,
+                forceRevealed: isFilteringMerchants || showFocusedSearchCategoryChips
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: viewModel.userLocation) { _, newLocation in
@@ -535,7 +538,8 @@ struct BusinessesListView: View {
     private var shouldShowCategoryChips: Bool {
         guard viewModel.hasLoadedInitialData, !isShowingInitialLoadingState else { return false }
         guard viewModel.activeMerchantAlertDigest == nil else { return false }
-        return !isCollapsedSheet || showFocusedSearchCategoryChips || liveSheetHeight > collapsedContentRevealHeight
+        // Detent-based visibility; continuous fade is handled by sheetCollapsedReveal.
+        return !isCollapsedSheet || showFocusedSearchCategoryChips
     }
 
     private var shouldShowDiscoveryLoadingState: Bool {
@@ -549,27 +553,6 @@ struct BusinessesListView: View {
 
     private var isShowingInitialLoadingState: Bool {
         viewModel.isLoading && elements.isEmpty && !viewModel.hasLoadedInitialData
-    }
-
-    private var shouldHideCollapsedSheetContent: Bool {
-        isCollapsedSheet &&
-        !isFilteringMerchants &&
-        !showFocusedSearchCategoryChips &&
-        liveSheetHeight <= collapsedContentRevealHeight
-    }
-
-    private var collapsedContentRevealHeight: CGFloat {
-        140
-    }
-
-    private var contentRevealProgress: CGFloat {
-        if !isCollapsedSheet || showFocusedSearchCategoryChips {
-            return 1
-        }
-
-        let revealRange: CGFloat = 36
-        let rawProgress = (liveSheetHeight - collapsedContentRevealHeight) / revealRange
-        return min(max(rawProgress, 0), 1)
     }
 
     private var searchStatusText: String? {

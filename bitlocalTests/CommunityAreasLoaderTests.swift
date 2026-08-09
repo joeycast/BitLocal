@@ -6,7 +6,7 @@ final class CommunityAreasLoaderTests: XCTestCase {
     /// must stay alive through async completions. A weak self capture in
     /// `step` deallocated it before the first page returned and onPage never
     /// fired. The stub completes asynchronously to reproduce that timing.
-    func testLoaderSurvivesCallingScopeWithAsyncRepository() {
+    func testLoaderSurvivesCallingScopeWithAsyncRepository() async {
         let repository = AsyncStubRepository()
         repository.pages = [[makeArea(id: "a")]]
         let onPageFired = expectation(description: "onPage fires")
@@ -22,10 +22,10 @@ final class CommunityAreasLoaderTests: XCTestCase {
         }
         kickOff() // loader local goes out of scope before the fetch completes
 
-        wait(for: [onPageFired], timeout: 2)
+        await fulfillment(of: [onPageFired], timeout: 2)
     }
 
-    func testPaginatesUntilShortPage() {
+    func testPaginatesUntilShortPage() async {
         let repository = AsyncStubRepository()
         repository.pages = [
             [makeArea(id: "a", updatedAt: "2024-01-01T00:00:00Z"), makeArea(id: "b", updatedAt: "2024-01-02T00:00:00Z")],
@@ -45,7 +45,7 @@ final class CommunityAreasLoaderTests: XCTestCase {
             }
         }
 
-        wait(for: [completed], timeout: 2)
+        await fulfillment(of: [completed], timeout: 2)
     }
 
     private func makeArea(id: String, updatedAt: String = "2024-01-01T00:00:00Z") -> V2AreaRecord {
@@ -77,6 +77,7 @@ private final class AsyncStubRepository: BTCMapRepositoryProtocol {
     func loadCachedElements() -> [Element]? { nil }
     func hasCachedData() -> Bool { false }
     func refreshElements(completion: @escaping ([Element]?) -> Void) { completion(nil) }
+    func lastSuccessfulSyncAtISO8601() -> String? { nil }
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
         completion(.success([]))
     }

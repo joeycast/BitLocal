@@ -55,8 +55,8 @@ final class MerchantSpatialIndexTests: XCTestCase {
     func testCandidatesAcrossAntimeridianUseShortArc() {
         // Points near ±180; naive min/max lon span is huge and would cover the wrong ocean.
         let elements = [
-            makeElement(id: "pacific-west", lat: 0, lon: 179.5),
-            makeElement(id: "pacific-east", lat: 0, lon: -179.5),
+            makeElement(id: "pacific-west", lat: 0, lon: 179.9),
+            makeElement(id: "pacific-east", lat: 0, lon: -179.9),
             makeElement(id: "atlantic", lat: 0, lon: 0)
         ]
         var index = MerchantSpatialIndex(cellSizeDegrees: 0.5)

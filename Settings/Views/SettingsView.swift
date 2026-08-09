@@ -82,7 +82,7 @@ struct SettingsView: View {
     // MARK: - Picker row
 
     private func pickerRow<SelectionValue: Hashable, Content: View>(
-        label: String,
+        label: LocalizedStringKey,
         selection: Binding<SelectionValue>,
         @ViewBuilder content: () -> Content
     ) -> some View {

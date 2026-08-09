@@ -36,7 +36,7 @@ final class CommunityAreasLoader {
         // the pagination) alive. A weak capture would deallocate the loader as
         // soon as the calling scope returns and onPage would never fire. The
         // retain resolves when the network completion runs.
-        repository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { result in
+        repository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { [self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .failure(let error):

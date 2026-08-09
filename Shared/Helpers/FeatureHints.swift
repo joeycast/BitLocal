@@ -100,6 +100,11 @@ final class FeatureHintsController: ObservableObject {
 
     func updateFrame(target: FeatureHintTarget, frame: CGRect) {
         guard frame.width > 0, frame.height > 0 else { return }
+        // Skip layout chatter while hints are not presenting (sheet drag fires many layout passes).
+        guard isPresenting || targetFrames[target] == nil else {
+            targetFrames[target] = frame
+            return
+        }
         let existing = targetFrames[target]
         targetFrames[target] = frame
         // Notify observers when a frame first appears or moves significantly,
