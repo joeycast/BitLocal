@@ -8,16 +8,19 @@ final class FeatureHintsControllerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+        UserDefaults.standard.set(true, forKey: FeatureFlags.featureHintsKey)
     }
 
     override func tearDown() {
         UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+        UserDefaults.standard.removeObject(forKey: FeatureFlags.featureHintsKey)
         super.tearDown()
     }
 
     func testShowsCurrentCampaignWhenUnseenAndEligible() {
         let controller = makeController()
 
+        controller.markMainUIVisible()
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
         XCTAssertEqual(controller.activeTarget, .merchantSearch)
@@ -28,6 +31,7 @@ final class FeatureHintsControllerTests: XCTestCase {
         defaults.set(FeatureHintCampaign.current.id, forKey: "lastSeenHintCampaignID")
         let controller = FeatureHintsController(userDefaults: defaults)
 
+        controller.markMainUIVisible()
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
         XCTAssertFalse(controller.isPresenting)
@@ -39,6 +43,7 @@ final class FeatureHintsControllerTests: XCTestCase {
         let controller = FeatureHintsController(userDefaults: defaults)
 
         controller.scheduleReplay()
+        controller.markMainUIVisible()
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
         XCTAssertEqual(controller.activeTarget, .merchantSearch)
@@ -48,6 +53,7 @@ final class FeatureHintsControllerTests: XCTestCase {
         let defaults = testDefaults()
         let controller = FeatureHintsController(userDefaults: defaults)
 
+        controller.markMainUIVisible()
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
         controller.skip()
 

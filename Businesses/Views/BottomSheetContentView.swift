@@ -13,9 +13,6 @@ import CryptoKit
 import MapKit
 
 struct BottomSheetContentView: View {
-    private static let sheetHeightPublishThreshold: CGFloat = 24
-    private static let sheetHeightBucketSize: CGFloat = 24
-
     @EnvironmentObject var viewModel: ContentViewModel
     @EnvironmentObject private var featureHintsController: FeatureHintsController
 
@@ -23,32 +20,33 @@ struct BottomSheetContentView: View {
     @Binding var currentDetent: PresentationDetent
 
     var body: some View {
-        GeometryReader { geometry in
-            VStack {
-                navigationStack(sheetHeight: geometry.size.height)
-                .onChange(of: viewModel.unifiedSearchText) { _, _ in
-                    guard viewModel.mapDisplayMode != .communities else { return }
-                    viewModel.performUnifiedSearch()
-                }
-                .onChange(of: viewModel.isSearchActive) { _, isActive in
-                    guard viewModel.mapDisplayMode != .communities else { return }
-                    if !isActive {
-                        // Clearing search dismisses any persisted category chip.
-                        viewModel.clearMerchantSearch(userInitiated: true)
-                    }
-                }
-            }
+        navigationStack
             .ignoresSafeArea(edges: .bottom)
+            // UIKit reader reports screen-bottom → sheet-top using the presentation
+            // frame (not NavigationStack layout height), so map buttons clear the card.
+            .background {
+                SheetEdgeHeightReader(
+                    onHeightChange: { height in
+                        viewModel.reportSheetHeight(height)
+                    },
+                    onMotionSettled: { height in
+                        viewModel.reportSheetMotionSettled(height)
+                    }
+                )
+            }
             .onAppear {
                 featureHintsController.markMainUIVisible()
             }
-            .onChange(of: geometry.size.height) { _, newHeight in
-                viewModel.liveBottomPadding = newHeight
-                let normalizedHeight = (newHeight / Self.sheetHeightBucketSize).rounded() * Self.sheetHeightBucketSize
-                guard abs(viewModel.bottomPadding - normalizedHeight) >= Self.sheetHeightPublishThreshold else {
-                    return
+            .onChange(of: viewModel.unifiedSearchText) { _, _ in
+                guard viewModel.mapDisplayMode != .communities else { return }
+                viewModel.performUnifiedSearch()
+            }
+            .onChange(of: viewModel.isSearchActive) { _, isActive in
+                guard viewModel.mapDisplayMode != .communities else { return }
+                if !isActive {
+                    // Clearing search dismisses any persisted category chip.
+                    viewModel.clearMerchantSearch(userInitiated: true)
                 }
-                viewModel.bottomPadding = normalizedHeight
             }
             .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")
@@ -59,12 +57,11 @@ struct BottomSheetContentView: View {
                     viewModel.deselectAnnotation()
                 }
             }
-        }
     }
 
-    private func navigationStack(sheetHeight: CGFloat) -> some View {
+    private var navigationStack: some View {
         NavigationStack(path: $viewModel.path) {
-            sheetRootContentWithSafeAreaBehavior(sheetHeight: sheetHeight)
+            sheetRootContentWithSafeAreaBehavior
                 .modifier(RootSheetNavigationBarModifier())
                 .navigationDestination(for: Element.self) { element in
                     businessDetailDestination(for: element)
@@ -77,25 +74,24 @@ struct BottomSheetContentView: View {
     }
 
     @ViewBuilder
-    private func sheetRootContentWithSafeAreaBehavior(sheetHeight: CGFloat) -> some View {
+    private var sheetRootContentWithSafeAreaBehavior: some View {
         if #available(iOS 26.0, *) {
-            sheetRootContent(sheetHeight: sheetHeight)
+            sheetRootContent
                 .ignoresSafeArea(.container, edges: .top)
         } else {
-            sheetRootContent(sheetHeight: sheetHeight)
+            sheetRootContent
         }
     }
 
     @ViewBuilder
-    private func sheetRootContent(sheetHeight: CGFloat) -> some View {
+    private var sheetRootContent: some View {
         if viewModel.mapDisplayMode == .communities {
             CommunitiesListView(currentDetent: currentDetent)
                 .environmentObject(viewModel)
         } else {
             BusinessesListView(
                 elements: visibleElements,
-                currentDetent: currentDetentBinding,
-                liveSheetHeight: sheetHeight
+                currentDetent: currentDetentBinding
             )
             .environmentObject(viewModel)
         }

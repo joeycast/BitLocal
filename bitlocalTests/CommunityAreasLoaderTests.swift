@@ -77,6 +77,7 @@ private final class AsyncStubRepository: BTCMapRepositoryProtocol {
     func loadCachedElements() -> [Element]? { nil }
     func hasCachedData() -> Bool { false }
     func refreshElements(completion: @escaping ([Element]?) -> Void) { completion(nil) }
+    func lastSuccessfulSyncAtISO8601() -> String? { nil }
     func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
         completion(.success([]))
     }

@@ -144,15 +144,41 @@ struct MapView: UIViewRepresentable {
         // Check padding changes
         let currentPadding = (context.coordinator.topPadding, context.coordinator.bottomPadding)
         let newPadding = (topPadding, bottomPadding)
-        if currentPadding != newPadding {
+        let paddingChanged = currentPadding != newPadding
+        if paddingChanged {
             context.coordinator.updatePadding(top: topPadding, bottom: bottomPadding)
             needsUpdate = true
         }
         
         // Check map type changes
-        if mapView.mapType != mapType {
+        let mapTypeChanged = mapView.mapType != mapType
+        if mapTypeChanged {
             mapView.mapType = mapType
             needsUpdate = true
+        }
+
+        let shouldForceUpdate = viewModel.forceMapRefresh
+        let currentMode = viewModel.mapDisplayMode
+        let modeChanged = context.coordinator.lastDisplayMode != currentMode
+        let annotationInputSignature = currentMode == .merchants
+            ? viewModel.merchantMapAnnotationInputSignature
+            : nil
+
+        // Fast path: unrelated parent updates must not re-hash every merchant.
+        // A detent selection re-enters updateUIView even though map content is
+        // unchanged; hashing ~29k merchants here causes a visible release hitch.
+        let canSkipAnnotationHash =
+            !shouldForceUpdate &&
+            !modeChanged &&
+            annotationInputSignature == context.coordinator.lastAnnotationInputSignature &&
+            currentMode != .communities
+
+        if canSkipAnnotationHash {
+            let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
+            if needsUpdate {
+                Debug.logMap("⏱ updateUIView: padding/mapType-only in \(String(format: "%.1f", elapsed))ms")
+            }
+            return
         }
         
         // Handle elements updates (most important)
@@ -162,8 +188,8 @@ struct MapView: UIViewRepresentable {
         if let elements = elements, !elements.isEmpty {
             // Content-aware hash so name/boost/icon updates invalidate pins even when IDs are unchanged.
             let elementsHash = elements.mapAnnotationsContentHash
-            let shouldForceUpdate = viewModel.forceMapRefresh
             let hashChanged = context.coordinator.lastElementsHash != elementsHash
+            context.coordinator.lastAnnotationInputSignature = annotationInputSignature
             
             // Only log details if we're actually going to update
             if hashChanged || shouldForceUpdate {
@@ -188,14 +214,13 @@ struct MapView: UIViewRepresentable {
                 needsUpdate = true
             }
         } else if elements?.isEmpty == true {
+            context.coordinator.lastAnnotationInputSignature = annotationInputSignature
             if context.coordinator.clearMerchantAnnotations(on: mapView) {
                 needsUpdate = true
             }
         }
         
         // Handle community/merchant display mode overlay sync
-        let currentMode = viewModel.mapDisplayMode
-        let modeChanged = context.coordinator.lastDisplayMode != currentMode
         let currentAreaDataHash = viewModel.communityMapAreas.isEmpty
             ? viewModel.areaBrowserAreas.hashValue
             : viewModel.communityMapAreas.hashValue
@@ -291,6 +316,7 @@ struct MapView: UIViewRepresentable {
         private var cancellable: AnyCancellable?
         private var debounceTimer: AnyCancellable?
         var lastElementsHash: Int?
+        var lastAnnotationInputSignature: Int?
         var lastDisplayMode: MapDisplayMode = .merchants
         var lastCommunityAreasHash: Int?
         private var lastAnnotationPassKey: AnnotationPassKey?
