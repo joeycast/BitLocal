@@ -1825,8 +1825,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         performUnifiedSearch()
     }
 
-    /// Lazy-load events on first list appearance
+    /// Lazy-load events on first list appearance (no-op while events UI is disabled).
     func ensureEventsLoaded() {
+        guard FeatureFlags.isEventsUIEnabled else { return }
         guard !hasLoadedEvents else { return }
         hasLoadedEvents = true
         loadBTCMapEvents()

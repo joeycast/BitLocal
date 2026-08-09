@@ -367,6 +367,10 @@ enum FeatureFlags {
     static let sharePlaceLinksKey = "share_place_links_enabled"
     static let featureHintsKey = "feature_hints_enabled"
 
+    /// Events discovery UI and network fetch. Off until the product is ready.
+    /// Keep `EventsDiscoverySection`, `AllEventsListView`, and v4 events API code for later.
+    static let isEventsUIEnabled = false
+
     static var isSharePlaceLinksEnabled: Bool {
         if UserDefaults.standard.object(forKey: sharePlaceLinksKey) == nil {
             return true

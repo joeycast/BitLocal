@@ -132,7 +132,9 @@ struct BusinessesListView: View {
             refreshEmptyStateVisibility()
         }
         .onAppear {
-            viewModel.ensureEventsLoaded()
+            if FeatureFlags.isEventsUIEnabled {
+                viewModel.ensureEventsLoaded()
+            }
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
             refreshDiscoveryCache()
             syncDisplayedSearchResultsToMap()
@@ -230,13 +232,15 @@ struct BusinessesListView: View {
 
     private var normalListView: some View {
         List {
-            // Events carousel (only renders if events exist)
-            Section {
-                EventsDiscoverySection()
-                    .environmentObject(viewModel)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .clearListRowBackground(if: shouldUseGlassyRows)
+            // Kept behind FeatureFlags.isEventsUIEnabled until product is ready.
+            if FeatureFlags.isEventsUIEnabled {
+                Section {
+                    EventsDiscoverySection()
+                        .environmentObject(viewModel)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .clearListRowBackground(if: shouldUseGlassyRows)
+                }
             }
 
             if !featuredTopSortedElements.isEmpty {
