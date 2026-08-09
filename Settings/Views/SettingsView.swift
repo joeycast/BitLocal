@@ -42,10 +42,12 @@ struct SettingsView: View {
                 Text("Km").tag(DistanceUnit.kilometers)
             }
 
-            Divider()
-                .padding(.top, 4)
-
-            hideATMsToggle
+            pickerRow(label: "ATMs", selection: atmVisibilityBinding) {
+                Text(NSLocalizedString("Show", comment: "Settings: show ATMs on map and list"))
+                    .tag(false)
+                Text(NSLocalizedString("Hide", comment: "Settings: hide ATMs on map and list"))
+                    .tag(true)
+            }
 
             Divider()
                 .padding(.top, 4)
@@ -96,27 +98,8 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Map & list filters
-
-    private var hideATMsToggle: some View {
-        Toggle(isOn: hideATMsBinding) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(NSLocalizedString("Hide ATMs", comment: "Settings toggle to hide Bitcoin ATMs from map and list"))
-                    .font(.headline)
-                Text(NSLocalizedString(
-                    "Show shops and services only. Bitcoin ATMs stay hidden on the map and nearby list.",
-                    comment: "Settings subtitle for Hide ATMs toggle"
-                ))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .tint(.accentColor)
-        .padding(.vertical, 4)
-    }
-
-    private var hideATMsBinding: Binding<Bool> {
+    /// `true` = hide ATMs (matches view model storage).
+    private var atmVisibilityBinding: Binding<Bool> {
         Binding(
             get: { viewModel.hideATMsFromMapAndList },
             set: { viewModel.setHideATMsFromMapAndList($0) }

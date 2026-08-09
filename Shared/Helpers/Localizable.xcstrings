@@ -28235,6 +28235,21 @@
       "comment": "Settings subtitle for Hide ATMs toggle",
       "extractionState": "manual",
       "localizations": {}
+    },
+    "Show": {
+      "comment": "Settings: show ATMs on map and list",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "Hide": {
+      "comment": "Settings: hide ATMs on map and list",
+      "extractionState": "manual",
+      "localizations": {}
+    },
+    "ATMs": {
+      "comment": "Settings row label for ATM visibility",
+      "extractionState": "manual",
+      "localizations": {}
     }
   }
 }
