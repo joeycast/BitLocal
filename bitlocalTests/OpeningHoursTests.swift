@@ -1,7 +1,7 @@
 import XCTest
 @testable import bitlocal
 
-final class OSMOpeningHoursParserTests: XCTestCase {
+final class OSMOpeningHoursParserEdgeCaseTests: XCTestCase {
     func testTwentyFourSevenOpensEveryDayAllDay() throws {
         let schedule = try XCTUnwrap(OSMOpeningHoursParser.parseWeekSchedule(" 24/7 "))
 
