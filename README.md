@@ -4,13 +4,15 @@ Find places that accept Bitcoin.
 
 BitLocal is a native iOS app for discovering real-world businesses where you can spend bitcoin. It puts Bitcoin-friendly merchants on an interactive map, shows accepted payment methods like on-chain, Lightning, and contactless Lightning, and helps people support the circular Bitcoin economy without accounts, ads, or tracking.
 
-Whether you are looking for coffee, food, travel stops, shops, events, or nearby Bitcoin communities, BitLocal is built to make the physical Bitcoin economy easier to find.
+Whether you are looking for coffee, food, travel stops, shops, Bitcoin ATMs, or nearby Bitcoin communities, BitLocal is built to make the physical Bitcoin economy easier to find.
 
 ## Highlights
 
 - Interactive map of Bitcoin-accepting businesses
 - Merchant details with address, website, phone, opening hours, and payment method data when available
 - Search and category discovery for nearby places
+- Bitcoin communities with their areas shown on the map
+- Option to show or hide Bitcoin ATMs
 - Directions through Apple Maps
 - Optional location access, with the app still usable if location is denied
 - Optional merchant alerts for cities you care about
@@ -104,6 +106,8 @@ BitLocal/
 +-- Settings/            # Preferences, resources, and support surfaces
 +-- Shared/              # Shared SwiftUI views, helpers, networking, and app state
 +-- bitlocalTests/       # Unit tests
++-- Fonts/, Resources/   # Custom fonts and bundled data (BundledCities.sqlite)
++-- bitlocal-maestro/    # Maestro UI test flows
 +-- docs/                # Project docs and operational notes
 +-- scripts/             # Supporting automation scripts
 `-- bitlocal.xcodeproj   # Xcode project

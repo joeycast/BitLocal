@@ -1,6 +1,21 @@
 # Release Notes
 
-## Upcoming Release
+## 3.0.2 (build 62)
+
+### App Store "What's New"
+
+- New setting to show or hide Bitcoin ATMs on the map and in lists.
+- Smoother bottom sheet: dragging between sizes is faster and more stable.
+- Search remembers your selected category.
+- Clearer sync status and empty states when merchants are loading or nothing matches.
+- Refresh Merchants now lives in About, next to Show What's New.
+- More reliable map pins, merchant details, and city alerts, plus updated translations.
+
+### Support Note
+
+Pull-to-refresh on the merchant list was removed; use About > Refresh Merchants instead. Events discovery is built but turned off (`FeatureFlags.isEventsUIEnabled`) until it is ready.
+
+## 3.0
 
 ### App Store "What's New"
 
