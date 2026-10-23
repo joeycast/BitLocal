@@ -62,7 +62,9 @@ struct IPhoneHeaderView: View {
                     }
                 }
                 .cornerRadius(10)
-                .ignoresSafeArea(edges: .top)
+                // Run the bar under side camera strips (iPhone Duo) too; the
+                // buttons stay inside the safe area.
+                .ignoresSafeArea(edges: [.top, .horizontal])
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .onAppear {

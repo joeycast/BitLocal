@@ -921,7 +921,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         } else {
             bottomInset = 0
         }
-        return UIEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
+        // The split view's sidebar (and any side camera strip) floats over the
+        // map; its safe area keeps pins and centering in the visible part.
+        let sideInsets = usesSplitLayout ? mapView.safeAreaInsets : .zero
+        return UIEdgeInsets(top: topInset, left: sideInsets.left, bottom: bottomInset, right: sideInsets.right)
     }
 
     func mapListViewportRect(for mapView: MKMapView) -> CGRect {

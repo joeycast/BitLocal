@@ -113,7 +113,12 @@ struct IPadLayoutView: View {
 
     @ViewBuilder
     private var sidePanelRootContentWithSafeAreaBehavior: some View {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 27.0, *) {
+            // iOS 27 places the toolbar inside the top safe area on iPad and
+            // iPhone Duo alike, so the iOS 26 compensation below would slide
+            // the search row under the toolbar buttons.
+            sidePanelRootContent
+        } else if #available(iOS 26.0, *) {
             sidePanelRootContent
                 // The iPadOS 26 transparent nav bar keeps the toolbar animation we want,
                 // but it also leaves extra visible space before our custom search row.
