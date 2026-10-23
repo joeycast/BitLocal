@@ -37,7 +37,9 @@ final class BTCMapV4SyncTests: XCTestCase {
                     icon: "local_cafe",
                     comments: 3,
                     boostedUntil: nil,
-                    name: nil,
+                    // Named so the bootstrap doesn't trip the placeholder-name backfill,
+                    // which deliberately restarts the incremental sync from the epoch.
+                    name: "Cafe 1",
                     displayName: nil
                 )
             ],
