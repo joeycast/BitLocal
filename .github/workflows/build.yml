@@ -37,7 +37,7 @@ jobs:
             -project bitlocal.xcodeproj \
             -scheme bitlocal \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=26.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             build-for-testing
@@ -48,7 +48,7 @@ jobs:
             -project bitlocal.xcodeproj \
             -scheme bitlocal \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=26.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
             -derivedDataPath build/DerivedData \
             -only-testing:bitlocalTests \
             CODE_SIGNING_ALLOWED=NO \
