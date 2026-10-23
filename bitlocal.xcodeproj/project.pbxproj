@@ -13,6 +13,8 @@
 		F7E500013B18000000000001 /* MerchantSpatialIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E500013B18000000000002 /* MerchantSpatialIndex.swift */; };
 		F7E800013B1B000000000003 /* MerchantSearchEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E800013B1B000000000004 /* MerchantSearchEngineTests.swift */; };
 		F7E800013B1B000000000001 /* MerchantSearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E800013B1B000000000002 /* MerchantSearchEngine.swift */; };
+		F7EA00013B1D000000000001 /* MerchantSearchController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EA00013B1D000000000002 /* MerchantSearchController.swift */; };
+		F7EA00013B1D000000000003 /* MerchantSearchControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EA00013B1D000000000004 /* MerchantSearchControllerTests.swift */; };
 		F7E700013B1A000000000005 /* MerchantElementStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */; };
 		F7E700013B1A000000000003 /* BTCMapAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000004 /* BTCMapAsync.swift */; };
 		F7E700013B1A000000000001 /* MerchantElementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000002 /* MerchantElementStore.swift */; };
@@ -125,6 +127,8 @@
 		F7E500013B18000000000002 /* MerchantSpatialIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSpatialIndex.swift; sourceTree = "<group>"; };
 		F7E800013B1B000000000004 /* MerchantSearchEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchEngineTests.swift; sourceTree = "<group>"; };
 		F7E800013B1B000000000002 /* MerchantSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchEngine.swift; sourceTree = "<group>"; };
+		F7EA00013B1D000000000002 /* MerchantSearchController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchController.swift; sourceTree = "<group>"; };
+		F7EA00013B1D000000000004 /* MerchantSearchControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchControllerTests.swift; sourceTree = "<group>"; };
 		F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantElementStoreTests.swift; sourceTree = "<group>"; };
 		F7E700013B1A000000000004 /* BTCMapAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapAsync.swift; sourceTree = "<group>"; };
 		F7E700013B1A000000000002 /* MerchantElementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantElementStore.swift; sourceTree = "<group>"; };
@@ -411,6 +415,7 @@
 			isa = PBXGroup;
 			children = (
 				F66E0B982DE33F1200D68897 /* ContentViewModel.swift */,
+				F7EA00013B1D000000000002 /* MerchantSearchController.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -530,6 +535,7 @@
 				F7E500013B18000000000004 /* MerchantSpatialIndexTests.swift */,
 				F7E600013B19000000000004 /* MerchantSearchPersistenceTests.swift */,
 				F7E800013B1B000000000004 /* MerchantSearchEngineTests.swift */,
+				F7EA00013B1D000000000004 /* MerchantSearchControllerTests.swift */,
 				F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */,
 				F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */,
 				F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */,
@@ -720,6 +726,7 @@
 				F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */,
 				F63E80832EFC554E00ED1F00 /* BusinessHours.swift in Sources */,
 				F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */,
+				F7EA00013B1D000000000001 /* MerchantSearchController.swift in Sources */,
 				F63E80812EFC302700ED1F00 /* MailComposer.swift in Sources */,
 				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,
 				F7C0A1013A5B100100000001 /* BTCMapV4Contracts.swift in Sources */,
@@ -741,6 +748,7 @@
 				F7E500013B18000000000003 /* MerchantSpatialIndexTests.swift in Sources */,
 				F7E600013B19000000000003 /* MerchantSearchPersistenceTests.swift in Sources */,
 				F7E800013B1B000000000003 /* MerchantSearchEngineTests.swift in Sources */,
+				F7EA00013B1D000000000003 /* MerchantSearchControllerTests.swift in Sources */,
 				F7E700013B1A000000000005 /* MerchantElementStoreTests.swift in Sources */,
 				F7E900013B1C000000000005 /* PlaceDeepLinkResolverTests.swift in Sources */,
 				F7E900013B1C000000000007 /* CommunityAreasLoaderTests.swift in Sources */,
