@@ -13,6 +13,7 @@ struct ContentView: View {
     @EnvironmentObject private var featureHintsController: FeatureHintsController
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @StateObject private var appearanceManager = AppearanceManager()
 
     @State public var showingAbout = false
@@ -35,13 +36,12 @@ struct ContentView: View {
     }
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
-    /// Prefer idiom + size class over hard-coded pixel thresholds so iPad
-    /// multitasking and large phones don't flip the wrong layout shell.
+    /// Pick the shell from size classes, not the device idiom. iOS 27 runs
+    /// phone-idiom apps in regular-width windows (iPhone Duo unfolded, iPhone
+    /// apps on iPad), so idiom no longer says how much room we have.
+    /// Compact height (large iPhones in landscape) keeps the phone shell.
     private var usesIPadLayout: Bool {
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return horizontalSizeClass != .compact
-        }
-        return false
+        horizontalSizeClass == .regular && verticalSizeClass != .compact
     }
 
     var body: some View {
@@ -77,11 +77,22 @@ struct ContentView: View {
         }
         .onAppear {
             Debug.log("ContentView.onAppear called")
+            viewModel.usesSplitLayout = usesIPadLayout
 
             cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation
             }
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
+        }
+        .onChange(of: usesIPadLayout) { _, usesSplit in
+            // Folding/unfolding swaps shells live; drop the phone header and
+            // sheet insets so the split view's map isn't padded by stale values.
+            viewModel.usesSplitLayout = usesSplit
+            if usesSplit {
+                headerHeight = 0
+                viewModel.topPadding = 0
+                viewModel.bottomPadding = 0
+            }
         }
         .onChange(of: featureHintsController.activeTarget) { _, target in
             if target == .merchantAlerts {

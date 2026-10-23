@@ -8,7 +8,7 @@
 import SwiftUI
 import CoreLocation
 import Foundation // for DebugUtils
-import UIKit     // ← added, for checking userInterfaceIdiom
+import UIKit
 
 enum OnboardingPageKind {
     case info
@@ -27,6 +27,8 @@ struct OnboardingPage {
 struct OnboardingView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @State private var currentPage = 0
     @State private var iconScale: CGFloat = 1.0
@@ -36,8 +38,10 @@ struct OnboardingView: View {
     @State private var isEnablingAlerts = false
 
     // ──────────────── Device Detection Helpers ────────────────
+    /// iPad-sized window (iPad, unfolded iPhone Duo), judged by size class
+    /// rather than idiom.
     private var isPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
+        horizontalSizeClass == .regular && verticalSizeClass == .regular
     }
     
     // Screen size categories based on actual dimensions

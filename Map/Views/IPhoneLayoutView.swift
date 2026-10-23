@@ -345,6 +345,10 @@ private struct IPhoneMapButtonsChrome: View {
         )
         .fixedSize()
         .padding(.trailing, 18)
+        // Measure the 18pt from the screen edge, not from a side camera
+        // strip's safe area (iPhone Duo), so the pill lines up with the sheet.
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .ignoresSafeArea(edges: .horizontal)
         .padding(.top, shouldPresentBottomSheet ? 0 : mapOverlayTopOffset)
         .opacity(showingSettings ? 0 : 1)
         .allowsHitTesting(!showingSettings)

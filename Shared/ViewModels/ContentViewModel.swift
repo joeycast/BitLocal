@@ -126,6 +126,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Settled sheet bottom inset for map edge padding / camera math.
     /// Updated only when a detent selection settles — not during drag sampling.
     @Published var bottomPadding: CGFloat = 0
+    /// True while ContentView shows the split (iPad-style) shell. Set from size
+    /// classes, so it's also true on an unfolded iPhone Duo. Not published:
+    /// only read by map viewport math.
+    var usesSplitLayout = false
     /// Live sheet geometry isolated from this object so detent drag does not
     /// invalidate every `@EnvironmentObject` / `@ObservedObject` subscriber.
     let sheetGeometry = SheetGeometryModel()
@@ -842,7 +846,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func listFocusCoordinate() -> CLLocationCoordinate2D? {
-        guard UIDevice.current.userInterfaceIdiom == .phone,
+        guard !usesSplitLayout,
               let mapView = mapView else { return nil }
 
         let focusRect = mapListViewportRect(for: mapView)
@@ -903,12 +907,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func mapListViewportInsets(for mapView: MKMapView) -> UIEdgeInsets {
         let topInset = max(topPadding, 0)
         let bottomInset: CGFloat
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if !usesSplitLayout {
             bottomInset = effectiveIPhoneViewportBottomInset(mapHeight: mapView.bounds.height)
         } else {
             bottomInset = 0
         }
-        return UIEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
+        // The split view's sidebar (and any side camera strip) floats over the
+        // map; its safe area keeps pins and centering in the visible part.
+        let sideInsets = usesSplitLayout ? mapView.safeAreaInsets : .zero
+        return UIEdgeInsets(top: topInset, left: sideInsets.left, bottom: bottomInset, right: sideInsets.right)
     }
 
     func mapListViewportRect(for mapView: MKMapView) -> CGRect {
@@ -1355,13 +1362,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
             DispatchQueue.main.async {
                 // If on iPad, center with NO horizontal inset—so the map pane centers user dot visually.
-                if UIDevice.current.userInterfaceIdiom == .pad {
+                if self.usesSplitLayout {
                     let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
                     mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
                 } else {
                     // iPhone: preserve your bottom‐sheet inset (unchanged)
-                    let screenHeight = UIScreen.main.bounds.height
-                    let bottomSheetHeight = screenHeight * (0.8 / 3.0)
+                    // Use the map's own height; in resizable windows the screen
+                    // can be larger than the scene.
+                    let bottomSheetHeight = mapView.bounds.height * (0.8 / 3.0)
                     let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: bottomSheetHeight, right: 0)
                     mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
                 }

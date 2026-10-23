@@ -77,7 +77,9 @@ struct BottomSheetContentView: View {
     private var sheetRootContentWithSafeAreaBehavior: some View {
         if #available(iOS 26.0, *) {
             sheetRootContent
-                .ignoresSafeArea(.container, edges: .top)
+                // Also ignore side insets so content spans the card next to a
+                // side camera strip (iPhone Duo) instead of leaving a gap.
+                .ignoresSafeArea(.container, edges: [.top, .horizontal])
         } else {
             sheetRootContent
         }

@@ -675,7 +675,7 @@ struct MapView: UIViewRepresentable {
                                     dy: -rect.size.height * (zoomOutScale - 1))
                 
                 // Edge padding to respect header and bottom sheet
-                let topInset: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 10 : viewModel.topPadding + 10
+                let topInset: CGFloat = viewModel.usesSplitLayout ? 10 : viewModel.topPadding + 10
                 let edgePadding = UIEdgeInsets(
                     top: topInset,
                     left: 20,
