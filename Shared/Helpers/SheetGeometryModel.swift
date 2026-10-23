@@ -158,7 +158,9 @@ final class SheetEdgeHeightReaderView: UIView {
         }
 
         guard sheetFrame.height > 1 || sheetFrame.minY > 0 else { return }
-        let screenHeight = window?.screen.bounds.height ?? UIScreen.main.bounds.height
+        // Sheet frames are in window coordinates, so measure against the
+        // window, which can be smaller than the screen in resizable scenes.
+        guard let screenHeight = window?.bounds.height else { return }
         let heightFromBottom = max(0, screenHeight - sheetFrame.minY)
         guard heightFromBottom > 1 else { return }
 
