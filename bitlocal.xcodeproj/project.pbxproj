@@ -108,6 +108,13 @@
 		F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */; };
 		F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */; };
 		F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */; };
+		F7EC00013B1E000000000001 /* AvailablePaymentMethodsChecksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1E000000000002 /* AvailablePaymentMethodsChecksTests.swift */; };
+		F7EC00013B1E000000000003 /* BTCMapV4SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1E000000000004 /* BTCMapV4SyncTests.swift */; };
+		F7EC00013B1E000000000005 /* ElementMapVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1E000000000006 /* ElementMapVisibilityTests.swift */; };
+		F7EC00013B1E000000000007 /* LRUCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1E000000000008 /* LRUCacheTests.swift */; };
+		F7EC00013B1E000000000009 /* OpeningHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1E00000000000A /* OpeningHoursTests.swift */; };
+		F7EC00013B1E00000000000B /* BusinessSubmissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1E00000000000C /* BusinessSubmissionTests.swift */; };
+		F7EC00013B1E00000000000D /* StringFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1E00000000000E /* StringFormattingTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -226,6 +233,13 @@
 		F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4SearchQueryEncodingTests.swift; sourceTree = "<group>"; };
 		F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapMergeTests.swift; sourceTree = "<group>"; };
 		F7C0A2153A5B100100000115 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		F7EC00013B1E000000000002 /* AvailablePaymentMethodsChecksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailablePaymentMethodsChecksTests.swift; sourceTree = "<group>"; };
+		F7EC00013B1E000000000004 /* BTCMapV4SyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapV4SyncTests.swift; sourceTree = "<group>"; };
+		F7EC00013B1E000000000006 /* ElementMapVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementMapVisibilityTests.swift; sourceTree = "<group>"; };
+		F7EC00013B1E000000000008 /* LRUCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCacheTests.swift; sourceTree = "<group>"; };
+		F7EC00013B1E00000000000A /* OpeningHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpeningHoursTests.swift; sourceTree = "<group>"; };
+		F7EC00013B1E00000000000C /* BusinessSubmissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessSubmissionTests.swift; sourceTree = "<group>"; };
+		F7EC00013B1E00000000000E /* StringFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringFormattingTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -540,6 +554,13 @@
 				F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */,
 				F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */,
 				F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */,
+				F7EC00013B1E000000000002 /* AvailablePaymentMethodsChecksTests.swift */,
+				F7EC00013B1E000000000004 /* BTCMapV4SyncTests.swift */,
+				F7EC00013B1E000000000006 /* ElementMapVisibilityTests.swift */,
+				F7EC00013B1E000000000008 /* LRUCacheTests.swift */,
+				F7EC00013B1E00000000000A /* OpeningHoursTests.swift */,
+				F7EC00013B1E00000000000C /* BusinessSubmissionTests.swift */,
+				F7EC00013B1E00000000000E /* StringFormattingTests.swift */,
 			);
 			path = bitlocalTests;
 			sourceTree = "<group>";
@@ -755,6 +776,13 @@
 				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
 				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
 				F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */,
+				F7EC00013B1E000000000001 /* AvailablePaymentMethodsChecksTests.swift in Sources */,
+				F7EC00013B1E000000000003 /* BTCMapV4SyncTests.swift in Sources */,
+				F7EC00013B1E000000000005 /* ElementMapVisibilityTests.swift in Sources */,
+				F7EC00013B1E000000000007 /* LRUCacheTests.swift in Sources */,
+				F7EC00013B1E000000000009 /* OpeningHoursTests.swift in Sources */,
+				F7EC00013B1E00000000000B /* BusinessSubmissionTests.swift in Sources */,
+				F7EC00013B1E00000000000D /* StringFormattingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
