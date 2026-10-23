@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BitLocal is an iOS app that helps users discover physical businesses accepting Bitcoin payments. It displays an interactive map with merchant locations from the BTC Map API, plus communities, events, merchant alerts, and hybrid search.
+BitLocal is an iOS app that helps users discover physical businesses accepting Bitcoin payments. It displays an interactive map with merchant locations from the BTC Map API, plus communities, merchant alerts, and hybrid search (events are built but hidden behind a feature flag).
 
 **Key facts:**
 - 100% SwiftUI, iOS 18.0+, zero external dependencies
@@ -44,6 +44,11 @@ Or use Xcode: `Cmd+B` to build, `Cmd+R` to run, `Cmd+U` for tests.
 - `Businesses/Models/Element.swift` — merchant model (identity by place `id`)
 - `Shared/Helpers/MerchantAlerts.swift` — CloudKit merchant alert digests
 - `Map/Views/MapView.swift` — `MKMapView` bridge + annotation coordinator
+- `Shared/Helpers/MerchantElementStore.swift`, `MerchantSpatialIndex.swift`, `MerchantSearchEngine.swift`, `MerchantSearchPersistence.swift` — merchant storage, viewport lookup, and search extracted from `ContentViewModel`
+- `Shared/Helpers/PlaceDeepLinkResolver.swift` — place share URL parsing
+- `Shared/Helpers/CommunityAreasLoader.swift` — community areas fetch
+- `Shared/Helpers/ReleaseNotes.swift` — in-app "What's New" catalog (keep in sync with `RELEASE_NOTES.md`)
+- `Shared/Helpers/Extensions.swift` — `FeatureFlags` (events UI is off via `isEventsUIEnabled`)
 
 **Folder Structure:**
 ```
@@ -56,6 +61,8 @@ bitlocal/
 ├── Fonts/           # Custom font registration
 ├── Resources/       # Font files, BundledCities.sqlite
 ├── bitlocalTests/   # Unit tests
+├── bitlocal-maestro/ # Maestro UI test flows
+├── scripts/         # CloudKit digest sync, city index builder, keepalive
 └── docs/            # Feature notes (e.g. CloudKit alerts)
 ```
 
@@ -77,7 +84,7 @@ Default repository mode is **auto**: prefer v4, fall back to v2 when needed.
 
 **Other API surfaces:**
 - Search: `v4/places/search/`
-- Events: `v4/events`
+- Events: `v4/events` (fetch skipped while `FeatureFlags.isEventsUIEnabled` is false)
 - Communities/areas: v2/v3 area endpoints
 - Deep links: place share URLs → single-place fetch
 
