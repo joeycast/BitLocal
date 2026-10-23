@@ -1,9 +1,17 @@
 name: Build
 
 on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   pull_request:
     branches:
-      - develop
+      - main
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -23,16 +31,35 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
+      # Ad-hoc sign instead of CODE_SIGNING_ALLOWED=NO so the simulator app keeps
+      # its entitlements; CloudKit traps at launch without them, which kills the
+      # test host before any test runs.
       - name: Build
         run: |
           xcodebuild \
             -project bitlocal.xcodeproj \
             -scheme bitlocal \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=26.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
             -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            build-for-testing
+
+      - name: Test
+        run: |
+          xcodebuild \
+            -project bitlocal.xcodeproj \
+            -scheme bitlocal \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
+            -derivedDataPath build/DerivedData \
+            -only-testing:bitlocalTests \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            test-without-building
 
       - name: Upload simulator app
         uses: actions/upload-artifact@v6
