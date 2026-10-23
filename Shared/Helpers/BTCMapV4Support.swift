@@ -840,10 +840,18 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     private let refreshStateQueue = DispatchQueue(label: "app.bitlocal.btcmap-refresh-state", qos: .userInitiated)
     private var isV4RefreshInFlight = false
     private var pendingV4RefreshCompletions: [([Element]?) -> Void] = []
+    private let cacheDirectory: URL
 
-    init(v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(), userDefaults: UserDefaults = .standard) {
+    /// `cacheDirectory` defaults to the app's Caches directory; tests pass their own
+    /// so they don't share cache files with the host app's live sync.
+    init(
+        v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(),
+        userDefaults: UserDefaults = .standard,
+        cacheDirectory: URL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+    ) {
         self.v4Client = v4Client
         self.userDefaults = userDefaults
+        self.cacheDirectory = cacheDirectory
         // Ensure v2 version-change side effects still run (APIManager.init).
         _ = APIManager.shared
         clearV4CacheIfAppVersionChanged()
@@ -869,13 +877,11 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private var v4ElementsFileURL: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("btcmap_elements_v4.json")
+        cacheDirectory.appendingPathComponent("btcmap_elements_v4.json")
     }
 
     private var v4SyncStateFileURL: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("btcmap_v4_sync_state.json")
+        cacheDirectory.appendingPathComponent("btcmap_v4_sync_state.json")
     }
 
     func loadCachedElements() -> [Element]? {

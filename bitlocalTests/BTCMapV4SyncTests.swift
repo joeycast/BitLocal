@@ -2,18 +2,27 @@ import XCTest
 @testable import bitlocal
 
 final class BTCMapV4SyncTests: XCTestCase {
-    private let elementsFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        .appendingPathComponent("btcmap_elements_v4.json")
-    private let syncStateFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        .appendingPathComponent("btcmap_v4_sync_state.json")
+    // A per-test cache directory keeps these tests away from the cache files the
+    // host app's own launch-time sync reads and writes.
+    private var cacheDirectory: URL!
+
+    private var elementsFileURL: URL {
+        cacheDirectory.appendingPathComponent("btcmap_elements_v4.json")
+    }
+
+    private var syncStateFileURL: URL {
+        cacheDirectory.appendingPathComponent("btcmap_v4_sync_state.json")
+    }
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        try removeV4CacheFiles()
+        cacheDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BTCMapV4SyncTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
     }
 
     override func tearDownWithError() throws {
-        try removeV4CacheFiles()
+        try FileManager.default.removeItem(at: cacheDirectory)
         try super.tearDownWithError()
     }
 
@@ -28,7 +37,9 @@ final class BTCMapV4SyncTests: XCTestCase {
                     icon: "local_cafe",
                     comments: 3,
                     boostedUntil: nil,
-                    name: nil,
+                    // Named so the bootstrap doesn't trip the placeholder-name backfill,
+                    // which deliberately restarts the incremental sync from the epoch.
+                    name: "Cafe 1",
                     displayName: nil
                 )
             ],
@@ -36,7 +47,7 @@ final class BTCMapV4SyncTests: XCTestCase {
         ))
         client.fetchPlacesResult = .success([])
 
-        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
+        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults(), cacheDirectory: cacheDirectory)
         let expectation = expectation(description: "refresh completes")
 
         repository.refreshElements { _ in
@@ -108,7 +119,7 @@ final class BTCMapV4SyncTests: XCTestCase {
         let client = MockBTCMapV4Client()
         client.fetchPlacesResult = .success([])
 
-        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
+        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults(), cacheDirectory: cacheDirectory)
         let expectation = expectation(description: "refresh completes")
 
         repository.refreshElements { _ in
@@ -120,18 +131,14 @@ final class BTCMapV4SyncTests: XCTestCase {
         XCTAssertEqual(client.fetchPlacesUpdatedSinceValues, ["2025-06-11T00:00:00Z"])
     }
 
-    private func removeV4CacheFiles() throws {
-        for url in [elementsFileURL, syncStateFileURL] {
-            if FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.removeItem(at: url)
-            }
-        }
-    }
-
     private func testUserDefaults() -> UserDefaults {
         let suiteName = "BTCMapV4SyncTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
+        // Match the running app version so the repository's version-change check
+        // doesn't wipe the cache files a test seeds before creating it.
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        defaults.set(currentVersion, forKey: "btcmap_last_app_version")
         return defaults
     }
 }
