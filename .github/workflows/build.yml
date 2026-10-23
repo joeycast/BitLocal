@@ -1,9 +1,17 @@
 name: Build
 
 on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   pull_request:
     branches:
-      - develop
+      - main
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -32,7 +40,19 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=26.2' \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            build-for-testing
+
+      - name: Test
+        run: |
+          xcodebuild \
+            -project bitlocal.xcodeproj \
+            -scheme bitlocal \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=26.2' \
+            -derivedDataPath build/DerivedData \
+            -only-testing:bitlocalTests \
+            CODE_SIGNING_ALLOWED=NO \
+            test-without-building
 
       - name: Upload simulator app
         uses: actions/upload-artifact@v6
