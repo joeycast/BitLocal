@@ -89,7 +89,8 @@ private struct VisibleCommunityListCacheKey: Equatable {
     let viewportMaxYBucket: Int
 }
 
-final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate, MerchantSearchHost {
+@MainActor
+final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate, MKMapViewDelegate, MerchantSearchHost {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
@@ -275,7 +276,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Redesign phase 6: local search runs on the store's FTS5 index over the whole
     /// catalog, nearest first, instead of filtering the merchants on screen.
     private static func storeSearch(_ query: String, near: CLLocationCoordinate2D) async -> [String]? {
-        guard let store = MerchantStoreBootstrap.environment?.store, await StoreMap.shared.isReady else { return nil }
+        guard let store = MerchantStoreBootstrap.environment?.store, StoreMap.shared.isReady else { return nil }
         let filter = MerchantFilter(hideATMs: UserDefaults.standard.bool(forKey: hideATMsFromMapAndListKey))
         guard let hits = try? await store.search(
             query,
@@ -1127,16 +1128,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         )
         let adjustedRegion = MKCoordinateRegion(center: adjustedCenterCoordinate, span: currentSpan)
 
-        let apply = {
-            self.region = adjustedRegion
-            mapView.setRegion(adjustedRegion, animated: animated)
-        }
-
-        if Thread.isMainThread {
-            apply()
-        } else {
-            DispatchQueue.main.async(execute: apply)
-        }
+        region = adjustedRegion
+        mapView.setRegion(adjustedRegion, animated: animated)
     }
 
     func selectAnnotationForListSelection(

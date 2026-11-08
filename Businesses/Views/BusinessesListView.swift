@@ -1082,6 +1082,7 @@ struct ElementCell: View {
     }
 }
 
+@MainActor
 class ElementCellViewModel: ObservableObject {
 
     static let regionCountryCodeDidChange = Notification.Name("regionCountryCodeDidChange")
@@ -1149,11 +1150,6 @@ class ElementCellViewModel: ObservableObject {
             }
     }
 
-    deinit {
-        userLocationCancellable?.cancel()
-        regionCodeCancellable?.cancel()
-    }
-    
     // OPTIMIZED: Add method for manual location updates with deduplication
     func updateUserLocationIfNeeded(_ newLocation: CLLocation) {
         // Only update if location changed significantly

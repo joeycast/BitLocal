@@ -4,7 +4,7 @@ import MapKit
 import Security
 import SwiftUI
 import UIKit
-import UserNotifications
+@preconcurrency import UserNotifications
 
 struct CitySubscription: Codable, Hashable, Identifiable {
     let id: UUID
@@ -822,23 +822,25 @@ final class BitLocalAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         }
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        await MerchantAlertsManager.shared.handleNotificationResponse(
-            userInfo: response.notification.request.content.userInfo
-        )
+        // The payload is a plain property list, read once by the manager.
+        nonisolated(unsafe) let userInfo = response.notification.request.content.userInfo
+        await MerchantAlertsManager.shared.handleNotificationResponse(userInfo: userInfo)
     }
 }
 
+/// Main-actor wrappers, so the manager never sends the shared center off its actor.
+@MainActor
 private extension UNUserNotificationCenter {
     func merchantAlertsRequestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
         try await withCheckedThrowingContinuation { continuation in
@@ -855,6 +857,8 @@ private extension UNUserNotificationCenter {
     func merchantAlertsSettings() async -> UNNotificationSettings {
         await withCheckedContinuation { continuation in
             getNotificationSettings { settings in
+                // Read-only snapshot handed straight back to the caller.
+                nonisolated(unsafe) let settings = settings
                 continuation.resume(returning: settings)
             }
         }

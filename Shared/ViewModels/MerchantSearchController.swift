@@ -10,6 +10,7 @@ import MapKit
 
 /// Map/catalog state the search controller reads from its owner. `ContentViewModel`
 /// conforms directly; tests can supply a lightweight fake.
+@MainActor
 protocol MerchantSearchHost: AnyObject {
     var region: MKCoordinateRegion { get }
     var userLocation: CLLocation? { get }
@@ -32,6 +33,7 @@ extension MerchantSearchHost {
 
 /// Owns merchant search state and orchestration (hybrid local search, legacy remote
 /// search, result caches). Extracted from `ContentViewModel`, which forwards to it.
+@MainActor
 final class MerchantSearchController: ObservableObject {
     @Published var unifiedSearchText = ""
     @Published var isSearchActive = false
@@ -540,35 +542,19 @@ final class MerchantSearchController: ObservableObject {
         )
 
         let group = DispatchGroup()
-        let aggregationQueue = DispatchQueue(label: "bitlocal.merchant-search.remote-aggregation")
-        var mergedByID: [String: V4PlaceRecord] = [:]
-        var errors: [String] = []
-        var hadSuccess = false
+        let accumulator = RemoteSearchAccumulator()
 
         for plan in plans {
             group.enter()
-            btcMapRepository.searchPlaces(query: plan.query) { [weak self] result in
-                guard let self else {
-                    group.leave()
-                    return
-                }
-
+            // Filtering and ranking read the map's location, so they run on the
+            // main actor once every request is back (see `group.notify`).
+            btcMapRepository.searchPlaces(query: plan.query) { result in
+                defer { group.leave() }
                 switch result {
                 case .success(let records):
-                    let filtered = self.filterRemoteSearchRecords(records, normalizedQuery: normalizedQuery)
-                    aggregationQueue.async {
-                        hadSuccess = true
-                        for record in filtered {
-                            mergedByID[record.idString] = mergedByID[record.idString] ?? record
-                        }
-                        group.leave()
-                    }
-
+                    accumulator.add(records)
                 case .failure(let error):
-                    aggregationQueue.async {
-                        errors.append(error.localizedDescription)
-                        group.leave()
-                    }
+                    accumulator.addError(error.localizedDescription)
                 }
             }
         }
@@ -576,10 +562,11 @@ final class MerchantSearchController: ObservableObject {
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard self.latestMerchantSearchRequestID == requestID else { return }
+            let (mergedRecords, errors, hadSuccess) = accumulator.snapshot()
 
             if hadSuccess {
                 let rankedRecords = self.filterRemoteSearchRecords(
-                    Array(mergedByID.values),
+                    mergedRecords,
                     normalizedQuery: normalizedQuery
                 )
                 self.applyRemoteEnrichment(
@@ -843,5 +830,30 @@ final class MerchantSearchController: ObservableObject {
 
     private func normalizedMerchantName(_ raw: String) -> String {
         raw.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase
+    }
+}
+
+/// Collects results from the concurrent remote search requests of one query.
+private final class RemoteSearchAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var mergedByID: [String: V4PlaceRecord] = [:]
+    private var errors: [String] = []
+    private var hadSuccess = false
+
+    func add(_ records: [V4PlaceRecord]) {
+        lock.withLock {
+            hadSuccess = true
+            for record in records {
+                mergedByID[record.idString] = mergedByID[record.idString] ?? record
+            }
+        }
+    }
+
+    func addError(_ message: String) {
+        lock.withLock { errors.append(message) }
+    }
+
+    func snapshot() -> (records: [V4PlaceRecord], errors: [String], hadSuccess: Bool) {
+        lock.withLock { (Array(mergedByID.values), errors, hadSuccess) }
     }
 }

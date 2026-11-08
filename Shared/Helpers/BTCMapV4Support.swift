@@ -1229,13 +1229,14 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         return dateOnly.date(from: value)
     }
 
-    private static let iso8601WithFractional: ISO8601DateFormatter = {
+    // ISO8601DateFormatter is thread-safe for parsing and formatting.
+    nonisolated(unsafe) private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    private static let iso8601Basic: ISO8601DateFormatter = {
+    nonisolated(unsafe) private static let iso8601Basic: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter

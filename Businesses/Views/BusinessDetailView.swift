@@ -510,6 +510,8 @@ private struct TranslatableReviewBodyTextView: View {
             }
         }
         .translationTask(translationConfiguration) { session in
+            // The session only lives for this closure and is used once.
+            nonisolated(unsafe) let session = session
             do {
                 let response = try await session.translate(text)
                 await MainActor.run {
@@ -906,6 +908,8 @@ private struct TranslatableBusinessDescriptionView: View {
             }
         }
         .translationTask(translationConfiguration) { session in
+            // The session only lives for this closure and is used once.
+            nonisolated(unsafe) let session = session
             do {
                 let response = try await session.translate(description)
                 await MainActor.run {

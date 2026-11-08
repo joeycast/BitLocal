@@ -33,7 +33,8 @@ struct CitySearchResult: Identifiable, Hashable, Sendable {
 actor CityIndexStore {
     static let shared = CityIndexStore()
 
-    private var database: OpaquePointer?
+    // Only touched inside the actor, plus once in deinit when nothing else can reach it.
+    nonisolated(unsafe) private var database: OpaquePointer?
     private var openTask: Task<Void, Never>?
 
     deinit {

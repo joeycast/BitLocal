@@ -1,5 +1,5 @@
 import SwiftUI
-import MapKit
+@preconcurrency import MapKit
 
 struct LocationSearchView: View {
     @Binding var submission: BusinessSubmission
@@ -231,7 +231,8 @@ struct SearchResult: Identifiable {
 }
 
 // MARK: - Location Search ViewModel
-class LocationSearchViewModel: NSObject, ObservableObject {
+@MainActor
+final class LocationSearchViewModel: NSObject, ObservableObject {
     @Published var searchText = ""
     @Published var searchResults: [SearchResult] = []
     @Published var isSearching = false
@@ -264,7 +265,6 @@ class LocationSearchViewModel: NSObject, ObservableObject {
         }
     }
 
-    @MainActor
     private func performSearch(_ query: String) async {
         guard !query.isEmpty else {
             searchResults = []
@@ -273,16 +273,18 @@ class LocationSearchViewModel: NSObject, ObservableObject {
         searchCompleter.queryFragment = query
     }
 
-    func selectLocation(_ result: SearchResult, completion: @escaping (SearchLocation) -> Void) {
+    func selectLocation(_ result: SearchResult, completion: @escaping @MainActor (SearchLocation) -> Void) {
         isSearching = true
 
         let searchRequest = MKLocalSearch.Request(completion: result.completion)
         let search = MKLocalSearch(request: searchRequest)
+        let resultTitle = result.title
+        let resultSubtitle = result.subtitle
 
         search.start { [weak self] response, error in
-            guard let self = self else { return }
-
-            DispatchQueue.main.async {
+            // MapKit calls this handler on the main thread.
+            MainActor.assumeIsolated {
+                guard let self else { return }
                 self.isSearching = false
 
                 guard let mapItem = response?.mapItems.first else { return }
@@ -299,8 +301,8 @@ class LocationSearchViewModel: NSObject, ObservableObject {
                 self.applyMapItemDetails(mapItem, to: &addressComponents)
 
                 let location = SearchLocation(
-                    title: mapItem.name ?? result.title,
-                    subtitle: result.subtitle,
+                    title: mapItem.name ?? resultTitle,
+                    subtitle: resultSubtitle,
                     coordinate: placemark.coordinate,
                     addressComponents: addressComponents
                 )
@@ -310,14 +312,14 @@ class LocationSearchViewModel: NSObject, ObservableObject {
         }
     }
 
-    func reverseGeocode(coordinate: CLLocationCoordinate2D, completion: @escaping (SearchLocation) -> Void) {
+    func reverseGeocode(coordinate: CLLocationCoordinate2D, completion: @escaping @MainActor (SearchLocation) -> Void) {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let requestKey = "location-search:\(ReverseGeocodingSpatialKey.key(for: coordinate))"
 
         Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey) { placemark in
             guard let placemark else { return }
 
-            DispatchQueue.main.async {
+            do {
                 var addressComponents = BusinessSubmission()
 
                 addressComponents.streetNumber = placemark.subThoroughfare ?? ""
@@ -410,8 +412,9 @@ class LocationSearchViewModel: NSObject, ObservableObject {
 
 // MARK: - MKLocalSearchCompleterDelegate
 extension LocationSearchViewModel: MKLocalSearchCompleterDelegate {
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        DispatchQueue.main.async {
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        // The completer reports on the main thread, where it was created.
+        MainActor.assumeIsolated {
             self.searchResults = completer.results.map { completion in
                 SearchResult(
                     title: completion.title,
@@ -422,7 +425,7 @@ extension LocationSearchViewModel: MKLocalSearchCompleterDelegate {
         }
     }
 
-    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         print("Search completer error: \(error.localizedDescription)")
     }
 }

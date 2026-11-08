@@ -36,13 +36,14 @@ enum BTCMapDateParser {
 }
 
 private extension ISO8601DateFormatter {
-    static let fullPrecision: ISO8601DateFormatter = {
+    // ISO8601DateFormatter is thread-safe for parsing and formatting.
+    nonisolated(unsafe) static let fullPrecision: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    static let basic: ISO8601DateFormatter = {
+    nonisolated(unsafe) static let basic: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
