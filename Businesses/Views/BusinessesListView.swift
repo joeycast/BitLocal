@@ -2,6 +2,7 @@
 
 import SwiftUI
 import BitLocalDesign
+import BitLocalData
 import MapKit
 import CoreLocation
 import Combine
@@ -29,6 +30,7 @@ struct BusinessesListView: View {
     @State private var canShowEmptyState = false
     @State private var emptyStateRevealWorkItem: DispatchWorkItem?
     @FocusState private var isSearchFieldFocused: Bool
+    @State private var recentSearches: [String] = []
 
     init(
         elements: [Element],
@@ -72,6 +74,8 @@ struct BusinessesListView: View {
                 if isShowingInitialLoadingState {
                     Color.clear
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if isShowingRecentSearches {
+                    recentSearchesView
                 } else if isFilteringMerchants {
                     searchResultsView
                 } else if viewModel.activeMerchantAlertDigest != nil {
@@ -106,6 +110,10 @@ struct BusinessesListView: View {
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
             refreshDiscoveryCache()
+        }
+        .task(id: isSearchFieldFocused) {
+            guard isSearchFieldFocused else { return }
+            recentSearches = await RecentSearchStore.load()
         }
         .onChange(of: isSearchFieldFocused) { _, focused in
             if focused && !viewModel.isSearchActive {
@@ -182,6 +190,10 @@ struct BusinessesListView: View {
                 .font(.body)
                 .focused($isSearchFieldFocused)
                 .submitLabel(.search)
+                .onSubmit {
+                    let query = trimmedSearchQuery
+                    Task { await RecentSearchStore.record(query) }
+                }
             if !viewModel.unifiedSearchText.isEmpty {
                 Button {
                     viewModel.clearMerchantSearch(userInitiated: true)
@@ -519,6 +531,44 @@ struct BusinessesListView: View {
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: Array(viewModel.merchantSearchPrimaryResults.prefix(20)))
         }
+    }
+
+    // MARK: - Recent searches (ui-redesign 6.2)
+
+    private var isShowingRecentSearches: Bool {
+        isSearchFieldFocused && trimmedSearchQuery.isEmpty && !recentSearches.isEmpty
+    }
+
+    private var recentSearchesView: some View {
+        List {
+            Section("Recent") {
+                ForEach(recentSearches, id: \.self) { query in
+                    Button {
+                        viewModel.unifiedSearchText = query
+                        Task { await RecentSearchStore.record(query) }
+                    } label: {
+                        Label {
+                            Text(query)
+                                .foregroundStyle(.primary)
+                        } icon: {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            recentSearches.removeAll { $0 == query }
+                            Task { await RecentSearchStore.delete(query) }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.immediately)
     }
 
     // MARK: - Helpers
@@ -1475,5 +1525,25 @@ struct PaymentIcons: View {
             format: NSLocalizedString("Accepts %@", comment: "VoiceOver summary of accepted payment methods"),
             methods.joined(separator: ", ")
         )
+    }
+}
+
+/// Recent searches live in the merchant database (`recent_searches` table).
+/// Every call is a no-op until the store exists.
+enum RecentSearchStore {
+    static func load(limit: Int = 5) async -> [String] {
+        guard let store = MerchantStoreBootstrap.environment?.store else { return [] }
+        return (try? await store.recentSearches(limit: limit)) ?? []
+    }
+
+    static func record(_ query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2, let store = MerchantStoreBootstrap.environment?.store else { return }
+        try? await store.recordRecentSearch(trimmed)
+    }
+
+    static func delete(_ query: String) async {
+        guard let store = MerchantStoreBootstrap.environment?.store else { return }
+        try? await store.deleteRecentSearch(query)
     }
 }
