@@ -49,6 +49,7 @@ struct MapView: UIViewRepresentable {
             // Reattach delegate and config
             existingMap.delegate = context.coordinator
             context.coordinator.installCommunityOverlayTapRecognizer(on: existingMap)
+            context.coordinator.installPlacesRotor(on: existingMap)
             setupCluster(mapView: existingMap)
             existingMap.showsUserLocation = true
             existingMap.mapType = mapType
@@ -66,6 +67,7 @@ struct MapView: UIViewRepresentable {
         // Set the delegate to the Coordinator
         mapView.delegate = context.coordinator
         context.coordinator.installCommunityOverlayTapRecognizer(on: mapView)
+        context.coordinator.installPlacesRotor(on: mapView)
         
         // Set up clustering
         setupCluster(mapView: mapView)
@@ -507,6 +509,41 @@ struct MapView: UIViewRepresentable {
             mapView.setRegion(mapView.regionThatFits(region), animated: true)
         }
 
+        /// VoiceOver "Places" rotor (ui-redesign 7): steps through the pins and
+        /// clusters on screen in reading order, top to bottom, then left to right.
+        func installPlacesRotor(on mapView: MKMapView) {
+            let rotor = UIAccessibilityCustomRotor(name: String(localized: "Places")) { [weak mapView] predicate in
+                guard let mapView else { return nil }
+                let views = mapView.annotations(in: mapView.visibleMapRect)
+                    .compactMap { $0.base as? MKAnnotation }
+                    .filter { !($0 is MKUserLocation) }
+                    .sorted { lhs, rhs in
+                        if lhs.coordinate.latitude != rhs.coordinate.latitude {
+                            return lhs.coordinate.latitude > rhs.coordinate.latitude
+                        }
+                        return lhs.coordinate.longitude < rhs.coordinate.longitude
+                    }
+                    .compactMap { mapView.view(for: $0) }
+                    .filter { !$0.isHidden }
+                guard !views.isEmpty else { return nil }
+
+                let currentIndex = (predicate.currentItem.targetElement as? UIView)
+                    .flatMap { current in views.firstIndex { $0 === current } }
+                let nextIndex: Int
+                switch predicate.searchDirection {
+                case .next:
+                    nextIndex = currentIndex.map { $0 + 1 } ?? 0
+                case .previous:
+                    nextIndex = currentIndex.map { $0 - 1 } ?? views.count - 1
+                @unknown default:
+                    return nil
+                }
+                guard views.indices.contains(nextIndex) else { return nil }
+                return UIAccessibilityCustomRotorItemResult(targetElement: views[nextIndex], targetRange: nil)
+            }
+            mapView.accessibilityCustomRotors = [rotor]
+        }
+
         func installCommunityOverlayTapRecognizer(on mapView: MKMapView) {
             if let existing = mapView.gestureRecognizers?.first(where: { $0.name == "communityOverlayTap" }) as? UITapGestureRecognizer {
                 existing.removeTarget(nil, action: nil)
@@ -806,7 +843,7 @@ struct MapView: UIViewRepresentable {
                 let symbolName = ElementCategorySymbols.symbolName(for: element)
                 Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
                 view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
-                view?.accessibilityLabel = Self.accessibilityLabel(for: element)
+                view?.accessibilityLabel = accessibilityLabel(for: element)
                 view?.accessibilityTraits = .button
                 view?.accessibilityHint = NSLocalizedString(
                     "Double tap to open merchant details",
@@ -817,13 +854,25 @@ struct MapView: UIViewRepresentable {
             return view
         }
 
-        private static func accessibilityLabel(for element: Element) -> String {
+        /// "Prickly Pear Coffee Co., Featured, Coffee shop, 0.3 mi, Lightning, Open" (ui-redesign 7).
+        private func accessibilityLabel(for element: Element) -> String {
             let name = element.displayNameForUI
                 ?? element.displayName
                 ?? NSLocalizedString("Bitcoin merchant", comment: "Fallback VoiceOver name for unnamed merchant pin")
             var parts = [name]
             if element.isCurrentlyBoosted() {
                 parts.append(NSLocalizedString("Featured", comment: "VoiceOver flag for boosted merchants"))
+            }
+            let summary = element.merchant?.summary
+            if let summary,
+               let category = ElementCategorySymbols.friendlyCategoryLabel(forIcon: summary.category.rawValue) {
+                parts.append(category)
+            }
+            if let userLocation = viewModel.userLocation, let coordinate = element.mapCoordinate {
+                let distance = userLocation.distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+                let formatter = MKDistanceFormatter()
+                formatter.unitStyle = .full
+                parts.append(formatter.string(fromDistance: distance))
             }
             var methods: [String] = []
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
@@ -838,7 +887,10 @@ struct MapView: UIViewRepresentable {
             if !methods.isEmpty {
                 parts.append(methods.joined(separator: ", "))
             }
-            return parts.joined(separator: ". ")
+            if let hours = OpeningHours.parse(summary?.openingHours) {
+                parts.append(OpeningHoursText.status(hours.status(at: .now)).state)
+            }
+            return parts.joined(separator: ", ")
         }
         
         // Handle annotation selection to update navigation path

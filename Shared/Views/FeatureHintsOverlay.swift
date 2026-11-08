@@ -182,7 +182,7 @@ struct FeatureHintsOverlay: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 15)
         .frame(width: width)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .legibleSurface(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(.white.opacity(0.05))

@@ -10,9 +10,9 @@
 
 import SwiftUI
 import MapKit
+import BitLocalNavigation
 import BitLocalDomain
 import BitLocalDesign
-import BitLocalNavigation
 
 struct MerchantCardView: View {
     let element: Element
@@ -26,6 +26,17 @@ struct MerchantCardView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var isPaging = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
+
+    /// Accessibility text sizes stack the card instead of truncating it (ui-redesign 7).
+    private var isAccessibilitySize: Bool { dynamicTypeSize.isAccessibilitySize }
+
+    /// The sheet can grow to show the full detail; VoiceOver gets an explicit action for it.
+    private var canExpandDetails: Bool {
+        horizontalSizeClass == .compact && navigation != nil && navigation?.sheetDetent != .full
+    }
 
     private var merchant: Merchant? { element.merchant }
 
@@ -50,6 +61,9 @@ struct MerchantCardView: View {
             if hasPrevious {
                 Button(String(localized: "Previous place")) { _ = onPage?(-1) }
             }
+            if canExpandDetails {
+                Button(String(localized: "Expand details")) { navigation?.sheetDetent = .full }
+            }
         }
     }
 
@@ -70,9 +84,14 @@ struct MerchantCardView: View {
                     }
                 }
                 subtitle
+                if isAccessibilitySize, let distanceText {
+                    Text(distanceText)
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer(minLength: Spacing.xs)
-            if let distanceText {
+            if !isAccessibilitySize, let distanceText {
                 Text(distanceText)
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -83,7 +102,7 @@ struct MerchantCardView: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 30, height: 30)
-                        .background(.thinMaterial, in: Circle())
+                        .legibleSurface(.thinMaterial, in: Circle())
                         .frame(width: LayoutMetrics.minimumHitTarget, height: LayoutMetrics.minimumHitTarget)
                         .contentShape(Rectangle())
                 }
@@ -124,33 +143,50 @@ struct MerchantCardView: View {
 
     // MARK: Actions
 
+    /// One row that scrolls sideways; a two-column grid at accessibility sizes.
+    @ViewBuilder
     private var actionRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Spacing.xs) {
-                if let coordinate = element.mapCoordinate {
-                    CardActionButton(title: String(localized: "Directions"), systemImage: "arrow.triangle.turn.up.right.diamond.fill", isPrimary: true) {
-                        openLocationInMaps(coordinate: coordinate, name: element.displayNameForUI, address: element.address)
-                    }
-                }
-                if let phone = merchant?.contact.phone, let url = phoneURL(phone) {
-                    CardActionButton(title: String(localized: "Call"), systemImage: "phone.fill") {
-                        UIApplication.shared.open(url)
-                    }
-                }
-                if let website = merchant?.contact.website {
-                    CardActionButton(title: String(localized: "Website"), systemImage: "safari.fill") {
-                        UIApplication.shared.open(website)
-                    }
-                }
-                if FeatureFlags.isSharePlaceLinksEnabled, let url = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
-                    ShareLink(item: url, message: Text(shareMessage)) {
-                        CardActionLabel(title: String(localized: "Share"), systemImage: "square.and.arrow.up", isPrimary: false)
-                    }
-                    .buttonStyle(.pressable)
+        if isAccessibilitySize {
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: Spacing.xs), GridItem(.flexible(), spacing: Spacing.xs)],
+                alignment: .leading,
+                spacing: Spacing.xs
+            ) {
+                actionButtons
+            }
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Spacing.xs) {
+                    actionButtons
                 }
             }
+            .scrollClipDisabled()
         }
-        .scrollClipDisabled()
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        if let coordinate = element.mapCoordinate {
+            CardActionButton(title: String(localized: "Directions"), systemImage: "arrow.triangle.turn.up.right.diamond.fill", isPrimary: true) {
+                openLocationInMaps(coordinate: coordinate, name: element.displayNameForUI, address: element.address)
+            }
+        }
+        if let phone = merchant?.contact.phone, let url = phoneURL(phone) {
+            CardActionButton(title: String(localized: "Call"), systemImage: "phone.fill") {
+                UIApplication.shared.open(url)
+            }
+        }
+        if let website = merchant?.contact.website {
+            CardActionButton(title: String(localized: "Website"), systemImage: "safari.fill") {
+                UIApplication.shared.open(website)
+            }
+        }
+        if FeatureFlags.isSharePlaceLinksEnabled, let url = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
+            ShareLink(item: url, message: Text(shareMessage)) {
+                CardActionLabel(title: String(localized: "Share"), systemImage: "square.and.arrow.up", isPrimary: false)
+            }
+            .buttonStyle(.pressable)
+        }
     }
 
     private var shareMessage: String {
@@ -219,12 +255,16 @@ private struct CardActionLabel: View {
     let systemImage: String
     let isPrimary: Bool
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
+        let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
         Label(title, systemImage: systemImage)
             .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
+            .lineLimit(isAccessibilitySize ? 2 : 1)
             .padding(.horizontal, Spacing.s)
-            .frame(minHeight: LayoutMetrics.minimumHitTarget)
+            .padding(.vertical, isAccessibilitySize ? Spacing.xs : 0)
+            .frame(maxWidth: isAccessibilitySize ? .infinity : nil, minHeight: LayoutMetrics.minimumHitTarget)
             .foregroundStyle(isPrimary ? BrandColor.onBrandFill : BrandColor.brandInk)
             .background(
                 isPrimary ? BrandColor.brandFill : Color.secondary.opacity(0.14),
@@ -235,9 +275,17 @@ private struct CardActionLabel: View {
 
 struct PaymentChipsView: View {
     let methods: PaymentMethods
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// Chips sit in a row, and stack at accessibility sizes so none is cut off.
+    private var layout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs))
+            : AnyLayout(HStackLayout(spacing: Spacing.xs))
+    }
 
     var body: some View {
-        HStack(spacing: Spacing.xs) {
+        layout {
             if methods.contains(.lightning) {
                 chip(String(localized: "Lightning"), "bolt.fill")
             }

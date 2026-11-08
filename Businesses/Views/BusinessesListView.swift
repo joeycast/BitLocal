@@ -958,21 +958,37 @@ struct ElementCell: View {
     var showsBottomDivider = false
     @State private var appeared = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// At accessibility sizes the distance moves under the name (ui-redesign 7).
+    private var nameRowLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Spacing.xs))
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
-                Text(
-                    viewModel.element.displayNameForUI ??
-                    NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
-                )
-                    .foregroundColor(.primary)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                    .minimumScaleFactor(1)
-                    .padding(.vertical, 5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            nameRowLayout {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(
+                        viewModel.element.displayNameForUI ??
+                        NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
+                    )
+                        .foregroundColor(.primary)
+                        .fontWeight(.semibold)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                        .minimumScaleFactor(1)
+                    // Boosted is worded, not only colored (ui-redesign 7).
+                    if viewModel.element.isCurrentlyBoosted() {
+                        Text(NSLocalizedString("Featured", comment: "Tag on boosted merchants"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(BrandColor.boost)
+                    }
+                }
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 
                 // Distance from location
                 distanceText
