@@ -25,6 +25,7 @@ struct BottomSheetContentView: View {
 
     var body: some View {
         navigationStack
+            .overlay(alignment: .top) { SheetGrabber() }
             .ignoresSafeArea(edges: .bottom)
             // UIKit reader reports screen-bottom → sheet-top using the presentation
             // frame (not NavigationStack layout height), so map buttons clear the card.
@@ -171,7 +172,7 @@ private struct SheetHeaderRow: View {
                 .accessibilityLabel("BitLocal")
             Spacer(minLength: 8)
             BrowseModePicker()
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 240)
             Spacer(minLength: 8)
             SettingsButtonView(onSettingsSelected: onSettings)
                 .frame(width: 44, height: 44)
@@ -184,6 +185,44 @@ private struct SheetHeaderRow: View {
         // labels crushed the wordmark and pushed the row above the sheet's edge.
         // Long-press shows the Large Content Viewer instead.
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+}
+
+/// BitLocal's own drag indicator. The system one (`presentationDragIndicator`) cycles
+/// the detent on tap, and on the folded Duo its tap target reached down over the
+/// Places/Communities switch: every tap on the switch moved the sheet instead. This
+/// one is drawn only; dragging anywhere on the sheet still resizes it, and VoiceOver
+/// gets the same "cycle height" behaviour as an action.
+private struct SheetGrabber: View {
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
+
+    var body: some View {
+        Capsule()
+            .fill(Color.secondary.opacity(0.45))
+            .frame(width: 36, height: 5)
+            .padding(.top, 5)
+            .allowsHitTesting(false)
+            .accessibilityElement()
+            .accessibilityLabel(Text("Sheet grabber"))
+            .accessibilityValue(Text(valueText))
+            .accessibilityHint(Text("Double-tap to change the sheet's height"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                guard let navigation else { return }
+                switch navigation.sheetDetent {
+                case .peek: navigation.sheetDetent = .card
+                case .card: navigation.sheetDetent = .full
+                case .full: navigation.sheetDetent = .peek
+                }
+            }
+    }
+
+    private var valueText: String {
+        switch navigation?.sheetDetent {
+        case .peek: String(localized: "Collapsed")
+        case .full: String(localized: "Expanded")
+        default: String(localized: "Half height")
+        }
     }
 }
 
@@ -1606,7 +1645,7 @@ struct BrowseModePicker: View {
             Text(title)
                 .font(.subheadline.weight(isSelected ? .semibold : .regular))
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.5)
                 .foregroundStyle(isSelected ? Color.primary : Color.secondary)
                 .frame(maxWidth: .infinity, minHeight: 30)
                 .padding(.horizontal, 10)

@@ -103,7 +103,8 @@ struct CompactLayoutView: View {
                     [BottomSheetDetents.collapsed, .height(cardHeight), fullDetent],
                     selection: detentBinding(cardHeight: cardHeight, fullDetent: fullDetent)
                 )
-                .presentationDragIndicator(.visible)
+                // Hidden: the header draws its own grabber (see `SheetGrabber`, DECISIONS 89).
+                .presentationDragIndicator(.hidden)
                 .interactiveDismissDisabled(true)
                 .presentationBackgroundInteraction(.enabled(upThrough: .height(cardHeight)))
                 .sheet(isPresented: $showingSettings) {

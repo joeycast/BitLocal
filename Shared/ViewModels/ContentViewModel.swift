@@ -707,8 +707,10 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
             guard let self = self else { return }
 
             // Only center the map on the user's location if this is the first update (initial launch)
-            if !self.initialRegionSet {
-                self.centerMap(to: latestLocation.coordinate)
+            // Only count the first center once it actually happened: on a fresh
+            // install with location already granted, the fix can arrive before the
+            // map is attached, and the map then stayed on its default continent view.
+            if !self.initialRegionSet, self.centerMap(to: latestLocation.coordinate) {
                 self.initialRegionSet = true
             }
 
@@ -1560,10 +1562,10 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         let newRegion = MKCoordinateRegion(center: center, span: span)
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            // Doesn't mark the initial region as set: the map reports its default
+            // (continent-wide) region before the first location fix, and counting that
+            // skipped centering on the user.
             self.region = newRegion
-            if !self.initialRegionSet {
-                self.initialRegionSet = true
-            }
         }
     }
     

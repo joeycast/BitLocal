@@ -88,8 +88,9 @@ struct MapView: UIViewRepresentable {
             if let userLocation = self.viewModel.locationManager.location {
                 Debug.log("MapView.makeUIView - centering to existing location: \(userLocation.coordinate)")
                 // Center the map and mark initial region as set
-                self.viewModel.centerMap(to: userLocation.coordinate, force: true)
-                self.viewModel.initialRegionSet = true
+                if self.viewModel.centerMap(to: userLocation.coordinate, force: true) {
+                    self.viewModel.initialRegionSet = true
+                }
                 // Update the viewModel.region to match the visible map rect
                 let center = userLocation.coordinate
                 let spanLatitude = mapView.region.span.latitudeDelta
