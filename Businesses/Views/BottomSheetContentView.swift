@@ -12,6 +12,7 @@ import UIKit
 import CryptoKit
 import MapKit
 import BitLocalDesign
+import BitLocalNavigation
 
 struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
@@ -24,6 +25,7 @@ struct BottomSheetContentView: View {
 
     var body: some View {
         navigationStack
+            .overlay(alignment: .top) { SheetGrabber() }
             .ignoresSafeArea(edges: .bottom)
             // UIKit reader reports screen-bottom → sheet-top using the presentation
             // frame (not NavigationStack layout height), so map buttons clear the card.
@@ -170,7 +172,7 @@ private struct SheetHeaderRow: View {
                 .accessibilityLabel("BitLocal")
             Spacer(minLength: 8)
             BrowseModePicker()
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 240)
             Spacer(minLength: 8)
             SettingsButtonView(onSettingsSelected: onSettings)
                 .frame(width: 44, height: 44)
@@ -178,6 +180,49 @@ private struct SheetHeaderRow: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .frame(height: 50, alignment: .bottom)
+        // The header is fixed-height chrome above the peek detent, like a navigation
+        // bar, so its text stops growing at xxxLarge; at accessibility sizes the switch
+        // labels crushed the wordmark and pushed the row above the sheet's edge.
+        // Long-press shows the Large Content Viewer instead.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+}
+
+/// BitLocal's own drag indicator. The system one (`presentationDragIndicator`) cycles
+/// the detent on tap, and on the folded Duo its tap target reached down over the
+/// Places/Communities switch: every tap on the switch moved the sheet instead. This
+/// one is drawn only; dragging anywhere on the sheet still resizes it, and VoiceOver
+/// gets the same "cycle height" behaviour as an action.
+private struct SheetGrabber: View {
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
+
+    var body: some View {
+        Capsule()
+            .fill(Color.secondary.opacity(0.45))
+            .frame(width: 36, height: 5)
+            .padding(.top, 5)
+            .allowsHitTesting(false)
+            .accessibilityElement()
+            .accessibilityLabel(Text("Sheet grabber"))
+            .accessibilityValue(Text(valueText))
+            .accessibilityHint(Text("Double-tap to change the sheet's height"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                guard let navigation else { return }
+                switch navigation.sheetDetent {
+                case .peek: navigation.sheetDetent = .card
+                case .card: navigation.sheetDetent = .full
+                case .full: navigation.sheetDetent = .peek
+                }
+            }
+    }
+
+    private var valueText: String {
+        switch navigation?.sheetDetent {
+        case .peek: String(localized: "Collapsed")
+        case .full: String(localized: "Expanded")
+        default: String(localized: "Half height")
+        }
     }
 }
 
@@ -613,6 +658,7 @@ private final class CommunityRowMetadataObservableStore: ObservableObject {
 
 struct CommunityDetailView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(AppNavigation.self) private var sheetNavigation: AppNavigation?
     @EnvironmentObject private var viewModel: ContentViewModel
     let area: V2AreaRecord
     @Binding private var currentDetent: PresentationDetent?
@@ -1363,9 +1409,10 @@ struct CommunityDetailView: View {
         return detent == BottomSheetDetents.collapsed || detentIdentifier(detent).contains("fraction 0.11")
     }
 
+    /// Reads the named detent: the full detent is a custom height on the folded Duo.
     private var isLargeSheet: Bool {
-        guard let detent = currentDetent else { return false }
-        return detentIdentifier(detent).contains("large")
+        guard currentDetent != nil else { return false }
+        return sheetNavigation?.sheetDetent == .full
     }
 
     private var shouldUseGlassyRows: Bool {
@@ -1568,18 +1615,53 @@ private extension View {
 }
 
 /// Places / Communities switch (ui-redesign 6.5). Lives in the sheet header on
-/// compact widths and in the sidebar toolbar on wide ones.
+/// compact widths and under the sidebar bar on wide ones.
+///
+/// Built from two buttons instead of a segmented `Picker`: in the sheet header the
+/// system sheet's drag gesture won over `UISegmentedControl`'s touch tracking on the
+/// folded Duo, so taps moved the sheet instead of switching. Plain buttons get the
+/// same tap priority as the gear next to it, which always worked.
 struct BrowseModePicker: View {
     @EnvironmentObject private var viewModel: ContentViewModel
+    @Namespace private var selectionNamespace
 
     var body: some View {
-        Picker("Browse", selection: modeBinding) {
-            Text("Places").tag(MapDisplayMode.merchants)
-            Text("Communities").tag(MapDisplayMode.communities)
+        HStack(spacing: 2) {
+            segment(.merchants, title: String(localized: "Places"))
+            segment(.communities, title: String(localized: "Communities"))
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+        .padding(2)
+        .background(Capsule().fill(Color(uiColor: .tertiarySystemFill)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Browse"))
         .featureHintAnchor(.communityToggle)
+    }
+
+    private func segment(_ mode: MapDisplayMode, title: String) -> some View {
+        let isSelected = modeBinding.wrappedValue == mode
+        return Button {
+            withAnimation(.snappy(duration: 0.2)) { modeBinding.wrappedValue = mode }
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                .frame(maxWidth: .infinity, minHeight: 30)
+                .padding(.horizontal, 10)
+                .contentShape(Capsule())
+                .background {
+                    if isSelected {
+                        Capsule()
+                            .fill(Color(uiColor: .systemBackground))
+                            .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                            .matchedGeometryEffect(id: "selection", in: selectionNamespace)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityShowsLargeContentViewer()
     }
 
     private var modeBinding: Binding<MapDisplayMode> {

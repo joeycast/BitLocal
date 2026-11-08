@@ -31,7 +31,20 @@ struct SplitLayoutView: View {
     private var usesInspector: Bool { navigation.posture.hasInspector }
 
     private var sidebarIdealWidth: CGFloat {
-        navigation.posture == .compactLandscape ? LayoutMetrics.sidebarMinWidth : LayoutMetrics.sidebarIdealWidth
+        switch navigation.posture {
+        case .compactLandscape:
+            LayoutMetrics.sidebarMinWidth
+        case .foldColumns(let division, _):
+            // The browse column's trailing edge sits on the fold (duo.md 2).
+            max(division.minX, LayoutMetrics.sidebarMinWidth)
+        default:
+            LayoutMetrics.sidebarIdealWidth
+        }
+    }
+
+    private var foldStackDivision: CGRect? {
+        if case .foldStack(let division, _) = navigation.posture { return division }
+        return nil
     }
 
     /// In the expanded posture the inspector shows the selection, so the sidebar
@@ -59,10 +72,44 @@ struct SplitLayoutView: View {
     }
 
     var body: some View {
+        Group {
+            if let division = foldStackDivision {
+                foldStackLayout(division: division)
+            } else {
+                splitLayout
+            }
+        }
+        .onChange(of: viewModel.path) { _, newPath in
+            if newPath.last != nil {
+                _ = viewModel.consumeSelectionSource()
+            } else {
+                viewModel.deselectAnnotation()
+            }
+            viewModel.selectedElement = newPath.last
+        }
+        .onAppear {
+            viewModel.applyTargetSheetHeight(0)
+            viewModel.topPadding = 0
+        }
+    }
+
+    /// Fold stack (duo.md 1, 2): the map fills the region above the fold and runs
+    /// under the fold's gutter (tiles may cross it); the browse panel starts at the
+    /// fold's bottom edge. Detail pushes inside the panel, never an inspector.
+    private func foldStackLayout(division: CGRect) -> some View {
+        VStack(spacing: 0) {
+            mapPanel(bottomClearance: division.height)
+                .frame(height: max(division.maxY, 0))
+            sidebar
+                .background(.background)
+        }
+    }
+
+    private var splitLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
-            mapPanel
+            mapPanel()
         }
         .navigationSplitViewStyle(.balanced)
         .inspector(isPresented: inspectorPresented) {
@@ -76,18 +123,6 @@ struct SplitLayoutView: View {
         .onChange(of: columnVisibility) { _, newValue in
             guard newValue != .all else { return }
             columnVisibility = .all
-        }
-        .onChange(of: viewModel.path) { _, newPath in
-            if newPath.last != nil {
-                _ = viewModel.consumeSelectionSource()
-            } else {
-                viewModel.deselectAnnotation()
-            }
-            viewModel.selectedElement = newPath.last
-        }
-        .onAppear {
-            viewModel.applyTargetSheetHeight(0)
-            viewModel.topPadding = 0
         }
     }
 
@@ -153,13 +188,15 @@ struct SplitLayoutView: View {
         }
     }
 
-    private var mapPanel: some View {
+    /// `bottomClearance` keeps pins' centering, the attribution and the controls off
+    /// a fold gutter that the map runs under (fold stack).
+    private func mapPanel(bottomClearance: CGFloat = 0) -> some View {
         ZStack {
             if let elements {
                 MapView(
                     elements: elements,
                     topPadding: 0,
-                    bottomPadding: 0,
+                    bottomPadding: bottomClearance,
                     mapType: selectedMapTypeBinding.wrappedValue,
                     storeRenderToken: StoreMap.shared.renderToken
                 )
@@ -175,7 +212,7 @@ struct SplitLayoutView: View {
         .overlay(alignment: .bottomLeading) {
             OpenStreetMapAttributionView()
                 .padding(.leading, Spacing.columnEdge)
-                .padding(.bottom, Spacing.xs)
+                .padding(.bottom, Spacing.xs + bottomClearance)
         }
         .overlay(alignment: .topTrailing) {
             MapButtonsView(

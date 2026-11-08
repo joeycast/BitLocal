@@ -18,6 +18,7 @@ struct ContentView: View {
     @StateObject private var appearanceManager = AppearanceManager()
     @State private var navigation = AppNavigation()
     @State private var showingSettings = false
+    @State private var topOcclusion: CGFloat = 0
     @SceneStorage("navigationState") private var savedNavigationState: Data?
 
     @AppStorage("selectedMapType") private var storedMapType: Int = 0
@@ -37,7 +38,8 @@ struct ContentView: View {
                     elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.listElementsForCurrentDisplay,
                     showingSettings: $showingSettings,
-                    selectedMapTypeBinding: selectedMapTypeBinding
+                    selectedMapTypeBinding: selectedMapTypeBinding,
+                    topOcclusion: topOcclusion
                 )
             } else {
                 SplitLayoutView(
@@ -68,6 +70,14 @@ struct ContentView: View {
             )
         } action: { snapshot in
             updateGeometry(snapshot)
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            FoldGeometry.topOcclusion(in: proxy)
+        } action: { occlusion in
+            if topOcclusion != occlusion {
+                Debug.log("Top occlusion region ends \(occlusion) pt from the window top")
+                topOcclusion = occlusion
+            }
         }
         .onChange(of: horizontalSizeClass) { _, _ in
             if let geometry = navigation.geometry { updateGeometry(geometry) }
@@ -140,11 +150,34 @@ struct ContentView: View {
     }
 }
 
-/// Fold detection (duo.md 7). `GeometryProxy.reservedRegions(kind: .division)`
-/// only exists in the iOS 27.1 SDK; CI builds with Xcode 26 today, so this
-/// returns no divisions until the toolchain moves (DECISIONS.md, phase 3).
+/// Fold detection (duo.md 7). The reserved-region API ships in the iOS 27.1 SDK
+/// (Swift 6.4, Xcode 27). CI still builds with Xcode 26, so the query sits behind a
+/// compiler check and older toolchains or OS versions report no regions.
 enum FoldGeometry {
     static func divisions(in proxy: GeometryProxy) -> [Division] {
-        []
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            // Include inactive (flat) folds so columns snap to the fold before it bends (duo.md 2).
+            return proxy.reservedRegions(kind: .division, options: .includeInactive)
+                .map { Division(frame: $0.frame, isActive: $0.isActive) }
+        }
+        #endif
+        return []
+    }
+
+    /// How far down from the top of the window something occludes content (the Duo's
+    /// outer camera and status strip), beyond the safe area. Zero when nothing reports.
+    static func topOcclusion(in proxy: GeometryProxy) -> CGFloat {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            let regions = proxy.reservedRegions(kind: .occlusion, options: .includeInactive)
+            let topBand = proxy.size.height / 3
+            return regions
+                .filter { $0.frame.minY < topBand }
+                .map { $0.frame.maxY + proxy.safeAreaInsets.top }
+                .max() ?? 0
+        }
+        #endif
+        return 0
     }
 }

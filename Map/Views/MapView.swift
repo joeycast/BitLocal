@@ -59,10 +59,11 @@ struct MapView: UIViewRepresentable {
         
         Debug.log("MapView.makeUIView() called - creating new MKMapView")
         
-        // Store reference to mapView in viewModel - ensure main queue
-        DispatchQueue.main.async {
-            self.viewModel.mapView = mapView
-        }
+        // Store the reference right away (it isn't published, so this doesn't touch
+        // SwiftUI state). Deferring it let a second makeUIView in the same pass (the
+        // first layout switch on iPad) build a second map; the first-launch center then
+        // landed on the map that was thrown away.
+        viewModel.mapView = mapView
         
         // Set the delegate to the Coordinator
         mapView.delegate = context.coordinator
@@ -88,8 +89,9 @@ struct MapView: UIViewRepresentable {
             if let userLocation = self.viewModel.locationManager.location {
                 Debug.log("MapView.makeUIView - centering to existing location: \(userLocation.coordinate)")
                 // Center the map and mark initial region as set
-                self.viewModel.centerMap(to: userLocation.coordinate, force: true)
-                self.viewModel.initialRegionSet = true
+                if self.viewModel.centerMap(to: userLocation.coordinate, force: true) {
+                    self.viewModel.initialRegionSet = true
+                }
                 // Update the viewModel.region to match the visible map rect
                 let center = userLocation.coordinate
                 let spanLatitude = mapView.region.span.latitudeDelta
@@ -949,6 +951,17 @@ struct MapView: UIViewRepresentable {
         }
         
         
+        /// MapKit's own location fix. On a fresh iPad install with location already
+        /// allowed, Core Location's delegate never delivered a fix to the view model, so
+        /// the map showed the blue dot in the right place while staying zoomed out on the
+        /// continent and sorting the list from the map's center. Adopt MapKit's fix then.
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            guard let location = userLocation.location else { return }
+            MainActor.assumeIsolated {
+                viewModel.adoptMapUserLocationIfNeeded(location)
+            }
+        }
+
         // Detect when the map region changes
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             Debug.logTiming(

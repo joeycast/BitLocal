@@ -119,7 +119,9 @@ final class SheetEdgeHeightReaderView: UIView {
         if window != nil {
             stableFrameCount = 0
             startDisplayLinkIfNeeded()
-            report()
+            // Not synchronously: the view joins the window while SwiftUI is still
+            // updating the sheet, and reporting then publishes from a view update.
+            DispatchQueue.main.async { [weak self] in self?.report() }
         } else {
             stopDisplayLink()
         }
