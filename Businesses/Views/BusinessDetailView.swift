@@ -1172,6 +1172,7 @@ private struct BusinessSectionHeader: View {
     }
 }
 
+@MainActor
 private func businessSectionHeader(_ title: String, includesFeaturedBadge: Bool = false) -> some View {
     BusinessSectionHeader(title: title, includesFeaturedBadge: includesFeaturedBadge)
 }

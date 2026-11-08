@@ -106,12 +106,10 @@ struct SplitLayoutView: View {
                         Text(verbatim: "bitlocal")
                             .font(.custom("Fredoka-Medium", size: 24, relativeTo: .title2))
                             .foregroundStyle(BrandColor.brand)
+                            .lineLimit(1)
+                            .fixedSize()
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityLabel("BitLocal")
-                    }
-                    ToolbarItem(placement: .principal) {
-                        BrowseModePicker()
-                            .frame(maxWidth: 200)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         SettingsButtonView(onSettingsSelected: { showingSettings = true })
@@ -133,8 +131,19 @@ struct SplitLayoutView: View {
         .navigationSplitViewColumnWidth(min: LayoutMetrics.sidebarMinWidth, ideal: sidebarIdealWidth)
     }
 
-    @ViewBuilder
+    /// The Places/Communities switch sits under the bar, full width, instead of in
+    /// the bar's center, where it squeezed the wordmark to "bi…" in a narrow sidebar.
     private var sidebarRootContent: some View {
+        sidebarBrowseContent
+            .safeAreaInset(edge: .top, spacing: 0) {
+                BrowseModePicker()
+                    .padding(.horizontal, Spacing.columnEdge)
+                    .padding(.bottom, Spacing.xs)
+            }
+    }
+
+    @ViewBuilder
+    private var sidebarBrowseContent: some View {
         if viewModel.mapDisplayMode == .communities {
             CommunitiesListView()
                 .environmentObject(viewModel)
@@ -155,7 +164,9 @@ struct SplitLayoutView: View {
                     storeRenderToken: StoreMap.shared.renderToken
                 )
                 .id("PersistentMap")
-                .ignoresSafeArea()
+                // Only vertically: on iOS 26 the sidebar floats over the detail column,
+                // and a map running under it hid pins and tinted the glass sidebar.
+                .ignoresSafeArea(.container, edges: .vertical)
                 .onAppear {
                     viewModel.locationManager.startUpdatingLocation()
                 }

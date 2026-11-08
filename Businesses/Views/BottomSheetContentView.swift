@@ -76,14 +76,10 @@ struct BottomSheetContentView: View {
         }
     }
 
-    @ViewBuilder
+    /// The root keeps the top safe area so the header never slides under the
+    /// status bar at the full detent (seen on the folded Duo).
     private var sheetRootContentWithSafeAreaBehavior: some View {
-        if #available(iOS 26.0, *) {
-            sheetRootContent
-                .ignoresSafeArea(.container, edges: .top)
-        } else {
-            sheetRootContent
-        }
+        sheetRootContent
     }
 
     @ViewBuilder
@@ -167,6 +163,9 @@ private struct SheetHeaderRow: View {
             Text(verbatim: "bitlocal")
                 .font(.custom("Fredoka-Medium", size: 22))
                 .foregroundStyle(BrandColor.brand)
+                .lineLimit(1)
+                .fixedSize()
+                .layoutPriority(1)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityLabel("BitLocal")
             Spacer(minLength: 8)
@@ -182,19 +181,14 @@ private struct SheetHeaderRow: View {
     }
 }
 
+/// The sheet root has its own header row, so it hides the navigation bar on every
+/// iOS version. A visible-but-transparent bar (the old iOS 26 setup) sat on top of
+/// the header and swallowed taps on the Places/Communities switch and the gear.
+/// Pushed screens bring their bar back with `bitLocalDetailNavigationChrome()`.
 private struct RootSheetNavigationBarModifier: ViewModifier {
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .toolbar(.visible, for: .navigationBar)
-                .toolbarBackground(.hidden, for: .navigationBar)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationTitle("")
-        } else {
-            content
-                .toolbar(.hidden, for: .navigationBar)
-        }
+        content
+            .toolbar(.hidden, for: .navigationBar)
     }
 }
 

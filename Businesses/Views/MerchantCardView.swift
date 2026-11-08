@@ -117,7 +117,24 @@ struct MerchantCardView: View {
         let category = merchant.flatMap { ElementCategorySymbols.friendlyCategoryLabel(forIcon: $0.summary.category.rawValue) }
         let hours = OpeningHours.parse(merchant?.summary.openingHours)
         let status = hours.map { OpeningHoursText.status($0.status(at: .now)) }
-        if category != nil || status != nil {
+        if isAccessibilitySize, category != nil || status != nil {
+            // One fact per line, so long words never hyphenate.
+            VStack(alignment: .leading, spacing: 2) {
+                if let category {
+                    Text(category)
+                }
+                if let status {
+                    Text(status.state)
+                        .foregroundStyle(status.isOpen ? BrandColor.open : BrandColor.closed)
+                    if let detail = status.detail {
+                        Text(detail)
+                    }
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        } else if category != nil || status != nil {
             HStack(spacing: 4) {
                 if let category {
                     Text(category)
@@ -143,47 +160,47 @@ struct MerchantCardView: View {
 
     // MARK: Actions
 
-    /// One row that scrolls sideways; a two-column grid at accessibility sizes.
+    /// A row of labeled buttons when it fits; otherwise the secondary actions drop
+    /// to icons (Directions keeps its label). Accessibility sizes stack full-width
+    /// buttons so no label breaks mid-word.
     @ViewBuilder
     private var actionRow: some View {
         if isAccessibilitySize {
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: Spacing.xs), GridItem(.flexible(), spacing: Spacing.xs)],
-                alignment: .leading,
-                spacing: Spacing.xs
-            ) {
-                actionButtons
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                actionButtons(iconOnly: false)
             }
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Spacing.xs) {
-                    actionButtons
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Spacing.xs) { actionButtons(iconOnly: false) }
+                HStack(spacing: Spacing.xs) { actionButtons(iconOnly: true) }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Spacing.xs) { actionButtons(iconOnly: true) }
                 }
+                .scrollClipDisabled()
             }
-            .scrollClipDisabled()
         }
     }
 
     @ViewBuilder
-    private var actionButtons: some View {
+    private func actionButtons(iconOnly: Bool) -> some View {
         if let coordinate = element.mapCoordinate {
             CardActionButton(title: String(localized: "Directions"), systemImage: "arrow.triangle.turn.up.right.diamond.fill", isPrimary: true) {
                 openLocationInMaps(coordinate: coordinate, name: element.displayNameForUI, address: element.address)
             }
         }
         if let phone = merchant?.contact.phone, let url = phoneURL(phone) {
-            CardActionButton(title: String(localized: "Call"), systemImage: "phone.fill") {
+            CardActionButton(title: String(localized: "Call"), systemImage: "phone.fill", iconOnly: iconOnly) {
                 UIApplication.shared.open(url)
             }
         }
         if let website = merchant?.contact.website {
-            CardActionButton(title: String(localized: "Website"), systemImage: "safari.fill") {
+            CardActionButton(title: String(localized: "Website"), systemImage: "safari.fill", iconOnly: iconOnly) {
                 UIApplication.shared.open(website)
             }
         }
         if FeatureFlags.isSharePlaceLinksEnabled, let url = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
             ShareLink(item: url, message: Text(shareMessage)) {
-                CardActionLabel(title: String(localized: "Share"), systemImage: "square.and.arrow.up", isPrimary: false)
+                CardActionLabel(title: String(localized: "Share"), systemImage: "square.and.arrow.up", isPrimary: false, iconOnly: iconOnly)
             }
             .buttonStyle(.pressable)
         }
@@ -240,11 +257,12 @@ private struct CardActionButton: View {
     let title: String
     let systemImage: String
     var isPrimary = false
+    var iconOnly = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            CardActionLabel(title: title, systemImage: systemImage, isPrimary: isPrimary)
+            CardActionLabel(title: title, systemImage: systemImage, isPrimary: isPrimary, iconOnly: iconOnly)
         }
         .buttonStyle(.pressable)
     }
@@ -254,17 +272,31 @@ private struct CardActionLabel: View {
     let title: String
     let systemImage: String
     let isPrimary: Bool
+    var iconOnly = false
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
-        Label(title, systemImage: systemImage)
+        // The label stays the VoiceOver name when only the icon shows.
+        Group {
+            if iconOnly {
+                Label(title, systemImage: systemImage).labelStyle(.iconOnly)
+            } else {
+                Label(title, systemImage: systemImage)
+            }
+        }
             .font(.subheadline.weight(.semibold))
             .lineLimit(isAccessibilitySize ? 2 : 1)
-            .padding(.horizontal, Spacing.s)
+            .fixedSize(horizontal: !isAccessibilitySize, vertical: false)
+            .padding(.horizontal, iconOnly ? 0 : Spacing.s)
             .padding(.vertical, isAccessibilitySize ? Spacing.xs : 0)
-            .frame(maxWidth: isAccessibilitySize ? .infinity : nil, minHeight: LayoutMetrics.minimumHitTarget)
+            .frame(
+                minWidth: iconOnly ? LayoutMetrics.minimumHitTarget : nil,
+                maxWidth: isAccessibilitySize ? .infinity : nil,
+                minHeight: LayoutMetrics.minimumHitTarget,
+                alignment: isAccessibilitySize ? .leading : .center
+            )
             .foregroundStyle(isPrimary ? BrandColor.onBrandFill : BrandColor.brandInk)
             .background(
                 isPrimary ? BrandColor.brandFill : Color.secondary.opacity(0.14),
@@ -277,34 +309,43 @@ struct PaymentChipsView: View {
     let methods: PaymentMethods
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// Chips sit in a row, and stack at accessibility sizes so none is cut off.
-    private var layout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xs))
-            : AnyLayout(HStackLayout(spacing: Spacing.xs))
-    }
-
+    /// Chips sit in a row when they fit and stack otherwise, so no label breaks.
     var body: some View {
-        layout {
-            if methods.contains(.lightning) {
-                chip(String(localized: "Lightning"), "bolt.fill")
-            }
-            if methods.contains(.onchain) {
-                chip(String(localized: "On-chain"), "bitcoinsign.circle.fill")
-            }
-            if methods.contains(.lightningContactless) {
-                chip(String(localized: "Contactless"), "wave.3.right")
-            }
-            if methods.contains(.bitcoinUnspecified) && !methods.contains(.onchain) && !methods.contains(.lightning) {
-                chip(String(localized: "Bitcoin"), "bitcoinsign.circle.fill")
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Spacing.xs) { chips }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Spacing.xs) { chips }
+                    VStack(alignment: .leading, spacing: Spacing.xs) { chips }
+                }
             }
         }
         .accessibilityElement(children: .combine)
     }
 
+    @ViewBuilder
+    private var chips: some View {
+        if methods.contains(.lightning) {
+            chip(String(localized: "Lightning"), "bolt.fill")
+        }
+        if methods.contains(.onchain) {
+            chip(String(localized: "On-chain"), "bitcoinsign.circle.fill")
+        }
+        if methods.contains(.lightningContactless) {
+            chip(String(localized: "Contactless"), "wave.3.right")
+        }
+        if methods.contains(.bitcoinUnspecified) && !methods.contains(.onchain) && !methods.contains(.lightning) {
+            chip(String(localized: "Bitcoin"), "bitcoinsign.circle.fill")
+        }
+    }
+
     private func chip(_ title: String, _ systemImage: String) -> some View {
         Label {
-            Text(title).foregroundStyle(.primary)
+            Text(title)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .fixedSize()
         } icon: {
             Image(systemName: systemImage).foregroundStyle(BrandColor.brandInk)
         }
