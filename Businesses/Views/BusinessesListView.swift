@@ -219,6 +219,9 @@ struct BusinessesListView: View {
         .clipShape(RoundedRectangle(cornerRadius: 40))
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
+        // Sits in the fixed-height peek detent with the header (DECISIONS 86, 92):
+        // past xxxLarge the two outgrew the peek and the header floated above the sheet.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .featureHintAnchor(.merchantSearch)
     }
 

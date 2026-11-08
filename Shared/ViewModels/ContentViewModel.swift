@@ -733,6 +733,20 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         isUpdatingLocation = false
     }
     
+    /// Fallback for when Core Location hasn't delivered a fix but the map has one
+    /// (see `MapView.Coordinator.mapView(_:didUpdate:)`). Only fills gaps: once the
+    /// view model has a location, Core Location stays the source.
+    func adoptMapUserLocationIfNeeded(_ location: CLLocation) {
+        guard userLocation == nil else { return }
+        Debug.log("Adopting MapKit user location: \(location.coordinate)")
+        if !initialRegionSet, centerMap(to: location.coordinate) {
+            initialRegionSet = true
+        }
+        region = MKCoordinateRegion(center: location.coordinate, span: region.span)
+        userLocation = location
+        userLocationSubject.send(location)
+    }
+
     // locationManager failure scenario (could not get user location)
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Debug.log("LocationManager error: \(error.localizedDescription)")

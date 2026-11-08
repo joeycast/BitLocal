@@ -950,6 +950,17 @@ struct MapView: UIViewRepresentable {
         }
         
         
+        /// MapKit's own location fix. On a fresh iPad install with location already
+        /// allowed, Core Location's delegate never delivered a fix to the view model, so
+        /// the map showed the blue dot in the right place while staying zoomed out on the
+        /// continent and sorting the list from the map's center. Adopt MapKit's fix then.
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            guard let location = userLocation.location else { return }
+            MainActor.assumeIsolated {
+                viewModel.adoptMapUserLocationIfNeeded(location)
+            }
+        }
+
         // Detect when the map region changes
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             Debug.logTiming(
