@@ -100,7 +100,8 @@ final class SheetEdgeHeightReaderView: UIView {
     var onHeightChange: ((CGFloat) -> Void)?
     var onMotionSettled: ((CGFloat) -> Void)?
     private var lastReported: CGFloat = -1
-    private var displayLink: CADisplayLink?
+    // Only touched on the main actor, plus once in deinit.
+    nonisolated(unsafe) private var displayLink: CADisplayLink?
     private var stableFrameCount = 0
     private weak var cachedPresentedView: UIView?
     private static let stableFramesBeforePause = 8

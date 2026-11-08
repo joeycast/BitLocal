@@ -89,7 +89,8 @@ private struct VisibleCommunityListCacheKey: Equatable {
     let viewportMaxYBucket: Int
 }
 
-final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDelegate, MKMapViewDelegate, MerchantSearchHost {
+@MainActor
+final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate, MKMapViewDelegate, MerchantSearchHost {
     // Sets the initial state of the map before getting user location. Coordinates are for Nashville, TN.
     @Published var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 36.13, longitude: -86.775), span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5))
     @Published var userLocation: CLLocation?
@@ -275,7 +276,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Redesign phase 6: local search runs on the store's FTS5 index over the whole
     /// catalog, nearest first, instead of filtering the merchants on screen.
     private static func storeSearch(_ query: String, near: CLLocationCoordinate2D) async -> [String]? {
-        guard let store = MerchantStoreBootstrap.environment?.store, await StoreMap.shared.isReady else { return nil }
+        guard let store = MerchantStoreBootstrap.environment?.store, StoreMap.shared.isReady else { return nil }
         let filter = MerchantFilter(hideATMs: UserDefaults.standard.bool(forKey: hideATMsFromMapAndListKey))
         guard let hits = try? await store.search(
             query,
@@ -362,7 +363,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         for id in batch {
             btcMapRepository.fetchPlace(id: id) { [weak self] result in
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     self.placeholderNameHydrationInFlight.remove(id)
 
@@ -580,7 +581,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         isSearchActive = false
 
         placeDeepLinkResolver.resolve(placeID: placeID) { [weak self] resolution in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 switch resolution {
                 case .invalidIdentifier:
@@ -1127,16 +1128,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         )
         let adjustedRegion = MKCoordinateRegion(center: adjustedCenterCoordinate, span: currentSpan)
 
-        let apply = {
-            self.region = adjustedRegion
-            mapView.setRegion(adjustedRegion, animated: animated)
-        }
-
-        if Thread.isMainThread {
-            apply()
-        } else {
-            DispatchQueue.main.async(execute: apply)
-        }
+        region = adjustedRegion
+        mapView.setRegion(adjustedRegion, animated: animated)
     }
 
     func selectAnnotationForListSelection(
@@ -2365,7 +2358,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         return inside
     }
 
-    private func resolveV3AreaID(for area: V2AreaRecord, completion: @escaping (Int?) -> Void) {
+    private func resolveV3AreaID(for area: V2AreaRecord, completion: @escaping @MainActor @Sendable (Int?) -> Void) {
         // If the V2 ID is already numeric, use it directly.
         if let parsed = Int(area.id) {
             completion(parsed)
@@ -2393,7 +2386,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private func fetchCommunityMembers(areaID: Int, requestID: UUID) {
         btcMapRepository.fetchV3AreaElements(areaID: areaID, updatedSince: "1970-01-01T00:00:00Z", limit: 10000) { [weak self] result in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 guard self.latestCommunitySelectionRequestID == requestID else { return }
                 switch result {
@@ -2446,8 +2439,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
 
         let group = DispatchGroup()
-        let resultQueue = DispatchQueue(label: "community-members-hydration-results")
-        var hydratedMembers: [Element] = []
+        let collector = LockedCollector<Element>()
 
         for id in missingIDs {
             group.enter()
@@ -2456,15 +2448,14 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 guard case .success(let record) = result else { return }
                 let mapped = V4PlaceToElementMapper.placeRecordToElement(record)
                 if !(mapped.deletedAt?.isEmpty ?? true) { return }
-                resultQueue.sync {
-                    hydratedMembers.append(mapped)
-                }
+                collector.append(mapped)
             }
         }
 
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard self.latestCommunitySelectionRequestID == requestID else { return }
+            let hydratedMembers = collector.values
 
             var byID = IdentifiableIndex.byID(seedMembers)
             for member in hydratedMembers {
@@ -2539,7 +2530,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         let query = V4EventsQuery(includePast: eventsIncludePast, limit: 100)
         btcMapRepository.fetchEvents(query: query) { [weak self] result in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.eventsIsLoading = false
                 switch result {
@@ -2575,7 +2566,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let pageLimit = 5000
         let maxPages = 12
         btcMapRepository.fetchV3Areas(updatedSince: anchor, limit: pageLimit) { [weak self] result in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
 
                 switch result {
@@ -2628,27 +2619,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let batchIDs = Array(missingCommunityIDs.prefix(100))
         batchIDs.forEach { requestedCommunityAreaDetailIDs.insert($0) }
 
+        // URLSession already caps connections per host, so the batch is issued at once.
+        // (The old semaphore waited on the main thread and could stall the UI.)
         let group = DispatchGroup()
-        let resultQueue = DispatchQueue(label: "bitlocal.community-geojson-hydration")
-        let semaphore = DispatchSemaphore(value: 8)
-        var hydrated: [V3AreaRecord] = []
+        let collector = LockedCollector<V3AreaRecord>()
 
         for areaID in batchIDs {
             group.enter()
-            semaphore.wait()
-            btcMapRepository.fetchV3Area(id: areaID) { [weak self] result in
-                defer {
-                    semaphore.signal()
-                    group.leave()
-                }
-                guard self != nil else { return }
-                switch result {
-                case .success(let area):
-                    if area.geoJSON != nil {
-                        resultQueue.sync { hydrated.append(area) }
-                    }
-                case .failure:
-                    break
+            btcMapRepository.fetchV3Area(id: areaID) { result in
+                defer { group.leave() }
+                if case .success(let area) = result, area.geoJSON != nil {
+                    collector.append(area)
                 }
             }
         }
@@ -2656,6 +2637,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             self.communityGeoJSONHydrationInFlight = false
+            let hydrated = collector.values
 
             if !hydrated.isEmpty {
                 var byID = IdentifiableIndex.byID(self.areaBrowserAreas)
@@ -2682,7 +2664,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
 
         btcMapRepository.fetchV3AreaElements(areaID: area.id, updatedSince: "1970-01-01T00:00:00Z", limit: 5000) { [weak self] result in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 switch result {
                 case .success(let rows):
@@ -2723,7 +2705,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
         if record.lat != nil, record.lon != nil, merchantSearch.shouldHydrateSearchResult(record) {
             btcMapRepository.fetchPlace(id: record.idString) { [weak self] result in
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     switch result {
                     case .success(let fullRecord):
@@ -2814,7 +2796,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
 
     /// User-initiated merchant refresh (pull-to-refresh / empty-state retry).
     /// Reuses repository in-flight coalescing.
-    func refreshMerchantData(userInitiated: Bool = true, completion: (() -> Void)? = nil) {
+    func refreshMerchantData(userInitiated: Bool = true, completion: (@MainActor @Sendable () -> Void)? = nil) {
         if userInitiated {
             merchantSyncFailed = false
             merchantSyncStatusMessage = nil
@@ -2842,7 +2824,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     // `warmupOnly` preloads merchant data without triggering onboarding-hostile side effects.
     // `forceNetworkRefresh` always joins a repository network refresh (pull-to-refresh /
     // retry) and never takes the "warm cache only" early return.
-    func fetchElements(warmupOnly: Bool = false, forceNetworkRefresh: Bool = false, completion: (() -> Void)? = nil) {
+    func fetchElements(warmupOnly: Bool = false, forceNetworkRefresh: Bool = false, completion: (@MainActor @Sendable () -> Void)? = nil) {
         Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh)")
         Debug.logTiming("data", "fetchElements invoked (warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh), allElements=\(allElements.count), isLoading=\(isLoading))")
         
@@ -2856,7 +2838,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 if forceNetworkRefresh {
                     Debug.log("Already loading; joining in-flight repository refresh for user pull")
                     self.btcMapRepository.refreshElements { [weak self] elements in
-                        DispatchQueue.main.async {
+                        DispatchQueue.main.async { [weak self] in
                             guard let self else {
                                 completion?()
                                 return
@@ -2938,7 +2920,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             Debug.logTiming("data", "starting repository refresh (hadCache=\(hadAnyCache), currentEmpty=\(currentElementsEmpty), warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh))")
 
             self.btcMapRepository.refreshElements { [weak self] elements in
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     self.applyRepositoryRefreshResult(
                         elements: elements,
@@ -3050,7 +3032,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         Debug.log("Starting background update check")
 
         btcMapRepository.refreshElements { [weak self] elements in
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
 
                 let refreshedElements = elements ?? []

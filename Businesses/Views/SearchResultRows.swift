@@ -152,13 +152,14 @@ struct BTCMapAreaRow: View {
 
 // MARK: - Shared date formatters
 
-let btcMapISO8601WithFractional: ISO8601DateFormatter = {
+// ISO8601DateFormatter is thread-safe for parsing and formatting.
+nonisolated(unsafe) let btcMapISO8601WithFractional: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return formatter
 }()
 
-let btcMapISO8601Basic: ISO8601DateFormatter = {
+nonisolated(unsafe) let btcMapISO8601Basic: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
     return formatter

@@ -8,7 +8,7 @@
 
 import SwiftUI
 import MapKit
-import Combine
+@preconcurrency import Combine
 import Foundation // for Debug logging
 import BitLocalDomain
 import BitLocalMap
@@ -604,11 +604,8 @@ struct MapView: UIViewRepresentable {
             })
         }
         
-        // Ensure to cancel the subscription when the Coordinator is deinitialized
-        deinit {
-            cancellable?.cancel()
-        }
-        
+        // `AnyCancellable` cancels itself when the coordinator is released.
+
         // Efficiently update annotations by only adding/removing what's changed
         func updateAnnotations(mapView: MKMapView, elements: [Element]?, elementsHash: Int, force: Bool = false) {
             let annStart = CFAbsoluteTimeGetCurrent()

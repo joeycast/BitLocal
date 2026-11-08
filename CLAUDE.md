@@ -40,7 +40,7 @@ Or use Xcode: `Cmd+B` to build, `Cmd+R` to run, `Cmd+U` for tests.
 - `Shared/ViewModels/ContentViewModel.swift` — primary app state
 - `Shared/Helpers/BTCMapV4Support.swift` — v4 client, repository, snapshot/incremental sync
 - `Shared/Helpers/BTCMapV4Contracts.swift` — v4 DTOs + sync state
-- `Shared/Helpers/BtcMapCall.swift` — legacy v2 `APIManager`, `NilOnFail`, `LogManager`
+- `Shared/Helpers/BtcMapCall.swift` — `NilOnFail` and the one-time removal of the old v2 cache (`APIManager` is gone)
 - `Businesses/Models/Element.swift` — merchant model (identity by place `id`)
 - `Shared/Helpers/MerchantAlerts.swift` — CloudKit merchant alert digests
 - `Map/Views/MapView.swift` — `MKMapView` bridge + annotation coordinator
@@ -91,7 +91,7 @@ v4 is the only merchant source (the v2 fallback was removed in the redesign, pha
 
 **Caching / invalidation:**
 - Geocoding LRU + `geocoding_cache.json`
-- App marketing version change clears v2 cache (`APIManager`) and v4 cache files (`BTCMapRepository`)
+- App marketing version change clears the v4 cache files (`BTCMapRepository`); the old v2 `elements.json` is deleted once
 - Sync schema version on `V4SyncState` drives one-time name backfill when needed
 
 **User-Agent:** `BitLocal-iOS/<version> (<build>; iOS)` via `BTCMapRequestMetadata.appUserAgent`

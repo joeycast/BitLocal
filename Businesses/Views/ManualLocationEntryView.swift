@@ -103,23 +103,19 @@ struct ManualLocationEntryView: View {
 
         let addressString = addressComponents.joined(separator: ", ")
 
-        let geocoder = CLGeocoder()
-        geocoder.geocodeAddressString(addressString) { placemarks, error in
-            isGeocoding = false
-
-            if let error = error {
+        Task { @MainActor in
+            // Still save when geocoding fails or finds nothing, with zero coordinates.
+            var coordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+            do {
+                let placemarks = try await CLGeocoder().geocodeAddressString(addressString)
+                if let found = placemarks.first?.location?.coordinate {
+                    coordinate = found
+                }
+            } catch {
                 print("Geocoding error: \(error.localizedDescription)")
-                // Still save even if geocoding fails, coordinates will be nil
-                onSave(CLLocationCoordinate2D(latitude: 0, longitude: 0))
-                return
             }
-
-            if let coordinate = placemarks?.first?.location?.coordinate {
-                onSave(coordinate)
-            } else {
-                // No coordinates found, but still save
-                onSave(CLLocationCoordinate2D(latitude: 0, longitude: 0))
-            }
+            isGeocoding = false
+            onSave(coordinate)
         }
     }
 }

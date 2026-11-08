@@ -1531,7 +1531,8 @@ actor CommunityIconCache {
 }
 
 private extension ISO8601DateFormatter {
-    static let communityFullPrecision: ISO8601DateFormatter = {
+    // ISO8601DateFormatter is thread-safe for parsing and formatting.
+    nonisolated(unsafe) static let communityFullPrecision: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter

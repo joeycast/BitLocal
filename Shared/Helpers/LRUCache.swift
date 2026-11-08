@@ -155,13 +155,14 @@ enum ReverseGeocodingSpatialKey {
     }
 }
 
-struct ReverseGeocodeResponse {
+struct ReverseGeocodeResponse: Sendable {
     let placemark: CLPlacemark?
     let error: Error?
     let retryAfter: Date?
 }
 
-final class Geocoder {
+/// All mutable state lives on `queue`; completions run on the main actor.
+final class Geocoder: @unchecked Sendable {
     static let shared = Geocoder()
 
     private struct PendingRequest {
@@ -175,7 +176,7 @@ final class Geocoder {
     private let maxBackoff: TimeInterval
 
     private var pendingRequests: [PendingRequest] = []
-    private var handlersByKey: [String: [(ReverseGeocodeResponse) -> Void]] = [:]
+    private var handlersByKey: [String: [@MainActor @Sendable (ReverseGeocodeResponse) -> Void]] = [:]
     private var isRequestInFlight = false
     private var isPumpScheduled = false
     private var nextAllowedRequestDate = Date.distantPast
@@ -189,7 +190,7 @@ final class Geocoder {
     func reverseGeocode(
         location: CLLocation,
         requestKey: String? = nil,
-        completion: @escaping (ReverseGeocodeResponse) -> Void
+        completion: @escaping @MainActor @Sendable (ReverseGeocodeResponse) -> Void
     ) {
         let key = requestKey ?? ReverseGeocodingSpatialKey.key(for: location.coordinate)
         queue.async {
@@ -207,7 +208,7 @@ final class Geocoder {
     func reverseGeocode(
         location: CLLocation,
         requestKey: String? = nil,
-        completion: @escaping (CLPlacemark?) -> Void
+        completion: @escaping @MainActor @Sendable (CLPlacemark?) -> Void
     ) {
         reverseGeocode(location: location, requestKey: requestKey) { response in
             completion(response.placemark)
@@ -239,7 +240,7 @@ final class Geocoder {
                 let response = self.makeResponse(placemark: placemarks?.first, error: error)
                 let handlers = self.handlersByKey.removeValue(forKey: request.key) ?? []
 
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     handlers.forEach { $0(response) }
                 }
 
@@ -294,5 +295,19 @@ final class Geocoder {
         default:
             return nil
         }
+    }
+}
+
+/// Append-only, lock-guarded collection for results of concurrent requests.
+final class LockedCollector<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [Value] = []
+
+    func append(_ item: Value) {
+        lock.withLock { items.append(item) }
+    }
+
+    var values: [Value] {
+        lock.withLock { items }
     }
 }

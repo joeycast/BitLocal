@@ -41,7 +41,10 @@ struct MailComposerView: UIViewControllerRepresentable {
             } else {
                 onComplete(.success(result))
             }
-            controller.dismiss(animated: true)
+            // MessageUI calls its delegate on the main thread.
+            MainActor.assumeIsolated {
+                controller.dismiss(animated: true)
+            }
         }
     }
 }

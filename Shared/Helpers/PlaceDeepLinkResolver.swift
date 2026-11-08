@@ -36,7 +36,7 @@ final class PlaceDeepLinkResolver {
         self.repository = repository
     }
 
-    func resolve(placeID: String, completion: @escaping (PlaceDeepLinkResolution) -> Void) {
+    func resolve(placeID: String, completion: @escaping @Sendable (PlaceDeepLinkResolution) -> Void) {
         let trimmed = placeID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard PlaceShareLinkBuilder.isValidPlaceID(trimmed) else {
             completion(.invalidIdentifier)
