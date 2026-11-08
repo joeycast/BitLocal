@@ -109,6 +109,7 @@
 		DD73E770291BA8E3611ADA14 /* CompactLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEFFAC3B72301BCEA278C92 /* CompactLayoutView.swift */; };
 		3771484A5FEBBDBABB408AEA /* SplitLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6DDD73F02EBA22EBF9153BC /* SplitLayoutView.swift */; };
 		FBF2425D4D8C1FE75592577F /* StoreMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6979786E242F47DA60556127 /* StoreMap.swift */; };
+		8EAC44FF15F445C9CBB286B3 /* MerchantCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12F27290855AB539E3735B46 /* MerchantCardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -227,6 +228,7 @@
 		CCEFFAC3B72301BCEA278C92 /* CompactLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactLayoutView.swift; sourceTree = "<group>"; };
 		F6DDD73F02EBA22EBF9153BC /* SplitLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitLayoutView.swift; sourceTree = "<group>"; };
 		6979786E242F47DA60556127 /* StoreMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreMap.swift; sourceTree = "<group>"; };
+		12F27290855AB539E3735B46 /* MerchantCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantCardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -329,6 +331,7 @@
 				F7C0A1253A5B100100000007 /* AllEventsListView.swift */,
 				F7C0A1273A5B100100000009 /* AllRegionsListView.swift */,
 				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
+				12F27290855AB539E3735B46 /* MerchantCardView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -735,6 +738,7 @@
 				DD73E770291BA8E3611ADA14 /* CompactLayoutView.swift in Sources */,
 				3771484A5FEBBDBABB408AEA /* SplitLayoutView.swift in Sources */,
 				FBF2425D4D8C1FE75592577F /* StoreMap.swift in Sources */,
+				8EAC44FF15F445C9CBB286B3 /* MerchantCardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -175,3 +175,32 @@ struct MapFramingTests {
         #expect(MapFraming.standAloneMetersPerPoint(neighborDistance: 0, current: 100) == 0.1)
     }
 }
+
+@Suite("Card paging")
+struct CardPagingTests {
+    @Test func claimsOnlyMostlyHorizontalDrags() {
+        #expect(!CardPaging.claims(dx: 8, dy: 0))
+        #expect(CardPaging.claims(dx: -12, dy: 3))
+        #expect(!CardPaging.claims(dx: 12, dy: 10))
+    }
+
+    @Test func stepsByDistanceOrFlick() {
+        #expect(CardPaging.step(translation: -100, velocity: 0, width: 360) == 1)
+        #expect(CardPaging.step(translation: 100, velocity: 0, width: 360) == -1)
+        #expect(CardPaging.step(translation: -30, velocity: -200, width: 360) == 1)
+        #expect(CardPaging.step(translation: -30, velocity: -50, width: 360) == 0)
+    }
+
+    @Test func neighbors() {
+        let order = [1, 2, 3]
+        #expect(CardPaging.neighbor(of: 2, in: order, step: 1) == 3)
+        #expect(CardPaging.neighbor(of: 1, in: order, step: -1) == nil)
+        #expect(CardPaging.neighbor(of: 9, in: order, step: 1) == nil)
+    }
+
+    @Test func rubberBandsAtTheEnds() {
+        #expect(CardPaging.offset(for: -100, hasPrevious: true, hasNext: false) == -30)
+        #expect(CardPaging.offset(for: -100, hasPrevious: false, hasNext: true) == -100)
+        #expect(CardPaging.offset(for: 50, hasPrevious: false, hasNext: true) == 15)
+    }
+}
