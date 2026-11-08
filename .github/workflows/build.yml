@@ -9,9 +9,8 @@ on:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/PULL_REQUEST_TEMPLATE.md'
+  # Any base branch, so stacked redesign PRs (phase N onto phase N-1) get CI too.
   pull_request:
-    branches:
-      - main
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
