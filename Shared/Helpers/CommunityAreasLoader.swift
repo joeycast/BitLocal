@@ -2,7 +2,8 @@ import Foundation
 
 /// Paginated loader for BTC Map v2 community areas.
 /// Publishes progressive merges so the map can show communities before the full crawl finishes.
-final class CommunityAreasLoader {
+/// Immutable after init; safe to share across threads.
+final class CommunityAreasLoader: @unchecked Sendable {
     private let repository: BTCMapRepositoryProtocol
     private let pageLimit: Int
     private let maxPages: Int
@@ -20,7 +21,7 @@ final class CommunityAreasLoader {
     /// Loads all community-capable v2 areas, calling `onPage` on the main queue after each page merge.
     func loadAll(
         initialAnchor: String = "2022-01-01T00:00:00.000Z",
-        onPage: @escaping (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
+        onPage: @escaping @MainActor @Sendable (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
     ) {
         step(anchor: initialAnchor, page: 1, accumulated: [:], onPage: onPage)
     }
@@ -29,7 +30,7 @@ final class CommunityAreasLoader {
         anchor: String,
         page: Int,
         accumulated: [String: V2AreaRecord],
-        onPage: @escaping (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
+        onPage: @escaping @MainActor @Sendable (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
     ) {
         // Deliberately capture self strongly: callers create this loader as a
         // local, so the in-flight completion is the only thing keeping it (and

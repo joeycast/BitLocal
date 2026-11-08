@@ -141,28 +141,28 @@ private final class MockBTCMapV4Client: BTCMapV4ClientProtocol {
     var fetchPlacesResult: Result<[V4PlaceRecord], Error> = .success([])
     var fetchPlacesUpdatedSinceValues: [String] = []
 
-    func fetchSnapshot(completion: @escaping (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
+    func fetchSnapshot(completion: @escaping @Sendable (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
         completion(snapshotResult)
     }
 
-    func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         fetchPlacesUpdatedSinceValues.append(updatedSince)
         completion(fetchPlacesResult)
     }
 
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         completion(.success([]))
     }
 
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         completion(.failure(MockError.unimplemented))
     }
 
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         completion(.success([]))
     }
 
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         completion(.success([]))
     }
 

@@ -338,7 +338,7 @@ struct BTCMapPlaceCommentsListView: View {
     @State private var errorText: String?
     @State private var hasLoaded = false
 
-    private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
+    private let repository = BTCMapRepository.shared
 
     var body: some View {
         List {
@@ -419,19 +419,18 @@ struct BTCMapPlaceCommentsListView: View {
         isLoading = true
         errorText = nil
 
-        repository.fetchPlaceComments(placeID: element.id) { result in
-            DispatchQueue.main.async {
-                isLoading = false
-                hasLoaded = true
-                switch result {
-                case .success(let comments):
-                    self.comments = comments
-                        .filter { !$0.bodyText.isEmpty }
-                        .sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
-                case .failure(let error):
-                    errorText = error.localizedDescription
-                }
+        let placeID = element.id
+        Task { @MainActor in
+            do {
+                let comments = try await repository.fetchPlaceComments(placeID: placeID)
+                self.comments = comments
+                    .filter { !$0.bodyText.isEmpty }
+                    .sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
+            } catch {
+                errorText = error.localizedDescription
             }
+            isLoading = false
+            hasLoaded = true
         }
     }
 }
@@ -668,7 +667,7 @@ struct BTCMapVerificationSection: View {
     @State private var isLoadingVerifiedAt = false
     @State private var hasAttemptedHydration = false
 
-    private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
+    private let repository = BTCMapRepository.shared
     private var metadata: ElementV4Metadata? { element.v4Metadata }
     private var effectiveVerifiedAt: String? { hydratedVerifiedAt ?? metadata?.verifiedAt }
 
@@ -787,13 +786,13 @@ struct BTCMapVerificationSection: View {
         hasAttemptedHydration = true
         isLoadingVerifiedAt = true
 
-        repository.fetchPlace(id: element.id) { result in
-            DispatchQueue.main.async {
-                if case .success(let record) = result, let verifiedAt = record.verifiedAt, !verifiedAt.isEmpty {
-                    hydratedVerifiedAt = verifiedAt
-                }
-                isLoadingVerifiedAt = false
+        let placeID = element.id
+        Task { @MainActor in
+            if let record = try? await repository.fetchPlace(id: placeID),
+               let verifiedAt = record.verifiedAt, !verifiedAt.isEmpty {
+                hydratedVerifiedAt = verifiedAt
             }
+            isLoadingVerifiedAt = false
         }
     }
 }

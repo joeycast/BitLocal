@@ -2358,7 +2358,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         return inside
     }
 
-    private func resolveV3AreaID(for area: V2AreaRecord, completion: @escaping (Int?) -> Void) {
+    private func resolveV3AreaID(for area: V2AreaRecord, completion: @escaping @MainActor @Sendable (Int?) -> Void) {
         // If the V2 ID is already numeric, use it directly.
         if let parsed = Int(area.id) {
             completion(parsed)
@@ -2439,8 +2439,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         }
 
         let group = DispatchGroup()
-        let resultQueue = DispatchQueue(label: "community-members-hydration-results")
-        var hydratedMembers: [Element] = []
+        let collector = LockedCollector<Element>()
 
         for id in missingIDs {
             group.enter()
@@ -2449,15 +2448,14 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
                 guard case .success(let record) = result else { return }
                 let mapped = V4PlaceToElementMapper.placeRecordToElement(record)
                 if !(mapped.deletedAt?.isEmpty ?? true) { return }
-                resultQueue.sync {
-                    hydratedMembers.append(mapped)
-                }
+                collector.append(mapped)
             }
         }
 
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard self.latestCommunitySelectionRequestID == requestID else { return }
+            let hydratedMembers = collector.values
 
             var byID = IdentifiableIndex.byID(seedMembers)
             for member in hydratedMembers {
@@ -2621,27 +2619,17 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         let batchIDs = Array(missingCommunityIDs.prefix(100))
         batchIDs.forEach { requestedCommunityAreaDetailIDs.insert($0) }
 
+        // URLSession already caps connections per host, so the batch is issued at once.
+        // (The old semaphore waited on the main thread and could stall the UI.)
         let group = DispatchGroup()
-        let resultQueue = DispatchQueue(label: "bitlocal.community-geojson-hydration")
-        let semaphore = DispatchSemaphore(value: 8)
-        var hydrated: [V3AreaRecord] = []
+        let collector = LockedCollector<V3AreaRecord>()
 
         for areaID in batchIDs {
             group.enter()
-            semaphore.wait()
-            btcMapRepository.fetchV3Area(id: areaID) { [weak self] result in
-                defer {
-                    semaphore.signal()
-                    group.leave()
-                }
-                guard self != nil else { return }
-                switch result {
-                case .success(let area):
-                    if area.geoJSON != nil {
-                        resultQueue.sync { hydrated.append(area) }
-                    }
-                case .failure:
-                    break
+            btcMapRepository.fetchV3Area(id: areaID) { result in
+                defer { group.leave() }
+                if case .success(let area) = result, area.geoJSON != nil {
+                    collector.append(area)
                 }
             }
         }
@@ -2649,6 +2637,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             self.communityGeoJSONHydrationInFlight = false
+            let hydrated = collector.values
 
             if !hydrated.isEmpty {
                 var byID = IdentifiableIndex.byID(self.areaBrowserAreas)

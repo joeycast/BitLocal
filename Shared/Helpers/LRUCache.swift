@@ -176,7 +176,7 @@ final class Geocoder: @unchecked Sendable {
     private let maxBackoff: TimeInterval
 
     private var pendingRequests: [PendingRequest] = []
-    private var handlersByKey: [String: [@MainActor (ReverseGeocodeResponse) -> Void]] = [:]
+    private var handlersByKey: [String: [@MainActor @Sendable (ReverseGeocodeResponse) -> Void]] = [:]
     private var isRequestInFlight = false
     private var isPumpScheduled = false
     private var nextAllowedRequestDate = Date.distantPast
@@ -190,7 +190,7 @@ final class Geocoder: @unchecked Sendable {
     func reverseGeocode(
         location: CLLocation,
         requestKey: String? = nil,
-        completion: @escaping @MainActor (ReverseGeocodeResponse) -> Void
+        completion: @escaping @MainActor @Sendable (ReverseGeocodeResponse) -> Void
     ) {
         let key = requestKey ?? ReverseGeocodingSpatialKey.key(for: location.coordinate)
         queue.async {
@@ -208,7 +208,7 @@ final class Geocoder: @unchecked Sendable {
     func reverseGeocode(
         location: CLLocation,
         requestKey: String? = nil,
-        completion: @escaping @MainActor (CLPlacemark?) -> Void
+        completion: @escaping @MainActor @Sendable (CLPlacemark?) -> Void
     ) {
         reverseGeocode(location: location, requestKey: requestKey) { response in
             completion(response.placemark)
@@ -295,5 +295,19 @@ final class Geocoder: @unchecked Sendable {
         default:
             return nil
         }
+    }
+}
+
+/// Append-only, lock-guarded collection for results of concurrent requests.
+final class LockedCollector<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [Value] = []
+
+    func append(_ item: Value) {
+        lock.withLock { items.append(item) }
+    }
+
+    var values: [Value] {
+        lock.withLock { items }
     }
 }

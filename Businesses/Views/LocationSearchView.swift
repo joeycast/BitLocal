@@ -273,7 +273,7 @@ final class LocationSearchViewModel: NSObject, ObservableObject {
         searchCompleter.queryFragment = query
     }
 
-    func selectLocation(_ result: SearchResult, completion: @escaping @MainActor (SearchLocation) -> Void) {
+    func selectLocation(_ result: SearchResult, completion: @escaping @MainActor @Sendable (SearchLocation) -> Void) {
         isSearching = true
 
         let searchRequest = MKLocalSearch.Request(completion: result.completion)
@@ -312,7 +312,7 @@ final class LocationSearchViewModel: NSObject, ObservableObject {
         }
     }
 
-    func reverseGeocode(coordinate: CLLocationCoordinate2D, completion: @escaping @MainActor (SearchLocation) -> Void) {
+    func reverseGeocode(coordinate: CLLocationCoordinate2D, completion: @escaping @MainActor @Sendable (SearchLocation) -> Void) {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let requestKey = "location-search:\(ReverseGeocodingSpatialKey.key(for: coordinate))"
 

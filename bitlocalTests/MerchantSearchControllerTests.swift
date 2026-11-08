@@ -252,7 +252,7 @@ private final class MockSearchService: BTCMapSearchServiceProtocol {
     private(set) var searchPlaceQueries: [V4SearchQuery] = []
     private(set) var fetchPlaceIDs: [String] = []
 
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         searchPlaceQueries.append(query)
         if let searchPlacesHandler {
             searchPlacesHandler(query, completion)
@@ -261,7 +261,7 @@ private final class MockSearchService: BTCMapSearchServiceProtocol {
         }
     }
 
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         fetchPlaceIDs.append(id)
         if let fetchPlaceHandler {
             fetchPlaceHandler(id, completion)
@@ -270,11 +270,11 @@ private final class MockSearchService: BTCMapSearchServiceProtocol {
         }
     }
 
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         completion(.success([]))
     }
 
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         completion(.success([]))
     }
 }
