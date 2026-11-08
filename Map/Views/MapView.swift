@@ -59,10 +59,11 @@ struct MapView: UIViewRepresentable {
         
         Debug.log("MapView.makeUIView() called - creating new MKMapView")
         
-        // Store reference to mapView in viewModel - ensure main queue
-        DispatchQueue.main.async {
-            self.viewModel.mapView = mapView
-        }
+        // Store the reference right away (it isn't published, so this doesn't touch
+        // SwiftUI state). Deferring it let a second makeUIView in the same pass (the
+        // first layout switch on iPad) build a second map; the first-launch center then
+        // landed on the map that was thrown away.
+        viewModel.mapView = mapView
         
         // Set the delegate to the Coordinator
         mapView.delegate = context.coordinator
