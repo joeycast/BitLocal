@@ -962,7 +962,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
             self?.performV4IncrementalSync(
                 initialAnchorOverride: initialAnchorOverride,
                 initialExistingOverride: initialExistingOverride,
-                completion: { result in
+                completion: { [weak self] result in
                 switch result {
                 case .success(let elements):
                     Debug.logTiming("sync", "v4 incremental sync completed with \(elements.count) elements")
