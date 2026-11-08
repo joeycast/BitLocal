@@ -21,6 +21,13 @@ protocol MerchantSearchHost: AnyObject {
     func hydratePlaceholderNamesIfNeeded(in elements: [Element])
     func pruneTransientMerchantCachesIfNeeded(force: Bool)
     func upsertElementIntoStore(_ element: Element)
+    func cachedElement(id: String) -> Element?
+}
+
+extension MerchantSearchHost {
+    func cachedElement(id: String) -> Element? {
+        allElements.first { $0.id == id }
+    }
 }
 
 /// Owns merchant search state and orchestration (hybrid local search, legacy remote
@@ -45,6 +52,12 @@ final class MerchantSearchController: ObservableObject {
     @Published var merchantSearchProviderFilter = ""
 
     weak var host: MerchantSearchHost?
+
+    /// Redesign phase 6: full-catalog FTS5 search from the SQLite store. Returns merchant
+    /// ids best first (name matches, then nearest to `near`), or nil when the store isn't
+    /// ready, in which case the legacy viewport filter runs instead.
+    var storeSearch: ((_ query: String, _ near: CLLocationCoordinate2D) async -> [String]?)?
+    private var lastLocalSearchUsedStore = false
 
     private let btcMapRepository: BTCMapSearchServiceProtocol
     private var unifiedSearchDebounceTask: Task<Void, Never>?
@@ -217,6 +230,8 @@ final class MerchantSearchController: ObservableObject {
 
     func refreshMerchantSearchFromVisibleElementsIfNeeded() {
         guard mapDisplayMode == .merchants else { return }
+        // Store results already cover the whole catalog; a pan must not narrow them to the viewport.
+        guard !lastLocalSearchUsedStore else { return }
         guard merchantSearchV2HybridEnabled else { return }
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else { return }
@@ -291,6 +306,48 @@ final class MerchantSearchController: ObservableObject {
     }
 
     private func scheduleLocalMerchantSearch(query: String, normalizedQuery: String) {
+        guard let storeSearch else {
+            scheduleLegacyLocalMerchantSearch(query: query, normalizedQuery: normalizedQuery)
+            return
+        }
+        let center = region.center
+        merchantSearchIsWaitingForLocalDebounce = true
+        // Results swap instantly (no debounce); each keystroke cancels the previous query.
+        localMerchantSearchTask = Task { [weak self] in
+            let ids = await storeSearch(query, center)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self else { return }
+                guard self.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
+                guard let ids else {
+                    self.lastLocalSearchUsedStore = false
+                    self.scheduleLegacyLocalMerchantSearch(query: query, normalizedQuery: normalizedQuery)
+                    return
+                }
+                self.applyStoreSearchResults(ids)
+            }
+        }
+    }
+
+    private func applyStoreSearchResults(_ ids: [String]) {
+        lastLocalSearchUsedStore = true
+        merchantSearchIsWaitingForLocalDebounce = false
+        let elements = elementsForDisplay(ids.compactMap { host?.cachedElement(id: $0) })
+        var scores: [String: Int] = [:]
+        for (index, element) in elements.enumerated() {
+            scores[element.id] = elements.count - index
+        }
+        merchantSearchLocalMatchScoreByID = scores
+        merchantSearchStrongLocalHitCount = elements.count
+        localFilteredMerchants = elements
+        merchantSearchPrimaryResults = elements
+        pruneFreshResultsAgainstPrimary()
+        hydratePlaceholderNamesIfNeeded(in: Array(elements.prefix(20)))
+        pruneTransientMerchantCachesIfNeeded()
+    }
+
+    private func scheduleLegacyLocalMerchantSearch(query: String, normalizedQuery: String) {
+        lastLocalSearchUsedStore = false
         let source = visibleElements
         merchantSearchIsWaitingForLocalDebounce = true
 

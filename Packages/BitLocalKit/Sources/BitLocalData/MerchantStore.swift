@@ -27,7 +27,7 @@ public struct StoreChange: Sendable, Equatable {
 /// for search (architecture-redesign.md section 4). One actor owns the
 /// connection, so no SQLite call ever runs on the main thread.
 public actor MerchantStore {
-    private let db: SQLiteDatabase
+    let db: SQLiteDatabase
     private let categoryTerms: @Sendable (MerchantCategory) -> String
     private var revision = 0
     private var continuations: [UUID: AsyncStream<StoreChange>.Continuation] = [:]
