@@ -82,7 +82,7 @@ Default repository mode is **auto**: prefer v4, fall back to v2 when needed.
 4. Incremental sync:  
    `GET https://api.btcmap.org/v4/places?updated_since=<anchor>&include_deleted=true&fields=...`
 5. Merge by place id, drop deleted, persist cache + sync anchor
-6. Map region changes debounce (~500ms) and refresh annotations in viewport (25-mile cap)
+6. Map: plain browsing reads from the SQLite store via `MapModel` (`Packages/BitLocalKit/Sources/BitLocalMap`, bridged in `Map/Models/StoreMap.swift`): 150 ms debounce, R-tree viewport query, BitLocal's own grid clustering, no distance cap. Search, alert digests and community members still use the legacy element path (25-mile cap, MapKit clustering) until phases 6–7
 
 **Other API surfaces:**
 - Search: `v4/places/search/`
@@ -118,7 +118,6 @@ Default repository mode is **auto**: prefer v4, fall back to v2 when needed.
 - iPhone: portrait-oriented product UX, bottom sheet with multiple detents
 - iPad: split layout when regular size class; compact multitasking uses phone shell
 - Map uses Bitcoin-orange markers (`MarkerColor`); boosted merchants use system orange tint
-- ~25-mile radius visible pin range from map center
 - Location permission: “When In Use” only (privacy-first)
 
 ## External References

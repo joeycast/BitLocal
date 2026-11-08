@@ -38,3 +38,14 @@ To overrule one, say which number and what you want instead.
 24. **Map controls sit top-trailing on split layouts too,** as an overlay. Moving them into the map column's toolbar waits for phase 4's map rewrite.
 25. **Only the sheet detent is restored across launches.** Restoring the selected merchant needs detail to read from the store (phase 5).
 26. **The UIKit sheet-edge reader stays** for now. The map inset is set from the *target* detent once per change (spec 4.3), and the reader only confirms the measured height when motion settles, so the camera no longer chases a drag.
+
+## Phase 4: map from the store, own clustering
+
+27. **The `MKMapView` bridge stays as the renderer for now** (the spec's named fallback). The new `MapModel` drives it: viewport query, clustering and the list all come from the store. Switching the renderer to SwiftUI `Map` needs the performance tests from architecture section 1 on a real device, and the bridge already keeps one map instance across layouts. `MapModel`'s API doesn't change when the renderer does.
+28. **Only plain browsing uses the store-backed map.** Search results, merchant-alert digests and community members stay on the legacy element path until search (phase 6) and communities/alerts (phase 7) move over. Those sets are small, so they keep MapKit's built-in clustering.
+29. **No 25-mile cap.** The viewport query reads up to 30,000 rows (the whole catalog today) instead of the spec's 5,000, so whole-country clusters count every merchant. If the device budget check fails, the next step is a per-zoom aggregate table, not a lower limit.
+30. **Cluster grid is anchored to the world and fixed within a zoom bucket,** so clusters keep their identity while panning. On screen a cell is 60 to 120 pt depending on where the zoom sits in its bucket. From zoom bucket 18 on, only merchants at the same spot are grouped.
+31. **Tapping a cluster zooms in 4×** around it. A cluster of merchants at the same spot opens the first one until phase 5 adds the "N places here" card.
+32. **The list shows the 200 nearest merchants inside the visible map,** measured from the center of the unobscured map (above the sheet). It used to be everything within 25 miles.
+33. **Pins still need the legacy `Element`** to open detail, so a store row without a matching element is skipped. This only happens while the two caches drift during a sync; it goes away when detail reads from the store in phase 5.
+34. **`MerchantSpatialIndex` stays until phase 7.** Its only remaining job is community membership, which moves to `CommunityStore` then. The map-delegate role of `ContentViewModel` also goes in phase 7 with the rest of that class.

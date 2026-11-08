@@ -4,9 +4,9 @@
 //
 //  Redesign phase 2: the SQLite merchant store runs next to the legacy JSON
 //  cache. On first launch it imports the JSON cache (or bootstraps from the
-//  CDN snapshot), then syncs from BTC Map v4. Until phase 4 moves the map onto
-//  the store, nothing reads from it in Release builds; Debug builds compare
-//  its row count with the legacy cache so drift shows up in the log.
+//  CDN snapshot), then syncs from BTC Map v4. Since phase 4 the map reads
+//  from it (`StoreMap`); Debug builds compare its row count with the legacy
+//  cache so drift shows up in the log.
 //
 
 import Foundation
@@ -39,7 +39,9 @@ enum MerchantStoreBootstrap {
             if try await store.syncValue(forKey: importedKey) == nil {
                 try await importLegacyCache(into: store)
             }
+            await markMapReadyIfStocked(store)
             let result = try await environment.sync.sync()
+            await markMapReadyIfStocked(store)
             logger.info("Store sync: bootstrapped=\(result.bootstrapped) pages=\(result.pages) upserted=\(result.upserted) deleted=\(result.deleted)")
             #if DEBUG
             await compareWithLegacyCache(store: store)
@@ -47,6 +49,12 @@ enum MerchantStoreBootstrap {
         } catch {
             logger.error("Store sync failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Phase 4: the map switches to the store as soon as it holds merchants.
+    private static func markMapReadyIfStocked(_ store: MerchantStore) async {
+        guard ((try? await store.count()) ?? 0) > 0 else { return }
+        await StoreMap.shared.markReady()
     }
 
     /// Moves the legacy `btcmap_elements_v4.json` rows and anchor into SQLite in one transaction.

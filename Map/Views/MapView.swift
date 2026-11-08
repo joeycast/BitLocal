@@ -10,6 +10,8 @@ import SwiftUI
 import MapKit
 import Combine
 import Foundation // for Debug logging
+import BitLocalDomain
+import BitLocalMap
 
 struct MapView: UIViewRepresentable {
     var elements: [Element]?
@@ -21,13 +23,17 @@ struct MapView: UIViewRepresentable {
     
     // Propery for map type selection
     var mapType: MKMapType
-    
+
+    /// Redesign phase 4: changes when the store-backed map pass has new pins.
+    var storeRenderToken: Int
+
     // Initializer
-    init(elements: [Element]?, topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType) {
+    init(elements: [Element]?, topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType, storeRenderToken: Int = -1) {
         self.elements = elements
         self.topPadding = topPadding
         self.bottomPadding = bottomPadding
         self.mapType = mapType
+        self.storeRenderToken = storeRenderToken
     }
     
     // Create the Coordinator, which will act as the MKMapViewDelegate
@@ -119,10 +125,11 @@ struct MapView: UIViewRepresentable {
         }
 
         guard viewModel.isReadyForPostOnboardingPresentation else {
-            let currentAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
+            let currentAnnotations = mapView.annotations.filter { $0 is Annotation || $0 is StoreClusterAnnotation }
             if !currentAnnotations.isEmpty {
                 mapView.removeAnnotations(currentAnnotations)
             }
+            context.coordinator.isInStoreMode = false
             Debug.logTiming(
                 "onboarding",
                 "MapView.updateUIView skipped -> waiting for post-onboarding settle (existingAnnotations=\(currentAnnotations.count), allElements=\(viewModel.mapElementsForCurrentDisplay.count))"
@@ -155,6 +162,14 @@ struct MapView: UIViewRepresentable {
         if mapTypeChanged {
             mapView.mapType = mapType
             needsUpdate = true
+        }
+
+        // Redesign phase 4: plain merchant browsing draws from the store pass.
+        if context.coordinator.storeModeActive {
+            context.coordinator.syncStoreMode(on: mapView)
+            return
+        } else if context.coordinator.isInStoreMode {
+            context.coordinator.leaveStoreMode(on: mapView)
         }
 
         let shouldForceUpdate = viewModel.forceMapRefresh
@@ -334,6 +349,151 @@ struct MapView: UIViewRepresentable {
         func updatePadding(top: CGFloat, bottom: CGFloat) {
             self.topPadding = top
             self.bottomPadding = bottom
+        }
+
+        // MARK: - Store-backed map (redesign phase 4)
+
+        var isInStoreMode = false
+        private var renderedStoreRevision = -1
+        private var lastStoreVisibleIDs: [String] = []
+
+        /// Plain merchant browsing (no search, digest or communities) once the store has data.
+        var storeModeActive: Bool {
+            MainActor.assumeIsolated {
+                guard StoreMap.shared.isReady, StoreMap.shared.model != nil else { return false }
+                guard viewModel.mapDisplayMode == .merchants, viewModel.activeMerchantAlertDigest == nil else { return false }
+                return viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
+            }
+        }
+
+        func syncStoreMode(on mapView: MKMapView) {
+            MainActor.assumeIsolated {
+                guard let model = StoreMap.shared.model else { return }
+                if !isInStoreMode {
+                    isInStoreMode = true
+                    renderedStoreRevision = -1
+                    lastStoreVisibleIDs = []
+                    let legacy = mapView.annotations.filter { $0 is Annotation && !($0 is StoreMerchantAnnotation) }
+                    if !legacy.isEmpty { mapView.removeAnnotations(legacy) }
+                    if !mapView.overlays.isEmpty { mapView.removeOverlays(mapView.overlays) }
+                    lastDisplayMode = .merchants
+                    if let viewport = storeViewport(for: mapView) {
+                        model.cameraDidChange(viewport)
+                        model.refresh()
+                    }
+                }
+                if model.revision != renderedStoreRevision {
+                    applyStoreItems(model, on: mapView)
+                }
+            }
+        }
+
+        func leaveStoreMode(on mapView: MKMapView) {
+            isInStoreMode = false
+            renderedStoreRevision = -1
+            lastStoreVisibleIDs = []
+            let storeAnnotations = mapView.annotations.filter { $0 is StoreMerchantAnnotation || $0 is StoreClusterAnnotation }
+            if !storeAnnotations.isEmpty { mapView.removeAnnotations(storeAnnotations) }
+            // Make the legacy path redraw from scratch.
+            lastElementsHash = nil
+            lastAnnotationInputSignature = nil
+            lastAnnotationPassKey = nil
+            lastVisibleElementIDs = []
+        }
+
+        /// The camera as the store pass needs it. The list sorts from the center of the
+        /// unobscured map (above the sheet), matching what the user sees.
+        func storeViewport(for mapView: MKMapView) -> MapViewport? {
+            let visible = mapView.visibleMapRect
+            guard mapView.bounds.width > 0, visible.size.width > 0 else { return nil }
+            let region = mapView.region
+            let rect = GeoRect(
+                center: Coordinate(latitude: region.center.latitude, longitude: region.center.longitude),
+                latitudeDelta: region.span.latitudeDelta,
+                longitudeDelta: region.span.longitudeDelta
+            )
+            let focusRect = viewModel.mapListViewportRect(for: mapView)
+            let focus = mapView.convert(CGPoint(x: focusRect.midX, y: focusRect.midY), toCoordinateFrom: mapView)
+            let worldSize = Double(mapView.bounds.width) * MKMapSize.world.width / visible.size.width
+            return MapViewport(
+                rect: rect,
+                center: Coordinate(latitude: focus.latitude, longitude: focus.longitude),
+                worldSize: worldSize
+            )
+        }
+
+        private func applyStoreItems(_ model: MapModel, on mapView: MKMapView) {
+            let start = CFAbsoluteTimeGetCurrent()
+            renderedStoreRevision = model.revision
+
+            var desiredPins: [String: (Element, String)] = [:]
+            var desiredClusters: [String: StoreClusterAnnotation] = [:]
+            for item in model.items {
+                switch item {
+                case .merchant(let summary):
+                    let id = String(summary.id.rawValue)
+                    // Pins need the legacy element for detail until phase 5 reads from the store.
+                    guard let element = viewModel.cachedElement(id: id) else { continue }
+                    let key = "m\(id)|\(element.mapAnnotationContentSignature)|\(element.isCurrentlyBoosted())"
+                    desiredPins[key] = (element, key)
+                case let .cluster(clusterID, coordinate, count, memberIDs, _):
+                    let key = "c\(clusterID.zoomBucket)|\(clusterID.cellX)|\(clusterID.cellY)|\(count)"
+                    desiredClusters[key] = StoreClusterAnnotation(
+                        storeKey: key,
+                        coordinate: coordinate,
+                        count: count,
+                        memberIDs: memberIDs,
+                        isColocated: clusterID.zoomBucket >= MerchantClusterer.colocatedOnlyBucket
+                    )
+                }
+            }
+
+            var toRemove: [MKAnnotation] = []
+            var existingKeys = Set<String>()
+            for annotation in mapView.annotations {
+                if let pin = annotation as? StoreMerchantAnnotation {
+                    if desiredPins[pin.storeKey] == nil { toRemove.append(pin) } else { existingKeys.insert(pin.storeKey) }
+                } else if let cluster = annotation as? StoreClusterAnnotation {
+                    if desiredClusters[cluster.storeKey] == nil { toRemove.append(cluster) } else { existingKeys.insert(cluster.storeKey) }
+                }
+            }
+            var toAdd: [MKAnnotation] = []
+            for (key, pin) in desiredPins where !existingKeys.contains(key) {
+                toAdd.append(StoreMerchantAnnotation(element: pin.0, storeKey: pin.1))
+            }
+            for (key, cluster) in desiredClusters where !existingKeys.contains(key) {
+                toAdd.append(cluster)
+            }
+            if !toRemove.isEmpty { mapView.removeAnnotations(toRemove) }
+            if !toAdd.isEmpty { mapView.addAnnotations(toAdd) }
+
+            let visibleIDs = model.visibleSummaries.map { String($0.id.rawValue) }
+            if visibleIDs != lastStoreVisibleIDs {
+                lastStoreVisibleIDs = visibleIDs
+                let elements = visibleIDs.compactMap { viewModel.cachedElement(id: $0) }
+                viewModel.visibleElementsSubject.send(elements)
+            }
+            viewModel.mapStoppedMovingSubject.send(())
+            Debug.logMap("⏱ store pass: \(model.items.count) items (+\(toAdd.count) −\(toRemove.count)), list \(visibleIDs.count)/\(model.visibleCount) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - start) * 1000))ms")
+        }
+
+        private func zoomInto(_ cluster: StoreClusterAnnotation, on mapView: MKMapView) {
+            mapView.deselectAnnotation(cluster, animated: false)
+            if cluster.isColocated {
+                // "N places here": phase 5 shows a card; for now open the first one.
+                if let first = cluster.memberIDs.first, let element = viewModel.cachedElement(id: String(first.rawValue)) {
+                    viewModel.setSelectionSource(.mapAnnotation)
+                    viewModel.path = [element]
+                    viewModel.selectedElement = element
+                }
+                return
+            }
+            let span = mapView.region.span
+            let region = MKCoordinateRegion(
+                center: cluster.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: span.latitudeDelta / 4, longitudeDelta: span.longitudeDelta / 4)
+            )
+            mapView.setRegion(mapView.regionThatFits(region), animated: true)
         }
 
         func installCommunityOverlayTapRecognizer(on mapView: MKMapView) {
@@ -583,7 +743,25 @@ struct MapView: UIViewRepresentable {
             let reuseIdentifier = "AnnotationView"
             var view: MKMarkerAnnotationView?
             
-            if let cluster = annotation as? MKClusterAnnotation {
+            if let cluster = annotation as? StoreClusterAnnotation {
+                let identifier = "StoreCluster"
+                let clusterView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+                    ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: identifier)
+                clusterView.annotation = cluster
+                clusterView.clusteringIdentifier = nil
+                clusterView.markerTintColor = UIColor(named: "MarkerColor")
+                clusterView.glyphImage = nil
+                clusterView.glyphText = cluster.glyphText
+                clusterView.canShowCallout = false
+                clusterView.displayPriority = .required
+                clusterView.accessibilityLabel = cluster.title
+                clusterView.accessibilityTraits = .button
+                clusterView.accessibilityHint = NSLocalizedString(
+                    "Double tap to zoom into this cluster",
+                    comment: "VoiceOver hint for merchant map clusters"
+                )
+                return clusterView
+            } else if let cluster = annotation as? MKClusterAnnotation {
                 // Handle cluster annotations
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
@@ -610,7 +788,9 @@ struct MapView: UIViewRepresentable {
                     return nil
                 }
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
-                view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+                view?.annotation = annotation
+                // Store pins are clustered by BitLocal already; MapKit must not regroup them.
+                view?.clusteringIdentifier = annotation is StoreMerchantAnnotation ? nil : MKMapViewDefaultClusterAnnotationViewReuseIdentifier
                 view?.canShowCallout = true
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
@@ -657,6 +837,10 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             if viewModel.selectionSource == .list {
                 viewModel.setSelectionSource(.unknown)
+                return
+            }
+            if let cluster = view.annotation as? StoreClusterAnnotation {
+                zoomInto(cluster, on: mapView)
                 return
             }
             if let cluster = view.annotation as? MKClusterAnnotation {
@@ -723,6 +907,19 @@ struct MapView: UIViewRepresentable {
                 self.viewModel.syncRegionFromMap(center: mapView.region.center, span: mapView.region.span)
             }
             
+            // Store-backed map: MapModel debounces and cancels on its own.
+            if viewModel.isReadyForPostOnboardingPresentation, storeModeActive {
+                debounceTimer?.cancel()
+                if isInStoreMode, let viewport = storeViewport(for: mapView) {
+                    MainActor.assumeIsolated { StoreMap.shared.model?.cameraDidChange(viewport) }
+                }
+                if animated, let completion = mapRegionChangeCompletion {
+                    mapRegionChangeCompletion = nil
+                    completion()
+                }
+                return
+            }
+
             // Debounce the call to update annotations
             debounceTimer?.cancel()
             debounceTimer = Just(())
