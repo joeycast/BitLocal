@@ -16,3 +16,13 @@ To overrule one, say which number and what you want instead.
 8. **The two oranges collapse into `#FC780F`** (`AccentColor` and `MarkerColor` assets now match the `BrandColor.brand` token, all sRGB). The hard-coded Featured gold uses `BrandColor.boost`.
 9. **Detail rows lose their orange labels now** (icons `.secondary`, labels `.primary`, link values `brandInk`), ahead of the full detail rebuild in phase 5, because it is low-risk polish the spec lists in build step 1.
 10. **CI picks Xcode 27.1+ when the runner image has it, otherwise the newest Xcode 26**, and picks the newest plain iPhone simulator instead of a hard-coded name/OS. The Duo-specific APIs (`reservedRegions`, `toolbarVerticalEdge`) can only compile on Xcode 27.1, so they are added once CI shows that toolchain.
+
+## Phase 2: SQLite merchant store
+
+11. **One SQLite connection owned by the `MerchantStore` actor** instead of a writer plus a pool of read-only connections. Simpler and still never on the main thread; sync pages are short transactions. If the viewport-query budget (≤ 16 ms) is missed while a sync page is being written, the read pool is the first fix.
+12. **The FTS5 table stores its own text** (a normal FTS5 table) instead of the spec's contentless table. Contentless tables can only delete rows on SQLite 3.43+ with `contentless_delete`, and deletes are needed on every sync. The extra space is a few MB.
+13. **Placeholder/category-fallback names are left out of the FTS name column**, so an unhydrated café never matches "Coffee" as a *name* (it still matches through the category terms column).
+14. **The JSON cache is still written in phase 2.** The spec removes the JSON write path in this phase, but nothing reads the store until phase 4 moves the map onto it, so removing it now would leave the current UI without data. The store runs next to it (`MerchantStoreBootstrap`): one-time import of the JSON cache with its sync anchor, then its own v4 sync. Debug builds log whether the two row counts match. The JSON path is deleted when the map switches over.
+15. **Merge rules match today's `mergeElements`:** a thin snapshot row never replaces a hydrated one; between hydrated rows the newer `updated_at` wins (ties go to the incoming row).
+16. **The import marks a row hydrated unless its name is a "BTC Map Place #" placeholder**, so rows the legacy sync never named get re-fetched on demand.
+17. **No `BGAppRefreshTask` yet.** Sync runs at launch; foreground and background refresh triggers land with the feature models in phase 7, where app lifecycle moves out of `bitlocalApp`.

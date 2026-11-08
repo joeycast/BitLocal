@@ -900,6 +900,15 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         }
     }
 
+    /// The incremental anchor of the legacy JSON cache, for the one-time SQLite import.
+    /// Nil when the cache predates the current schema, so the store re-syncs names from scratch.
+    func legacyIncrementalAnchor() -> String? {
+        let state = loadV4SyncState()
+        guard state.schemaVersion >= V4SyncState.currentSchemaVersion else { return nil }
+        let anchor = state.incrementalAnchorUpdatedSince?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return anchor.isEmpty ? nil : anchor
+    }
+
     func lastSuccessfulSyncAtISO8601() -> String? {
         let state = loadV4SyncState()
         if let value = state.lastSuccessfulSyncAt?.trimmingCharacters(in: .whitespacesAndNewlines),
