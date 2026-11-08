@@ -14,15 +14,24 @@ let package = Package(
     products: [
         .library(
             name: "BitLocalKit",
-            targets: ["BitLocalDomain", "BitLocalDesign"]
+            targets: ["BitLocalDomain", "BitLocalData", "BitLocalDesign"]
         ),
     ],
     targets: [
         .target(name: "BitLocalDomain"),
+        .target(
+            name: "BitLocalData",
+            dependencies: ["BitLocalDomain"],
+            linkerSettings: [.linkedLibrary("sqlite3")]
+        ),
         .target(name: "BitLocalDesign"),
         .testTarget(
             name: "BitLocalDomainTests",
             dependencies: ["BitLocalDomain"]
+        ),
+        .testTarget(
+            name: "BitLocalDataTests",
+            dependencies: ["BitLocalData", "BitLocalDomain"]
         ),
     ],
     swiftLanguageModes: [.v6]

@@ -34,6 +34,10 @@ struct bitlocalApp: App {
                 .task {
                     await merchantAlertsManager.refreshStatus()
                 }
+                .task {
+                    // Redesign phase 2: keep the SQLite store in sync next to the legacy cache.
+                    await MerchantStoreBootstrap.run()
+                }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     Debug.log("scenePhase changed from \(oldPhase) to: \(newPhase)")
                     

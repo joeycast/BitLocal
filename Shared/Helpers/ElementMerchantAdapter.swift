@@ -59,3 +59,84 @@ extension Element {
         )
     }
 }
+
+extension Element {
+    /// The full domain shape, used to import the legacy JSON cache into the SQLite store.
+    /// Snapshot-only rows (placeholder names) import as not hydrated so the store fetches them later.
+    var merchant: Merchant? {
+        guard let summary = merchantSummary else { return nil }
+        let tags = osmJSON?.tags
+        let metadata = v4Metadata
+        let postal = PostalAddress(
+            houseNumber: address?.streetNumber,
+            street: address?.streetName,
+            city: address?.cityOrTownName,
+            state: address?.regionOrStateName,
+            postalCode: address?.postalCode,
+            freeform: metadata?.rawAddress
+        )
+        var socials: [SocialLink] = []
+        var place = BTCMapPlace(id: summary.id.rawValue)
+        place.twitter = metadata?.twitter
+        place.facebook = metadata?.facebook
+        place.instagram = metadata?.instagram
+        place.telegram = metadata?.telegram
+        place.line = metadata?.line
+        place.lat = summary.coordinate.latitude
+        place.lon = summary.coordinate.longitude
+        if let mapped = MerchantMapper.app.merchant(from: place) {
+            socials = mapped.socials
+        }
+        return Merchant(
+            summary: summary,
+            address: postal.isEmpty ? nil : postal,
+            contact: Contact(
+                phone: tags?.phone ?? tags?.contactPhone,
+                website: MerchantMapper.webURL(tags?.website ?? tags?.contactWebsite),
+                email: metadata?.email
+            ),
+            socials: socials,
+            about: tags?.description ?? tags?.descriptionEn,
+            imageURL: MerchantMapper.webURL(metadata?.imageURL),
+            requiredAppURL: MerchantMapper.webURL(metadata?.requiredAppURL),
+            verifiedAt: BTCMapDateParser.parse(metadata?.verifiedAt),
+            commentsCount: metadata?.commentsCount ?? 0,
+            osmURL: MerchantMapper.webURL(metadata?.osmURL),
+            isHydrated: summary.hasRealName || !(tags?.name.map(Element.isPlaceholderName) ?? true)
+        )
+    }
+}
+
+/// Searchable words for a category: its localized group labels, aliases and tag values.
+/// Cached per icon because the catalog lookup is not free and runs for every imported row.
+final class CategorySearchTerms: @unchecked Sendable {
+    static let shared = CategorySearchTerms()
+
+    private let lock = NSLock()
+    private var cache: [String: String] = [:]
+
+    func terms(for category: MerchantCategory) -> String {
+        lock.lock()
+        if let cached = cache[category.rawValue] {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        var words: [String] = []
+        if let label = ElementCategorySymbols.friendlyCategoryLabel(forIcon: category.rawValue) {
+            words.append(label)
+        }
+        for group in ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: category.rawValue) {
+            words += ElementCategorySymbols.searchTerms(for: group)
+        }
+        words.append(category.rawValue.replacingOccurrences(of: "_", with: " "))
+        var seen = Set<String>()
+        let joined = words.filter { seen.insert($0.lowercased()).inserted }.joined(separator: " ")
+
+        lock.lock()
+        cache[category.rawValue] = joined
+        lock.unlock()
+        return joined
+    }
+}
