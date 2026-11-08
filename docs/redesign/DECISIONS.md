@@ -97,3 +97,4 @@ To overrule one, say which number and what you want instead.
 65. **Search with no results shows a proper empty state** (`ContentUnavailableView`) instead of one gray line.
 66. **Onboarding's alerts step offers "Continue" as a primary button when iCloud is unavailable**, since alerts can't be turned on there.
 67. **Dark mode keeps a dark label on the orange Directions button.** White on #FC780F is about 2.6:1 and fails WCAG AA; the dark label is about 7:1. Light mode uses the deeper `brandFill` with a white label (approved decision 2).
+68. **The app target moves to Swift 6 in two steps.** First, Swift 5 mode with complete concurrency checking, so every data-race problem shows up as a warning in CI without breaking the build. Once those are fixed, `SWIFT_VERSION` flips to 6 and they become errors.
