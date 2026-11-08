@@ -72,10 +72,15 @@ struct MerchantCardView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                // At accessibility sizes "Featured" goes under the name so the name keeps the width.
+                let nameLayout = isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+                nameLayout {
                     Text(merchant?.summary.name ?? element.displayNameForUI ?? String(localized: "Place"))
                         .font(.title3.weight(.semibold))
-                        .lineLimit(2)
+                        .lineLimit(isAccessibilitySize ? 4 : 2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
                     if element.isCurrentlyBoosted() {
                         Text(String(localized: "Featured"))

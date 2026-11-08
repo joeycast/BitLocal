@@ -23,16 +23,26 @@ struct MerchantSearchTests {
         #expect(hits.first?.matchesName == true)
     }
 
-    @Test func nameMatchesComeBeforeCategoryMatchesThenDistance() async throws {
+    @Test func nearbyBandFirstThenNameMatchesThenDistance() async throws {
         let store = try MerchantStore(url: nil, categoryTerms: { $0.rawValue == "local_cafe" ? "coffee cafe" : $0.rawValue })
         try await store.apply(SyncBatch(upserts: [
             makeMerchant(1, lat: 36.20, name: "Bean There", category: "local_cafe"),       // category match, near
-            makeMerchant(2, lat: 40.00, name: "Coffee Republic", category: "local_cafe"),  // name match, far
+            makeMerchant(2, lat: 40.00, name: "Coffee Republic", category: "local_cafe"),  // name match, ~430 km
             makeMerchant(3, lat: 36.17, name: "Coffee Corner", category: "local_cafe"),    // name match, near
+            makeMerchant(4, lat: 37.00, name: "Roastery", category: "local_cafe"),         // category match, ~93 km
+            makeMerchant(5, lat: 60.00, name: "Coffee Far", category: "local_cafe"),       // name match, far
         ]))
         let hits = try await store.search("coffee", near: Coordinate(latitude: 36.16, longitude: -86.78))
-        #expect(hits.map(\.summary.id.rawValue) == [3, 2, 1])
+        // Local band: name match, then category. Regional band: name match, then category. Then far.
+        #expect(hits.map(\.summary.id.rawValue) == [3, 1, 2, 4, 5])
         #expect(hits[0].distance! < hits[1].distance!)
+    }
+
+    @Test func distanceBands() {
+        #expect(SearchDistanceBand.band(for: 0) == 0)
+        #expect(SearchDistanceBand.band(for: 50_000) == 0)
+        #expect(SearchDistanceBand.band(for: 50_001) == 1)
+        #expect(SearchDistanceBand.band(for: 2_000_000) == 2)
     }
 
     @Test func respectsFilterAndLimit() async throws {

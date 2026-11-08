@@ -3,6 +3,7 @@
 import SwiftUI
 import BitLocalDesign
 import BitLocalData
+import BitLocalNavigation
 import MapKit
 import CoreLocation
 import Combine
@@ -12,6 +13,7 @@ import UIKit
 struct BusinessesListView: View {
 
     @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(AppNavigation.self) private var sheetNavigation: AppNavigation?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
@@ -892,14 +894,14 @@ struct BusinessesListView: View {
         )
     }
     private var shouldHideSheetBackground: Bool {
-        guard let detent = currentDetent else { return false }
-        return detent != .large
+        guard currentDetent != nil else { return false }
+        return !isLargeSheet
     }
 
     private var shouldUseGlassyRows: Bool {
-        guard let detent = currentDetent else { return false }
+        guard currentDetent != nil else { return false }
         guard #available(iOS 26.0, *) else { return false }
-        return detent != .large
+        return !isLargeSheet
     }
 
     private var shouldShowEmptyState: Bool {
@@ -914,9 +916,10 @@ struct BusinessesListView: View {
         return detent == collapsedSheetDetent
     }
 
+    /// Reads the named detent: the full detent is a custom height on the folded Duo.
     private var isLargeSheet: Bool {
-        guard let detent = currentDetent else { return false }
-        return detentIdentifier(detent).contains("large")
+        guard currentDetent != nil else { return false }
+        return sheetNavigation?.sheetDetent == .full
     }
 
     private var collapsedSheetDetent: PresentationDetent {
@@ -1004,7 +1007,7 @@ struct ElementCell: View {
                     Text(lines.first ?? "")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                 }
 
                 Spacer(minLength: 0)

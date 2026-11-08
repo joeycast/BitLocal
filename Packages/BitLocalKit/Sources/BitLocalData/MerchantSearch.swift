@@ -34,12 +34,25 @@ public struct MerchantSearchHit: Sendable, Hashable {
     }
 }
 
+/// Coarse distance bands for search ranking. Inside a band a name match wins;
+/// across bands the nearer band wins.
+public enum SearchDistanceBand {
+    /// Upper bounds in meters: local (50 km), regional (500 km), then everything else.
+    public static let limits: [Double] = [50_000, 500_000]
+
+    public static func band(for meters: Double) -> Int {
+        limits.firstIndex { meters <= $0 } ?? limits.count
+    }
+}
+
 extension MerchantStore {
     /// Full-text search over name, category words and address (architecture-redesign.md section 8).
     ///
     /// Candidates come from FTS5 (prefix match on every word, bm25 order, at most
-    /// `candidateLimit`). They're re-ranked in Swift: name matches first, then by
-    /// distance from `near` (nearest first), then by bm25.
+    /// `candidateLimit`). They're re-ranked in Swift: by distance band from `near`
+    /// (`SearchDistanceBand`), then name matches first, then nearest first, then bm25.
+    /// The band comes first so a café around the corner isn't buried under
+    /// "Coffee" names on other continents.
     public func search(
         _ text: String,
         near: Coordinate? = nil,
@@ -76,9 +89,12 @@ extension MerchantStore {
             return Ranked(hit: MerchantSearchHit(summary: summary, matchesName: matchesName, distance: distance), score: row.1)
         }
         let sorted = ranked.sorted { lhs, rhs in
-            if lhs.hit.matchesName != rhs.hit.matchesName { return lhs.hit.matchesName }
             let ld = lhs.hit.distance ?? 0
             let rd = rhs.hit.distance ?? 0
+            let lb = SearchDistanceBand.band(for: ld)
+            let rb = SearchDistanceBand.band(for: rd)
+            if lb != rb { return lb < rb }
+            if lhs.hit.matchesName != rhs.hit.matchesName { return lhs.hit.matchesName }
             if ld != rd { return ld < rd }
             if lhs.score != rhs.score { return lhs.score < rhs.score }
             return lhs.hit.summary.id.rawValue < rhs.hit.summary.id.rawValue

@@ -20,6 +20,9 @@ struct CompactLayoutView: View {
     var visibleElements: [Element]
     @Binding var showingSettings: Bool
     var selectedMapTypeBinding: Binding<MKMapType>
+    /// Distance from the window top that something occludes beyond the safe area
+    /// (the folded Duo's camera and status strip). Zero on other devices.
+    var topOcclusion: CGFloat = 0
 
     @Environment(AppNavigation.self) private var navigation
     @EnvironmentObject private var appearanceManager: AppearanceManager
@@ -38,6 +41,11 @@ struct CompactLayoutView: View {
         GeometryReader { geometry in
             let containerHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             let cardHeight = SheetDetentHeights.card(containerHeight: containerHeight)
+            let fullDetent = SheetDetentHeights.full(
+                containerHeight: containerHeight,
+                safeTop: geometry.safeAreaInsets.top,
+                topOcclusion: topOcclusion
+            )
 
             ZStack {
                 if let elements {
@@ -85,15 +93,15 @@ struct CompactLayoutView: View {
             .sheet(isPresented: .constant(shouldPresentBottomSheet)) {
                 BottomSheetContentView(
                     visibleElements: visibleElements,
-                    currentDetent: detentBinding(cardHeight: cardHeight),
+                    currentDetent: detentBinding(cardHeight: cardHeight, fullDetent: fullDetent),
                     onSettings: { showingSettings = true }
                 )
                 .id("\(appearanceManager.appearance.rawValue)-\(systemColorScheme)")
                 .environmentObject(viewModel)
                 .preferredColorScheme(effectiveColorScheme)
                 .presentationDetents(
-                    [BottomSheetDetents.collapsed, .height(cardHeight), .large],
-                    selection: detentBinding(cardHeight: cardHeight)
+                    [BottomSheetDetents.collapsed, .height(cardHeight), fullDetent],
+                    selection: detentBinding(cardHeight: cardHeight, fullDetent: fullDetent)
                 )
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled(true)
@@ -133,20 +141,20 @@ struct CompactLayoutView: View {
     }
 
     /// Maps the navigation model's named detent to the system sheet's detents.
-    private func detentBinding(cardHeight: CGFloat) -> Binding<PresentationDetent> {
+    private func detentBinding(cardHeight: CGFloat, fullDetent: PresentationDetent) -> Binding<PresentationDetent> {
         Binding(
             get: {
                 switch navigation.sheetDetent {
                 case .peek: BottomSheetDetents.collapsed
                 case .card: .height(cardHeight)
-                case .full: .large
+                case .full: fullDetent
                 }
             },
             set: { detent in
                 let named: SheetDetent
                 if detent == BottomSheetDetents.collapsed {
                     named = .peek
-                } else if detent == .large {
+                } else if detent == fullDetent || detent == .large {
                     named = .full
                 } else {
                     named = .card
@@ -180,6 +188,14 @@ enum SheetDetentHeights {
     static func card(containerHeight: CGFloat) -> CGFloat {
         let range = LayoutMetrics.cardDetentRange
         return min(max((containerHeight * 0.36).rounded(), range.lowerBound), range.upperBound)
+    }
+
+    /// The full detent is the system `.large`, unless something occludes the top of
+    /// the window below the safe area (the folded Duo's camera and status strip sat on
+    /// the search field). Then the sheet stops 8 pt under it.
+    static func full(containerHeight: CGFloat, safeTop: CGFloat, topOcclusion: CGFloat) -> PresentationDetent {
+        guard topOcclusion > safeTop else { return .large }
+        return .height(max(containerHeight - topOcclusion - 8, LayoutMetrics.cardDetentRange.upperBound))
     }
 
     /// The map inset for a detent. At `full` the map is hidden, so keep the card inset
