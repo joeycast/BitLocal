@@ -12,6 +12,8 @@ import Combine
 import CoreLocation
 import MapKit
 import Foundation // for Debug logging
+import BitLocalData
+import BitLocalDomain
 
 enum MapDisplayMode: String {
     case merchants
@@ -267,6 +269,20 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         self.merchantSearch = MerchantSearchController(btcMapRepository: BTCMapRepository.shared)
         super.init()
         configureBindings()
+        merchantSearch.storeSearch = Self.storeSearch
+    }
+
+    /// Redesign phase 6: local search runs on the store's FTS5 index over the whole
+    /// catalog, nearest first, instead of filtering the merchants on screen.
+    private static func storeSearch(_ query: String, near: CLLocationCoordinate2D) async -> [String]? {
+        guard let store = MerchantStoreBootstrap.environment?.store, await StoreMap.shared.isReady else { return nil }
+        let filter = MerchantFilter(hideATMs: UserDefaults.standard.bool(forKey: hideATMsFromMapAndListKey))
+        guard let hits = try? await store.search(
+            query,
+            near: Coordinate(latitude: near.latitude, longitude: near.longitude),
+            filter: filter
+        ) else { return nil }
+        return hits.map { String($0.summary.id.rawValue) }
     }
 
     init(

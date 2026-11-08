@@ -60,3 +60,12 @@ To overrule one, say which number and what you want instead.
 40. **The embedded map preview is removed** from detail (approved decision 5). A "Show on map" button for the compact `full` detent comes with the detent-aware detail in phase 8.
 41. **The detail still reads the legacy `Element`** (through `Element.merchant` for the card). Switching detail to `MerchantStore` + on-demand hydration needs the selection to carry a `MerchantID` end to end, which lands with search (phase 6) when the list also comes from the store.
 42. **No inline title yet.** The navigation bar keeps the merchant name; the scroll-driven title waits for the phase 8 polish pass.
+
+## Phase 6: search on the store
+
+43. **Local search now runs on the store's FTS5 index over the whole catalog,** not on the merchants on screen. Every word is a prefix term, accents are ignored, results swap on each keystroke with no debounce (the previous query is cancelled). The remote BTC Map search stays as a top-up for places the local copy doesn't have yet, unchanged.
+44. **Ranking:** name matches first, then distance from the map center, then bm25. FTS returns up to 5,000 candidates so a common word like "coffee" still finds the nearest ones; the list keeps the top 200.
+45. **Panning no longer narrows store results to the viewport.** The old path re-filtered on every pan; with whole-catalog results that would throw matches away.
+46. **The legacy viewport filter (`MerchantSearchEngine`) stays as the fallback** until the store is ready on first launch, and for the existing unit tests, which inject their own repository. It's deleted with `Element` in phase 8.
+47. **Category chips still search by category words** (the FTS `category_terms` column, filled from the app's category catalog) instead of applying a hard category filter. The token-in-the-field UI and pin filtering come with the sectioned search screen.
+48. **The sectioned search screen (Places / Categories / Areas) and recent searches are not built yet.** The store API for recents (`recordRecentSearch`, `recentSearches`, `deleteRecentSearch`) is in place with tests; the UI is part of the phase 8 pass, after Joe has seen the card and map on a device.
