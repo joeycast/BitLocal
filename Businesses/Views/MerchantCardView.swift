@@ -117,8 +117,8 @@ struct MerchantCardView: View {
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -255,9 +255,12 @@ struct PaymentChipsView: View {
     }
 
     private func chip(_ title: String, _ systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
+        Label {
+            Text(title).foregroundStyle(.primary)
+        } icon: {
+            Image(systemName: systemImage).foregroundStyle(BrandColor.brandInk)
+        }
             .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(Color.secondary.opacity(0.12), in: Capsule())

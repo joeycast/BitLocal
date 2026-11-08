@@ -165,10 +165,11 @@ struct BusinessDetailView: View {
                     hasPrevious: neighbor(-1) != nil,
                     hasNext: neighbor(1) != nil,
                     onPage: page,
-                    onClose: horizontalSizeClass == .compact ? { contentViewModel.path = [] } : nil
+                    onClose: nil
                 )
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
                 if horizontalSizeClass == .compact, let navigation, navigation.sheetDetent == .full {
                     // Approved decision 5: the map preview is gone, so the full
                     // detent offers a way back to the place on the real map.
@@ -182,6 +183,7 @@ struct BusinessDetailView: View {
                     .tint(BrandColor.brandInk)
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
             }
             BTCMapRequiredAppSection(element: element)
@@ -216,7 +218,8 @@ struct BusinessDetailView: View {
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
             elementCellViewModel.onCellAppear()
         }
-        .navigationTitle(element.displayNameForUI ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
+        // The card header already shows the name; an inline bar title repeated it.
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .bitLocalDetailNavigationChrome()
         .alert("Unable to share this place", isPresented: $showingShareErrorAlert) {

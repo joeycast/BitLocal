@@ -468,9 +468,14 @@ struct BusinessesListView: View {
                     if displayedPrimaryResults.isEmpty &&
                         !viewModel.merchantSearchIsWaitingForLocalDebounce &&
                         !viewModel.merchantSearchIsLoading {
-                        Text(noResultsText)
-                            .foregroundStyle(.secondary)
-                            .listRowSeparator(.hidden, edges: .top)
+                        ContentUnavailableView {
+                            Label(noResultsText, systemImage: "magnifyingglass")
+                        } description: {
+                            Text("Try another name or a category like \u{201C}coffee\u{201D}. Places nearby are searched first.")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                     } else {
                         if !displayedFeaturedPrimaryResults.isEmpty {
                             Section {
@@ -957,7 +962,7 @@ struct ElementCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             
-            HStack {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
                 Text(
                     viewModel.element.displayNameForUI ??
                     NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
@@ -971,7 +976,10 @@ struct ElementCell: View {
                 
                 // Distance from location
                 distanceText
-                    .font(.subheadline.weight(.medium))
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .layoutPriority(1)
             }
             
             HStack(alignment: .center, spacing: 8) {

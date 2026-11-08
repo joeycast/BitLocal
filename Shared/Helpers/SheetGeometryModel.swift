@@ -26,7 +26,7 @@ final class SheetGeometryModel: ObservableObject {
     private var lastContinuousSent: CGFloat = -1
 
     /// Only publish `liveHeight` for SwiftUI when near collapsed reveal.
-    private static let revealPublishCeiling: CGFloat = 200
+    private static let revealPublishCeiling: CGFloat = 220 // covers the reveal band (peek + 40 ... + 36)
     private static let livePublishThreshold: CGFloat = 2
     private static let continuousSendThreshold: CGFloat = 0.5
 
@@ -225,7 +225,10 @@ final class SheetEdgeHeightReaderView: UIView {
 struct SheetCollapsedRevealModifier: ViewModifier {
     @ObservedObject var geometry: SheetGeometryModel
 
-    private let revealHeight: CGFloat = 140
+    /// Fully hidden at the peek detent (128 pt plus up to ~40 pt of bottom safe area),
+    /// so the peek shows only the header and search field. It was 140, tuned for the
+    /// old 84 pt peek, which left half a row showing.
+    private let revealHeight: CGFloat = BottomSheetDetents.collapsedHeight + 40
     private let revealRange: CGFloat = 36
 
     private var progress: CGFloat {
