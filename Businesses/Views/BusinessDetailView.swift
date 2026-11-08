@@ -118,6 +118,7 @@ struct BusinessDetailView: View {
     var element: Element
     var userLocation: CLLocation?
     @Binding private var currentDetent: PresentationDetent?
+    @Environment(AppNavigation.self) private var navigation: AppNavigation?
     
     init(
         element: Element,
@@ -168,6 +169,20 @@ struct BusinessDetailView: View {
                 )
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .listRowBackground(Color.clear)
+                if horizontalSizeClass == .compact, let navigation, navigation.sheetDetent == .full {
+                    // Approved decision 5: the map preview is gone, so the full
+                    // detent offers a way back to the place on the real map.
+                    Button {
+                        withAnimation(Motion.move) { navigation.sheetDetent = .card }
+                    } label: {
+                        Label("Show on map", systemImage: "map")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(BrandColor.brandInk)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                }
             }
             BTCMapRequiredAppSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
