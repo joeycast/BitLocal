@@ -211,7 +211,7 @@ extension View {
     func cityPickerResultBackground(glassy: Bool) -> some View {
         if glassy {
             self
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .legibleSurface(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         } else {
             self
                 .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -222,7 +222,7 @@ extension View {
     func cityPickerSearchBackground(glassy: Bool) -> some View {
         if glassy {
             self
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .legibleSurface(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         } else {
             self
                 .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -469,5 +469,32 @@ enum BTCMapMerchantURLBuilder {
             return nil
         }
         return URL(string: "https://btcmap.org/merchant/\(trimmedID)")
+    }
+}
+
+// MARK: - Contrast-aware surfaces
+
+/// A material background that turns solid, with a hairline edge, when the user
+/// turns on Increase Contrast (ui-redesign 7). Reduce Transparency is handled by
+/// the system materials themselves.
+struct LegibleSurface<S: InsettableShape>: ViewModifier {
+    let material: Material
+    let shape: S
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        if contrast == .increased {
+            content
+                .background(Color(uiColor: .secondarySystemBackground), in: shape)
+                .overlay(shape.strokeBorder(Color(uiColor: .separator), lineWidth: 1))
+        } else {
+            content.background(material, in: shape)
+        }
+    }
+}
+
+extension View {
+    func legibleSurface<S: InsettableShape>(_ material: Material, in shape: S) -> some View {
+        modifier(LegibleSurface(material: material, shape: shape))
     }
 }

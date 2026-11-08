@@ -166,9 +166,13 @@ struct MapButtonsView: View {
 }
 
 private struct GlassCapsuleBackground: ViewModifier {
+    @Environment(\.colorSchemeContrast) private var contrast
+
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
+        if contrast == .increased {
+            content.legibleSurface(.ultraThinMaterial, in: Capsule())
+        } else if #available(iOS 26.0, *) {
             content
                 .glassEffect(.regular.interactive(), in: Capsule())
         } else {
