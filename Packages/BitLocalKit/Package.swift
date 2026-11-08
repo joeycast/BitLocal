@@ -14,7 +14,7 @@ let package = Package(
     products: [
         .library(
             name: "BitLocalKit",
-            targets: ["BitLocalDomain", "BitLocalData", "BitLocalDesign"]
+            targets: ["BitLocalDomain", "BitLocalData", "BitLocalNavigation", "BitLocalDesign"]
         ),
     ],
     targets: [
@@ -24,6 +24,7 @@ let package = Package(
             dependencies: ["BitLocalDomain"],
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),
+        .target(name: "BitLocalNavigation", dependencies: ["BitLocalDomain"]),
         .target(name: "BitLocalDesign"),
         .testTarget(
             name: "BitLocalDomainTests",
@@ -32,6 +33,10 @@ let package = Package(
         .testTarget(
             name: "BitLocalDataTests",
             dependencies: ["BitLocalData", "BitLocalDomain"]
+        ),
+        .testTarget(
+            name: "BitLocalNavigationTests",
+            dependencies: ["BitLocalNavigation", "BitLocalDomain"]
         ),
     ],
     swiftLanguageModes: [.v6]

@@ -12,6 +12,7 @@ struct SettingsView: View {
     @EnvironmentObject private var featureHintsController: FeatureHintsController
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
+    @State private var showingAbout = false
 
     init(
         selectedMapType: Binding<MKMapType>,
@@ -54,6 +55,10 @@ struct SettingsView: View {
 
             merchantAlertsSection
 
+            Divider()
+
+            aboutRow
+
             Spacer()
         }
         .padding(.horizontal, 24)
@@ -77,6 +82,42 @@ struct SettingsView: View {
         .task {
             await merchantAlertsManager.refreshStatus()
         }
+        .sheet(isPresented: $showingAbout) {
+            AboutView()
+                .environmentObject(viewModel)
+        }
+    }
+
+    // MARK: - About (moved here when the header bar was removed)
+
+    private var aboutRow: some View {
+        Button {
+            showingAbout = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "info.circle")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("About BitLocal")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("Data from BTC Map and OpenStreetMap, contact, and privacy.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Picker row

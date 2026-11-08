@@ -894,6 +894,25 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         syncBottomPaddingFromSettledGeometry()
     }
 
+    /// Redesign phase 3: the layout sets the map's bottom inset from the *target*
+    /// detent once per change. The sheet-edge reader still confirms the measured
+    /// height when motion settles; `0` (split layouts, no sheet) applies at once.
+    func applyTargetSheetHeight(_ height: CGFloat) {
+        guard height > 1 else {
+            pendingSheetDetentHeight = nil
+            if bottomPadding != 0 { bottomPadding = 0 }
+            return
+        }
+        if sheetGeometry.settledHeight <= 1 {
+            // No measurement yet (first presentation): trust the target.
+            sheetGeometry.reportMeasuredHeight(height)
+            sheetGeometry.reportDetentSettledHeight(height)
+            syncBottomPaddingFromSettledGeometry()
+        } else {
+            prepareForSheetDetentTransition(estimatedHeight: height)
+        }
+    }
+
     private func syncBottomPaddingFromSettledGeometry() {
         let settled = sheetGeometry.settledHeight
         guard settled > 1, abs(bottomPadding - settled) >= 0.5 else { return }

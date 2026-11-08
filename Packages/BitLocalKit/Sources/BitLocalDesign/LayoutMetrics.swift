@@ -17,7 +17,7 @@ public enum LayoutMetrics {
     public static let inspectorMaxWidth: CGFloat = 420
 
     /// Compact sheet detent heights.
-    public static let peekDetentHeight: CGFloat = 120
+    public static let peekDetentHeight: CGFloat = 128
     public static let cardDetentRange: ClosedRange<CGFloat> = 260...380
 
     /// Map clustering grid cell, in points.
