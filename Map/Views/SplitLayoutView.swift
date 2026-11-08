@@ -147,7 +147,8 @@ struct SplitLayoutView: View {
                     elements: elements,
                     topPadding: 0,
                     bottomPadding: 0,
-                    mapType: selectedMapTypeBinding.wrappedValue
+                    mapType: selectedMapTypeBinding.wrappedValue,
+                    storeRenderToken: StoreMap.shared.renderToken
                 )
                 .id("PersistentMap")
                 .ignoresSafeArea()

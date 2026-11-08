@@ -45,7 +45,8 @@ struct CompactLayoutView: View {
                         elements: elements,
                         topPadding: geometry.safeAreaInsets.top,
                         bottomPadding: viewModel.bottomPadding,
-                        mapType: selectedMapTypeBinding.wrappedValue
+                        mapType: selectedMapTypeBinding.wrappedValue,
+                        storeRenderToken: StoreMap.shared.renderToken
                     )
                     .ignoresSafeArea()
                     .onAppear {

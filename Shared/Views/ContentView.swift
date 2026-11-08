@@ -78,6 +78,7 @@ struct ContentView: View {
         // Bridge: the legacy view model still owns the merchant path; mirror it
         // into the navigation model so posture changes re-home the selection.
         .onChange(of: viewModel.path.last?.id) { _, id in
+            StoreMap.shared.setSelected(id.flatMap(MerchantID.init(string:)))
             let selection = id.flatMap(MerchantID.init(string:)).map(Selection.merchant)
             guard selection != navigation.selection else { return }
             let source: BitLocalNavigation.SelectionSource = viewModel.selectionSource == .mapAnnotation ? .map : .list

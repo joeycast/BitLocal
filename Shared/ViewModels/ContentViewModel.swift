@@ -956,6 +956,12 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         )
     }
 
+    /// Legacy element for a merchant id, used by the store-backed map (phase 4) until
+    /// detail reads from the store.
+    func cachedElement(id: String) -> Element? {
+        merchantElementStore.element(id: id)
+    }
+
     private func merchantAlertElements(for digest: CityDigest) -> [Element] {
         let ids = digest.merchantIDs
         guard !ids.isEmpty else { return [] }
@@ -1721,6 +1727,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func setHideATMsFromMapAndList(_ hide: Bool) {
         guard hideATMsFromMapAndList != hide else { return }
         hideATMsFromMapAndList = hide
+        MainActor.assumeIsolated { StoreMap.shared.setHideATMs(hide) }
         UserDefaults.standard.set(hide, forKey: Self.hideATMsFromMapAndListKey)
 
         if hide {
