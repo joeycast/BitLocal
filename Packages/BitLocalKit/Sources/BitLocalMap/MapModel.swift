@@ -147,6 +147,16 @@ public final class MapModel {
         let visibleCount: Int
     }
 
+    struct Ranked: Sendable {
+        let summary: MerchantSummary
+        let distance: Double
+
+        static func nearerFirst(_ lhs: Ranked, _ rhs: Ranked) -> Bool {
+            if lhs.distance != rhs.distance { return lhs.distance < rhs.distance }
+            return lhs.summary.id.rawValue < rhs.summary.id.rawValue
+        }
+    }
+
     /// Pure and nonisolated, so it runs off the main actor.
     nonisolated static func compute(
         _ summaries: [MerchantSummary],
@@ -157,11 +167,9 @@ public final class MapModel {
         let items = MerchantClusterer.cluster(summaries, viewport: viewport, cellSize: configuration.cellSize, selected: selected)
         let inside = summaries.filter { viewport.rect.contains($0.coordinate) }
         let center = viewport.center
-        let nearest = inside
-            .map { ($0, $0.coordinate.distance(to: center)) }
-            .sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0.id.rawValue < $1.0.id.rawValue }
-            .prefix(configuration.listLimit)
-            .map(\.0)
+        let ranked: [Ranked] = inside.map { Ranked(summary: $0, distance: $0.coordinate.distance(to: center)) }
+        let sorted = ranked.sorted(by: Ranked.nearerFirst)
+        let nearest: [MerchantSummary] = sorted.prefix(configuration.listLimit).map { $0.summary }
         return PassResult(items: items, visible: nearest, visibleCount: inside.count)
     }
 }
