@@ -1016,7 +1016,7 @@ struct ElementCell: View {
                     Text(lines.dropFirst().joined(separator: ", "))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     Spacer()

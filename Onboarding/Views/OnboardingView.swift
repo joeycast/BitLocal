@@ -49,10 +49,14 @@ struct OnboardingView: View {
         .background(Color.black.opacity(revealsMap ? 0 : 0.08).ignoresSafeArea())
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             finishLocationStepIfAnswered()
+            // The new authorization status can land just after the app is active
+            // again (seen on iPhone Duo), so look once more a moment later.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { finishLocationStepIfAnswered() }
         }
         .onChange(of: viewModel.userLocation) { _, location in
             guard location != nil else { return }
             reveal()
+            finishLocationStepIfAnswered()
         }
         .task(id: alertContextRefreshID) {
             guard step == .alerts else { return }
