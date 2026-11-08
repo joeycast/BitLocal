@@ -70,11 +70,10 @@ bitlocal/
 
 ## Data Flow (v4 preferred)
 
-Default repository mode is **auto**: prefer v4, fall back to v2 when needed.
+v4 is the only merchant source (the v2 fallback was removed in the redesign, phase 8). If v4 is down, the app keeps showing the saved catalog.
 
 1. On launch: load cached merchants from disk if present  
    - v4: `Caches/btcmap_elements_v4.json` + `btcmap_v4_sync_state.json`  
-   - v2 legacy: `Caches/elements.json`
 2. Show cached merchants immediately when available
 3. If no v4 cache: bootstrap from CDN snapshot  
    `https://cdn.static.btcmap.org/api/v4/places.json`  
