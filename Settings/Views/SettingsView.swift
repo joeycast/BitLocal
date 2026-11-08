@@ -1,18 +1,28 @@
 import MapKit
+import StoreKit
 import SwiftUI
+import BitLocalDesign
 
+/// One native list (ui-redesign 6.9): Map, Appearance, Merchant Alerts,
+/// Contribute, About. Every row is a system control.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
     @Binding var selectedMapType: MKMapType
     @Binding var currentDetent: PresentationDetent
     var onDone: (() -> Void)? = nil
 
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var appearanceManager: AppearanceManager
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     @State private var showingAbout = false
+    @State private var showingAddBusiness = false
+    @State private var copiedVersion = false
+
+    private let reportIssueURL = URL(string: "mailto:support@bitlocal.app?subject=BitLocal%20issue")!
+    private let privacyPolicyURL = URL(string: "https://www.bitlocal.app/privacy")!
 
     init(
         selectedMapType: Binding<MKMapType>,
@@ -25,57 +35,85 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            pickerRow(label: "Map", selection: $selectedMapType) {
-                Text("Standard").tag(MKMapType.standard)
-                Text("Hybrid").tag(MKMapType.hybrid)
+        List {
+            Section("Map") {
+                Picker("Map style", selection: $selectedMapType) {
+                    Text("Standard").tag(MKMapType.standard)
+                    Text("Satellite").tag(MKMapType.hybrid)
+                }
+                Picker("Distance units", selection: $distanceUnit) {
+                    Text("Auto").tag(DistanceUnit.auto)
+                    Text("Miles").tag(DistanceUnit.miles)
+                    Text("Kilometers").tag(DistanceUnit.kilometers)
+                }
+                Toggle("Show ATMs", isOn: showATMsBinding)
             }
 
-            pickerRow(label: "Theme", selection: $appearanceManager.appearance) {
-                Text("System").tag(Appearance.system)
-                Text("Light").tag(Appearance.light)
-                Text("Dark").tag(Appearance.dark)
+            Section("Appearance") {
+                Picker("Appearance", selection: $appearanceManager.appearance) {
+                    Text("System").tag(Appearance.system)
+                    Text("Light").tag(Appearance.light)
+                    Text("Dark").tag(Appearance.dark)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             }
 
-            pickerRow(label: "Distance", selection: $distanceUnit) {
-                Text("Auto").tag(DistanceUnit.auto)
-                Text("Miles").tag(DistanceUnit.miles)
-                Text("Km").tag(DistanceUnit.kilometers)
+            Section {
+                merchantAlertsRow
+            } footer: {
+                if !merchantAlertsManager.isCloudKitAvailable {
+                    Text("Merchant alerts need iCloud. Sign in to iCloud in the Settings app to turn them on.")
+                }
             }
 
-            pickerRow(label: "ATMs", selection: atmVisibilityBinding) {
-                Text(NSLocalizedString("Show", comment: "Settings: show ATMs on map and list"))
-                    .tag(false)
-                Text(NSLocalizedString("Hide", comment: "Settings: hide ATMs on map and list"))
-                    .tag(true)
+            Section("Contribute") {
+                Button {
+                    showingAddBusiness = true
+                } label: {
+                    Label("Add a business", systemImage: "storefront")
+                }
+                Link(destination: reportIssueURL) {
+                    Label("Report an issue", systemImage: "exclamationmark.bubble")
+                }
             }
 
-            Divider()
-                .padding(.top, 4)
-
-            merchantAlertsSection
-
-            Divider()
-
-            aboutRow
-
-            Spacer()
+            Section {
+                Button {
+                    showingAbout = true
+                } label: {
+                    Label("About BitLocal", systemImage: "info.circle")
+                }
+                Button {
+                    releaseNotesController.presentCurrentReleaseNotes()
+                    close()
+                } label: {
+                    Label("What's New", systemImage: "sparkles")
+                }
+                Link(destination: privacyPolicyURL) {
+                    Label("Privacy Policy", systemImage: "hand.raised")
+                }
+                Button {
+                    requestReview()
+                } label: {
+                    Label("Rate BitLocal", systemImage: "star")
+                }
+                versionRow
+            } header: {
+                Text("About")
+            } footer: {
+                attributionFooter
+            }
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .tint(BrandColor.brandInk)
         .navigationTitle(Text("Settings"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: {
-                    if let onDone {
-                        onDone()
-                    } else {
-                        dismiss()
-                    }
-                }) {
-                    Text("done_button")
-                        .bold()
+            ToolbarItem(placement: .confirmationAction) {
+                Button(action: close) {
+                    Text("done_button").bold()
                 }
             }
         }
@@ -86,133 +124,89 @@ struct SettingsView: View {
             AboutView()
                 .environmentObject(viewModel)
         }
-    }
-
-    // MARK: - About (moved here when the header bar was removed)
-
-    private var aboutRow: some View {
-        Button {
-            showingAbout = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "info.circle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("About BitLocal")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text("Data from BTC Map and OpenStreetMap, contact, and privacy.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Picker row
-
-    private func pickerRow<SelectionValue: Hashable, Content: View>(
-        label: LocalizedStringKey,
-        selection: Binding<SelectionValue>,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        HStack(spacing: 12) {
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(width: 64, alignment: .leading)
-
-            Picker(label, selection: selection, content: content)
-                .pickerStyle(.segmented)
-                .labelsHidden()
+        .sheet(isPresented: $showingAddBusiness) {
+            AddBusinessInfoView()
         }
     }
 
-    /// `true` = hide ATMs (matches view model storage).
-    private var atmVisibilityBinding: Binding<Bool> {
+    private func close() {
+        if let onDone {
+            onDone()
+        } else {
+            dismiss()
+        }
+    }
+
+    // MARK: - Rows
+
+    /// `hideATMsFromMapAndList` is stored inverted; the toggle reads as "show".
+    private var showATMsBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.hideATMsFromMapAndList },
-            set: { viewModel.setHideATMsFromMapAndList($0) }
+            get: { !viewModel.hideATMsFromMapAndList },
+            set: { viewModel.setHideATMsFromMapAndList(!$0) }
         )
     }
 
-    // MARK: - Merchant Alerts
-
-    private var merchantAlertsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Group {
-                if merchantAlertsManager.isCloudKitAvailable {
-                    NavigationLink {
-                        MerchantAlertsView(currentDetent: $currentDetent)
-                    } label: {
-                        merchantAlertsRow(showChevron: true)
-                    }
-                    .buttonStyle(.plain)
-                    .featureHintAnchor(.merchantAlerts)
-                } else {
-                    merchantAlertsRow(showChevron: false)
-                        .featureHintAnchor(.merchantAlerts)
-                }
-            }
-
-            if !merchantAlertsManager.isCloudKitAvailable {
-                Text("Merchant alerts require iCloud be enabled for your device.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .multilineTextAlignment(.leading)
-            }
-        }
-    }
-
-    private var merchantAlertsSubtitle: String {
-        "Get notified when new merchants appear in your city."
-    }
-
     @ViewBuilder
-    private func merchantAlertsRow(showChevron: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 12) {
-                Image(systemName: merchantAlertsManager.currentSubscription == nil ? "bell.badge" : "bell.badge.fill")
-                    .font(.title3)
-                    .foregroundStyle(merchantAlertsManager.isCloudKitAvailable ? .accent : .secondary)
-                    .frame(width: 28)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Merchant Alerts")
-                        .font(.headline)
-                        .foregroundStyle(merchantAlertsManager.isCloudKitAvailable ? .primary : .secondary)
-
-                    Text(merchantAlertsSubtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                if showChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.tertiary)
-                        .frame(height: 28)
-                }
+    private var merchantAlertsRow: some View {
+        if merchantAlertsManager.isCloudKitAvailable {
+            NavigationLink {
+                MerchantAlertsView(currentDetent: $currentDetent)
+            } label: {
+                merchantAlertsLabel
             }
+            .featureHintAnchor(.merchantAlerts)
+        } else {
+            merchantAlertsLabel
+                .foregroundStyle(.secondary)
+                .featureHintAnchor(.merchantAlerts)
         }
-        .padding(.vertical, 8)
-        .opacity(merchantAlertsManager.isCloudKitAvailable ? 1 : 0.65)
+    }
+
+    private var merchantAlertsLabel: some View {
+        LabeledContent {
+            Text(merchantAlertsStatus)
+        } label: {
+            Label("Merchant Alerts", systemImage: "bell.badge")
+        }
+    }
+
+    private var merchantAlertsStatus: String {
+        guard merchantAlertsManager.isCloudKitAvailable else {
+            return NSLocalizedString("Unavailable", comment: "Settings: merchant alerts status when iCloud is unavailable")
+        }
+        guard let subscription = merchantAlertsManager.currentSubscription else {
+            return NSLocalizedString("Off", comment: "Settings: merchant alerts status when no city is chosen")
+        }
+        return String(
+            format: NSLocalizedString("%@ · On", comment: "Settings: merchant alerts status, e.g. 'Nashville · On'"),
+            subscription.city
+        )
+    }
+
+    private var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+
+    private var versionRow: some View {
+        LabeledContent("Version") {
+            Text(copiedVersion ? NSLocalizedString("Copied", comment: "Settings: version copied to clipboard") : versionString)
+                .monospacedDigit()
+        }
         .contentShape(Rectangle())
+        .onLongPressGesture {
+            UIPasteboard.general.string = versionString
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            copiedVersion = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copiedVersion = false }
+        }
+        .accessibilityHint("Long press to copy")
+    }
+
+    private var attributionFooter: some View {
+        Text("Place data from [BTC Map](https://btcmap.org/) and [OpenStreetMap](https://openstreetmap.org/copyright) contributors.")
     }
 }
