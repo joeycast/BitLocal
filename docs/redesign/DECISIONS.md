@@ -87,3 +87,13 @@ To overrule one, say which number and what you want instead.
 58. **Phase 8 ships in slices, smallest risk first.** Deleting `Element`, `APIManager`, `ContentViewModel` and moving the app target to Swift 6 touches nearly every file. With CI as the only compiler, each slice is its own PR so a red build points at one change.
 59. **Recent searches show when the search field is focused and empty**: the last 5, newest first, swipe to delete. A search is saved when it is submitted from the keyboard or picked from the list (2+ characters). They live in the merchant database's `recent_searches` table, so they stay on the device.
 60. **"Show on map" appears under the merchant card only when the compact sheet is at its full detent.** It drops the sheet to the card detent so the selected pin is visible. Wide layouts always show the map next to detail, so they don't get the button.
+
+### Fixes from the first simulator pass (iPhone 18 Pro, Xcode 27.2)
+
+61. **The map redraws its store pass when the legacy element cache grows.** On a fresh install the store filled before the element cache, so pins and the list stayed empty or stale until relaunch. This goes away entirely when pins stop needing `Element` (phase 8 cleanup).
+62. **Detail no longer repeats the name** in the navigation bar, and the card's close button is gone on compact (the back button does the same thing). The hours line wraps to two lines instead of truncating. Payment chips use primary text with a `brandInk` icon for contrast.
+63. **List rows keep a gap between a long name and the distance** (the distance never shrinks or truncates).
+64. **The peek detent shows only the header and search field.** The reveal band was tuned for the old 84 pt peek and let half a row through.
+65. **Search with no results shows a proper empty state** (`ContentUnavailableView`) instead of one gray line.
+66. **Onboarding's alerts step offers "Continue" as a primary button when iCloud is unavailable**, since alerts can't be turned on there.
+67. **Dark mode keeps a dark label on the orange Directions button.** White on #FC780F is about 2.6:1 and fails WCAG AA; the dark label is about 7:1. Light mode uses the deeper `brandFill` with a white label (approved decision 2).

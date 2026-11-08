@@ -356,6 +356,10 @@ struct MapView: UIViewRepresentable {
         var isInStoreMode = false
         private var renderedStoreRevision = -1
         private var lastStoreVisibleIDs: [String] = []
+        /// Store rows need a legacy `Element` to become pins (DECISIONS 33). On a fresh
+        /// install the element cache fills after the store, so a store pass made before
+        /// that drew nothing; redraw whenever the element cache grows.
+        private var storePassElementCount = -1
 
         /// Plain merchant browsing (no search, digest or communities) once the store has data.
         var storeModeActive: Bool {
@@ -382,6 +386,12 @@ struct MapView: UIViewRepresentable {
                         model.refresh()
                     }
                 }
+                let elementCount = viewModel.allElements.count
+                if elementCount != storePassElementCount {
+                    storePassElementCount = elementCount
+                    renderedStoreRevision = -1
+                    lastStoreVisibleIDs = []
+                }
                 if model.revision != renderedStoreRevision {
                     applyStoreItems(model, on: mapView)
                 }
@@ -392,6 +402,7 @@ struct MapView: UIViewRepresentable {
             isInStoreMode = false
             renderedStoreRevision = -1
             lastStoreVisibleIDs = []
+            storePassElementCount = -1
             let storeAnnotations = mapView.annotations.filter { $0 is StoreMerchantAnnotation || $0 is StoreClusterAnnotation }
             if !storeAnnotations.isEmpty { mapView.removeAnnotations(storeAnnotations) }
             // Make the legacy path redraw from scratch.

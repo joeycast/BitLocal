@@ -226,7 +226,12 @@ struct OnboardingView: View {
                     .disabled(selectedAlertCity == nil || isEnablingAlerts || !merchantAlertsManager.canEnableAlerts)
                     .opacity(selectedAlertCity == nil ? 0.5 : 1)
                 }
-                textButton("Skip") { finish() }
+                if merchantAlertsManager.isCloudKitAvailable {
+                    textButton("Skip") { finish() }
+                } else {
+                    // Alerts can't be turned on here, so this is the step's only way forward.
+                    primaryButton("Continue") { finish() }
+                }
             }
         }
     }
