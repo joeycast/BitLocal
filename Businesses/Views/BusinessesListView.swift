@@ -1,6 +1,7 @@
 // BusinessesListView.swift
 
 import SwiftUI
+import BitLocalDesign
 import MapKit
 import CoreLocation
 import Combine
@@ -259,7 +260,7 @@ struct BusinessesListView: View {
                     merchantSectionHeader(
                         title: NSLocalizedString("Featured Nearby", comment: "Section header for boosted nearby merchants"),
                         systemImage: "star.fill",
-                        tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                        tint: BrandColor.boost,
                         topPadding: -3,
                         bottomPadding: -14
                     )
@@ -472,7 +473,7 @@ struct BusinessesListView: View {
                                 merchantSectionHeader(
                                     title: NSLocalizedString("Featured Nearby", comment: "Section header for boosted nearby search results"),
                                     systemImage: "star.fill",
-                                    tint: Color(red: 0.71, green: 0.50, blue: 0.12),
+                                    tint: BrandColor.boost,
                                     topPadding: 3,
                                     bottomPadding: -10
                                 )

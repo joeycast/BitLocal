@@ -1,6 +1,7 @@
 // BusinessDetailView.swift
 
 import SwiftUI
+import BitLocalDesign
 import CoreLocation
 import MapKit
 import Contacts
@@ -603,14 +604,14 @@ struct BTCMapRequiredAppSection: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Image(systemName: "app.badge.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(.secondary)
                             Text("Required App")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                         Text(requiredAppURL)
                             .font(.footnote)
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(BrandColor.brandInk)
                             .lineLimit(2)
                     }
                 }
@@ -976,11 +977,12 @@ struct BusinessDetailsSection: View {
             if let openingHours = element.osmJSON?.tags?.openingHours {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "clock.fill")
-                        .foregroundStyle(.accent)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
                         .frame(width: 18)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(.primary)
                         OpeningHoursDisplayView(rawOpeningHours: openingHours)
                     }
                     Spacer(minLength: 0)
@@ -1000,14 +1002,15 @@ private func businessLinkValueRow(
 ) -> some View {
     HStack(alignment: .top, spacing: 12) {
         Image(systemName: icon)
-            .foregroundStyle(.accent)
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(.secondary)
             .frame(width: 18)
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .foregroundStyle(.accent)
+                .foregroundStyle(.primary)
             Text(value)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(BrandColor.brandInk)
                 .lineLimit(valueLineLimit)
                 .multilineTextAlignment(.leading)
         }
@@ -1265,7 +1268,7 @@ struct PaymentDetailsSection: View {
             if acceptsBitcoin(element: element) {
                 HStack {
                     Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.accentColor)
+                        .foregroundStyle(.secondary)
                     Text(NSLocalizedString("accepts_bitcoin", comment: "Label for accepting Bitcoin"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -1276,7 +1279,7 @@ struct PaymentDetailsSection: View {
             if acceptsBitcoinOnChain(element: element) {
                 HStack {
                     Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.accentColor)
+                        .foregroundStyle(.secondary)
                     Text(NSLocalizedString("accepts_bitcoin_onchain", comment: "Label for accepting Bitcoin on Chain"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -1287,7 +1290,7 @@ struct PaymentDetailsSection: View {
             if acceptsLightning(element: element) {
                 HStack {
                     Image(systemName: "bolt.circle.fill")
-                        .foregroundColor(.accentColor)
+                        .foregroundStyle(.secondary)
                     Text(NSLocalizedString("accepts_bitcoin_lightning", comment: "Label for accepting Bitcoin over Lightning"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -1296,7 +1299,7 @@ struct PaymentDetailsSection: View {
             if acceptsContactlessLightning(element: element) {
                 HStack {
                     Image(systemName: "wave.3.right.circle.fill")
-                        .foregroundColor(.accentColor)
+                        .foregroundStyle(.secondary)
                     Text(NSLocalizedString("accepts_contactless_lightning", comment: "Label for accepting Contactless Lightning"))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)

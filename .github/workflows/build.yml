@@ -9,9 +9,8 @@ on:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/PULL_REQUEST_TEMPLATE.md'
+  # Any base branch, so stacked redesign PRs (phase N onto phase N-1) get CI too.
   pull_request:
-    branches:
-      - main
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -28,8 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+      - name: Select Xcode and simulator
+        run: scripts/ci/select-xcode.sh
+
+      - name: Test BitLocalKit package
+        working-directory: Packages/BitLocalKit
+        run: swift test
 
       # Ad-hoc sign instead of CODE_SIGNING_ALLOWED=NO so the simulator app keeps
       # its entitlements; CloudKit traps at launch without them, which kills the
@@ -40,7 +43,7 @@ jobs:
             -project bitlocal.xcodeproj \
             -scheme bitlocal \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
+            -destination "$SIM_DESTINATION" \
             -derivedDataPath build/DerivedData \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY=- \
@@ -53,7 +56,7 @@ jobs:
             -project bitlocal.xcodeproj \
             -scheme bitlocal \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
+            -destination "$SIM_DESTINATION" \
             -derivedDataPath build/DerivedData \
             -only-testing:bitlocalTests \
             CODE_SIGN_STYLE=Manual \

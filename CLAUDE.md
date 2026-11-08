@@ -50,6 +50,8 @@ Or use Xcode: `Cmd+B` to build, `Cmd+R` to run, `Cmd+U` for tests.
 - `Shared/Helpers/ReleaseNotes.swift` — in-app "What's New" catalog (keep in sync with `RELEASE_NOTES.md`)
 - `Shared/Helpers/Extensions.swift` — `FeatureFlags` (events UI is off via `isEventsUIEnabled`)
 
+**Redesign (in progress, Nov 2026):** specs in `docs/redesign/` (UI, architecture, iPhone Duo) and every build-time judgment call in `docs/redesign/DECISIONS.md`. New code goes in the local package `Packages/BitLocalKit` (Swift 6 mode; modules `BitLocalDomain`, `BitLocalDesign`, more per phase). Run its tests with `cd Packages/BitLocalKit && swift test`. `Shared/Helpers/ElementMerchantAdapter.swift` bridges the legacy `Element` to the new `MerchantSummary` until `Element` is deleted.
+
 **Folder Structure:**
 ```
 bitlocal/
