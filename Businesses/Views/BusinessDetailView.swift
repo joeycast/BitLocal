@@ -1,6 +1,7 @@
 // BusinessDetailView.swift
 
 import SwiftUI
+import BitLocalNavigation
 import BitLocalDesign
 import CoreLocation
 import MapKit
@@ -154,28 +155,37 @@ struct BusinessDetailView: View {
     
     var body: some View {
         List {
-            BusinessDescriptionSection(element: element)
-                .featuredHeader(isFeatured: shouldShowFeaturedBadgeInExpandedContent)
+            // Redesign phase 5 order (ui-redesign.md 6.3): card, pay-with, info, about,
+            // reviews, verification, boost. The embedded map preview is gone (decision 5).
+            Section {
+                MerchantCardView(
+                    element: element,
+                    distanceText: localizedDistanceString(),
+                    hasPrevious: neighbor(-1) != nil,
+                    hasNext: neighbor(1) != nil,
+                    onPage: page,
+                    onClose: horizontalSizeClass == .compact ? { contentViewModel.path = [] } : nil
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
+            BTCMapRequiredAppSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BusinessDetailsSection(
                 element: element,
                 elementCellViewModel: elementCellViewModel,
-                isFirstVisibleSection: shouldShowFeaturedBadgeInExpandedContent && !element.hasBusinessDescription
+                isFirstVisibleSection: false
             )
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapSocialsSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            PaymentDetailsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapRequiredAppSection(element: element)
+            BusinessDescriptionSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapPlaceCommentsSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapVerificationSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
             BTCMapPaidActionsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BusinessMapSection(element: element)
                 .groupedCardListRowBackground(if: shouldUseGlassyRows)
         }
         .listStyle(.insetGrouped)
@@ -194,11 +204,6 @@ struct BusinessDetailView: View {
         .navigationTitle(element.displayNameForUI ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
         .navigationBarTitleDisplayMode(.inline)
         .bitLocalDetailNavigationChrome()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                shareToolbarItem
-            }
-        }
         .alert("Unable to share this place", isPresented: $showingShareErrorAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -215,6 +220,21 @@ struct BusinessDetailView: View {
 }
 
 extension BusinessDetailView {
+    /// Card paging follows the list order the user is looking at (nearest first).
+    private func neighbor(_ step: Int) -> Element? {
+        let order = contentViewModel.listElementsForCurrentDisplay
+        guard let id = CardPaging.neighbor(of: element.id, in: order.map(\.id), step: step) else { return nil }
+        return order.first { $0.id == id }
+    }
+
+    private func page(_ step: Int) -> Bool {
+        guard let next = neighbor(step) else { return false }
+        contentViewModel.setSelectionSource(.list)
+        contentViewModel.selectAnnotationForListSelection(next, animated: true, allowCameraMovement: true)
+        contentViewModel.path = [next]
+        return true
+    }
+
     @ViewBuilder
     private var shareToolbarItem: some View {
         if FeatureFlags.isSharePlaceLinksEnabled {

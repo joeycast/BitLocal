@@ -49,3 +49,14 @@ To overrule one, say which number and what you want instead.
 32. **The list shows the 200 nearest merchants inside the visible map,** measured from the center of the unobscured map (above the sheet). It used to be everything within 25 miles.
 33. **Pins still need the legacy `Element`** to open detail, so a store row without a matching element is skipped. This only happens while the two caches drift during a sync; it goes away when detail reads from the store in phase 5.
 34. **`MerchantSpatialIndex` stays until phase 7.** Its only remaining job is community membership, which moves to `CommunityStore` then. The map-delegate role of `ContentViewModel` also goes in phase 7 with the rest of that class.
+
+## Phase 5: merchant card and swipe between places
+
+35. **The card is the first section of the existing detail view**, not a separate sheet state. Compact `card`, full detail, sidebar push and inspector all show it, as the spec asks ("top of every detail"). Dragging the sheet up reveals the rest of the same list.
+36. **Paging follows the list order on screen** (`listElementsForCurrentDisplay`: nearest first, or search results while searching). Swiping replaces the detail with the next merchant and selects its pin; the haptic is `.selection`. A rubber band past either end (offset × 0.3). The paging rules live in `CardPaging` (BitLocalNavigation) with tests. VoiceOver gets "Next place" / "Previous place" actions.
+37. **Opening hours are parsed in the domain** (`OpeningHours`): the common weekly forms, overnight ranges and `PH off`. Anything richer (dates, comments, `+`, `||`) returns nil and the card leaves out the status instead of guessing. The detail's hours row keeps the existing view until phase 8 removes the old parser.
+38. **Action row:** Directions (primary, `brandFill`), Call, Website, Share. Missing actions are left out. Share moved from the toolbar into the row. The overflow menu (copy address, open in BTC Map, report) comes with the detail model in phase 7/8.
+39. **Payment chips replace the "Payment details" section.** The "Featured" tag sits next to the name instead of on the first section header.
+40. **The embedded map preview is removed** from detail (approved decision 5). A "Show on map" button for the compact `full` detent comes with the detent-aware detail in phase 8.
+41. **The detail still reads the legacy `Element`** (through `Element.merchant` for the card). Switching detail to `MerchantStore` + on-demand hydration needs the selection to carry a `MerchantID` end to end, which lands with search (phase 6) when the list also comes from the store.
+42. **No inline title yet.** The navigation bar keeps the merchant name; the scroll-driven title waits for the phase 8 polish pass.
