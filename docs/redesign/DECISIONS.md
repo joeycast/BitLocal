@@ -80,3 +80,8 @@ To overrule one, say which number and what you want instead.
 54. **Places / Communities is a segmented control** in the sheet header on compact widths and in the sidebar toolbar on wide ones. The map-mode button is gone from the map controls. Community rows and boundary framing are unchanged.
 55. **Add business still hands off to BTC Map's add-location form** (today's behavior), restyled. The 5-step in-app flow in ui-redesign 6.7 isn't built: the old in-app form isn't wired to anything and only emails support, while BTC Map's form is where new places actually get reviewed. Building a submission pipeline is a product call, so it waits for Joe. Long-press to add waits on the same call.
 56. **Two feature hints:** search and the communities switch. The alerts hint pointed inside Settings and is dropped. The campaign id is unchanged, so people who already saw the hints don't see them again.
+
+## Phase 8: cleanup (in slices)
+
+57. **The BTC Map v2 merchant fallback is gone** (approved decision 7). `BTCMapRepository` only syncs from v4. If the snapshot or the incremental sync fails, the app keeps showing the saved catalog and the next sync retries. The old `btcmap_data_source_mode` debug switch is removed with it. The v2 *areas* client stays because communities still read v2/v3 area endpoints.
+58. **Phase 8 ships in slices, smallest risk first.** Deleting `Element`, `APIManager`, `ContentViewModel` and moving the app target to Swift 6 touches nearly every file. With CI as the only compiler, each slice is its own PR so a red build points at one change.
