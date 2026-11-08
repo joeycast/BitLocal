@@ -18,6 +18,8 @@ struct BottomSheetContentView: View {
 
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
+    /// Opens Settings from the sheet header (the top bar is gone in the redesign).
+    var onSettings: (() -> Void)? = nil
 
     var body: some View {
         navigationStack
@@ -85,6 +87,16 @@ struct BottomSheetContentView: View {
 
     @ViewBuilder
     private var sheetRootContent: some View {
+        VStack(spacing: 0) {
+            if let onSettings {
+                SheetHeaderRow(onSettings: onSettings)
+            }
+            sheetBrowseContent
+        }
+    }
+
+    @ViewBuilder
+    private var sheetBrowseContent: some View {
         if viewModel.mapDisplayMode == .communities {
             CommunitiesListView(currentDetent: currentDetent)
                 .environmentObject(viewModel)
@@ -141,6 +153,27 @@ struct BottomSheetContentView: View {
                 }
             }
         )
+    }
+}
+
+/// The sheet's header row: wordmark leading, settings trailing (ui-redesign.md 4.2).
+/// Replaces the old floating top bar so the map runs full-bleed.
+private struct SheetHeaderRow: View {
+    let onSettings: () -> Void
+
+    var body: some View {
+        HStack {
+            Text("bitlocal")
+                .font(.custom("Fredoka-Medium", size: 22))
+                .foregroundStyle(Color.accentColor)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            SettingsButtonView(onSettingsSelected: onSettings)
+                .frame(width: 44, height: 44)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .frame(height: 50, alignment: .bottom)
     }
 }
 

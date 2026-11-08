@@ -59,13 +59,10 @@
 		F64093F52DE66D1700906C3E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F64093F42DE66D1700906C3E /* Localizable.xcstrings */; };
 		F66E0B732DE33ED800D68897 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6F2DE33ED800D68897 /* MapView.swift */; };
 		F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */; };
-		F66E0B752DE33ED800D68897 /* IPadLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */; };
 		F66E0B762DE33ED800D68897 /* MapButtonsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6E2DE33ED800D68897 /* MapButtonsView.swift */; };
 		F66E0B772DE33ED800D68897 /* AnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */; };
 		F66E0B782DE33ED800D68897 /* Annotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B682DE33ED800D68897 /* Annotation.swift */; };
-		F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */; };
 		F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */; };
-		F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */; };
 		F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */; };
 		F66E0B852DE33EE600D68897 /* BottomSheetContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */; };
 		F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B872DE33EF800D68897 /* DistanceUnit.swift */; };
@@ -78,7 +75,6 @@
 		F7D100242DE33EF800D68897 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = F7D100232DE33EF800D68897 /* libsqlite3.tbd */; };
 		F66E0BA22DE33F1200D68897 /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B952DE33F1200D68897 /* LRUCache.swift */; };
 		F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */; };
-		F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */; };
 		F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B942DE33F1200D68897 /* Extensions.swift */; };
 		F66E0BA62DE33F1200D68897 /* BtcMapCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B932DE33F1200D68897 /* BtcMapCall.swift */; };
 		0168D09104D24EC6B50C6E8C /* AddressFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20F5EFF99854866AD9E8045 /* AddressFormatting.swift */; };
@@ -87,7 +83,6 @@
 		F66E0BA92DE33F1200D68897 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9A2DE33F1200D68897 /* AboutView.swift */; };
 		F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */; };
 		F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B982DE33F1200D68897 /* ContentViewModel.swift */; };
-		F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */; };
 		F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0BAE2DE340CB00D68897 /* Element.swift */; };
 		F66E0BB12DE35B9100D68897 /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0BB02DE35B9100D68897 /* AppearanceManager.swift */; };
 		F67937612DE205E400A49AC3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F67937602DE205E400A49AC3 /* Assets.xcassets */; };
@@ -111,6 +106,8 @@
 		A5742116242DFD3865E8B3AF /* BitLocalKit in Frameworks */ = {isa = PBXBuildFile; productRef = ACEF3A6379F3651E1C101D5A /* BitLocalKit */; };
 		6F3A913019FC8E895DEF3BEE /* ElementMerchantAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4EB29D7020FA843EE65B06 /* ElementMerchantAdapter.swift */; };
 		CE3FC20347A2BA3636C6CA2F /* MerchantStoreBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB57A9E1B761C3A5D1AA429C /* MerchantStoreBootstrap.swift */; };
+		DD73E770291BA8E3611ADA14 /* CompactLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEFFAC3B72301BCEA278C92 /* CompactLayoutView.swift */; };
+		3771484A5FEBBDBABB408AEA /* SplitLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6DDD73F02EBA22EBF9153BC /* SplitLayoutView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -174,15 +171,12 @@
 		F64093F42DE66D1700906C3E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
-		F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
-		F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLayoutView.swift; sourceTree = "<group>"; };
 		F66E0B6E2DE33ED800D68897 /* MapButtonsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapButtonsView.swift; sourceTree = "<group>"; };
 		F66E0B6F2DE33ED800D68897 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenStreetMapAttributionView.swift; sourceTree = "<group>"; };
 		F66E0B7C2DE33EE600D68897 /* BottomSheetContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheetContentView.swift; sourceTree = "<group>"; };
 		F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessDetailView.swift; sourceTree = "<group>"; };
 		F66E0B7E2DE33EE600D68897 /* BusinessesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessesListView.swift; sourceTree = "<group>"; };
-		F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomiPadNavigationStackTitleView.swift; sourceTree = "<group>"; };
 		F66E0B862DE33EF800D68897 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		F66E0B872DE33EF800D68897 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
 		F7D100112DE33EF800D68897 /* CityIndexStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityIndexStore.swift; sourceTree = "<group>"; };
@@ -200,8 +194,6 @@
 		F66E0B982DE33F1200D68897 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
 		F66E0B9A2DE33F1200D68897 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		F66E0B9B2DE33F1200D68897 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoButtonView.swift; sourceTree = "<group>"; };
-		F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneHeaderView.swift; sourceTree = "<group>"; };
 		F66E0B9F2DE33F1200D68897 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		F66E0BAE2DE340CB00D68897 /* Element.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Element.swift; sourceTree = "<group>"; };
 		F66E0BB02DE35B9100D68897 /* AppearanceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceManager.swift; sourceTree = "<group>"; };
@@ -231,6 +223,8 @@
 		F7C0A2153A5B100100000115 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		1D4EB29D7020FA843EE65B06 /* ElementMerchantAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementMerchantAdapter.swift; sourceTree = "<group>"; };
 		DB57A9E1B761C3A5D1AA429C /* MerchantStoreBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantStoreBootstrap.swift; sourceTree = "<group>"; };
+		CCEFFAC3B72301BCEA278C92 /* CompactLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactLayoutView.swift; sourceTree = "<group>"; };
+		F6DDD73F02EBA22EBF9153BC /* SplitLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitLayoutView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -274,11 +268,11 @@
 			isa = PBXGroup;
 			children = (
 				F66E0B6F2DE33ED800D68897 /* MapView.swift */,
-				F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */,
-				F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */,
 				F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */,
 				F66E0B6E2DE33ED800D68897 /* MapButtonsView.swift */,
 				F66E0B702DE33ED800D68897 /* OpenStreetMapAttributionView.swift */,
+				CCEFFAC3B72301BCEA278C92 /* CompactLayoutView.swift */,
+				F6DDD73F02EBA22EBF9153BC /* SplitLayoutView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -332,7 +326,6 @@
 				F7C0A1253A5B100100000007 /* AllEventsListView.swift */,
 				F7C0A1273A5B100100000009 /* AllRegionsListView.swift */,
 				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
-				F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -435,10 +428,8 @@
 				F6EFC28D2DE69FAF00D573E1 /* RootView.swift */,
 				F66E0B9B2DE33F1200D68897 /* ContentView.swift */,
 				F7E200013B1300000000000B /* ReleaseNotesSheetView.swift */,
-				F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */,
 				F66E0B9A2DE33F1200D68897 /* AboutView.swift */,
 				F7E200013B13000000000004 /* FeatureHintsOverlay.swift */,
-				F66E0B9D2DE33F1200D68897 /* InfoButtonView.swift */,
 				F6EFC2922DE6A09300D573E1 /* LoadingScreenView.swift */,
 			);
 			path = Views;
@@ -677,12 +668,10 @@
 				F63E80952F0180EC00ED1F00 /* ManualLocationEntryView.swift in Sources */,
 				F66E0B732DE33ED800D68897 /* MapView.swift in Sources */,
 				F66E0B742DE33ED800D68897 /* OpenStreetMapAttributionView.swift in Sources */,
-				F66E0B752DE33ED800D68897 /* IPadLayoutView.swift in Sources */,
 				F66E0B762DE33ED800D68897 /* MapButtonsView.swift in Sources */,
 				F66E0B772DE33ED800D68897 /* AnnotationView.swift in Sources */,
 				F6EFC28E2DE69FAF00D573E1 /* RootView.swift in Sources */,
 				F66E0B782DE33ED800D68897 /* Annotation.swift in Sources */,
-				F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */,
 				F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */,
 				F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */,
 				F63E80852F017BE900ED1F00 /* BusinessSubmissionStep.swift in Sources */,
@@ -697,7 +686,6 @@
 				F60C1D2F2DE6A1E000F9AA06 /* OnboardingView.swift in Sources */,
 				F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */,
 				F66E0BAF2DE340CB00D68897 /* Element.swift in Sources */,
-				F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */,
 				F6004F922DEB7E30001183AE /* ElementCategorySymbols.swift in Sources */,
 				F66E0B842DE33EE600D68897 /* BusinessesListView.swift in Sources */,
 				F63E808B2F017C0800ED1F00 /* BusinessDetailsView.swift in Sources */,
@@ -719,7 +707,6 @@
 				F7E900013B1C000000000003 /* CommunityAreasLoader.swift in Sources */,
 				F7E900013B1C000000000001 /* PlaceDeepLinkResolver.swift in Sources */,
 				F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */,
-				F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */,
 				F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */,
 				0168D09104D24EC6B50C6E8C /* AddressFormatting.swift in Sources */,
 				F66E0BA62DE33F1200D68897 /* BtcMapCall.swift in Sources */,
@@ -738,11 +725,12 @@
 				F66E0BAC2DE33F1200D68897 /* ContentViewModel.swift in Sources */,
 				F7EA00013B1D000000000001 /* MerchantSearchController.swift in Sources */,
 				F63E80812EFC302700ED1F00 /* MailComposer.swift in Sources */,
-				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,
 				F7C0A1013A5B100100000001 /* BTCMapV4Contracts.swift in Sources */,
 				F7C0A1113A5B100100000002 /* BTCMapV4Support.swift in Sources */,
 				6F3A913019FC8E895DEF3BEE /* ElementMerchantAdapter.swift in Sources */,
 				CE3FC20347A2BA3636C6CA2F /* MerchantStoreBootstrap.swift in Sources */,
+				DD73E770291BA8E3611ADA14 /* CompactLayoutView.swift in Sources */,
+				3771484A5FEBBDBABB408AEA /* SplitLayoutView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

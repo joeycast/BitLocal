@@ -26,3 +26,15 @@ To overrule one, say which number and what you want instead.
 15. **Merge rules match today's `mergeElements`:** a thin snapshot row never replaces a hydrated one; between hydrated rows the newer `updated_at` wins (ties go to the incoming row).
 16. **The import marks a row hydrated unless its name is a "BTC Map Place #" placeholder**, so rows the legacy sync never named get re-fetched on demand.
 17. **No `BGAppRefreshTask` yet.** Sync runs at launch; foreground and background refresh triggers land with the feature models in phase 7, where app lifecycle moves out of `bitlocalApp`.
+
+## Phase 3: adaptive navigation shell
+
+18. **The persistent-map spike is deferred to phase 4.** Each layout owns its own `MapView` for now, so a posture change rebuilds the map. Phase 4 replaces the map with a `MapModel` owned above the layouts; doing the spike before that model exists would mean building it twice. Camera framing math (`MapFraming`) is in place and tested so the zoom level can be carried across postures then.
+19. **Fold detection is a stub.** `GeometryProxy.reservedRegions(kind: .division)` and the toolbar edge APIs need the iOS 27.1 SDK; CI runs Xcode 26.4, so `FoldGeometry.divisions` returns nothing and Duo falls back to the iPad-style regular/expanded postures (duo.md 7). The resolver and its tests already cover `foldColumns`/`foldStack`; turning it on is a one-function change once CI has Xcode 27.1.
+20. **Posture comes from size classes and window size, never the device idiom.** iPhone stays portrait-only in the Info.plist for now; `compactLandscape` is resolved and tested but only reachable on iPad slide-over/Stage Manager.
+21. **The peek detent is 128 pt** (was 84): it holds the new header row (wordmark + settings) and the search field. The spec's 120 was one line short once the wordmark moved into the sheet.
+22. **The card detent is 36% of the window, clamped to 260–380 pt,** until the merchant card exists and can be measured (phase 5).
+23. **About moved into Settings** ("About BitLocal" row). With the top bar gone there was no home for the info button.
+24. **Map controls sit top-trailing on split layouts too,** as an overlay. Moving them into the map column's toolbar waits for phase 4's map rewrite.
+25. **Only the sheet detent is restored across launches.** Restoring the selected merchant needs detail to read from the store (phase 5).
+26. **The UIKit sheet-edge reader stays** for now. The map inset is set from the *target* detent once per change (spec 4.3), and the reader only confirms the measured height when motion settles, so the camera no longer chases a drag.
