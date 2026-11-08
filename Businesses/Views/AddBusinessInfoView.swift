@@ -1,4 +1,5 @@
 import SwiftUI
+import BitLocalDesign
 
 struct AddBusinessInfoView: View {
     @Environment(\.dismiss) var dismiss
@@ -6,14 +7,15 @@ struct AddBusinessInfoView: View {
     private let btcMapAddLocationURL = URL(string: "https://btcmap.org/add-location")!
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Header section
                     VStack(spacing: 16) {
                         Image(systemName: "storefront.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.accentColor)
+                            .font(.system(size: 52))
+                            .foregroundStyle(BrandColor.brand)
+                            .accessibilityHidden(true)
 
                         Text("add_business_info_title")
                             .font(.title2)
@@ -51,11 +53,10 @@ struct AddBusinessInfoView: View {
                                 .fontWeight(.semibold)
                             Image(systemName: "arrow.up.right")
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.accentColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .foregroundStyle(BrandColor.onBrandFill)
+                        .background(BrandColor.brandFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
 
                     Text("add_business_info_leaving_app")
@@ -89,8 +90,10 @@ private struct InfoCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundColor(.accentColor)
+                .font(.system(size: 22))
+                .foregroundStyle(BrandColor.brandInk)
+                .frame(width: 28)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -103,8 +106,7 @@ private struct InfoCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
-        .cornerRadius(12)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
     }
 }
 

@@ -41,16 +41,9 @@ struct FeatureHintCampaign: Equatable {
             FeatureHintStep(
                 target: .communityToggle,
                 title: String(localized: "Find communities"),
-                message: String(localized: "Tap here to see bitcoin communities near you."),
-                primaryButtonTitle: String(localized: "Next"),
-                preferredCardPlacement: .below
-            ),
-            FeatureHintStep(
-                target: .merchantAlerts,
-                title: String(localized: "Stay in the loop"),
-                message: String(localized: "Turn on Merchant Alerts to get notified when new bitcoin-friendly places open in your city."),
+                message: String(localized: "Switch to Communities to see bitcoin groups near you."),
                 primaryButtonTitle: String(localized: "Done"),
-                preferredCardPlacement: .above
+                preferredCardPlacement: .below
             ),
         ]
     )

@@ -15,6 +15,8 @@ struct RootView: View {
     @StateObject private var featureHintsController = FeatureHintsController()
     @StateObject private var releaseNotesController = ReleaseNotesController()
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
+    /// Onboarding sits on a card over the live map, blurred until the person allows location.
+    @State private var onboardingRevealsMap = false
     
     var body: some View {
         ZStack {
@@ -22,11 +24,14 @@ struct RootView: View {
                 .environmentObject(contentViewModel)
                 .environmentObject(featureHintsController)
                 .environmentObject(releaseNotesController)
-            
+                .blur(radius: didCompleteOnboarding || onboardingRevealsMap ? 0 : 20)
+                .allowsHitTesting(didCompleteOnboarding)
+                .accessibilityHidden(!didCompleteOnboarding)
+
             if !didCompleteOnboarding {
-                OnboardingView()
+                OnboardingView(revealsMap: $onboardingRevealsMap)
                     .environmentObject(contentViewModel)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(999)
             }
         }
@@ -46,7 +51,11 @@ struct RootView: View {
         .onChange(of: didCompleteOnboarding) { _, completed in
             Debug.log("onboarding completion changed to: \(completed)")
 
-            guard completed else { return }
+            guard completed else {
+                // Replayed from About: start blurred again.
+                onboardingRevealsMap = false
+                return
+            }
             Debug.logTiming("onboarding", "didCompleteOnboarding flipped to true")
 
             contentViewModel.preparePostOnboardingPresentation()

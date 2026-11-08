@@ -11,6 +11,7 @@ import Foundation // for Debug logging
 import UIKit
 import CryptoKit
 import MapKit
+import BitLocalDesign
 
 struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
@@ -163,11 +164,15 @@ private struct SheetHeaderRow: View {
 
     var body: some View {
         HStack {
-            Text("bitlocal")
+            Text(verbatim: "bitlocal")
                 .font(.custom("Fredoka-Medium", size: 22))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(BrandColor.brand)
                 .accessibilityAddTraits(.isHeader)
-            Spacer()
+                .accessibilityLabel("BitLocal")
+            Spacer(minLength: 8)
+            BrowseModePicker()
+                .frame(maxWidth: 220)
+            Spacer(minLength: 8)
             SettingsButtonView(onSettingsSelected: onSettings)
                 .frame(width: 44, height: 44)
         }
@@ -1564,5 +1569,32 @@ private extension View {
         } else {
             self
         }
+    }
+}
+
+/// Places / Communities switch (ui-redesign 6.5). Lives in the sheet header on
+/// compact widths and in the sidebar toolbar on wide ones.
+struct BrowseModePicker: View {
+    @EnvironmentObject private var viewModel: ContentViewModel
+
+    var body: some View {
+        Picker("Browse", selection: modeBinding) {
+            Text("Places").tag(MapDisplayMode.merchants)
+            Text("Communities").tag(MapDisplayMode.communities)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .featureHintAnchor(.communityToggle)
+    }
+
+    private var modeBinding: Binding<MapDisplayMode> {
+        Binding(
+            get: { viewModel.mapDisplayMode },
+            set: { newValue in
+                guard newValue != viewModel.mapDisplayMode else { return }
+                UISelectionFeedbackGenerator().selectionChanged()
+                viewModel.toggleMapMode()
+            }
+        )
     }
 }

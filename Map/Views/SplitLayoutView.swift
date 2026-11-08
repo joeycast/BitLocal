@@ -109,6 +109,10 @@ struct SplitLayoutView: View {
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityLabel("BitLocal")
                     }
+                    ToolbarItem(placement: .principal) {
+                        BrowseModePicker()
+                            .frame(maxWidth: 200)
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         SettingsButtonView(onSettingsSelected: { showingSettings = true })
                             .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
