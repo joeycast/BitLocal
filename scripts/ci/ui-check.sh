@@ -51,6 +51,8 @@ run_device() {
   xcrun simctl bootstatus "$udid" -b
   xcrun simctl status_bar "$udid" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 2>/dev/null
   xcrun simctl ui "$udid" appearance light
+  # Start clean: the unit tests ran in this simulator and left a saved search.
+  xcrun simctl uninstall "$udid" "$BUNDLE_ID" 2>/dev/null
   xcrun simctl install "$udid" "$APP"
   xcrun simctl privacy "$udid" grant location "$BUNDLE_ID"
   xcrun simctl location "$udid" set "$LAT,$LON"

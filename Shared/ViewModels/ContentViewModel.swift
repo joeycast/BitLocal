@@ -3078,10 +3078,12 @@ extension ContentViewModel {
             performUnifiedSearch()
         case .communities, .community:
             if mapDisplayMode != .communities { toggleMapMode() }
-            guard scenario == .community else { break }
             for _ in 0..<60 where communityMapAreas.filter(\.isCommunity).isEmpty {
                 try? await Task.sleep(for: .milliseconds(500))
             }
+            let park = communityMapAreas.filter { $0.id.contains("bitcoin-park") || $0.displayName.localizedCaseInsensitiveContains("bitcoin park") }
+            uiCheckLog("UICheck: v2 areas=\(communityMapAreas.count) withGeo=\(communityMapAreas.filter { $0.geoJSON != nil }.count) overlays=\(communityOverlays.count) bitcoinPark=\(park.map { "\($0.id) geo=\($0.geoJSON != nil) box=\(mapRegion(forCommunityArea: $0) != nil)" })")
+            guard scenario == .community else { break }
             let here = userLocation?.coordinate ?? region.center
             let candidates = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted }
             let scored = candidates.compactMap { area -> (V2AreaRecord, Double)? in
