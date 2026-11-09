@@ -2738,6 +2738,15 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
     private func replaceMerchantCatalog(_ elements: [Element], refreshMapPins: Bool) {
         merchantStoreRevision = merchantElementStore.replaceAll(elements)
         allElements = merchantElementStore.snapshot()
+        if !StoreMap.shared.isReady, !elements.isEmpty {
+            // Fresh install: if the store's own download hasn't landed, seed it from
+            // this catalog so the map isn't empty (DECISIONS 100).
+            let merchants = elements.compactMap(\.merchant)
+            let newestUpdate = elements.compactMap(\.updatedAt).max()
+            Task.detached(priority: .utility) {
+                await MerchantStoreBootstrap.adoptCatalogIfStoreEmpty(merchants, fallbackAnchor: newestUpdate)
+            }
+        }
         if refreshMapPins {
             self.mapPinRevision &+= 1
         }
