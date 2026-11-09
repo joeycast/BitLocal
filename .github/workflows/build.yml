@@ -16,6 +16,13 @@ on:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/PULL_REQUEST_TEMPLATE.md'
+  # Manual runs can add the screenshot pass (ui_check) without a code change.
+  workflow_dispatch:
+    inputs:
+      ui_check:
+        description: Take iPhone, iPad and Duo screenshots
+        type: boolean
+        default: true
 
 concurrency:
   group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -66,13 +73,16 @@ jobs:
 
       # Screenshots of the main screens on iPhone, iPad and (if the runtime has
       # one) iPhone Duo. Printed into the log and uploaded; never fails the build.
+      # Opt-in (about 25 minutes): a manual run, or "[ui-check]" in the head
+      # commit message.
       - name: Visual UI check
+        if: inputs.ui_check || contains(github.event.head_commit.message, '[ui-check]') || contains(github.event.pull_request.title, '[ui-check]')
         continue-on-error: true
-        timeout-minutes: 25
+        timeout-minutes: 45
         run: scripts/ci/ui-check.sh
 
       - name: Upload UI check screenshots
-        if: always()
+        if: inputs.ui_check || contains(github.event.head_commit.message, '[ui-check]') || contains(github.event.pull_request.title, '[ui-check]')
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:

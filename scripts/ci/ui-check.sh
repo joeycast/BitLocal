@@ -87,7 +87,12 @@ IPAD="$(pick_device '^iPad (Pro 11|Air 11)')"
 [ -n "$IPAD" ] || IPAD="$(pick_device '^iPad')"
 DUO="$(pick_device 'Duo')"
 
-run_device iphone "$IPHONE"
-run_device ipad "$IPAD"
-run_device duo "$DUO"
+# UI_CHECK_DEVICES picks a subset, e.g. "ipad duo".
+for device in ${UI_CHECK_DEVICES:-iphone ipad duo}; do
+  case "$device" in
+    iphone) run_device iphone "$IPHONE" ;;
+    ipad) run_device ipad "$IPAD" ;;
+    duo) run_device duo "$DUO" ;;
+  esac
+done
 exit 0
