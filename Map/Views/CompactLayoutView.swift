@@ -16,7 +16,6 @@ import BitLocalNavigation
 
 struct CompactLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
-    var elements: [Element]?
     var visibleElements: [Element]
     @Binding var showingSettings: Bool
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -48,18 +47,15 @@ struct CompactLayoutView: View {
             )
 
             ZStack {
-                if let elements {
-                    MapView(
-                        elements: elements,
-                        topPadding: geometry.safeAreaInsets.top,
-                        bottomPadding: viewModel.bottomPadding,
-                        mapType: selectedMapTypeBinding.wrappedValue,
-                        storeRenderToken: StoreMap.shared.renderToken
-                    )
-                    .ignoresSafeArea()
-                    .onAppear {
-                        viewModel.locationManager.startUpdatingLocation()
-                    }
+                MapView(
+                    topPadding: geometry.safeAreaInsets.top,
+                    bottomPadding: viewModel.bottomPadding,
+                    mapType: selectedMapTypeBinding.wrappedValue,
+                    storeRenderToken: StoreMap.shared.renderToken
+                )
+                .ignoresSafeArea()
+                .onAppear {
+                    viewModel.locationManager.startUpdatingLocation()
                 }
             }
             // No top bar any more: the map's top inset is just the safe area.

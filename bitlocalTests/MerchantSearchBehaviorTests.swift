@@ -122,53 +122,6 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         XCTAssertEqual(repo.searchPlaceQueries.count, 0)
     }
 
-    func testMapElementsFollowDisplayedSearchResultsWhenSearching() {
-        let repo = MockBTCMapRepository()
-        let viewModel = makeViewModel(repo: repo)
-        let cafe = Self.element(id: "1", icon: "local_cafe")
-        let diner = Self.element(id: "2", icon: "restaurant")
-
-        viewModel.mapDisplayMode = .merchants
-        viewModel.unifiedSearchText = "coffee"
-        viewModel.setAllElementsForTesting([cafe, diner])
-        viewModel.setMerchantSearchMapResults([cafe])
-
-        XCTAssertEqual(viewModel.mapElementsForCurrentDisplay.map(\.id), ["1"])
-    }
-
-    func testMapElementsShowAllMerchantsWhenSearchIsTooShort() {
-        let repo = MockBTCMapRepository()
-        let viewModel = makeViewModel(repo: repo)
-        let cafe = Self.element(id: "1", icon: "local_cafe")
-        let diner = Self.element(id: "2", icon: "restaurant")
-
-        viewModel.mapDisplayMode = .merchants
-        viewModel.unifiedSearchText = "c"
-        viewModel.setAllElementsForTesting([cafe, diner])
-        viewModel.setMerchantSearchMapResults([cafe])
-
-        XCTAssertEqual(viewModel.mapElementsForCurrentDisplay.map(\.id), ["1", "2"])
-    }
-
-    func testClearingMapAnnotationsResetsCoordinatorCachesForSameResultReentry() {
-        let repo = MockBTCMapRepository()
-        let viewModel = makeViewModel(repo: repo)
-        let coordinator = MapView.Coordinator(viewModel: viewModel, topPadding: 0, bottomPadding: 0)
-        let mapView = MKMapView()
-        let cafe = Self.element(id: "1", icon: "local_cafe")
-
-        mapView.addAnnotation(Annotation(element: cafe))
-        coordinator.lastElementsHash = [cafe].hashValue
-        coordinator.lastVisibleElementIDs = [cafe.id]
-
-        XCTAssertEqual(mapView.annotations.compactMap { ($0 as? Annotation)?.element?.id }, ["1"])
-
-        XCTAssertTrue(coordinator.clearMerchantAnnotations(on: mapView))
-        XCTAssertNil(coordinator.lastElementsHash)
-        XCTAssertEqual(coordinator.lastVisibleElementIDs, [])
-        XCTAssertTrue(mapView.annotations.compactMap { $0 as? Annotation }.isEmpty)
-    }
-
     func testPunctuationInsensitiveLocalMatchFindsSteakNShake() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)

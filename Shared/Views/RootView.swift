@@ -48,6 +48,9 @@ struct RootView: View {
             evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()
         }
+        #if DEBUG
+        .task { await contentViewModel.runUICheckScenarioIfNeeded() }
+        #endif
         .onChange(of: didCompleteOnboarding) { _, completed in
             Debug.log("onboarding completion changed to: \(completed)")
 
@@ -77,7 +80,7 @@ struct RootView: View {
         .onChange(of: contentViewModel.isReadyForPostOnboardingPresentation) { _, _ in
             Debug.logTiming(
                 "onboarding",
-                "main UI readiness changed -> ready=\(contentViewModel.isReadyForPostOnboardingPresentation), loaded=\(contentViewModel.hasLoadedInitialData), allElements=\(contentViewModel.allElements.count), visibleElements=\(contentViewModel.visibleElements.count), forceMapRefresh=\(contentViewModel.forceMapRefresh)"
+                "main UI readiness changed -> ready=\(contentViewModel.isReadyForPostOnboardingPresentation), loaded=\(contentViewModel.hasLoadedInitialData), allElements=\(contentViewModel.allElements.count), visibleElements=\(contentViewModel.visibleElements.count)"
             )
             evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()

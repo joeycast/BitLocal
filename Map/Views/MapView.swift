@@ -8,13 +8,11 @@
 
 import SwiftUI
 import MapKit
-@preconcurrency import Combine
 import Foundation // for Debug logging
 import BitLocalDomain
 import BitLocalMap
 
 struct MapView: UIViewRepresentable {
-    var elements: [Element]?
     @EnvironmentObject var viewModel: ContentViewModel
     
     // Properties for Dynamic Padding
@@ -28,8 +26,7 @@ struct MapView: UIViewRepresentable {
     var storeRenderToken: Int
 
     // Initializer
-    init(elements: [Element]?, topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType, storeRenderToken: Int = -1) {
-        self.elements = elements
+    init(topPadding: CGFloat, bottomPadding: CGFloat, mapType: MKMapType, storeRenderToken: Int = -1) {
         self.topPadding = topPadding
         self.bottomPadding = bottomPadding
         self.mapType = mapType
@@ -50,7 +47,6 @@ struct MapView: UIViewRepresentable {
             existingMap.delegate = context.coordinator
             context.coordinator.installCommunityOverlayTapRecognizer(on: existingMap)
             context.coordinator.installPlacesRotor(on: existingMap)
-            setupCluster(mapView: existingMap)
             existingMap.showsUserLocation = true
             existingMap.mapType = mapType
             return existingMap
@@ -69,9 +65,6 @@ struct MapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         context.coordinator.installCommunityOverlayTapRecognizer(on: mapView)
         context.coordinator.installPlacesRotor(on: mapView)
-        
-        // Set up clustering
-        setupCluster(mapView: mapView)
         
         // Show user location on the map
         mapView.showsUserLocation = true
@@ -136,7 +129,7 @@ struct MapView: UIViewRepresentable {
             context.coordinator.isInStoreMode = false
             Debug.logTiming(
                 "onboarding",
-                "MapView.updateUIView skipped -> waiting for post-onboarding settle (existingAnnotations=\(currentAnnotations.count), allElements=\(viewModel.mapElementsForCurrentDisplay.count))"
+                "MapView.updateUIView skipped -> waiting for post-onboarding settle (existingAnnotations=\(currentAnnotations.count))"
             )
             return
         }
@@ -168,179 +161,24 @@ struct MapView: UIViewRepresentable {
             needsUpdate = true
         }
 
-        // Redesign phase 4: plain merchant browsing draws from the store pass.
+        // Every map mode draws from the store pass (phases 4, 8i, 8j). Until the
+        // store holds merchants on a first launch, the map shows no pins.
         if context.coordinator.storeModeActive {
             context.coordinator.syncStoreMode(on: mapView)
-            return
-        } else if context.coordinator.isInStoreMode {
-            context.coordinator.leaveStoreMode(on: mapView)
-        }
-
-        let shouldForceUpdate = viewModel.forceMapRefresh
-        let currentMode = viewModel.mapDisplayMode
-        let modeChanged = context.coordinator.lastDisplayMode != currentMode
-        let annotationInputSignature = currentMode == .merchants
-            ? viewModel.merchantMapAnnotationInputSignature
-            : nil
-
-        // Fast path: unrelated parent updates must not re-hash every merchant.
-        // A detent selection re-enters updateUIView even though map content is
-        // unchanged; hashing ~29k merchants here causes a visible release hitch.
-        let canSkipAnnotationHash =
-            !shouldForceUpdate &&
-            !modeChanged &&
-            annotationInputSignature == context.coordinator.lastAnnotationInputSignature &&
-            currentMode != .communities
-
-        if canSkipAnnotationHash {
-            let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
-            if needsUpdate {
-                Debug.logMap("⏱ updateUIView: padding/mapType-only in \(String(format: "%.1f", elapsed))ms")
-            }
-            return
-        }
-        
-        // Handle elements updates (most important)
-        var shouldRefreshAnnotations = false
-        var refreshElementsHash: Int?
-        var refreshForce = false
-        if let elements = elements, !elements.isEmpty {
-            // Content-aware hash so name/boost/icon updates invalidate pins even when IDs are unchanged.
-            let elementsHash = elements.mapAnnotationsContentHash
-            let hashChanged = context.coordinator.lastElementsHash != elementsHash
-            context.coordinator.lastAnnotationInputSignature = annotationInputSignature
-            
-            // Only log details if we're actually going to update
-            if hashChanged || shouldForceUpdate {
-                Debug.logMap("MapView.updateUIView - Elements update needed:")
-                Debug.logMap("   - Elements count: \(elements.count)")
-                Debug.logMap("   - Hash changed: \(hashChanged)")
-                Debug.logMap("   - Force refresh: \(shouldForceUpdate)")
-                
-                context.coordinator.lastElementsHash = elementsHash
-                shouldRefreshAnnotations = true
-                refreshElementsHash = elementsHash
-                refreshForce = refreshForce || shouldForceUpdate
-                Debug.logMap("Annotations marked for update")
-                
-                // Reset the force refresh flag after using it
-                if shouldForceUpdate {
-                    DispatchQueue.main.async {
-                        self.viewModel.forceMapRefresh = false
-                        Debug.logMap("Reset forceMapRefresh to false")
-                    }
-                }
-                needsUpdate = true
-            }
-        } else if elements?.isEmpty == true {
-            context.coordinator.lastAnnotationInputSignature = annotationInputSignature
-            if context.coordinator.clearMerchantAnnotations(on: mapView) {
-                needsUpdate = true
-            }
-        }
-        
-        // Handle community/merchant display mode overlay sync
-        let currentAreaDataHash = viewModel.communityMapAreas.isEmpty
-            ? viewModel.areaBrowserAreas.hashValue
-            : viewModel.communityMapAreas.hashValue
-        if modeChanged || currentMode == .communities {
-            context.coordinator.lastDisplayMode = currentMode
-
-            if currentMode == .communities {
-                context.coordinator.lastCommunityAreasHash = currentAreaDataHash
-                // On iPad we reuse the same MKMapView instance, so community overlays
-                // need to be reconciled on every update while this mode is active.
-                let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
-                let desiredOverlays = Set(viewModel.communityOverlays)
-                let toRemove = existingOverlays.subtracting(desiredOverlays)
-                let toAdd = desiredOverlays.subtracting(existingOverlays)
-                if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
-                if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
-
-                // Only show pins for selected community members.
-                if viewModel.isShowingCommunityMembersOnMap {
-                if let elements = elements {
-                        shouldRefreshAnnotations = true
-                        refreshElementsHash = context.coordinator.lastElementsHash ?? elements.hashValue
-                        refreshForce = true
-                    }
-                } else {
-                    let merchantAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-                    if !merchantAnnotations.isEmpty {
-                        mapView.removeAnnotations(merchantAnnotations)
-                    }
-                }
-            } else {
-                context.coordinator.lastCommunityAreasHash = currentAreaDataHash
-                // Remove all overlays
-                if !mapView.overlays.isEmpty {
-                    mapView.removeOverlays(mapView.overlays)
-                }
-                // Force annotation refresh
-                if let elements = elements, !elements.isEmpty {
-                    shouldRefreshAnnotations = true
-                    refreshElementsHash = context.coordinator.lastElementsHash ?? elements.hashValue
-                    refreshForce = true
-                }
-            }
-            needsUpdate = true
-        }
-
-        if shouldRefreshAnnotations, let elements = elements, !elements.isEmpty {
-            context.coordinator.updateAnnotations(
-                mapView: mapView,
-                elements: elements,
-                elementsHash: refreshElementsHash ?? elements.hashValue,
-                force: refreshForce
-            )
-            Debug.logMap("Annotations updated!")
-            needsUpdate = true
         }
 
         let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
         if needsUpdate {
-            Debug.logMap("⏱ updateUIView: COMPLETED with changes in \(String(format: "%.1f", elapsed))ms")
-        } else if elapsed > 1.0 {
-            Debug.logMap("⏱ updateUIView: no-op but took \(String(format: "%.1f", elapsed))ms")
+            Debug.logMap("⏱ updateUIView: padding/mapType changed in \(String(format: "%.1f", elapsed))ms")
         }
     }
-    
-    // Set up clustering for map annotations
-    private func setupCluster(mapView: MKMapView) {
-        let clusteringIdentifier = "Cluster"
-        mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: clusteringIdentifier)
-    }
-    
+
     // Coordinator class to handle MKMapViewDelegate methods and annotations management
     class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
-        private struct AnnotationPassKey: Equatable {
-            let elementsHash: Int
-            let mapMode: MapDisplayMode
-            let showingCommunityMembers: Bool
-            let selectedCommunityID: String?
-            let viewportMinXBucket: Int
-            let viewportMinYBucket: Int
-            let viewportMaxXBucket: Int
-            let viewportMaxYBucket: Int
-        }
-
         var viewModel: ContentViewModel
         var topPadding: CGFloat
         var bottomPadding: CGFloat
-        var mapRegionChangeCompletion: (() -> Void)?
-        
-        // Keep track of previously displayed elements to manage annotations efficiently
-        var previousElements: Set<Element> = []
-        var currentAnnotations: [String: Annotation] = [:] // Keep track of current annotations
-        private var cancellable: AnyCancellable?
-        private var debounceTimer: AnyCancellable?
-        var lastElementsHash: Int?
-        var lastAnnotationInputSignature: Int?
-        var lastDisplayMode: MapDisplayMode = .merchants
-        var lastCommunityAreasHash: Int?
-        private var lastAnnotationPassKey: AnnotationPassKey?
-        private var hasLoggedInitialAnnotationPass = false
-        var lastVisibleElementIDs: [String] = []
+
         weak var overlayTapRecognizer: UITapGestureRecognizer?
 
         init(viewModel: ContentViewModel, topPadding: CGFloat, bottomPadding: CGFloat) {
@@ -362,8 +200,9 @@ struct MapView: UIViewRepresentable {
         private var lastStoreVisibleIDs: [String] = []
         /// Store rows need a legacy `Element` to become pins (DECISIONS 33). On a fresh
         /// install the element cache fills after the store, so a store pass made before
-        /// that drew nothing; redraw whenever the element cache grows.
-        private var storePassElementCount = -1
+        /// that drew nothing; redraw whenever the element cache grows or its elements
+        /// change (`mapPinRevision`).
+        private var renderedElementState: (count: Int, revision: Int) = (-1, -1)
 
         /// Every map mode draws pins from the store pass once the store has data.
         /// Search, digests and community members narrow it with `MapModel.restriction`;
@@ -398,17 +237,14 @@ struct MapView: UIViewRepresentable {
                     isInStoreMode = true
                     renderedStoreRevision = -1
                     lastStoreVisibleIDs = []
-                    let legacy = mapView.annotations.filter { $0 is Annotation && !($0 is StoreMerchantAnnotation) }
-                    if !legacy.isEmpty { mapView.removeAnnotations(legacy) }
-                    lastDisplayMode = viewModel.mapDisplayMode
                     if let viewport = storeViewport(for: mapView) {
                         model.cameraDidChange(viewport)
                         model.refresh()
                     }
                 }
-                let elementCount = viewModel.allElements.count
-                if elementCount != storePassElementCount {
-                    storePassElementCount = elementCount
+                let elementState = (count: viewModel.allElements.count, revision: viewModel.mapPinRevision)
+                if elementState != renderedElementState {
+                    renderedElementState = elementState
                     renderedStoreRevision = -1
                     lastStoreVisibleIDs = []
                 }
@@ -416,20 +252,6 @@ struct MapView: UIViewRepresentable {
                     applyStoreItems(model, on: mapView)
                 }
             }
-        }
-
-        func leaveStoreMode(on mapView: MKMapView) {
-            isInStoreMode = false
-            renderedStoreRevision = -1
-            lastStoreVisibleIDs = []
-            storePassElementCount = -1
-            let storeAnnotations = mapView.annotations.filter { $0 is StoreMerchantAnnotation || $0 is StoreClusterAnnotation }
-            if !storeAnnotations.isEmpty { mapView.removeAnnotations(storeAnnotations) }
-            // Make the legacy path redraw from scratch.
-            lastElementsHash = nil
-            lastAnnotationInputSignature = nil
-            lastAnnotationPassKey = nil
-            lastVisibleElementIDs = []
         }
 
         /// The camera as the store pass needs it. The list sorts from the center of the
@@ -606,200 +428,6 @@ struct MapView: UIViewRepresentable {
             true
         }
         
-        // Smoothly expand the cluster and zoom to a specific annotation
-        private func expandClusterAndZoomToAnnotation(_ cluster: MKClusterAnnotation, targetAnnotation: MKAnnotation, mapView: MKMapView) {
-            // Calculate the bounding rect for the cluster's member annotations
-            var rect = MKMapRect.null
-            for annotation in cluster.memberAnnotations {
-                let point = MKMapPoint(annotation.coordinate)
-                rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
-            }
-            
-            // Apply a slight zoom-out scale for better visual feedback
-            let zoomOutScale: Double = 1.3
-            rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1), dy: -rect.size.height * (zoomOutScale - 1))
-            
-            // Edge padding for header and bottom sheet
-            let edgePadding = UIEdgeInsets(
-                top: viewModel.topPadding + 10,
-                left: 20,
-                bottom: viewModel.bottomPadding + 100,
-                right: 20
-            )
-            
-            // Smoothly animate to the expanded cluster region
-            DispatchQueue.main.async {
-                UIView.animate(withDuration: 0.7, delay: 0, options: [.curveEaseInOut], animations: {
-                    mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: false)
-                }, completion: { _ in
-                    // After cluster expansion, smoothly center and zoom into the target annotation
-                    self.centerAnnotationSmoothly(mapView: mapView, annotation: targetAnnotation)
-                })
-            }
-        }
-        
-        // Smoothly center and zoom into an annotation
-        private func centerAnnotationSmoothly(mapView: MKMapView, annotation: MKAnnotation) {
-            let targetCoordinate = annotation.coordinate
-            
-            // Desired camera altitude for zoom (adjust this value for more/less zoom)
-            let altitude: CLLocationDistance = 500 // A lower value zooms in more
-            
-            // Create an MKMapCamera with the target coordinate and altitude
-            let camera = MKMapCamera(lookingAtCenter: targetCoordinate, fromDistance: altitude, pitch: 0, heading: 0)
-            
-            // Perform a smooth camera animation
-            UIView.animate(withDuration: 1.0, delay: 0, options: [.curveEaseInOut], animations: {
-                mapView.setCamera(camera, animated: true)
-            }, completion: { _ in
-                // Select the annotation after the animation completes
-                DispatchQueue.main.async {
-                    mapView.selectAnnotation(annotation, animated: true)
-                }
-            })
-        }
-        
-        // `AnyCancellable` cancels itself when the coordinator is released.
-
-        // Efficiently update annotations by only adding/removing what's changed
-        func updateAnnotations(mapView: MKMapView, elements: [Element]?, elementsHash: Int, force: Bool = false) {
-            let annStart = CFAbsoluteTimeGetCurrent()
-            guard let elements = elements else { return }
-
-            if !hasLoggedInitialAnnotationPass {
-                hasLoggedInitialAnnotationPass = true
-                Debug.logTiming("map", "initial annotation pass started (elements=\(elements.count), force=\(force))")
-            }
-
-            let sourceElements: [Element]
-            if viewModel.mapDisplayMode == .communities,
-               viewModel.selectedCommunityArea != nil,
-               !viewModel.communityMemberElementIDs.isEmpty {
-                let allowedIDs = viewModel.communityMemberElementIDs
-                sourceElements = elements.filter { allowedIDs.contains($0.id) }
-            } else {
-                sourceElements = elements
-            }
-
-            let viewportRect = effectiveViewportRect(for: mapView)
-            let centerPoint = CGPoint(x: viewportRect.midX, y: viewportRect.midY)
-            let centerCoordinate = mapView.convert(centerPoint, toCoordinateFrom: mapView)
-
-            let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
-            let maxDistanceMeters = 25.0 * 1609.344
-            let centerLat = centerCoordinate.latitude
-            let centerLon = centerCoordinate.longitude
-            let viewportBucketScale = 1_000.0
-            let currentKey = AnnotationPassKey(
-                elementsHash: elementsHash,
-                mapMode: viewModel.mapDisplayMode,
-                showingCommunityMembers: viewModel.isShowingCommunityMembersOnMap,
-                selectedCommunityID: viewModel.selectedCommunityArea?.id,
-                viewportMinXBucket: Int((visibleRect.minX / viewportBucketScale).rounded()),
-                viewportMinYBucket: Int((visibleRect.minY / viewportBucketScale).rounded()),
-                viewportMaxXBucket: Int((visibleRect.maxX / viewportBucketScale).rounded()),
-                viewportMaxYBucket: Int((visibleRect.maxY / viewportBucketScale).rounded())
-            )
-            if !force, lastAnnotationPassKey == currentKey {
-                return
-            }
-            lastAnnotationPassKey = currentKey
-
-            let visibleElements = sourceElements.filter { element in
-                // 1. Cheapest checks first — pure string comparisons
-                guard (element.deletedAt == nil || element.deletedAt == ""),
-                      element.hasMapRenderableIdentity,
-                      let coordinate = element.mapCoordinate else { return false }
-
-                // 2. Rect containment — cheap math, eliminates most elements
-                let mapPoint = MKMapPoint(coordinate)
-                guard visibleRect.contains(mapPoint) else { return false }
-
-                // 3. Distance check — only for the few elements still in the rect.
-                //    Use Equirectangular approximation instead of CLLocation (avoids object allocation).
-                let dLat = (coordinate.latitude - centerLat) * .pi / 180.0
-                let dLon = (coordinate.longitude - centerLon) * .pi / 180.0
-                let cosLat = cos(centerLat * .pi / 180.0)
-                let approxDistance = 6_371_000.0 * sqrt(dLat * dLat + (dLon * cosLat) * (dLon * cosLat))
-                return approxDistance <= maxDistanceMeters
-            }
-
-            let existingAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-            var existingByID: [String: Annotation] = [:]
-            existingByID.reserveCapacity(existingAnnotations.count)
-            for annotation in existingAnnotations {
-                if let elementID = annotation.element?.id {
-                    existingByID[elementID] = annotation
-                }
-            }
-
-            var newByID: [String: Element] = [:]
-            newByID.reserveCapacity(visibleElements.count)
-            for element in visibleElements where newByID[element.id] == nil {
-                newByID[element.id] = element
-            }
-
-            // Drop pins that left the viewport, and pins whose map-facing content changed
-            // (name, boost, icon) so marker tint/title stay current.
-            let annotationsToRemove = existingByID.compactMap { id, annotation -> Annotation? in
-                guard let latest = newByID[id] else { return annotation }
-                let existingSignature = annotation.element?.mapAnnotationContentSignature
-                let latestSignature = latest.mapAnnotationContentSignature
-                let boostChanged = (annotation.element?.isCurrentlyBoosted() ?? false) != latest.isCurrentlyBoosted()
-                if existingSignature != latestSignature || boostChanged {
-                    return annotation
-                }
-                return nil
-            }
-            let removedIDs = Set(annotationsToRemove.compactMap { $0.element?.id })
-            let elementsToAdd = newByID.compactMap { id, element -> Element? in
-                if existingByID[id] == nil || removedIDs.contains(id) {
-                    return element
-                }
-                return nil
-            }
-
-            mapView.removeAnnotations(annotationsToRemove)
-
-            let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
-            mapView.addAnnotations(newAnnotations)
-
-            let latestByID = IdentifiableIndex.byID(sourceElements)
-            let visibleIDs = visibleElements.map(\.id)
-            let refreshedVisibleElements = visibleIDs.compactMap { id in
-                latestByID[id] ?? newByID[id]
-            }
-            if visibleIDs != lastVisibleElementIDs {
-                lastVisibleElementIDs = visibleIDs
-                Debug.logTiming(
-                    "map",
-                    "publishing visible elements -> count=\(refreshedVisibleElements.count), annotations=\(mapView.annotations.compactMap { $0 as? Annotation }.count)"
-                )
-                self.viewModel.visibleElementsSubject.send(refreshedVisibleElements)
-            }
-            Debug.logMap("⏱ updateAnnotations: \(sourceElements.count) source → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - annStart) * 1000))ms")
-        }
-
-        @discardableResult
-        func clearMerchantAnnotations(on mapView: MKMapView) -> Bool {
-            let currentAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
-            guard !currentAnnotations.isEmpty || lastElementsHash != nil || !lastVisibleElementIDs.isEmpty else {
-                return false
-            }
-
-            if !currentAnnotations.isEmpty {
-                Debug.logMap("MapView.updateUIView: Clearing \(currentAnnotations.count) annotations")
-                mapView.removeAnnotations(currentAnnotations)
-            }
-
-            // Reset annotation caches so the same search result IDs can be re-added
-            // after transient empty states during search refinement.
-            lastElementsHash = nil
-            lastVisibleElementIDs = []
-            lastAnnotationPassKey = nil
-            return true
-        }
-
         // MARK: - MKMapViewDelegate Methods
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
@@ -824,26 +452,6 @@ struct MapView: UIViewRepresentable {
                     comment: "VoiceOver hint for merchant map clusters"
                 )
                 return clusterView
-            } else if let cluster = annotation as? MKClusterAnnotation {
-                // Handle cluster annotations
-                view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
-                view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
-                view?.markerTintColor = UIColor(named: "MarkerColor")
-                view?.glyphText = "\(cluster.memberAnnotations.count)"
-                let count = cluster.memberAnnotations.count
-                // localizedStringWithFormat resolves the catalog's plural variations.
-                view?.accessibilityLabel = String.localizedStringWithFormat(
-                    NSLocalizedString(
-                        "%d Bitcoin merchants",
-                        comment: "VoiceOver label for a map cluster of merchants"
-                    ),
-                    count
-                )
-                view?.accessibilityTraits = .button
-                view?.accessibilityHint = NSLocalizedString(
-                    "Double tap to zoom into this cluster",
-                    comment: "VoiceOver hint for merchant map clusters"
-                )
             } else if let annotation = annotation as? Annotation {
                 // Handle individual annotations — never crash on missing element.
                 guard let element = annotation.element else {
@@ -852,8 +460,8 @@ struct MapView: UIViewRepresentable {
                 }
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
                 view?.annotation = annotation
-                // Store pins are clustered by BitLocal already; MapKit must not regroup them.
-                view?.clusteringIdentifier = annotation is StoreMerchantAnnotation ? nil : MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+                // Pins are clustered by BitLocal already; MapKit must not regroup them.
+                view?.clusteringIdentifier = nil
                 view?.canShowCallout = true
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
@@ -921,40 +529,7 @@ struct MapView: UIViewRepresentable {
                 zoomInto(cluster, on: mapView)
                 return
             }
-            if let cluster = view.annotation as? MKClusterAnnotation {
-                let annotations = cluster.memberAnnotations
-                
-                // Calculate the bounding map rect for the cluster annotations
-                var rect = MKMapRect.null
-                for annotation in annotations {
-                    let point = MKMapPoint(annotation.coordinate)
-                    rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
-                }
-                
-                // Apply a scale factor to control zoom level
-                let zoomOutScale: Double = 1.3 // Adjust this value for better zoom
-                rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1),
-                                    dy: -rect.size.height * (zoomOutScale - 1))
-                
-                // Edge padding to respect header and bottom sheet
-                let topInset: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 10 : viewModel.topPadding + 10
-                let edgePadding = UIEdgeInsets(
-                    top: topInset,
-                    left: 20,
-                    bottom: viewModel.bottomPadding + 100,
-                    right: 20
-                )
-                
-                // Set the visible map rect with padding and zoom adjustments
-                mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: true)
-                
-                Debug.logMap("""
-                Cluster Selected -> 
-                Edge Padding (Top: \(edgePadding.top), Bottom: \(edgePadding.bottom)),
-                Zoom Scale: \(zoomOutScale)
-                """)
-            }
-            else if let annotation = view.annotation as? Annotation, let element = annotation.element {
+            if let annotation = view.annotation as? Annotation, let element = annotation.element {
                 // Restore the logic to display BusinessDetailView
                 DispatchQueue.main.async {
                     self.viewModel.setSelectionSource(.mapAnnotation)
@@ -996,42 +571,12 @@ struct MapView: UIViewRepresentable {
                 self.viewModel.syncRegionFromMap(center: mapView.region.center, span: mapView.region.span)
             }
             
-            // Store-backed map: MapModel debounces and cancels on its own.
-            if viewModel.isReadyForPostOnboardingPresentation, storeModeActive {
-                debounceTimer?.cancel()
-                if isInStoreMode, let viewport = storeViewport(for: mapView) {
-                    MainActor.assumeIsolated { StoreMap.shared.model?.cameraDidChange(viewport) }
-                }
-                if animated, let completion = mapRegionChangeCompletion {
-                    mapRegionChangeCompletion = nil
-                    completion()
-                }
-                return
-            }
-
-            // Debounce the call to update annotations
-            debounceTimer?.cancel()
-            debounceTimer = Just(())
-                .delay(for: .seconds(0.5), scheduler: RunLoop.main)
-                .sink { [weak self] _ in
-                    guard let self = self else { return }
-                    guard self.viewModel.isReadyForPostOnboardingPresentation else {
-                        self.viewModel.mapStoppedMovingSubject.send(())
-                        return
-                    }
-                    let all = self.viewModel.mapElementsForCurrentDisplay
-                    self.updateAnnotations(
-                        mapView: mapView,
-                        elements: all,
-                        elementsHash: all.mapAnnotationsContentHash,
-                        force: false
-                    )
-                }
-            
-            if animated, let completion = mapRegionChangeCompletion {
-                // Trigger completion handler
-                mapRegionChangeCompletion = nil // Reset to avoid repeated calls
-                completion()
+            // MapModel debounces and cancels on its own.
+            if viewModel.isReadyForPostOnboardingPresentation, storeModeActive, isInStoreMode,
+               let viewport = storeViewport(for: mapView) {
+                MainActor.assumeIsolated { StoreMap.shared.model?.cameraDidChange(viewport) }
+            } else {
+                viewModel.mapStoppedMovingSubject.send(())
             }
         }
 
@@ -1050,30 +595,6 @@ struct MapView: UIViewRepresentable {
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)
-        }
-
-        // Update visible elements based on annotations in the visible map rect
-        func updateVisibleElements(for mapView: MKMapView) {
-            let viewportRect = effectiveViewportRect(for: mapView)
-            let visibleRect = effectiveVisibleMapRect(for: mapView, viewportRect: viewportRect)
-            let visibleAnnotations = mapView.annotations(in: visibleRect)
-            let visibleElements = visibleAnnotations.compactMap { ($0 as? Annotation)?.element }
-            let latestByID = IdentifiableIndex.byID(self.viewModel.allElements)
-            let refreshed = visibleElements.compactMap { latestByID[$0.id] ?? $0 }
-
-            self.viewModel.visibleElementsSubject.send(refreshed)
-            self.viewModel.mapStoppedMovingSubject.send(())
-        }
-
-        private func effectiveViewportRect(for mapView: MKMapView) -> CGRect {
-            if viewModel.mapDisplayMode == .merchants {
-                return mapView.bounds
-            }
-            return viewModel.mapListViewportRect(for: mapView)
-        }
-
-        private func effectiveVisibleMapRect(for mapView: MKMapView, viewportRect: CGRect) -> MKMapRect {
-            viewModel.mapRect(for: viewportRect, in: mapView)
         }
     }
 }

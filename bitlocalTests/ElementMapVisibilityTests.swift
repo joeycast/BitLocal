@@ -2,39 +2,15 @@ import XCTest
 @testable import bitlocal
 
 final class ElementMapVisibilityTests: XCTestCase {
-    func testBrandOnlyMerchantHasMapRenderableIdentity() {
-        let element = makeElement(name: nil, brand: "Steak 'n Shake", operatorName: nil)
-        XCTAssertEqual(element.displayName, "Steak 'n Shake")
-        XCTAssertTrue(element.hasMapRenderableIdentity)
+    func testDisplayNameFallsBackToBrandThenOperator() {
+        XCTAssertEqual(makeElement(name: nil, brand: "Steak 'n Shake", operatorName: nil).displayName, "Steak 'n Shake")
+        XCTAssertEqual(makeElement(name: nil, brand: nil, operatorName: "Acme Ops LLC").displayName, "Acme Ops LLC")
     }
 
-    func testOperatorOnlyMerchantHasMapRenderableIdentity() {
-        let element = makeElement(name: nil, brand: nil, operatorName: "Acme Ops LLC")
-        XCTAssertEqual(element.displayName, "Acme Ops LLC")
-        XCTAssertTrue(element.hasMapRenderableIdentity)
-    }
-
-    func testNamedMerchantHasMapRenderableIdentity() {
-        let element = makeElement(name: "Cafe Bitcoin", brand: nil, operatorName: nil)
-        XCTAssertTrue(element.hasMapRenderableIdentity)
-    }
-
-    func testPlaceholderNameStillHasMapRenderableIdentity() {
-        let element = makeElement(name: "BTC Map Place #42", brand: nil, operatorName: nil)
-        XCTAssertNil(element.displayName)
-        XCTAssertTrue(element.hasMapRenderableIdentity)
-    }
-
-    func testEmptyIdentityIsNotMapRenderable() {
-        let element = makeElement(name: nil, brand: nil, operatorName: nil)
-        XCTAssertNil(element.displayName)
-        XCTAssertFalse(element.hasMapRenderableIdentity)
-    }
-
-    func testUnnamedWithoutFallbackIsNotMapRenderable() {
-        let element = makeElement(name: "unnamed", brand: nil, operatorName: nil)
-        XCTAssertNil(element.displayName)
-        XCTAssertFalse(element.hasMapRenderableIdentity)
+    func testPlaceholderAndUnnamedHaveNoDisplayName() {
+        XCTAssertNil(makeElement(name: "BTC Map Place #42", brand: nil, operatorName: nil).displayName)
+        XCTAssertNil(makeElement(name: "unnamed", brand: nil, operatorName: nil).displayName)
+        XCTAssertNil(makeElement(name: nil, brand: nil, operatorName: nil).displayName)
     }
 
     func testAmenityATMIsDetected() {
