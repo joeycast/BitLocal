@@ -1048,7 +1048,13 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
             rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
         }
 
-        let edgePadding = mapListViewportInsets(for: mapView)
+        // Room for the pins themselves and their titles, so the outermost places
+        // aren't cut off at the screen edge (seen in the CI screenshots).
+        var edgePadding = mapListViewportInsets(for: mapView)
+        edgePadding.top += 56
+        edgePadding.left += 56
+        edgePadding.bottom += 28
+        edgePadding.right += 56
         DispatchQueue.main.async {
             mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: animated)
         }
