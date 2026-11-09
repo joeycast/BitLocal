@@ -365,14 +365,27 @@ struct MapView: UIViewRepresentable {
         /// that drew nothing; redraw whenever the element cache grows.
         private var storePassElementCount = -1
 
-        /// Merchant mode (browsing, search results and alert digests) once the store has
-        /// data. Search and digests narrow the store pass with `MapModel.restriction`.
-        /// Communities still draw from the legacy path (area overlays and members).
+        /// Every map mode draws pins from the store pass once the store has data.
+        /// Search, digests and community members narrow it with `MapModel.restriction`;
+        /// community area outlines are overlays reconciled alongside (phase 8j).
         var storeModeActive: Bool {
             MainActor.assumeIsolated {
-                guard StoreMap.shared.isReady, StoreMap.shared.model != nil else { return false }
-                return viewModel.mapDisplayMode == .merchants
+                StoreMap.shared.isReady && StoreMap.shared.model != nil
             }
+        }
+
+        /// Community outlines in Communities mode, none otherwise.
+        private func syncStoreOverlays(on mapView: MKMapView) {
+            let existing = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
+            let desired: Set<MKPolygon> = viewModel.mapDisplayMode == .communities
+                ? Set(viewModel.communityOverlays)
+                : []
+            let toRemove = existing.subtracting(desired)
+            let toAdd = desired.subtracting(existing)
+            if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
+            if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
+            let stray = mapView.overlays.filter { !($0 is MKPolygon) }
+            if !stray.isEmpty { mapView.removeOverlays(stray) }
         }
 
         func syncStoreMode(on mapView: MKMapView) {
@@ -380,14 +393,14 @@ struct MapView: UIViewRepresentable {
                 guard let model = StoreMap.shared.model else { return }
                 let restriction = viewModel.storeMapRestriction
                 if model.restriction != restriction { model.restriction = restriction }
+                syncStoreOverlays(on: mapView)
                 if !isInStoreMode {
                     isInStoreMode = true
                     renderedStoreRevision = -1
                     lastStoreVisibleIDs = []
                     let legacy = mapView.annotations.filter { $0 is Annotation && !($0 is StoreMerchantAnnotation) }
                     if !legacy.isEmpty { mapView.removeAnnotations(legacy) }
-                    if !mapView.overlays.isEmpty { mapView.removeOverlays(mapView.overlays) }
-                    lastDisplayMode = .merchants
+                    lastDisplayMode = viewModel.mapDisplayMode
                     if let viewport = storeViewport(for: mapView) {
                         model.cameraDidChange(viewport)
                         model.refresh()
