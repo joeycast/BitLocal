@@ -3078,6 +3078,15 @@ extension ContentViewModel {
         try? await Task.sleep(for: .seconds(2))
         uiCheckLog("UICheck: running \(scenario.rawValue) (store=\(StoreMap.shared.isReady), elements=\(allElements.count), visible=\(visibleElements.count))")
 
+        // The search scenario's query is restored on the next launch; start the
+        // other screens without it.
+        if scenario != .search, !unifiedSearchText.isEmpty {
+            unifiedSearchText = ""
+            isSearchActive = false
+            performUnifiedSearch()
+            try? await Task.sleep(for: .seconds(1))
+        }
+
         switch scenario {
         case .browse:
             break
