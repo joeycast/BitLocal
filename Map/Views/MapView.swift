@@ -365,18 +365,21 @@ struct MapView: UIViewRepresentable {
         /// that drew nothing; redraw whenever the element cache grows.
         private var storePassElementCount = -1
 
-        /// Plain merchant browsing (no search, digest or communities) once the store has data.
+        /// Merchant mode (browsing, search results and alert digests) once the store has
+        /// data. Search and digests narrow the store pass with `MapModel.restriction`.
+        /// Communities still draw from the legacy path (area overlays and members).
         var storeModeActive: Bool {
             MainActor.assumeIsolated {
                 guard StoreMap.shared.isReady, StoreMap.shared.model != nil else { return false }
-                guard viewModel.mapDisplayMode == .merchants, viewModel.activeMerchantAlertDigest == nil else { return false }
-                return viewModel.unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
+                return viewModel.mapDisplayMode == .merchants
             }
         }
 
         func syncStoreMode(on mapView: MKMapView) {
             MainActor.assumeIsolated {
                 guard let model = StoreMap.shared.model else { return }
+                let restriction = viewModel.storeMapRestriction
+                if model.restriction != restriction { model.restriction = restriction }
                 if !isInStoreMode {
                     isInStoreMode = true
                     renderedStoreRevision = -1
