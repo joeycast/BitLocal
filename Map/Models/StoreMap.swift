@@ -3,9 +3,9 @@
 //  bitlocal
 //
 //  Redesign phase 4: the map reads merchants from the SQLite store through
-//  `MapModel` (viewport query + clustering, no 25-mile cap). Search results
-//  and alert digests narrow it with `MapModel.restriction` (phase 8i); only
-//  community members still use the legacy element path.
+//  `MapModel` (viewport query + clustering, no 25-mile cap). Search results,
+//  alert digests and community members narrow it with `MapModel.restriction`
+//  (phases 8i, 8j).
 //
 
 import Foundation
