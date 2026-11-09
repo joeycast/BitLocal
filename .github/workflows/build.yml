@@ -64,6 +64,22 @@ jobs:
             DEVELOPMENT_TEAM= \
             test-without-building
 
+      # Screenshots of the main screens on iPhone, iPad and (if the runtime has
+      # one) iPhone Duo. Printed into the log and uploaded; never fails the build.
+      - name: Visual UI check
+        continue-on-error: true
+        timeout-minutes: 25
+        run: scripts/ci/ui-check.sh
+
+      - name: Upload UI check screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: ui-check
+          path: build/ui-check/*.png
+          retention-days: 7
+
       - name: Upload simulator app
         uses: actions/upload-artifact@v6
         with:

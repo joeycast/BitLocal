@@ -3037,3 +3037,81 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         }
     }
 }
+
+#if DEBUG
+// MARK: - UI check scenarios (CI screenshots)
+
+/// Debug-only screens for the CI screenshot job (`scripts/ci/ui-check.sh`). Pass
+/// `-UICheckScenario <name>` at launch; the app waits for the store map, then
+/// opens the screen. Release builds don't contain this.
+enum UICheckScenario: String {
+    case browse, search, communities, community, digest
+
+    static var current: UICheckScenario? {
+        UserDefaults.standard.string(forKey: "UICheckScenario").flatMap(UICheckScenario.init(rawValue:))
+    }
+}
+
+/// Unbuffered, so the CI script sees the marker while the app is still running.
+private func uiCheckLog(_ message: String) {
+    FileHandle.standardError.write(Data((message + "\n").utf8))
+}
+
+extension ContentViewModel {
+    func runUICheckScenarioIfNeeded() async {
+        guard let scenario = UICheckScenario.current else { return }
+        Debug.log("UICheck: waiting to run \(scenario.rawValue)")
+        for _ in 0..<240 {
+            if StoreMap.shared.isReady, !allElements.isEmpty, !visibleElements.isEmpty,
+               isReadyForPostOnboardingPresentation { break }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        try? await Task.sleep(for: .seconds(2))
+        uiCheckLog("UICheck: running \(scenario.rawValue) (store=\(StoreMap.shared.isReady), elements=\(allElements.count), visible=\(visibleElements.count))")
+
+        switch scenario {
+        case .browse:
+            break
+        case .search:
+            isSearchActive = true
+            unifiedSearchText = "coffee"
+            performUnifiedSearch()
+        case .communities, .community:
+            if mapDisplayMode != .communities { toggleMapMode() }
+            guard scenario == .community else { break }
+            for _ in 0..<60 where communityMapAreas.filter(\.isCommunity).isEmpty {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            let here = userLocation?.coordinate ?? region.center
+            let candidates = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted }
+            let scored = candidates.compactMap { area -> (V2AreaRecord, Double)? in
+                guard let region = mapRegion(forCommunityArea: area) else { return nil }
+                let dLat = region.center.latitude - here.latitude
+                let dLon = region.center.longitude - here.longitude
+                return (area, dLat * dLat + dLon * dLon)
+            }
+            if let nearest = scored.min(by: { $0.1 < $1.1 })?.0 {
+                uiCheckLog("UICheck: selecting community \(nearest.id)")
+                selectCommunity(nearest)
+            }
+        case .digest:
+            let ids = Array(visibleElements.prefix(8).map(\.id))
+            let digest = CityDigest(
+                id: "ui-check",
+                locationID: nil,
+                cityKey: "ui-check",
+                cityDisplayName: "Nashville",
+                digestWindowStart: nil,
+                digestWindowEnd: nil,
+                merchantCount: ids.count,
+                merchantIDs: ids,
+                topMerchantNames: visibleElements.prefix(2).compactMap(\.displayName),
+                timeZoneID: nil,
+                deliveryLocalDate: nil
+            )
+            activateMerchantAlertDigest(digest)
+        }
+        uiCheckLog("UICheck: ready \(scenario.rawValue)")
+    }
+}
+#endif

@@ -48,6 +48,9 @@ struct RootView: View {
             evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()
         }
+        #if DEBUG
+        .task { await contentViewModel.runUICheckScenarioIfNeeded() }
+        #endif
         .onChange(of: didCompleteOnboarding) { _, completed in
             Debug.log("onboarding completion changed to: \(completed)")
 
