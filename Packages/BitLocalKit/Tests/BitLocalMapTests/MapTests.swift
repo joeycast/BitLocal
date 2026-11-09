@@ -190,6 +190,25 @@ struct MapModelTests {
         #expect(model.visibleSummaries.map(\.id) == [MerchantID(2)])
     }
 
+    @Test func restrictionLimitsPinsAndListUntilCleared() async {
+        let source = FakeSource([summary(1, 36.16, -86.78), summary(2, 36.161, -86.78), summary(3, 36.162, -86.78)])
+        let model = MapModel(source: source, configuration: .init(debounce: .zero))
+        model.cameraDidChange(viewport(center: nashville, span: 0.5))
+        await model.settle()
+        #expect(model.visibleCount == 3)
+        model.restriction = [MerchantID(1), MerchantID(3)]
+        await model.settle()
+        #expect(Set(model.visibleSummaries.map(\.id)) == [MerchantID(1), MerchantID(3)])
+        #expect(merchantCount(model.items) == 2)
+        model.restriction = []
+        await model.settle()
+        #expect(model.visibleCount == 0)
+        #expect(model.items.isEmpty)
+        model.restriction = nil
+        await model.settle()
+        #expect(model.visibleCount == 3)
+    }
+
     @Test func refreshPicksUpNewRows() async {
         let source = FakeSource([summary(1, 36.16, -86.78)])
         let model = MapModel(source: source, configuration: .init(debounce: .zero))

@@ -57,6 +57,13 @@ public final class MapModel {
         didSet { if filter != oldValue { refresh(immediately: true) } }
     }
 
+    /// When set, only these merchants are drawn and listed (search results, an alert
+    /// digest). Nil draws everything the filter allows. Applied after the viewport
+    /// query, so the set can be any size without a SQL `IN` list.
+    public var restriction: Set<MerchantID>? {
+        didSet { if restriction != oldValue { refresh(immediately: true) } }
+    }
+
     /// Always drawn as its own pin.
     public var selectedID: MerchantID? {
         didSet { if selectedID != oldValue { recluster() } }
@@ -88,14 +95,16 @@ public final class MapModel {
         let configuration = configuration
         let filter = filter
         let selected = selectedID
+        let restriction = restriction
         pass = Task { [weak self] in
             if !immediately, configuration.debounce > .zero {
                 try? await Task.sleep(for: configuration.debounce)
             }
             guard !Task.isCancelled else { return }
             let queryRect = viewport.rect.expanded(by: configuration.margin)
-            guard let summaries = try? await source.summaries(in: queryRect, filter: filter, limit: configuration.queryLimit),
+            guard let queried = try? await source.summaries(in: queryRect, filter: filter, limit: configuration.queryLimit),
                   !Task.isCancelled else { return }
+            let summaries = restriction.map { allowed in queried.filter { allowed.contains($0.id) } } ?? queried
             let result = await Self.compute(summaries, viewport: viewport, selected: selected, configuration: configuration)
             guard !Task.isCancelled else { return }
             self?.apply(result, summaries: summaries, viewport: viewport)

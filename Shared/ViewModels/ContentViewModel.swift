@@ -1692,6 +1692,22 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         loadCommunityMapAreasV2()
     }
 
+    /// What the store-backed map is limited to (redesign phase 8i): the alert
+    /// digest's places, or the search results the list shows. Nil while plain
+    /// browsing. Replaces the legacy element path (and its 25-mile cap and MapKit
+    /// clustering) for search and digests.
+    var storeMapRestriction: Set<MerchantID>? {
+        guard mapDisplayMode == .merchants else { return nil }
+        if let digest = activeMerchantAlertDigest {
+            return Set(digest.merchantIDs.compactMap(MerchantID.init(string:)))
+        }
+        let trimmedQuery = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedQuery.count >= 2 {
+            return Set(merchantSearchMapResults.compactMap { MerchantID(string: $0.id) })
+        }
+        return nil
+    }
+
     var mapElementsForCurrentDisplay: [Element] {
         switch mapDisplayMode {
         case .merchants:
