@@ -16,7 +16,6 @@ import BitLocalNavigation
 
 struct SplitLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
-    var elements: [Element]?
     var visibleElements: [Element]
     @Binding var showingSettings: Bool
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -192,21 +191,18 @@ struct SplitLayoutView: View {
     /// a fold gutter that the map runs under (fold stack).
     private func mapPanel(bottomClearance: CGFloat = 0) -> some View {
         ZStack {
-            if let elements {
-                MapView(
-                    elements: elements,
-                    topPadding: 0,
-                    bottomPadding: bottomClearance,
-                    mapType: selectedMapTypeBinding.wrappedValue,
-                    storeRenderToken: StoreMap.shared.renderToken
-                )
-                .id("PersistentMap")
-                // Only vertically: on iOS 26 the sidebar floats over the detail column,
-                // and a map running under it hid pins and tinted the glass sidebar.
-                .ignoresSafeArea(.container, edges: .vertical)
-                .onAppear {
-                    viewModel.locationManager.startUpdatingLocation()
-                }
+            MapView(
+                topPadding: 0,
+                bottomPadding: bottomClearance,
+                mapType: selectedMapTypeBinding.wrappedValue,
+                storeRenderToken: StoreMap.shared.renderToken
+            )
+            .id("PersistentMap")
+            // Only vertically: on iOS 26 the sidebar floats over the detail column,
+            // and a map running under it hid pins and tinted the glass sidebar.
+            .ignoresSafeArea(.container, edges: .vertical)
+            .onAppear {
+                viewModel.locationManager.startUpdatingLocation()
             }
         }
         .overlay(alignment: .bottomLeading) {

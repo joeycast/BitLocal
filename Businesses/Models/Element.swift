@@ -157,15 +157,6 @@ struct Element: Codable, Identifiable, Hashable {
         return nil
     }
 
-    /// Whether this merchant has enough identity to render as a map pin.
-    /// Matches list/search labeling: valid display name (name, brand, or operator),
-    /// plus snapshot placeholder names so cold-start pins still appear before hydration.
-    var hasMapRenderableIdentity: Bool {
-        if displayName != nil { return true }
-        let rawName = osmJSON?.tags?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return Self.isPlaceholderName(rawName)
-    }
-
     /// List/map title for first paint. CDN snapshots often lack real names;
     /// fall back to a localized category while placeholder tags still drive hydration.
     var displayNameForUI: String? {
@@ -219,26 +210,6 @@ struct Element: Codable, Identifiable, Hashable {
         if icon == "local_atm" || icon == "atm" { return true }
 
         return false
-    }
-}
-
-extension Array where Element == bitlocal.Element {
-    /// Content-aware signature for map invalidation (IDs alone are not enough).
-    /// Uses stored boost tokens rather than live date checks so full-catalog
-    /// hashing stays cheap; become-active force-refresh covers expiry re-tint.
-    var mapAnnotationsContentHash: Int {
-        var hasher = Hasher()
-        hasher.combine(count)
-        for element in self {
-            hasher.combine(element.id)
-            // Same components as mapAnnotationContentSignature, hashed directly
-            // to avoid building a string per element on every map update.
-            hasher.combine(element.updatedAt ?? "")
-            hasher.combine(element.displayName ?? element.osmJSON?.tags?.name ?? "")
-            hasher.combine(element.v4Metadata?.boostedUntil ?? element.tags?.boostExpires ?? "")
-            hasher.combine(element.v4Metadata?.icon ?? element.tags?.iconPlatform ?? "")
-        }
-        return hasher.finalize()
     }
 }
 

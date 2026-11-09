@@ -138,3 +138,7 @@ To overrule one, say which number and what you want instead.
 ### Phase 8j: communities on the store map
 
 98. **Community members are pins from the store pass too, and community outlines are overlays reconciled next to it.** Every map mode now uses one pin pipeline. In Communities mode with no community selected, the restriction is empty, so no merchant pins show (same as before). The legacy element pin path now only runs in the moment before the store is ready on a first launch; it is deleted together with `Element`.
+
+### Phase 8k: legacy pin path removed
+
+99. **The legacy element pin path is deleted.** The map only draws from the store pass now, so `MapView` no longer takes an element array, there's no MapKit clustering, no 25-mile cap and no per-update hash of the whole catalog (`ContentView` used to filter all ~29k elements on every body pass just to hand them to the map). On a first launch the map shows no pins for the moment between the element cache filling and the store's first import; both come from the same snapshot, so that gap is short. If the SQLite store can't be opened at all, the map shows no pins rather than falling back. `forceMapRefresh` became `mapPinRevision`, which the store pass actually reads: before, it was only read by the legacy path, so a name hydrated or a boost expiring didn't redraw store pins until the store's own revision changed.

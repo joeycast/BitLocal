@@ -77,7 +77,7 @@ struct RootView: View {
         .onChange(of: contentViewModel.isReadyForPostOnboardingPresentation) { _, _ in
             Debug.logTiming(
                 "onboarding",
-                "main UI readiness changed -> ready=\(contentViewModel.isReadyForPostOnboardingPresentation), loaded=\(contentViewModel.hasLoadedInitialData), allElements=\(contentViewModel.allElements.count), visibleElements=\(contentViewModel.visibleElements.count), forceMapRefresh=\(contentViewModel.forceMapRefresh)"
+                "main UI readiness changed -> ready=\(contentViewModel.isReadyForPostOnboardingPresentation), loaded=\(contentViewModel.hasLoadedInitialData), allElements=\(contentViewModel.allElements.count), visibleElements=\(contentViewModel.visibleElements.count)"
             )
             evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()

@@ -35,7 +35,6 @@ struct ContentView: View {
             if navigation.posture.usesSheet {
                 CompactLayoutView(
                     viewModel: viewModel,
-                    elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.listElementsForCurrentDisplay,
                     showingSettings: $showingSettings,
                     selectedMapTypeBinding: selectedMapTypeBinding,
@@ -44,7 +43,6 @@ struct ContentView: View {
             } else {
                 SplitLayoutView(
                     viewModel: viewModel,
-                    elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.listElementsForCurrentDisplay,
                     showingSettings: $showingSettings,
                     selectedMapTypeBinding: selectedMapTypeBinding

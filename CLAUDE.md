@@ -81,7 +81,7 @@ v4 is the only merchant source (the v2 fallback was removed in the redesign, pha
 4. Incremental sync:  
    `GET https://api.btcmap.org/v4/places?updated_since=<anchor>&include_deleted=true&fields=...`
 5. Merge by place id, drop deleted, persist cache + sync anchor
-6. Map: merchant mode reads from the SQLite store via `MapModel` (`Packages/BitLocalKit/Sources/BitLocalMap`, bridged in `Map/Models/StoreMap.swift`): 150 ms debounce, R-tree viewport query, BitLocal's own grid clustering, no distance cap. Search results, alert digests and community members use the same store pass, narrowed by `MapModel.restriction`; community outlines are overlays drawn alongside. The legacy element pin path only runs before the store is ready
+6. Map: merchant mode reads from the SQLite store via `MapModel` (`Packages/BitLocalKit/Sources/BitLocalMap`, bridged in `Map/Models/StoreMap.swift`): 150 ms debounce, R-tree viewport query, BitLocal's own grid clustering, no distance cap. Search results, alert digests and community members use the same store pass, narrowed by `MapModel.restriction`; community outlines are overlays drawn alongside. Until the store holds merchants on a first launch, the map shows no pins (the legacy element pin path is gone)
 
 **Other API surfaces:**
 - Search: `v4/places/search/`

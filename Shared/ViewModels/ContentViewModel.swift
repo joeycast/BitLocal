@@ -136,7 +136,10 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
     /// finishes its release-to-detent animation.
     private var pendingSheetDetentHeight: CGFloat?
     @Published var initialRegionSet = false // Track if initial region has been set
-    @Published var forceMapRefresh = false // Flag to force map annotation refresh
+    /// Bumps whenever the legacy elements behind the store pins change (names hydrated,
+    /// boosts expiring, a fresh catalog), so the map redraws pins the store revision
+    /// alone wouldn't catch. Pins still read their detail from `Element` (DECISIONS 33).
+    @Published private(set) var mapPinRevision = 0
     @Published var isReadyForPostOnboardingPresentation = true
     @Published var selectionSource: SelectionSource = .unknown
     // Unified search state (owned by MerchantSearchController; forwarded for existing views)
@@ -405,7 +408,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         placeholderNameHydrationPendingResults.removeAll(keepingCapacity: true)
         placeholderNameHydrationApplyWorkItem = nil
 
-        upsertMerchants(Array(pending.values), forceMapRefresh: true)
+        upsertMerchants(Array(pending.values), refreshMapPins: true)
 
         if let selectedID = selectedElement?.id, let updated = pending[selectedID] {
             selectedElement = updated
@@ -490,7 +493,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
 
             // Re-evaluate boost styling / annotation content after background time.
             if wasInactive {
-                self.forceMapRefresh = true
+                self.mapPinRevision &+= 1
             }
             self.scheduleBoostExpiryMapRefreshIfNeeded()
             
@@ -521,7 +524,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
             Debug.logMap("Boost expiry timer fired — refreshing map annotations")
-            self.forceMapRefresh = true
+            self.mapPinRevision &+= 1
             self.scheduleBoostExpiryMapRefreshIfNeeded()
         }
         boostExpiryRefreshWorkItem = workItem
@@ -664,7 +667,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
     private func refreshAfterInactive() {
         // Reset states that might be stale
         self.isLoading = false
-        self.forceMapRefresh = true
+        self.mapPinRevision &+= 1
         
         // Restart location if we don't have user location
         if self.userLocation == nil {
@@ -1009,11 +1012,11 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
 
     private func fitMapToMerchantAlertElements(_ elements: [Element], animated: Bool) {
         guard !elements.isEmpty else {
-            forceMapRefresh = true
+            mapPinRevision &+= 1
             return
         }
 
-        forceMapRefresh = true
+        mapPinRevision &+= 1
 
         let coordinates = elements.compactMap(\.mapCoordinate)
         guard !coordinates.isEmpty else { return }
@@ -1491,7 +1494,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         postOnboardingPresentationFallbackTask = nil
         Debug.logTiming("onboarding", "post-onboarding presentation released")
         isReadyForPostOnboardingPresentation = true
-        forceMapRefresh = true
+        mapPinRevision &+= 1
     }
 
     private func cancelPendingPostOnboardingMapPresentation() {
@@ -1504,7 +1507,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
         shouldReleasePostOnboardingPresentationAfterNextMapRender = false
         isReadyForPostOnboardingPresentation = true
-        forceMapRefresh = true
+        mapPinRevision &+= 1
     }
 
     private func schedulePostOnboardingPresentationFallback() {
@@ -1712,50 +1715,6 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         return nil
     }
 
-    var mapElementsForCurrentDisplay: [Element] {
-        switch mapDisplayMode {
-        case .merchants:
-            if let digest = activeMerchantAlertDigest {
-                return elementsForDisplay(merchantAlertElements(for: digest))
-            }
-            let trimmedQuery = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedQuery.count >= 2 {
-                return elementsForDisplay(merchantSearchMapResults)
-            }
-            return elementsForDisplay(allElements)
-        case .communities:
-            return selectedCommunityArea == nil ? [] : elementsForDisplay(communityMemberElements)
-        }
-    }
-
-    /// Cheap invalidation key for merchant annotations. MapView uses this to
-    /// distinguish actual map-content changes from unrelated parent updates such
-    /// as a sheet detent selection. Full element hashing remains the correctness
-    /// check when this signature changes.
-    var merchantMapAnnotationInputSignature: Int {
-        var hasher = Hasher()
-        hasher.combine(hideATMsFromMapAndList)
-
-        if let digest = activeMerchantAlertDigest {
-            hasher.combine(0)
-            hasher.combine(digest)
-            hasher.combine(merchantStoreRevision)
-            return hasher.finalize()
-        }
-
-        let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.count >= 2 {
-            hasher.combine(1)
-            // Search result sets are small; their content-aware hash keeps same-ID
-            // metadata changes correct without scanning the full merchant catalog.
-            hasher.combine(merchantSearchMapResults.mapAnnotationsContentHash)
-        } else {
-            hasher.combine(2)
-            hasher.combine(merchantStoreRevision)
-        }
-        return hasher.finalize()
-    }
-
     var listElementsForCurrentDisplay: [Element] {
         if let digest = activeMerchantAlertDigest, mapDisplayMode == .merchants {
             return elementsForDisplay(merchantAlertElements(for: digest))
@@ -1784,7 +1743,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
             performUnifiedSearch()
         }
 
-        forceMapRefresh = true
+        mapPinRevision &+= 1
     }
 
     var isShowingMerchantAlertDigest: Bool {
@@ -1821,14 +1780,8 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
     func clearMerchantAlertDigest() {
         guard activeMerchantAlertDigest != nil else { return }
         activeMerchantAlertDigest = nil
-        forceMapRefresh = true
+        mapPinRevision &+= 1
     }
-
-#if DEBUG
-    func setAllElementsForTesting(_ elements: [Element]) {
-        replaceMerchantCatalog(elements, forceMapRefresh: false)
-    }
-#endif
 
     var isShowingCommunityMembersOnMap: Bool {
         mapDisplayMode == .communities && selectedCommunityArea != nil
@@ -1903,7 +1856,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
 
             // Publish progressively so visible communities can appear immediately.
             self.communityMapAreas = areas
-            self.forceMapRefresh = true
+            self.mapPinRevision &+= 1
             if isComplete {
                 self.communityMapAreasIsLoading = false
             }
@@ -2079,7 +2032,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
 
         // Flip mode and refresh in a single pass.
         mapDisplayMode = switchingToCommunities ? .communities : .merchants
-        forceMapRefresh = true
+        mapPinRevision &+= 1
 
         let afterFlip = CFAbsoluteTimeGetCurrent()
         Debug.log("⏱ toggleMapMode: mode flipped in \(String(format: "%.1f", (afterFlip - afterReset) * 1000))ms")
@@ -2128,7 +2081,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
                     requestID: requestID
                 )
             }
-            forceMapRefresh = true
+            mapPinRevision &+= 1
             return
         }
 
@@ -2139,7 +2092,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
                 DispatchQueue.main.async {
                     self?.communityMembersIsLoading = false
                     self?.communityMembersError = "Could not resolve community"
-                    self?.forceMapRefresh = true
+                    self?.mapPinRevision &+= 1
                 }
                 return
             }
@@ -2463,7 +2416,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
                         )
                     }
                 }
-                self.forceMapRefresh = true
+                self.mapPinRevision &+= 1
             }
         }
     }
@@ -2500,12 +2453,12 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
             self.communityMemberElements = Array(byID.values)
 
             if !hydratedMembers.isEmpty {
-                self.upsertMerchants(hydratedMembers, forceMapRefresh: false)
+                self.upsertMerchants(hydratedMembers, refreshMapPins: false)
             }
 
             self.communityMembersIsLoading = false
             self.communityMembersError = nil
-            self.forceMapRefresh = true
+            self.mapPinRevision &+= 1
         }
     }
 
@@ -2515,7 +2468,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         communityMemberElementIDs = []
         communityMembersIsLoading = false
         communityMembersError = nil
-        forceMapRefresh = true
+        mapPinRevision &+= 1
     }
 
     private func mapRegion(forCommunityArea area: V2AreaRecord) -> MKCoordinateRegion? {
@@ -2683,7 +2636,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
                 self.areaBrowserAreas = Array(byID.values)
                     .filter { $0.bounds != nil || $0.geoJSON != nil }
                     .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
-                self.forceMapRefresh = true
+                self.mapPinRevision &+= 1
             }
 
             // Continue in batches until we exhaust missing community polygons.
@@ -2777,20 +2730,20 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
     }
 
     func upsertElementIntoStore(_ element: Element) {
-        replaceOrUpsertMerchant(element, forceMapRefresh: true)
+        replaceOrUpsertMerchant(element, refreshMapPins: true)
     }
 
     // MARK: - Merchant catalog (MerchantElementStore)
 
-    private func replaceMerchantCatalog(_ elements: [Element], forceMapRefresh: Bool) {
+    private func replaceMerchantCatalog(_ elements: [Element], refreshMapPins: Bool) {
         merchantStoreRevision = merchantElementStore.replaceAll(elements)
         allElements = merchantElementStore.snapshot()
-        if forceMapRefresh {
-            self.forceMapRefresh = true
+        if refreshMapPins {
+            self.mapPinRevision &+= 1
         }
     }
 
-    private func replaceOrUpsertMerchant(_ element: Element, forceMapRefresh: Bool) {
+    private func replaceOrUpsertMerchant(_ element: Element, refreshMapPins: Bool) {
         let isNew = merchantElementStore.element(id: element.id) == nil
         merchantStoreRevision = merchantElementStore.upsert(element)
         // Avoid re-materializing the full catalog on single-element updates.
@@ -2801,12 +2754,12 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         } else {
             allElements = merchantElementStore.snapshot()
         }
-        if forceMapRefresh {
-            self.forceMapRefresh = true
+        if refreshMapPins {
+            self.mapPinRevision &+= 1
         }
     }
 
-    private func upsertMerchants(_ elements: [Element], forceMapRefresh: Bool) {
+    private func upsertMerchants(_ elements: [Element], refreshMapPins: Bool) {
         guard !elements.isEmpty else { return }
         merchantStoreRevision = merchantElementStore.upsertMany(elements)
         // Small batches patch the published array in place; large ones snapshot once.
@@ -2821,8 +2774,8 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
         } else {
             allElements = merchantElementStore.snapshot()
         }
-        if forceMapRefresh {
-            self.forceMapRefresh = true
+        if refreshMapPins {
+            self.mapPinRevision &+= 1
         }
     }
 
@@ -2904,7 +2857,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
                !cachedElements.isEmpty {
                 Debug.logCache("Loading \(cachedElements.count) elements from cache into memory")
                 Debug.logTiming("data", "loaded \(cachedElements.count) cached elements into memory")
-                self.replaceMerchantCatalog(cachedElements, forceMapRefresh: false)
+                self.replaceMerchantCatalog(cachedElements, refreshMapPins: false)
                 self.hasLoadedInitialData = true
                 self.merchantSyncFailed = false
                 self.refreshLastSuccessfulSyncAtFromRepository()
@@ -2986,7 +2939,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
 
         if !refreshedElements.isEmpty {
             Debug.logMap("Setting allElements to repository snapshot (\(refreshedElements.count) elements)")
-            replaceMerchantCatalog(refreshedElements, forceMapRefresh: true)
+            replaceMerchantCatalog(refreshedElements, refreshMapPins: true)
             hasLoadedInitialData = true
             noteMerchantSyncSucceeded()
         } else if currentElementsEmpty && !hadAnyCache {
@@ -3075,7 +3028,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
 
                 if !refreshedElements.isEmpty {
                     Debug.logMap("Background update: Repository returned \(refreshedElements.count) elements")
-                    self.replaceMerchantCatalog(refreshedElements, forceMapRefresh: true)
+                    self.replaceMerchantCatalog(refreshedElements, refreshMapPins: true)
                 } else {
                     Debug.log("Background update: No new data available")
                     self.refreshLastSuccessfulSyncAtFromRepository()
