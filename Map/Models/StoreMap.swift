@@ -93,7 +93,14 @@ final class StoreClusterAnnotation: NSObject, MKAnnotation {
         )
     }
 
+    /// "8", "240", "1.2k", "12k": short enough to sit in the bubble.
     var glyphText: String {
-        count >= 1_000 ? "\(count / 1_000)k+" : "\(count)"
+        switch count {
+        case ..<1_000: return "\(count)"
+        case ..<10_000:
+            let tenths = (count / 100) % 10
+            return tenths == 0 ? "\(count / 1_000)k" : "\(count / 1_000).\(tenths)k"
+        default: return "\(count / 1_000)k"
+        }
     }
 }

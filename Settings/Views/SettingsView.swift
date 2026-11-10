@@ -57,8 +57,9 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
+                // Inside its card like every other row; edge to edge on a clear row it
+                // stuck out past the cards above and below it.
+                .padding(.vertical, 4)
             }
 
             Section {

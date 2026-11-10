@@ -143,7 +143,9 @@ struct MerchantCardView: View {
             let lead = [distanceText, category].compactMap { $0 }.joined(separator: " · ")
             Group {
                 if let status {
-                    let tail = status.detail.map { " · \($0)" } ?? ""
+                    // "Closed · Opens 10 AM" stays together when the line wraps, instead
+                    // of leaving "Closed ·" at the end of one line.
+                    let tail = status.detail.map { "\u{00A0}·\u{00A0}" + $0.replacingOccurrences(of: " ", with: "\u{00A0}") } ?? ""
                     let separator = lead.isEmpty ? "" : " · "
                     Text("\(lead)\(separator)\(Text(status.state).foregroundStyle(status.isOpen ? BrandColor.open : BrandColor.closed))\(tail)")
                 } else {
@@ -281,7 +283,7 @@ private struct CardActionLabel: View {
                 .padding(.vertical, Spacing.xs)
                 .frame(maxWidth: .infinity, minHeight: LayoutMetrics.minimumHitTarget, alignment: .leading)
                 .foregroundStyle(isPrimary ? BrandColor.onBrandFill : BrandColor.brandInk)
-                .background(tileFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background { tileBackground }
         } else {
             VStack(spacing: 4) {
                 Image(systemName: systemImage)
@@ -294,15 +296,24 @@ private struct CardActionLabel: View {
             }
             .foregroundStyle(isPrimary ? BrandColor.onBrandFill : BrandColor.brandInk)
             .frame(maxWidth: .infinity, minHeight: 56)
-            .background(tileFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background { tileBackground }
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(title))
         }
     }
 
-    private var tileFill: Color {
-        isPrimary ? BrandColor.brandFill : BrandColor.brand.opacity(0.12)
+    /// Secondary tiles sit on a solid card color under the orange wash. On the
+    /// glass sheet a bare 12% orange picked up the map behind it and turned olive.
+    @ViewBuilder
+    private var tileBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        if isPrimary {
+            shape.fill(BrandColor.brandFill)
+        } else {
+            shape.fill(Color(.secondarySystemGroupedBackground))
+                .overlay(shape.fill(BrandColor.brand.opacity(0.10)))
+        }
     }
 }
 
@@ -353,7 +364,10 @@ struct PaymentChipsView: View {
             .font(.caption.weight(.medium))
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.secondary.opacity(0.12), in: Capsule())
+            // Same chip as the category filters: solid, with a hairline, so it reads
+            // on the glass sheet in both appearances.
+            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color(.separator).opacity(0.6), lineWidth: 0.5))
     }
 }
 
@@ -405,7 +419,7 @@ struct MerchantCategoryBadge: View {
     var size: CGFloat = 40
 
     var body: some View {
-        Image(systemName: ElementCategorySymbols.symbolName(for: element))
+        Image(systemName: ElementCategorySymbols.badgeSymbolName(for: element))
             .font(.system(size: size * 0.42, weight: .semibold))
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(BrandColor.brandInk)

@@ -997,7 +997,37 @@ struct ElementCategorySymbols {
         if let iconSymbol = symbolName(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconPlatform) {
             return iconSymbol
         }
+        // A known category ("Bars", "Shopping") still gets its own glyph.
+        if let group = merchantCategoryGroups(forCategoryIcon: element.v4Metadata?.icon ?? element.tags?.iconPlatform).first {
+            return merchantCategoryDescriptor(for: group).chipSymbolName
+        }
         // Fallback
         return "bitcoinsign.circle.fill"
+    }
+
+    /// The glyph for places that draw their own disc (list badges, the card header,
+    /// map pins). A ".circle.fill" symbol inside a disc read as a ring in a ring, so
+    /// the bare form is used when SF Symbols has one: "bitcoinsign" for
+    /// "bitcoinsign.circle.fill", "cart" for "cart.circle.fill".
+    @MainActor
+    static func badgeSymbolName(for element: Element) -> String {
+        bareSymbolName(symbolName(for: element))
+    }
+
+    @MainActor private static var bareSymbolCache: [String: String] = [:]
+
+    @MainActor
+    static func bareSymbolName(_ name: String) -> String {
+        if let cached = bareSymbolCache[name] { return cached }
+        var resolved = name
+        for suffix in [".circle.fill", ".circle", ".square.fill", ".square"] where name.hasSuffix(suffix) {
+            let base = String(name.dropLast(suffix.count))
+            if UIImage(systemName: base) != nil {
+                resolved = base
+            }
+            break
+        }
+        bareSymbolCache[name] = resolved
+        return resolved
     }
 }
