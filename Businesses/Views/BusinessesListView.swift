@@ -1052,8 +1052,8 @@ struct ElementCell: View {
         ), category != viewModel.element.displayNameForUI {
             parts.append(category)
         }
-        if let street = viewModel.address?.formatted(.compact)
-            .components(separatedBy: .newlines).first?
+        if let formatted = viewModel.address?.formatted(.compact),
+           let street = formatted.components(separatedBy: .newlines).first?
             .trimmingCharacters(in: .whitespaces), !street.isEmpty {
             parts.append(street)
         }
