@@ -158,3 +158,23 @@ To overrule one, say which number and what you want instead.
     - **The merchant page header** has a 52 pt category badge, a bold title and one line with distance, category and open status.
     - **Actions are four equal tiles** (icon over label: Directions filled, Call, Website, Share tinted), replacing capsules of four different widths that dropped to icons when they didn't fit.
     - **Detail cards are solid** (`secondarySystemGroupedBackground`) with bold section titles; each row has its glyph on a small orange tile, a grey label and the value in orange ink. Before, it was grey cards with grey titles on a grey glass panel.
+
+### Phase 8m: design review
+
+Findings and their ranking are in [ui-review-8m.md](ui-review-8m.md).
+
+103. **Clusters are drawn bubbles, not markers.** A white-ringed orange disc with a soft halo, sized by count (32/38/44/50 pt), rounded monospaced digits, counts shortened to "1.2k" / "12k". The view (`StoreClusterBubbleView`) lives in `MapView.swift` rather than its own file so no new pbxproj entry is needed. It has no map title, which removes the "2 Bitcoin merchants" labels; the title stays as the VoiceOver label. Images are cached per count, size and appearance.
+104. **The user's location is system blue.** `MKMapView.tintColor` is set to `.systemBlue`; with the app's orange tint the dot read as a pin.
+105. **Known categories get their category glyph, and containers use bare symbols.** `symbolName(for:)` falls back to the category group's chip glyph before ₿. New `badgeSymbolName(for:)` / `bareSymbolName(_:)` strip `.circle.fill`, `.circle`, `.square.fill`, `.square` when SF Symbols has the bare name (checked once per name, cached). Used by list badges, the card header, map pins, category chips and detail-row tiles.
+106. **Secondary action tiles sit on the solid card color with a 10% orange wash**, and payment chips use the category-chip style (solid + hairline). Directions keeps `brandFill`.
+107. **Opening hours group consecutive identical days** ("Every day", "Mon–Fri") and drop ":00". Today's group is bold. A 24/7 week still reads "Every day 24/7".
+108. **One distance format** in `DistanceUnit.format(meters:)`: feet under 0.1 mi (rounded to 50), one decimal under 10 mi/km, whole numbers above; meters under 1 km (rounded to 10). Used by list rows, the card and `ContentViewModel.localizedDistanceString`.
+109. **List-row payment glyphs are secondary grey**, not orange.
+110. **The Places/Communities switch steps both labels down together** with `ViewThatFits` (subheadline, footnote, then caption with shrink as the last resort), and both labels are semibold. The selected segment shows in color and the raised pill, so its width no longer changes on tap. The switch animation is off with Reduce Motion.
+111. **Communities matches Places**: same search field metrics (and the same xxxLarge cap, decision 92), rows with a 40 pt badge, bold name and an inflected "44 places" line, no chevron, and the list hidden at the peek detent via `sheetCollapsedReveal`.
+112. **Single-token detail values truncate in the middle on one line** (three lines at accessibility sizes). Social rows show the handle only; X uses the `at` glyph.
+113. **The card's open status wraps as a unit** (non-breaking spaces between "Closed", "·" and the detail).
+114. **Settings' Appearance segmented control sits inside its row** instead of on a clear, inset-less row.
+115. **Pins and clusters fade in** over 200 ms from 85% scale with ease-out, interruptible (`beginFromCurrentState`, `allowUserInteraction`). Reduce Motion: fade only.
+116. **Pins stay MapKit markers** (review item 14). On iOS 27 they already draw as compact discs that grow when selected and handle label collisions; a custom view isn't worth losing that.
+117. **New debug scenarios for screenshots**: `merchant` (nearest named place with hours and a phone), `merchantFull`, `full` and `settings`. The layout-owned ones go through a `UICheckScenario.layoutRequest` notification that `ContentView` handles. Debug builds only. The unfolded Duo was not checked (Device Hub), as in decision 96.

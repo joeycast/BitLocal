@@ -204,6 +204,7 @@ struct BusinessesListView: View {
                         .foregroundStyle(.secondary)
                         .font(.system(size: 15))
                 }
+                .accessibilityLabel(Text("Clear"))
             }
             if viewModel.isSearchActive {
                 Button("Cancel") {
@@ -679,8 +680,10 @@ struct BusinessesListView: View {
                 applyCategoryChip(chip)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: chip.symbolName)
-                        .font(.system(size: 12, weight: .semibold))
+                    // Bare glyphs: the circled variants read as dots at chip size.
+                    Image(systemName: ElementCategorySymbols.bareSymbolName(chip.symbolName))
+                        .font(.footnote.weight(.semibold))
+                        .imageScale(.small)
                         .foregroundStyle(BrandColor.brandInk)
                     Text(chip.localizedLabel)
                         .font(.footnote.weight(.semibold))
@@ -1062,54 +1065,16 @@ struct ElementCell: View {
     }
 
     private var distanceText: some View {
-        let formattedDistance: String? = {
-            if let distance = localizedDistanceString(for: viewModel.element) {
-                return distance
-            } else {
-                // fallback to miles for now
-                if let distance = viewModel.viewModel.distanceInMiles(element: viewModel.element) {
-                    if distance < 1 {
-                        return String(format: "%.2f mi", distance)
-                    } else {
-                        return String(format: "%.1f mi", distance)
-                    }
-                }
-                return nil
-            }
-        }()
+        let formattedDistance = localizedDistanceString(for: viewModel.element)
         return Text(formattedDistance ?? "")
             .opacity(formattedDistance != nil ? 1 : 0)
             .padding(.trailing, 3)
     }
-    
+
     private func localizedDistanceString(for element: Element) -> String? {
         guard let userLocation = viewModel.viewModel.userLocation, let coord = element.mapCoordinate else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
-        let distanceInMeters = userLocation.distance(from: location)
-        let useMetric: Bool
-        switch distanceUnit {
-        case .auto:
-            useMetric = Locale.current.measurementSystem == .metric
-        case .miles:
-            useMetric = false
-        case .kilometers:
-            useMetric = true
-        }
-        if useMetric {
-            let km = distanceInMeters / 1000
-            if km < 1 {
-                return String(format: "%.2f km", km)
-            } else {
-                return String(format: "%.1f km", km)
-            }
-        } else {
-            let miles = distanceInMeters / 1609.344
-            if miles < 1 {
-                return String(format: "%.2f mi", miles)
-            } else {
-                return String(format: "%.1f mi", miles)
-            }
-        }
+        return distanceUnit.format(meters: userLocation.distance(from: location))
     }
 }
 
@@ -1518,22 +1483,24 @@ struct PaymentIcons: View {
     let element: Element
 
     var body: some View {
+        // Secondary, not orange: every row accepts bitcoin, so an orange glyph on each
+        // one was noise. Orange stays for the one thing selected.
         HStack(spacing: 6) {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
-                    .foregroundColor(.accentColor)
+                    .foregroundStyle(.secondary)
                     .accessibilityLabel(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
             }
 
             if acceptsLightning(element: element) {
                 Image(systemName: "bolt.circle.fill")
-                    .foregroundColor(.accentColor)
+                    .foregroundStyle(.secondary)
                     .accessibilityLabel(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
             }
 
             if acceptsContactlessLightning(element: element) {
                 Image(systemName: "wave.3.right.circle.fill")
-                    .foregroundColor(.accentColor)
+                    .foregroundStyle(.secondary)
                     .accessibilityLabel(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
             }
         }

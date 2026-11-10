@@ -281,16 +281,13 @@ struct CommunitiesListView: View {
                             Button {
                                 viewModel.selectCommunity(area, presentDetail: true)
                             } label: {
-                                ZStack(alignment: .trailing) {
-                                    CommunityRow(
-                                        area: area,
-                                        metadata: metadataStore.metadataByAreaID[area.id]
-                                    )
-                                    .padding(.trailing, 18)
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(.gray.opacity(0.6))
-                                }
+                                // No chevron, like the Places rows (decision 102): the
+                                // whole row is the button.
+                                CommunityRow(
+                                    area: area,
+                                    metadata: metadataStore.metadataByAreaID[area.id]
+                                )
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
@@ -307,6 +304,13 @@ struct CommunitiesListView: View {
                 }
             }
             .listStyle(.plain)
+            // Same as Places: at the peek height the list stays hidden instead of a
+            // half-cut first row showing under the search field.
+            .sheetCollapsedReveal(
+                geometry: viewModel.sheetGeometry,
+                isCollapsedLike: currentDetent == BottomSheetDetents.collapsed,
+                forceRevealed: !filterText.isEmpty
+            )
         }
         .onAppear {
             // Returning from detail should always restore the visible-community browsing state.
@@ -323,11 +327,13 @@ struct CommunitiesListView: View {
         }
     }
 
+    /// Matches the Places search field exactly (glyph, height, padding, text cap), so
+    /// switching between Places and Communities doesn't make the field jump.
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-                .font(.system(size: 15))
+                .font(.system(size: 16, weight: .medium))
             TextField("Search communities…", text: $filterText)
                 .textFieldStyle(.plain)
                 .font(.body)
@@ -341,13 +347,14 @@ struct CommunitiesListView: View {
                         .foregroundStyle(.secondary)
                         .font(.system(size: 15))
                 }
+                .accessibilityLabel(Text("Clear"))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .background(Color(.tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 40))
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
+        .background(Color(.tertiarySystemFill), in: Capsule())
         .padding(.horizontal, 16)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private var searchBarTopPadding: CGFloat {
@@ -532,49 +539,41 @@ private struct CommunityRow: View {
     let area: V2AreaRecord
     let metadata: CommunityRowMetadata?
 
+    /// Same anatomy as a place row: 40 pt badge, bold name, one grey line under it.
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .center, spacing: Spacing.s) {
             communityIcon
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(area.displayName)
-                    .font(.headline.weight(.semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
+                merchantCountLine
             }
-
-            Spacer()
-
-            merchantCountBadge
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
 
     private var communityIcon: some View {
         CommunityIconImage(url: iconURL, placeholderSystemName: "person.3.fill", scaleToFill: true)
-            .frame(width: 32, height: 32)
-            .background(Color.accentColor.opacity(0.10), in: .circle)
+            .frame(width: 40, height: 40)
+            .background(BrandColor.brand.opacity(0.14), in: .circle)
             .clipShape(.circle)
     }
 
     @ViewBuilder
-    private var merchantCountBadge: some View {
+    private var merchantCountLine: some View {
         if let merchantCount = metadata?.merchantCount {
-            HStack(spacing: 8) {
-                Image(systemName: "storefront")
-                    .font(.system(size: 10, weight: .semibold))
-
-                Text("\(merchantCount)")
-                    .font(.caption.weight(.semibold))
-            }
+            Text("^[\(merchantCount) place](inflect: true)", comment: "Community row: number of places in the community")
+            .font(.subheadline)
+            .monospacedDigit()
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.secondary.opacity(0.12), in: Capsule())
         } else if metadata?.isResolved == false || metadata == nil {
-            PlaceholderCapsule(width: 44, height: 24)
+            PlaceholderCapsule(width: 64, height: 12)
         }
     }
 
@@ -1622,12 +1621,24 @@ private extension View {
 /// same tap priority as the gear next to it, which always worked.
 struct BrowseModePicker: View {
     @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var selectionNamespace
 
+    /// Both labels step down together when the switch is tight (the folded Duo's
+    /// outer display). Shrinking each label on its own left "Communities" at about
+    /// two thirds the size of "Places", which read as a mistake.
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            segments(font: .subheadline)
+            segments(font: .footnote)
+            segments(font: .caption, shrinks: true)
+        }
+    }
+
+    private func segments(font: Font, shrinks: Bool = false) -> some View {
         HStack(spacing: 2) {
-            segment(.merchants, title: String(localized: "Places"))
-            segment(.communities, title: String(localized: "Communities"))
+            segment(.merchants, title: String(localized: "Places"), font: font, shrinks: shrinks)
+            segment(.communities, title: String(localized: "Communities"), font: font, shrinks: shrinks)
         }
         .padding(2)
         .background(Capsule().fill(Color(uiColor: .tertiarySystemFill)))
@@ -1636,15 +1647,18 @@ struct BrowseModePicker: View {
         .featureHintAnchor(.communityToggle)
     }
 
-    private func segment(_ mode: MapDisplayMode, title: String) -> some View {
+    private func segment(_ mode: MapDisplayMode, title: String, font: Font, shrinks: Bool) -> some View {
         let isSelected = modeBinding.wrappedValue == mode
         return Button {
-            withAnimation(.snappy(duration: 0.2)) { modeBinding.wrappedValue = mode }
+            withAnimation(Motion.unlessReduced(.snappy(duration: 0.2), reduceMotion: reduceMotion)) { modeBinding.wrappedValue = mode }
         } label: {
+            // Semibold for both, so the selected one doesn't change width when tapped;
+            // selection shows in color and the raised pill.
             Text(title)
-                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                .font(font.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(shrinks ? 0.5 : 1)
+                .fixedSize(horizontal: !shrinks, vertical: false)
                 .foregroundStyle(isSelected ? Color.primary : Color.secondary)
                 .frame(maxWidth: .infinity, minHeight: 30)
                 .padding(.horizontal, 10)

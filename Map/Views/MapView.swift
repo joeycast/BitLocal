@@ -48,6 +48,7 @@ struct MapView: UIViewRepresentable {
             context.coordinator.installCommunityOverlayTapRecognizer(on: existingMap)
             context.coordinator.installPlacesRotor(on: existingMap)
             existingMap.showsUserLocation = true
+            existingMap.tintColor = MapView.userLocationTint
             existingMap.mapType = mapType
             return existingMap
         }
@@ -66,8 +67,9 @@ struct MapView: UIViewRepresentable {
         context.coordinator.installCommunityOverlayTapRecognizer(on: mapView)
         context.coordinator.installPlacesRotor(on: mapView)
         
-        // Show user location on the map
+        // Show user location on the map, in blue: an orange dot read as one more pin.
         mapView.showsUserLocation = true
+        mapView.tintColor = MapView.userLocationTint
         
         // Set initial map type
         mapView.mapType = mapType
@@ -435,18 +437,9 @@ struct MapView: UIViewRepresentable {
             var view: MKMarkerAnnotationView?
             
             if let cluster = annotation as? StoreClusterAnnotation {
-                let identifier = "StoreCluster"
-                let clusterView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
-                    ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: identifier)
+                let clusterView = mapView.dequeueReusableAnnotationView(withIdentifier: StoreClusterBubbleView.reuseIdentifier) as? StoreClusterBubbleView
+                    ?? StoreClusterBubbleView(annotation: cluster, reuseIdentifier: StoreClusterBubbleView.reuseIdentifier)
                 clusterView.annotation = cluster
-                clusterView.clusteringIdentifier = nil
-                clusterView.markerTintColor = UIColor(named: "MarkerColor")
-                clusterView.glyphImage = nil
-                clusterView.glyphText = cluster.glyphText
-                clusterView.canShowCallout = false
-                clusterView.displayPriority = .required
-                clusterView.accessibilityLabel = cluster.title
-                clusterView.accessibilityTraits = .button
                 clusterView.accessibilityHint = NSLocalizedString(
                     "Double tap to zoom into this cluster",
                     comment: "VoiceOver hint for merchant map clusters"
@@ -466,7 +459,10 @@ struct MapView: UIViewRepresentable {
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
                 view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
-                let symbolName = ElementCategorySymbols.symbolName(for: element)
+                // The name shows once there's room; the subtitle (address) never does.
+                view?.titleVisibility = .adaptive
+                view?.subtitleVisibility = .hidden
+                let symbolName = ElementCategorySymbols.badgeSymbolName(for: element)
                 Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
                 view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
                 view?.accessibilityLabel = accessibilityLabel(for: element)
@@ -580,6 +576,24 @@ struct MapView: UIViewRepresentable {
             }
         }
 
+        /// New pins and clusters settle in instead of popping: a short fade with a
+        /// small scale (never from zero). Reduce Motion keeps only the fade.
+        func mapView(_ mapView: MKMapView, didAdd views: [MKAnnotationView]) {
+            let reduceMotion = UIAccessibility.isReduceMotionEnabled
+            for view in views where !(view.annotation is MKUserLocation) {
+                view.alpha = 0
+                if !reduceMotion { view.transform = CGAffineTransform(scaleX: 0.85, y: 0.85) }
+                UIView.animate(
+                    withDuration: 0.2,
+                    delay: 0,
+                    options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]
+                ) {
+                    view.alpha = 1
+                    view.transform = .identity
+                }
+            }
+        }
+
         func mapViewDidFinishRenderingMap(_ mapView: MKMapView, fullyRendered: Bool) {
             guard fullyRendered else { return }
             Debug.logTiming("map", "mapViewDidFinishRenderingMap fullyRendered=true")
@@ -596,5 +610,115 @@ struct MapView: UIViewRepresentable {
             }
             return MKOverlayRenderer(overlay: overlay)
         }
+    }
+}
+
+extension MapView {
+    /// The user's own location: system blue, so it never reads as a merchant pin.
+    static let userLocationTint = UIColor.systemBlue
+}
+
+/// A cluster from `MerchantClusterer`: a round count bubble with a soft outer halo, so
+/// it reads as "several places" at a glance and never as one more pin. It grows a
+/// little with the count. Drawn once per count/size/appearance and cached.
+final class StoreClusterBubbleView: MKAnnotationView {
+    static let reuseIdentifier = "StoreClusterBubble"
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        canShowCallout = false
+        collisionMode = .circle
+        displayPriority = .required
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.22
+        layer.shadowRadius = 3
+        layer.shadowOffset = CGSize(width: 0, height: 1.5)
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: StoreClusterBubbleView, _: UITraitCollection) in
+            view.render()
+        }
+        render()
+    }
+
+    @available(*, unavailable)
+    required init?(coder aDecoder: NSCoder) { nil }
+
+    override var annotation: MKAnnotation? {
+        didSet { render() }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        alpha = 1
+        transform = .identity
+    }
+
+    private func render() {
+        guard let cluster = annotation as? StoreClusterAnnotation else { return }
+        image = Self.bubble(text: cluster.glyphText, diameter: Self.diameter(for: cluster.count), traits: traitCollection)
+        accessibilityLabel = cluster.title
+    }
+
+    static func diameter(for count: Int) -> CGFloat {
+        switch count {
+        case ..<10: 32
+        case ..<100: 38
+        case ..<1_000: 44
+        default: 50
+        }
+    }
+
+    @MainActor private static var cache: [String: UIImage] = [:]
+
+    private static func bubble(text: String, diameter: CGFloat, traits: UITraitCollection) -> UIImage {
+        let isDark = traits.userInterfaceStyle == .dark
+        let key = "\(text)|\(diameter)|\(isDark)"
+        if let cached = cache[key] { return cached }
+
+        let halo: CGFloat = 5
+        let side = diameter + halo * 2
+        let brand = UIColor(named: "MarkerColor") ?? .systemOrange
+        let format = UIGraphicsImageRendererFormat.preferred()
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+            let outer = CGRect(x: 0, y: 0, width: side, height: side)
+            brand.withAlphaComponent(isDark ? 0.32 : 0.24).setFill()
+            UIBezierPath(ovalIn: outer).fill()
+
+            let disc = outer.insetBy(dx: halo, dy: halo)
+            brand.setFill()
+            UIBezierPath(ovalIn: disc).fill()
+            let stroke = UIBezierPath(ovalIn: disc.insetBy(dx: 1, dy: 1))
+            stroke.lineWidth = 2
+            UIColor.white.setStroke()
+            stroke.stroke()
+
+            let size = diameter * (text.count > 2 ? 0.34 : 0.42)
+            let base = UIFont.systemFont(ofSize: size, weight: .bold)
+            let font = base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: size) } ?? base
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font.withMonospacedDigits(),
+                .foregroundColor: UIColor.white
+            ]
+            let textSize = (text as NSString).size(withAttributes: attributes)
+            (text as NSString).draw(
+                at: CGPoint(x: disc.midX - textSize.width / 2, y: disc.midY - textSize.height / 2),
+                withAttributes: attributes
+            )
+        }
+        cache[key] = image
+        return image
+    }
+}
+
+private extension UIFont {
+    func withMonospacedDigits() -> UIFont {
+        let descriptor = fontDescriptor.addingAttributes([
+            .featureSettings: [[
+                UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
+                UIFontDescriptor.FeatureKey.selector: kMonospacedNumbersSelector
+            ]]
+        ])
+        return UIFont(descriptor: descriptor, size: pointSize)
     }
 }

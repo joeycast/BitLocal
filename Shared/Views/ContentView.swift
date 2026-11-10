@@ -110,6 +110,15 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(colorScheme(for: appearanceManager.appearance))
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: UICheckScenario.layoutRequest)) { note in
+            switch note.object as? String {
+            case UICheckScenario.full.rawValue: navigation.sheetDetent = .full
+            case UICheckScenario.settings.rawValue: showingSettings = true
+            default: break
+            }
+        }
+        #endif
     }
 
     @State private var postureJustChanged = false

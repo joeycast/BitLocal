@@ -800,23 +800,7 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
     func localizedDistanceString(element: Element, distanceUnit: DistanceUnit) -> String? {
         guard let userLocation = userLocation, let coord = element.mapCoordinate else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
-        let distanceInMeters = userLocation.distance(from: location)
-        let useMetric: Bool
-        switch distanceUnit {
-        case .auto:
-            useMetric = Locale.current.measurementSystem == .metric
-        case .miles:
-            useMetric = false
-        case .kilometers:
-            useMetric = true
-        }
-        if useMetric {
-            let km = distanceInMeters / 1000
-            return String(format: "%.1f km", km)
-        } else {
-            let miles = distanceInMeters / 1609.34
-            return String(format: "%.1f mi", miles)
-        }
+        return distanceUnit.format(meters: userLocation.distance(from: location))
     }
     
     // Determining distance from center
@@ -3060,7 +3044,10 @@ final class ContentViewModel: NSObject, ObservableObject, @preconcurrency CLLoca
 /// `-UICheckScenario <name>` at launch; the app waits for the store map, then
 /// opens the screen. Release builds don't contain this.
 enum UICheckScenario: String {
-    case browse, search, communities, community, digest
+    case browse, search, communities, community, digest, merchant, merchantFull, full, settings
+
+    /// Posted for scenarios the layout owns (sheet height, settings sheet).
+    static let layoutRequest = Notification.Name("UICheckLayoutRequest")
 
     static var current: UICheckScenario? {
         UserDefaults.standard.string(forKey: "UICheckScenario").flatMap(UICheckScenario.init(rawValue:))
@@ -3136,6 +3123,29 @@ extension ContentViewModel {
                 deliveryLocalDate: nil
             )
             activateMerchantAlertDigest(digest)
+        case .merchant, .merchantFull:
+            let here = userLocation ?? CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+            // Prefer a place with hours and a phone so the page shows every section.
+            let named = visibleElements.filter { $0.displayName?.isEmpty == false }
+            let rich = named.filter { $0.osmJSON?.tags?.openingHours != nil && ($0.osmJSON?.tags?.phone ?? $0.osmJSON?.tags?.contactPhone) != nil }
+            let pool = rich.isEmpty ? named : rich
+            let nearest = pool.min { a, b in
+                let la = CLLocation(latitude: a.mapCoordinate?.latitude ?? 0, longitude: a.mapCoordinate?.longitude ?? 0)
+                let lb = CLLocation(latitude: b.mapCoordinate?.latitude ?? 0, longitude: b.mapCoordinate?.longitude ?? 0)
+                return la.distance(from: here) < lb.distance(from: here)
+            }
+            if let nearest {
+                uiCheckLog("UICheck: opening merchant \(nearest.id)")
+                setSelectionSource(.list)
+                path = [nearest]
+                selectedElement = nearest
+                if scenario == .merchantFull {
+                    try? await Task.sleep(for: .seconds(1))
+                    NotificationCenter.default.post(name: UICheckScenario.layoutRequest, object: UICheckScenario.full.rawValue)
+                }
+            }
+        case .full, .settings:
+            NotificationCenter.default.post(name: UICheckScenario.layoutRequest, object: scenario.rawValue)
         }
         uiCheckLog("UICheck: ready \(scenario.rawValue)")
     }

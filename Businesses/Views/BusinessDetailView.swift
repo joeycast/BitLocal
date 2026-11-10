@@ -135,23 +135,7 @@ struct BusinessDetailView: View {
     fileprivate func localizedDistanceString() -> String? {
         guard let userLocation = userLocation, let coord = element.mapCoordinate else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
-        let distanceInMeters = userLocation.distance(from: location)
-        let useMetric: Bool
-        switch distanceUnit {
-        case .auto:
-            useMetric = Locale.current.measurementSystem == .metric
-        case .miles:
-            useMetric = false
-        case .kilometers:
-            useMetric = true
-        }
-        if useMetric {
-            let km = distanceInMeters / 1000
-            return String(format: "%.1f km", km)
-        } else {
-            let miles = distanceInMeters / 1609.34
-            return String(format: "%.1f mi", miles)
-        }
+        return distanceUnit.format(meters: userLocation.distance(from: location))
     }
     
     var body: some View {
@@ -585,7 +569,7 @@ struct BTCMapSocialsSection: View {
     private var socialLinks: [(label: String, icon: String, value: String, url: URL?)] {
         guard let metadata else { return [] }
         return [
-            ("X", "xmark.circle.fill", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
+            ("X", "at", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
             ("Facebook", "f.cursive.circle.fill", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
             ("Instagram", "camera.circle.fill", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
             ("Telegram", "paperplane.circle.fill", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
@@ -594,7 +578,7 @@ struct BTCMapSocialsSection: View {
             guard let value = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
                 return nil
             }
-            return (item.0, item.1, value.cleanedForDisplay(), item.3)
+            return (item.0, item.1, socialHandle(value.cleanedForDisplay()), item.3)
         }
     }
 
@@ -614,6 +598,14 @@ struct BTCMapSocialsSection: View {
 
             }
         }
+    }
+
+    /// "facebook.com/FromNashvilleWithLove" shows as "FromNashvilleWithLove"; the row's
+    /// label already says which network it is.
+    private func socialHandle(_ display: String) -> String {
+        let trimmed = display.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard trimmed.contains("/"), let last = trimmed.split(separator: "/").last, !last.isEmpty else { return display }
+        return String(last)
     }
 
     private var hasContent: Bool {
@@ -1038,26 +1030,43 @@ private func businessLinkValueRow(
     icon: String,
     label: String,
     value: String,
-    valueLineLimit: Int = 2
+    valueLineLimit: Int = 1
 ) -> some View {
-    HStack(alignment: .center, spacing: 12) {
-        DetailRowIcon(systemName: icon)
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.body)
-                .foregroundStyle(BrandColor.brandInk)
-                .lineLimit(valueLineLimit)
-                .multilineTextAlignment(.leading)
+    BusinessLinkValueRow(icon: icon, label: label, value: value, valueLineLimit: valueLineLimit)
+}
+
+/// Grey label over the value in orange ink. Single-token values (website, email,
+/// phone, handles) stay on one line and truncate in the middle; wrapped, they broke
+/// mid-word ("info@fromnashvillewithlove.-com"). Accessibility sizes may wrap.
+private struct BusinessLinkValueRow: View {
+    let icon: String
+    let label: String
+    let value: String
+    let valueLineLimit: Int
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            DetailRowIcon(systemName: icon)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.body)
+                    .foregroundStyle(BrandColor.brandInk)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? max(valueLineLimit, 3) : valueLineLimit)
+                    .truncationMode(valueLineLimit == 1 ? .middle : .tail)
+                    .multilineTextAlignment(.leading)
+            }
+            Spacer(minLength: 0)
         }
-        Spacer(minLength: 0)
+        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + 30 + 12 }
     }
-    .padding(.vertical, 2)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .contentShape(.rect)
-    .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + 30 + 12 }
 }
 
 /// A detail row's glyph on a small brand-tinted tile.
@@ -1065,7 +1074,8 @@ struct DetailRowIcon: View {
     let systemName: String
 
     var body: some View {
-        Image(systemName: systemName)
+        // The tile is the container, so circled symbol variants become bare glyphs.
+        Image(systemName: ElementCategorySymbols.bareSymbolName(systemName))
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(BrandColor.brandInk)
             .frame(width: 30, height: 30)
@@ -1227,20 +1237,56 @@ private struct OpeningHoursDisplayView: View {
         }
     }
 
+    /// Consecutive days with the same hours share one row: "Every day", "Mon–Fri",
+    /// "Sat–Sun". A seven-row table of identical hours buried the one line that matters.
+    private struct DayGroup: Identifiable {
+        let days: [OSMOpeningHoursDaySchedule]
+        var id: String { days.map { "\($0.weekday)" }.joined(separator: ",") }
+        var representative: OSMOpeningHoursDaySchedule { days[0] }
+    }
+
+    private func groups(for schedule: OSMOpeningHoursWeekSchedule) -> [DayGroup] {
+        var result: [[OSMOpeningHoursDaySchedule]] = []
+        for day in schedule.days {
+            if let last = result.last?.last, signature(last) == signature(day) {
+                result[result.count - 1].append(day)
+            } else {
+                result.append([day])
+            }
+        }
+        return result.map(DayGroup.init)
+    }
+
+    private func signature(_ day: OSMOpeningHoursDaySchedule) -> String {
+        day.ranges.map { "\($0.startMinutes)-\($0.endMinutes)-\($0.isAllDay)" }.joined(separator: ",")
+    }
+
+    private func label(for group: DayGroup, totalDays: Int) -> String {
+        if group.days.count == totalDays, totalDays == 7 {
+            return NSLocalizedString("Every day", comment: "Opening hours: the same hours on all seven days")
+        }
+        let first = shortWeekdayLabel(for: group.days[0].weekday)
+        guard group.days.count > 1, let lastDay = group.days.last else { return first }
+        return "\(first)\u{2013}\(shortWeekdayLabel(for: lastDay.weekday))"
+    }
+
     var body: some View {
         if let parsedSchedule {
+            let grouped = groups(for: parsedSchedule)
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(parsedSchedule.days, id: \.weekday) { day in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(shortWeekdayLabel(for: day.weekday))
-                            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
-                            .foregroundStyle(day.weekday == todayWeekday ? .primary : .secondary)
+                ForEach(grouped) { group in
+                    let isToday = group.days.contains { $0.weekday == todayWeekday }
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(label(for: group, totalDays: parsedSchedule.days.count))
+                            .fontWeight(isToday ? .semibold : .regular)
+                            .foregroundStyle(isToday ? .primary : .secondary)
                             .lineLimit(1)
-                            .frame(width: 36, alignment: .leading)
+                            .fixedSize()
 
-                        hoursText(for: day)
+                        hoursText(for: group.representative, emphasized: isToday)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
+                    .monospacedDigit()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -1253,20 +1299,20 @@ private struct OpeningHoursDisplayView: View {
     }
 
     @ViewBuilder
-    private func hoursText(for day: OSMOpeningHoursDaySchedule) -> some View {
+    private func hoursText(for day: OSMOpeningHoursDaySchedule, emphasized: Bool) -> some View {
         if day.ranges.isEmpty {
             Text(NSLocalizedString("hours_closed", comment: "Closed label for business hours"))
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             .font(.body)
-            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+            .fontWeight(emphasized ? .semibold : .regular)
             .foregroundStyle(.secondary)
         } else if day.ranges.count == 1, day.ranges[0].isAllDay {
             Text("24/7")
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             .font(.body)
-            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+            .fontWeight(emphasized ? .semibold : .regular)
             .foregroundStyle(.primary)
         } else {
             VStack(alignment: .leading, spacing: 2) {
@@ -1275,7 +1321,7 @@ private struct OpeningHoursDisplayView: View {
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                     .font(.body)
-                    .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
+                    .fontWeight(emphasized ? .semibold : .regular)
                     .foregroundStyle(.primary)
                 }
             }
@@ -1322,10 +1368,10 @@ private struct OpeningHoursDisplayView: View {
             return String(format: "%02d:%02d", hour, minute)
         }
 
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter.string(from: date)
+        // "10 AM", "6:30 PM": same style as the card's open status.
+        return minute == 0
+            ? date.formatted(.dateTime.hour())
+            : date.formatted(.dateTime.hour().minute())
     }
 }
 
