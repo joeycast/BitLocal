@@ -312,7 +312,7 @@ struct BTCMapPlaceCommentsSection: View {
 
     var body: some View {
         if shouldShowSection {
-            Section(header: Text("Community Reviews")) {
+            Section(header: DetailSectionTitle("Community Reviews")) {
                 NavigationLink {
                     BTCMapPlaceCommentsListView(element: element)
                 } label: {
@@ -600,7 +600,7 @@ struct BTCMapSocialsSection: View {
 
     var body: some View {
         if hasContent {
-            Section(header: Text("Socials")) {
+            Section(header: DetailSectionTitle("Socials")) {
                 ForEach(socialLinks, id: \.label) { social in
                     if let url = social.url {
                         Link(destination: url) {
@@ -638,7 +638,7 @@ struct BTCMapRequiredAppSection: View {
         if let requiredAppURL,
            !requiredAppURL.isEmpty,
            let url = URL(string: requiredAppURL) {
-            Section(header: Text("Required App")) {
+            Section(header: DetailSectionTitle("Required App")) {
                 Link(destination: url) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -731,7 +731,7 @@ struct BTCMapVerificationSection: View {
     }
 
     var body: some View {
-        Section(header: Text("Verification")) {
+        Section(header: DetailSectionTitle("Verification")) {
             if let status, let verifiedDateText {
                 let value = String(format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"), verifiedDateText)
                 detailRow(icon: status.icon, tint: status.tint, label: status.title, value: LocalizedStringKey(value))
@@ -1017,13 +1017,12 @@ struct BusinessDetailsSection: View {
             // Opening Hours
             if let openingHours = element.osmJSON?.tags?.openingHours {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "clock.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 18)
+                    DetailRowIcon(systemName: "clock.fill")
                     VStack(alignment: .leading, spacing: 6) {
                         Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
-                            .foregroundStyle(.primary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
                         OpeningHoursDisplayView(rawOpeningHours: openingHours)
                     }
                     Spacer(minLength: 0)
@@ -1041,24 +1040,55 @@ private func businessLinkValueRow(
     value: String,
     valueLineLimit: Int = 2
 ) -> some View {
-    HStack(alignment: .top, spacing: 12) {
-        Image(systemName: icon)
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(.secondary)
-            .frame(width: 18)
-        VStack(alignment: .leading, spacing: 2) {
+    HStack(alignment: .center, spacing: 12) {
+        DetailRowIcon(systemName: icon)
+        VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .foregroundStyle(.primary)
-            Text(value)
                 .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.body)
                 .foregroundStyle(BrandColor.brandInk)
                 .lineLimit(valueLineLimit)
                 .multilineTextAlignment(.leading)
         }
         Spacer(minLength: 0)
     }
+    .padding(.vertical, 2)
     .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(.rect)
+    .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + 30 + 12 }
+}
+
+/// A detail row's glyph on a small brand-tinted tile.
+struct DetailRowIcon: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(BrandColor.brandInk)
+            .frame(width: 30, height: 30)
+            .background(BrandColor.brand.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+/// Section titles in the merchant detail: primary-colored and bold, so the cards
+/// read as headed groups instead of grey labels floating on a grey page.
+struct DetailSectionTitle: View {
+    private let text: Text
+
+    init(_ key: LocalizedStringKey) { text = Text(key) }
+    init(verbatim string: String) { text = Text(verbatim: string) }
+
+    var body: some View {
+        text
+            .font(.headline)
+            .foregroundStyle(.primary)
+            .textCase(nil)
+            .padding(.leading, -4)
+    }
 }
 
 private extension BusinessDetailsSection {
@@ -1166,7 +1196,7 @@ private struct BusinessSectionHeader: View {
                 }
             }
 
-            Text(title)
+            DetailSectionTitle(verbatim: title)
         }
         .padding(.top, shouldShowBadge ? -4 : 0)
     }
@@ -1305,7 +1335,7 @@ struct PaymentDetailsSection: View {
     var element: Element
     
     var body: some View {
-        Section(header: Text(NSLocalizedString("payment_details_section", comment: "Section header for payment details"))) {
+        Section(header: DetailSectionTitle(verbatim: NSLocalizedString("payment_details_section", comment: "Section header for payment details"))) {
             // Accepts Bitcoin (details regarding on chain/lightning/contactless lightning not available)
             if acceptsBitcoin(element: element) {
                 HStack {

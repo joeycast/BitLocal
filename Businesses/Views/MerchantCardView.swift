@@ -70,37 +70,33 @@ struct MerchantCardView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .top, spacing: Spacing.s) {
+            if !isAccessibilitySize {
+                MerchantCategoryBadge(element: element, size: 52)
+            }
+            VStack(alignment: .leading, spacing: 3) {
                 // At accessibility sizes "Featured" goes under the name so the name keeps the width.
                 let nameLayout = isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
                     : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
                 nameLayout {
                     Text(merchant?.summary.name ?? element.displayNameForUI ?? String(localized: "Place"))
-                        .font(.title3.weight(.semibold))
+                        .font(.title2.weight(.bold))
                         .lineLimit(isAccessibilitySize ? 4 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
                     if element.isCurrentlyBoosted() {
                         Text(String(localized: "Featured"))
-                            .font(.caption.weight(.semibold))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(BrandColor.boost)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(BrandColor.boost.opacity(0.14), in: Capsule())
                     }
                 }
                 subtitle
-                if isAccessibilitySize, let distanceText {
-                    Text(distanceText)
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
             }
-            Spacer(minLength: Spacing.xs)
-            if !isAccessibilitySize, let distanceText {
-                Text(distanceText)
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             if let onClose {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -122,9 +118,12 @@ struct MerchantCardView: View {
         let category = merchant.flatMap { ElementCategorySymbols.friendlyCategoryLabel(forIcon: $0.summary.category.rawValue) }
         let hours = OpeningHours.parse(merchant?.summary.openingHours)
         let status = hours.map { OpeningHoursText.status($0.status(at: .now)) }
-        if isAccessibilitySize, category != nil || status != nil {
+        if isAccessibilitySize, category != nil || status != nil || distanceText != nil {
             // One fact per line, so long words never hyphenate.
             VStack(alignment: .leading, spacing: 2) {
+                if let distanceText {
+                    Text(distanceText).monospacedDigit()
+                }
                 if let category {
                     Text(category)
                 }
@@ -139,24 +138,20 @@ struct MerchantCardView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-        } else if category != nil || status != nil {
-            HStack(spacing: 4) {
-                if let category {
-                    Text(category)
-                }
-                if category != nil, status != nil {
-                    Text(verbatim: "·")
-                }
+        } else if category != nil || status != nil || distanceText != nil {
+            // One wrapping line: "0.2 mi · Shopping · Closed · Opens 10 AM".
+            let lead = [distanceText, category].compactMap { $0 }.joined(separator: " · ")
+            Group {
                 if let status {
-                    Text(status.state)
-                        .foregroundStyle(status.isOpen ? BrandColor.open : BrandColor.closed)
-                    if let detail = status.detail {
-                        Text(verbatim: "·")
-                        Text(detail)
-                    }
+                    let tail = status.detail.map { " · \($0)" } ?? ""
+                    let separator = lead.isEmpty ? "" : " · "
+                    Text("\(lead)\(separator)\(Text(status.state).foregroundStyle(status.isOpen ? BrandColor.open : BrandColor.closed))\(tail)")
+                } else {
+                    Text(lead)
                 }
             }
             .font(.subheadline)
+            .monospacedDigit()
             .foregroundStyle(.secondary)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -165,9 +160,9 @@ struct MerchantCardView: View {
 
     // MARK: Actions
 
-    /// A row of labeled buttons when it fits; otherwise the secondary actions drop
-    /// to icons (Directions keeps its label). Accessibility sizes stack full-width
-    /// buttons so no label breaks mid-word.
+    /// Equal-width tiles, icon over label, so the row reads as one control strip
+    /// at any width. Accessibility sizes stack full-width buttons instead, so no
+    /// label breaks mid-word.
     @ViewBuilder
     private var actionRow: some View {
         if isAccessibilitySize {
@@ -175,14 +170,10 @@ struct MerchantCardView: View {
                 actionButtons(iconOnly: false)
             }
         } else {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: Spacing.xs) { actionButtons(iconOnly: false) }
-                HStack(spacing: Spacing.xs) { actionButtons(iconOnly: true) }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Spacing.xs) { actionButtons(iconOnly: true) }
-                }
-                .scrollClipDisabled()
+            HStack(spacing: Spacing.xs) {
+                actionButtons(iconOnly: false)
             }
+            .padding(.top, 2)
         }
     }
 
@@ -282,31 +273,36 @@ private struct CardActionLabel: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
-        // The label stays the VoiceOver name when only the icon shows.
-        Group {
-            if iconOnly {
-                Label(title, systemImage: systemImage).labelStyle(.iconOnly)
-            } else {
-                Label(title, systemImage: systemImage)
+        if dynamicTypeSize.isAccessibilitySize {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+                .padding(.horizontal, Spacing.s)
+                .padding(.vertical, Spacing.xs)
+                .frame(maxWidth: .infinity, minHeight: LayoutMetrics.minimumHitTarget, alignment: .leading)
+                .foregroundStyle(isPrimary ? BrandColor.onBrandFill : BrandColor.brandInk)
+                .background(tileFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else {
+            VStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(height: 20)
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-        }
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(isAccessibilitySize ? 2 : 1)
-            .fixedSize(horizontal: !isAccessibilitySize, vertical: false)
-            .padding(.horizontal, iconOnly ? 0 : Spacing.s)
-            .padding(.vertical, isAccessibilitySize ? Spacing.xs : 0)
-            .frame(
-                minWidth: iconOnly ? LayoutMetrics.minimumHitTarget : nil,
-                maxWidth: isAccessibilitySize ? .infinity : nil,
-                minHeight: LayoutMetrics.minimumHitTarget,
-                alignment: isAccessibilitySize ? .leading : .center
-            )
             .foregroundStyle(isPrimary ? BrandColor.onBrandFill : BrandColor.brandInk)
-            .background(
-                isPrimary ? BrandColor.brandFill : Color.secondary.opacity(0.14),
-                in: Capsule()
-            )
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(tileFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(title))
+        }
+    }
+
+    private var tileFill: Color {
+        isPrimary ? BrandColor.brandFill : BrandColor.brand.opacity(0.12)
     }
 }
 
@@ -398,5 +394,82 @@ enum OpeningHoursText {
             return date.formatted(.dateTime.hour())
         }
         return date.formatted(.dateTime.hour().minute())
+    }
+}
+
+/// A merchant's category glyph on a soft brand-tinted disc. Used at the start of
+/// every list row and in the merchant card header, so a place has the same face
+/// in the list, on the card and (in orange) on its pin.
+struct MerchantCategoryBadge: View {
+    let element: Element
+    var size: CGFloat = 40
+
+    var body: some View {
+        Image(systemName: ElementCategorySymbols.symbolName(for: element))
+            .font(.system(size: size * 0.42, weight: .semibold))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(BrandColor.brandInk)
+            .frame(width: size, height: size)
+            .background(BrandColor.brand.opacity(0.14), in: Circle())
+            .overlay {
+                if element.isCurrentlyBoosted() {
+                    Circle().strokeBorder(BrandColor.boost, lineWidth: 2)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// Lays chips out left to right and wraps to a new line instead of scrolling,
+/// for columns wide enough that every category fits in two rows.
+struct ChipFlowLayout: Layout {
+    var spacing: CGFloat = 8
+    var lineSpacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map(\.width).max() ?? 0
+        let height = rows.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
+                    proposal: ProposedViewSize(size)
+                )
+                x += size.width + spacing
+            }
+            y += row.height + lineSpacing
+        }
+    }
+
+    private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let needed = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            if needed > width, !current.indices.isEmpty {
+                rows.append(current)
+                current = Row()
+            }
+            current.width = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
     }
 }

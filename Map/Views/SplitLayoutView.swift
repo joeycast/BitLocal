@@ -135,25 +135,9 @@ struct SplitLayoutView: View {
                 .navigationDestination(isPresented: communityDetailBindingIsPresented) {
                     communityDetailDestination
                 }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Text(verbatim: "bitlocal")
-                            .font(.custom("Fredoka-Medium", size: 24, relativeTo: .title2))
-                            .foregroundStyle(BrandColor.brand)
-                            .lineLimit(1)
-                            .fixedSize()
-                            .accessibilityAddTraits(.isHeader)
-                            .accessibilityLabel("BitLocal")
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        SettingsButtonView(onSettingsSelected: { showingSettings = true })
-                            .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                                settingsPopover
-                            }
-                    }
-                }
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationTitle("")
+                // BitLocal's own header instead of bar items: on iOS 26 each bar item
+                // got its own glass pill, which boxed the wordmark in a bubble.
+                .toolbar(.hidden, for: .navigationBar)
                 .toolbar(removing: .sidebarToggle)
                 .clearNavigationContainerBackgroundIfAvailable()
         }
@@ -170,9 +154,27 @@ struct SplitLayoutView: View {
     private var sidebarRootContent: some View {
         sidebarBrowseContent
             .safeAreaInset(edge: .top, spacing: 0) {
-                BrowseModePicker()
-                    .padding(.horizontal, Spacing.columnEdge)
-                    .padding(.bottom, Spacing.xs)
+                VStack(spacing: Spacing.s) {
+                    HStack(alignment: .center) {
+                        Text(verbatim: "bitlocal")
+                            .font(.custom("Fredoka-Medium", size: 30, relativeTo: .title))
+                            .foregroundStyle(BrandColor.brand)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityLabel("BitLocal")
+                        Spacer(minLength: Spacing.xs)
+                        SettingsButtonView(onSettingsSelected: { showingSettings = true }, style: .circle)
+                            .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                                settingsPopover
+                            }
+                    }
+                    BrowseModePicker()
+                }
+                .padding(.horizontal, Spacing.columnEdge - 4)
+                .padding(.top, Spacing.xs)
+                .padding(.bottom, Spacing.s)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             }
     }
 
@@ -198,9 +200,11 @@ struct SplitLayoutView: View {
                 storeRenderToken: StoreMap.shared.renderToken
             )
             .id("PersistentMap")
-            // Only vertically: on iOS 26 the sidebar floats over the detail column,
-            // and a map running under it hid pins and tinted the glass sidebar.
-            .ignoresSafeArea(.container, edges: .vertical)
+            // Not under the leading edge: on iOS 26 the sidebar floats over the detail
+            // column, and a map running under it hid pins and tinted the glass sidebar.
+            // Vertically and trailing, so the map runs under the Duo's status column and an
+            // iPhone's landscape notch instead of stopping at a blank strip.
+            .ignoresSafeArea(.container, edges: [.vertical, .trailing])
             .onAppear {
                 viewModel.locationManager.startUpdatingLocation()
             }
@@ -275,6 +279,7 @@ struct SplitLayoutView: View {
             CommunityDetailView(area: area)
                 .id(area.id)
                 .environmentObject(viewModel)
+                .toolbar(.visible, for: .navigationBar)
                 .clearNavigationContainerBackgroundIfAvailable()
                 .toolbar(removing: .sidebarToggle)
         }
