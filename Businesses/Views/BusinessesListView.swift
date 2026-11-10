@@ -652,7 +652,8 @@ struct BusinessesListView: View {
     /// off at the column edge read as broken rather than scrollable.
     @ViewBuilder
     private var categoryChipsView: some View {
-        if horizontalSizeClass == .regular {
+        // No detent means a sidebar, whose column reports a compact size class on iPad.
+        if currentDetent == nil || horizontalSizeClass == .regular {
             ChipFlowLayout(spacing: 8, lineSpacing: 8) {
                 categoryChipButtons
             }
