@@ -186,7 +186,7 @@ struct BusinessesListView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-                .font(.system(size: 15))
+                .font(.system(size: 16, weight: .medium))
             TextField("Search merchants…", text: $viewModel.unifiedSearchText)
                 .textFieldStyle(.plain)
                 .font(.body)
@@ -213,10 +213,9 @@ struct BusinessesListView: View {
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .background(Color(.tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 40))
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
+        .background(Color(.tertiarySystemFill), in: Capsule())
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
         // Sits in the fixed-height peek detent with the header (DECISIONS 86, 92):
@@ -649,30 +648,52 @@ struct BusinessesListView: View {
         elements.count > topSortedElements.count
     }
 
+    /// Chips scroll sideways in the sheet and wrap in the sidebar, where a strip cut
+    /// off at the column edge read as broken rather than scrollable.
+    @ViewBuilder
     private var categoryChipsView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(visibleCategoryChips) { chip in
-                    Button {
-                        applyCategoryChip(chip)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: chip.symbolName)
-                                .font(.system(size: 12, weight: .semibold))
-                            Text(chip.localizedLabel)
-                                .font(.footnote.weight(.medium))
-                        }
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color(.secondarySystemFill), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text(chip.localizedLabel))
-                }
+        if horizontalSizeClass == .regular {
+            ChipFlowLayout(spacing: 8, lineSpacing: 8) {
+                categoryChipButtons
             }
             .padding(.horizontal, 16)
-            .padding(.top, categoryChipsTopPadding)
+            .padding(.top, categoryChipsTopPadding + 2)
+            .padding(.bottom, 6)
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    categoryChipButtons
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, categoryChipsTopPadding)
+                .padding(.bottom, 2)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var categoryChipButtons: some View {
+        ForEach(visibleCategoryChips) { chip in
+            Button {
+                applyCategoryChip(chip)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: chip.symbolName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(BrandColor.brandInk)
+                    Text(chip.localizedLabel)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)
+                .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+                .overlay(Capsule().strokeBorder(Color(.separator).opacity(0.6), lineWidth: 0.5))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.pressable)
+            .accessibilityLabel(Text(chip.localizedLabel))
         }
     }
 
@@ -723,13 +744,7 @@ struct BusinessesListView: View {
             prepareListNavigation(for: element)
             viewModel.path = [element]
         } label: {
-            ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
-                    .padding(.trailing, 18)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
-            }
+            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
         }
         .buttonStyle(.plain)
         .onAppear {
@@ -749,13 +764,7 @@ struct BusinessesListView: View {
             prepareListNavigation(for: element)
             viewModel.path = [element]
         } label: {
-            ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
-                    .padding(.trailing, 18)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
-            }
+            ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
         }
         .buttonStyle(.plain)
         .onAppear {
@@ -775,13 +784,7 @@ struct BusinessesListView: View {
                 allowCameraMovement: !isLargeSheet
             )
         } label: {
-            ZStack(alignment: .trailing) {
-                ElementCell(viewModel: cellVM)
-                    .padding(.trailing, 18)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
-            }
+            ElementCell(viewModel: cellVM)
         }
         .buttonStyle(.plain)
         .onAppear {
@@ -965,6 +968,7 @@ struct ElementCell: View {
     @State private var appeared = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.displayScale) private var displayScale
 
     /// At accessibility sizes the distance moves under the name (ui-redesign 7).
     private var nameRowLayout: AnyLayout {
@@ -974,70 +978,61 @@ struct ElementCell: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            
-            nameRowLayout {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(
-                        viewModel.element.displayNameForUI ??
-                        NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
-                    )
-                        .foregroundColor(.primary)
-                        .fontWeight(.semibold)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
-                        .minimumScaleFactor(1)
-                    // Boosted is worded, not only colored (ui-redesign 7).
-                    if viewModel.element.isCurrentlyBoosted() {
-                        Text(NSLocalizedString("Featured", comment: "Tag on boosted merchants"))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(BrandColor.boost)
+        HStack(alignment: .top, spacing: Spacing.s) {
+            MerchantCategoryBadge(element: viewModel.element, size: 40)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                nameRowLayout {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(
+                            viewModel.element.displayNameForUI ??
+                            NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
+                        )
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                        // Boosted is worded, not only colored (ui-redesign 7).
+                        if viewModel.element.isCurrentlyBoosted() {
+                            Text(NSLocalizedString("Featured", comment: "Tag on boosted merchants"))
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(BrandColor.boost)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(BrandColor.boost.opacity(0.14), in: Capsule())
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    distanceText
+                        .font(.footnote.weight(.medium).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                        .layoutPriority(1)
                 }
-                .padding(.vertical, 5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // Distance from location
-                distanceText
-                    .font(.subheadline.weight(.medium).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                    .layoutPriority(1)
-            }
-            
-            HStack(alignment: .center, spacing: 8) {
-                if let formatted = viewModel.address?.formatted(.compact) {
-                    let lines = formatted.components(separatedBy: .newlines)
-                    Text(lines.first ?? "")
+
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
+                    Text(secondaryLine)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                }
-
-                Spacer(minLength: 0)
-            }
-
-            HStack {
-                if let formatted = viewModel.address?.formatted(.compact) {
-                    let lines = formatted.components(separatedBy: .newlines)
-                    Text(lines.dropFirst().joined(separator: ", "))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Spacer()
-                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    PaymentIcons(element: viewModel.element)
+                        .font(.footnote)
                 }
-
-                PaymentIcons(element: viewModel.element)
             }
-
+            // Separators line up with the text, not the badge.
+            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+        }
+        .padding(.vertical, 6)
+        .overlay(alignment: .bottom) {
             if showsBottomDivider {
                 Rectangle()
                     .fill(Color(.separator))
-                    .frame(height: 1)
-                    .padding(.top, 10)
-                    .padding(.trailing, -22)
+                    .frame(height: 1 / displayScale)
+                    .padding(.leading, 40 + Spacing.s)
+                    .offset(y: 7)
             }
         }
         .contentShape(Rectangle())
@@ -1046,12 +1041,25 @@ struct ElementCell: View {
             appeared = true
             viewModel.onCellAppear()
         }
-        // REMOVED: Redundant onChange that was causing excessive logging
-        // .onChange(of: viewModel.viewModel.userLocation) { _, _ in
-        //     viewModel.onCellAppear()
-        // }
     }
-    
+
+    /// "Coffee shop · 333 Commerce Street": the category first, so a scan down the
+    /// list reads what each place is before where it is.
+    private var secondaryLine: String {
+        var parts: [String] = []
+        if let category = ElementCategorySymbols.friendlyCategoryLabel(
+            forIcon: viewModel.element.v4Metadata?.icon ?? viewModel.element.tags?.iconPlatform
+        ), category != viewModel.element.displayNameForUI {
+            parts.append(category)
+        }
+        if let street = viewModel.address?.formatted(.compact)
+            .components(separatedBy: .newlines).first?
+            .trimmingCharacters(in: .whitespaces), !street.isEmpty {
+            parts.append(street)
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private var distanceText: some View {
         let formattedDistance: String? = {
             if let distance = localizedDistanceString(for: viewModel.element) {

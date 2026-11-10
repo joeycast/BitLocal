@@ -194,7 +194,9 @@ extension View {
 
     @ViewBuilder
     func groupedCardListRowBackground(if shouldBeGlassy: Bool) -> some View {
-        self
+        // Solid cards on every surface: on the glass sidebar and sheet the system
+        // default came out grey on grey (Duo review, Nov 2026).
+        self.listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
     }
 
     @ViewBuilder

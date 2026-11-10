@@ -163,7 +163,7 @@ private struct SheetHeaderRow: View {
     var body: some View {
         HStack {
             Text(verbatim: "bitlocal")
-                .font(.custom("Fredoka-Medium", size: 22))
+                .font(.custom("Fredoka-Medium", size: 24))
                 .foregroundStyle(BrandColor.brand)
                 .lineLimit(1)
                 .fixedSize()
@@ -174,8 +174,7 @@ private struct SheetHeaderRow: View {
             BrowseModePicker()
                 .frame(maxWidth: 240)
             Spacer(minLength: 8)
-            SettingsButtonView(onSettingsSelected: onSettings)
-                .frame(width: 44, height: 44)
+            SettingsButtonView(onSettingsSelected: onSettings, style: .circle)
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
