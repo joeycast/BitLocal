@@ -13,6 +13,11 @@ struct SettingsView: View {
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
+    @State private var showingAddBusinessForm = false
+    @State private var isRefreshingMerchants = false
+
+    private let supportBitLocalURL = URL(string: "https://strike.me/joeycast/")!
+
     init(
         selectedMapType: Binding<MKMapType>,
         currentDetent: Binding<PresentationDetent> = .constant(.large),
@@ -24,53 +29,21 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                pickerRow(label: "Map", selection: $selectedMapType) {
-                    Text("Standard").tag(MKMapType.standard)
-                    Text("Hybrid").tag(MKMapType.hybrid)
-                }
-
-                pickerRow(label: "Theme", selection: $appearanceManager.appearance) {
-                    Text("System").tag(Appearance.system)
-                    Text("Light").tag(Appearance.light)
-                    Text("Dark").tag(Appearance.dark)
-                }
-
-                pickerRow(label: "Distance", selection: $distanceUnit) {
-                    Text("Auto").tag(DistanceUnit.auto)
-                    Text("Miles").tag(DistanceUnit.miles)
-                    Text("Km").tag(DistanceUnit.kilometers)
-                }
-
-                pickerRow(label: "ATMs", selection: atmVisibilityBinding) {
-                    Text(NSLocalizedString("Show", comment: "Settings: show ATMs on map and list"))
-                        .tag(false)
-                    Text(NSLocalizedString("Hide", comment: "Settings: hide ATMs on map and list"))
-                        .tag(true)
-                }
-
-                Divider()
-                    .padding(.top, 4)
-
-                merchantAlertsSection
+        List {
+            mapAndDisplaySection
+            alertsAndDataSection
+            contributeSection
+            if Locale.current.region?.identifier == "US" {
+                supportSection
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            .padding(.bottom, 20)
+            aboutSection
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .listStyle(.insetGrouped)
         .navigationTitle(Text("Settings"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button(action: {
-                    if let onDone {
-                        onDone()
-                    } else {
-                        dismiss()
-                    }
-                }) {
+                Button(action: handleDone) {
                     Text("done_button")
                         .bold()
                 }
@@ -80,101 +53,252 @@ struct SettingsView: View {
         .task {
             await merchantAlertsManager.refreshStatus()
         }
-    }
-
-    // MARK: - Picker row
-
-    private func pickerRow<SelectionValue: Hashable, Content: View>(
-        label: LocalizedStringKey,
-        selection: Binding<SelectionValue>,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        HStack(spacing: 12) {
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(width: 64, alignment: .leading)
-
-            Picker(label, selection: selection, content: content)
-                .pickerStyle(.segmented)
-                .labelsHidden()
+        .sheet(isPresented: $showingAddBusinessForm) {
+            AddBusinessInfoView()
+        }
+        .onChange(of: selectedMapType) { _, _ in
+            BitLocalHaptics.selection()
+        }
+        .onChange(of: appearanceManager.appearance) { _, _ in
+            BitLocalHaptics.selection()
+        }
+        .onChange(of: distanceUnit) { _, _ in
+            BitLocalHaptics.selection()
         }
     }
 
-    /// `true` = hide ATMs (matches view model storage).
-    private var atmVisibilityBinding: Binding<Bool> {
+    // MARK: - Sections
+
+    private var mapAndDisplaySection: some View {
+        Section {
+            Picker(selection: $selectedMapType) {
+                Text("Standard").tag(MKMapType.standard)
+                Text("Hybrid").tag(MKMapType.hybrid)
+            } label: {
+                Label("Map", systemImage: "map")
+            }
+
+            Picker(selection: $appearanceManager.appearance) {
+                Text("System").tag(Appearance.system)
+                Text("Light").tag(Appearance.light)
+                Text("Dark").tag(Appearance.dark)
+            } label: {
+                Label("Appearance", systemImage: "circle.lefthalf.filled")
+            }
+
+            Picker(selection: $distanceUnit) {
+                Text("Auto").tag(DistanceUnit.auto)
+                Text("Miles").tag(DistanceUnit.miles)
+                Text("Km").tag(DistanceUnit.kilometers)
+            } label: {
+                Label("Distance", systemImage: "ruler")
+            }
+
+            Toggle(isOn: showATMsBinding) {
+                Label("Show ATMs", systemImage: "banknote")
+            }
+            .tint(.accentColor)
+        }
+    }
+
+    private var alertsAndDataSection: some View {
+        Section {
+            if merchantAlertsManager.isCloudKitAvailable {
+                NavigationLink {
+                    MerchantAlertsView(currentDetent: $currentDetent)
+                } label: {
+                    merchantAlertsRowLabel
+                }
+                .featureHintAnchor(.merchantAlerts)
+            } else {
+                merchantAlertsRowLabel
+                    .opacity(0.6)
+                    .featureHintAnchor(.merchantAlerts)
+            }
+
+            Button {
+                BitLocalHaptics.lightTap()
+                refreshMerchants()
+            } label: {
+                HStack(spacing: 12) {
+                    if isRefreshingMerchants || viewModel.isLoading {
+                        ProgressView()
+                            .frame(width: 22, height: 22)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.body)
+                            .foregroundStyle(.accent)
+                            .frame(width: 22, alignment: .center)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(NSLocalizedString("Refresh Merchants", comment: "About action to refresh BTC Map merchant catalog"))
+                            .foregroundStyle(.primary)
+                        Text(merchantRefreshSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .disabled(isRefreshingMerchants || viewModel.isLoading)
+        } footer: {
+            if !merchantAlertsManager.isCloudKitAvailable {
+                Text("Merchant alerts require iCloud be enabled for your device.")
+            }
+        }
+    }
+
+    private var contributeSection: some View {
+        Section(header: Text("contribute_section")) {
+            Button {
+                BitLocalHaptics.lightTap()
+                showingAddBusinessForm = true
+            } label: {
+                Label {
+                    Text("add_business_to_map")
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "storefront")
+                        .foregroundStyle(.accent)
+                }
+            }
+        }
+    }
+
+    private var supportSection: some View {
+        Section(
+            header: Text("support_bitlocal_section"),
+            footer: Text("support_bitlocal_footer")
+        ) {
+            Link(destination: supportBitLocalURL) {
+                HStack {
+                    Label {
+                        Text("support_bitlocal_button_label")
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "heart")
+                            .foregroundStyle(.accent)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "arrow.up.forward")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    private var aboutSection: some View {
+        Section {
+            NavigationLink {
+                AboutView(
+                    currentDetent: $currentDetent,
+                    onDismissSheet: handleDone
+                )
+            } label: {
+                HStack {
+                    Label {
+                        Text("about_title")
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.accent)
+                    }
+                    Spacer(minLength: 8)
+                    if let version = appVersionString {
+                        Text(version)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var showATMsBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.hideATMsFromMapAndList },
-            set: { viewModel.setHideATMsFromMapAndList($0) }
+            get: { !viewModel.hideATMsFromMapAndList },
+            set: { showATMs in
+                BitLocalHaptics.selection()
+                viewModel.setHideATMsFromMapAndList(!showATMs)
+            }
         )
     }
 
-    // MARK: - Merchant Alerts
+    private var merchantAlertsRowLabel: some View {
+        HStack(spacing: 12) {
+            Image(systemName: merchantAlertsManager.currentSubscription == nil ? "bell.badge" : "bell.badge.fill")
+                .font(.body)
+                .foregroundStyle(merchantAlertsManager.isCloudKitAvailable ? .accent : .secondary)
+                .frame(width: 22, alignment: .center)
 
-    private var merchantAlertsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Group {
-                if merchantAlertsManager.isCloudKitAvailable {
-                    NavigationLink {
-                        MerchantAlertsView(currentDetent: $currentDetent)
-                    } label: {
-                        merchantAlertsRow(showChevron: true)
-                    }
-                    .buttonStyle(.plain)
-                    .featureHintAnchor(.merchantAlerts)
-                } else {
-                    merchantAlertsRow(showChevron: false)
-                        .featureHintAnchor(.merchantAlerts)
-                }
-            }
-
-            if !merchantAlertsManager.isCloudKitAvailable {
-                Text("Merchant alerts require iCloud be enabled for your device.")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Merchant Alerts")
+                    .foregroundStyle(.primary)
+                Text(merchantAlertsSubtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            if merchantAlertsManager.currentSubscription != nil {
+                Text("On")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
+        .padding(.vertical, 2)
     }
 
     private var merchantAlertsSubtitle: String {
-        "Get notified when new merchants appear in your city."
+        if let subscription = merchantAlertsManager.currentSubscription {
+            return subscription.displayName
+        }
+        return "Get notified when new merchants appear in your city."
     }
 
-    @ViewBuilder
-    private func merchantAlertsRow(showChevron: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 12) {
-                Image(systemName: merchantAlertsManager.currentSubscription == nil ? "bell.badge" : "bell.badge.fill")
-                    .font(.title3)
-                    .foregroundStyle(merchantAlertsManager.isCloudKitAvailable ? .accent : .secondary)
-                    .frame(width: 28)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Merchant Alerts")
-                        .font(.headline)
-                        .foregroundStyle(merchantAlertsManager.isCloudKitAvailable ? .primary : .secondary)
-
-                    Text(merchantAlertsSubtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                if showChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.tertiary)
-                        .frame(height: 28)
-                }
-            }
+    private var merchantRefreshSubtitle: String {
+        if isRefreshingMerchants || viewModel.isLoading {
+            return NSLocalizedString("Updating…", comment: "Status while merchant catalog refresh is in progress")
         }
-        .padding(.vertical, 8)
-        .opacity(merchantAlertsManager.isCloudKitAvailable ? 1 : 0.65)
-        .contentShape(Rectangle())
+        if let relative = viewModel.lastSuccessfulSyncRelativeDescription {
+            return String(
+                format: NSLocalizedString("Updated %@", comment: "Relative last-synced label, e.g. Updated 5 minutes ago"),
+                relative
+            )
+        }
+        return NSLocalizedString(
+            "Fetch new and changed merchants since the last sync.",
+            comment: "About subtitle explaining incremental merchant refresh"
+        )
+    }
+
+    private var appVersionString: String? {
+        guard let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+              !version.isEmpty else {
+            return nil
+        }
+        return "v\(version)"
+    }
+
+    private func refreshMerchants() {
+        guard !isRefreshingMerchants else { return }
+        isRefreshingMerchants = true
+        viewModel.refreshMerchantData(userInitiated: true) {
+            isRefreshingMerchants = false
+        }
+    }
+
+    private func handleDone() {
+        if let onDone {
+            onDone()
+        } else {
+            dismiss()
+        }
     }
 }

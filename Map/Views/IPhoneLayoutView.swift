@@ -15,7 +15,6 @@ struct IPhoneLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
     var elements: [Element]?
     var visibleElements: [Element]
-    @Binding var showingAbout: Bool
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -26,7 +25,6 @@ struct IPhoneLayoutView: View {
                 viewModel: viewModel,
                 elements: elements,
                 visibleElements: visibleElements,
-                showingAbout: $showingAbout,
                 showingSettings: $showingSettings,
                 headerHeight: $headerHeight,
                 selectedMapTypeBinding: selectedMapTypeBinding
@@ -39,7 +37,6 @@ private struct IPhoneLayoutContent: View {
     @ObservedObject var viewModel: ContentViewModel
     var elements: [Element]?
     var visibleElements: [Element]
-    @Binding var showingAbout: Bool
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -57,7 +54,7 @@ private struct IPhoneLayoutContent: View {
     private var appearance: Appearance { appearanceManager.appearance }
     @StateObject private var recenterController = MapLocationRecenterController()
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.37)
-    @State private var settingsSheetDetent: PresentationDetent = .medium
+    @State private var settingsSheetDetent: PresentationDetent = .large
     @State private var hasLiveSheetMeasurement = false
     @State private var hasAcceptedDefaultLiveMeasurement = false
     @State private var pendingLaunchOutlier: CGFloat?
@@ -123,7 +120,6 @@ private struct IPhoneLayoutContent: View {
                         IPhoneHeaderView(
                             screenWidth: geometry.size.width,
                             viewModel: viewModel,
-                            showingAbout: $showingAbout,
                             showingSettings: $showingSettings,
                             selectedMapTypeBinding: selectedMapTypeBinding
                         )
@@ -152,18 +148,7 @@ private struct IPhoneLayoutContent: View {
             }
             .toolbar {
                 if isVerticalToolbarActive {
-                    ToolbarItemGroup(placement: .topBarLeading) {
-                        Button {
-                            showingAbout = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 16, weight: .medium))
-                                .imageScale(.medium)
-                                .foregroundStyle(toolbarIconColor)
-                                .id("about-\(effectiveColorScheme == .dark)")
-                        }
-                        .accessibilityLabel(NSLocalizedString("about_accessibility_label", comment: ""))
-
+                    ToolbarItem(placement: .topBarLeading) {
                         Button {
                             showingSettings = true
                         } label: {
@@ -184,18 +169,6 @@ private struct IPhoneLayoutContent: View {
                         colorScheme: effectiveColorScheme
                     )
                 } else if usesNativeHorizontalBar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            showingAbout = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 16, weight: .medium))
-                                .imageScale(.medium)
-                                .foregroundStyle(toolbarIconColor)
-                                .id("about-h-\(effectiveColorScheme == .dark)")
-                        }
-                        .accessibilityLabel(NSLocalizedString("about_accessibility_label", comment: ""))
-                    }
                     ToolbarItem(placement: .principal) {
                         Text("bitlocal")
                             .font(.custom("Fredoka-Medium", size: 28))
@@ -250,10 +223,6 @@ private struct IPhoneLayoutContent: View {
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(true)
                     .presentationBackgroundInteraction(.enabled)
-                    .sheet(isPresented: $showingAbout) {
-                        AboutView()
-                            .environmentObject(viewModel)
-                    }
                     .sheet(isPresented: $showingSettings) {
                         NavigationStack {
                             SettingsView(
@@ -380,7 +349,7 @@ private struct IPhoneLayoutContent: View {
             }
             .onChange(of: showingSettings) { _, isShowing in
                 if isShowing {
-                    settingsSheetDetent = .medium
+                    settingsSheetDetent = .large
                 }
             }
             .ignoresSafeArea(.keyboard)

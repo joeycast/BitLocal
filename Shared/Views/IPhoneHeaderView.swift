@@ -15,7 +15,6 @@ struct IPhoneHeaderView: View {
 
     let screenWidth: CGFloat
     @ObservedObject var viewModel: ContentViewModel
-    @Binding var showingAbout: Bool
     @Binding var showingSettings: Bool
     var selectedMapTypeBinding: Binding<MKMapType>
 
@@ -35,8 +34,9 @@ struct IPhoneHeaderView: View {
 
             VStack(spacing: 0) {
                 HStack {
-                    InfoButtonView(showingAbout: $showingAbout)
+                    Color.clear
                         .frame(width: headerControlWidth, height: headerControlHeight)
+                        .accessibilityHidden(true)
                     Spacer()
                     Text("bitlocal")
                         .font(.custom("Fredoka-Medium", size: headerTitleSize))

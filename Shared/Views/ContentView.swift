@@ -17,7 +17,6 @@ struct ContentView: View {
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
     @StateObject private var appearanceManager = AppearanceManager()
 
-    @State public var showingAbout = false
     @State private var userLocation: CLLocation?
     @State private var cancellable: Cancellable?
     @State private var mapStoppedMovingCancellable: Cancellable?
@@ -57,7 +56,6 @@ struct ContentView: View {
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.listElementsForCurrentDisplay,
-                    showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding
@@ -68,7 +66,6 @@ struct ContentView: View {
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.listElementsForCurrentDisplay,
-                    showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding

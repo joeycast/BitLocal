@@ -12,7 +12,6 @@ struct IPadLayoutView: View {
     @ObservedObject var viewModel: ContentViewModel
     var elements: [Element]?
     var visibleElements: [Element]
-    @Binding var showingAbout: Bool
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -30,14 +29,9 @@ struct IPadLayoutView: View {
         return min(420, max(320, containerSize.width - 48))
     }
 
-    private var resolvedAboutPopoverHeight: CGFloat {
-        guard containerSize.height > 0 else { return 640 }
-        return min(640, max(340, containerSize.height - 110))
-    }
-
     private var resolvedSettingsPopoverHeight: CGFloat {
-        guard containerSize.height > 0 else { return 520 }
-        return min(520, max(340, containerSize.height - 110))
+        guard containerSize.height > 0 else { return 580 }
+        return min(580, max(360, containerSize.height - 110))
     }
 
     private var sidePanel: some View {
@@ -57,24 +51,6 @@ struct IPadLayoutView: View {
                     communityDetailDestination
                 }
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        InfoButtonView(showingAbout: $showingAbout)
-                            .padding(.top, toolbarContentTopPadding)
-                            .popover(isPresented: $showingAbout, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                                AboutView(onDone: {
-                                    showingAbout = false
-                                })
-                                .environmentObject(viewModel)
-                                .id("ipad-about-\(appearance.rawValue)-\(systemColorScheme)")
-                                .preferredColorScheme(effectiveColorScheme)
-                                .frame(
-                                    minWidth: 320,
-                                    idealWidth: resolvedPopoverWidth,
-                                    minHeight: 340,
-                                    idealHeight: resolvedAboutPopoverHeight
-                                )
-                            }
-                    }
                     ToolbarItem(placement: .principal) {
                         CustomiPadNavigationStackTitleView()
                             .padding(.top, toolbarContentTopPadding)
@@ -97,13 +73,13 @@ struct IPadLayoutView: View {
                                 )
                                 .environmentObject(viewModel)
                                 .environmentObject(MerchantAlertsManager.shared)
-                                .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
-                                .preferredColorScheme(effectiveColorScheme)
                             }
+                            .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
+                            .preferredColorScheme(effectiveColorScheme)
                             .frame(
                                 minWidth: 320,
                                 idealWidth: resolvedPopoverWidth,
-                                minHeight: 340,
+                                minHeight: 360,
                                 idealHeight: resolvedSettingsPopoverHeight
                             )
                         }
@@ -275,7 +251,6 @@ private struct SplitMapDetailView: View {
 struct IPadLayoutView_Previews: PreviewProvider {
     @State static var elements: [Element]? = []
     @State static var visibleElements: [Element] = []
-    @State static var showingAbout = false
     @State static var showingSettings = true
     @State static var headerHeight: CGFloat = 80
     @StateObject static var viewModel = ContentViewModel()
@@ -286,7 +261,6 @@ struct IPadLayoutView_Previews: PreviewProvider {
             viewModel: viewModel,
             elements: elements,
             visibleElements: visibleElements,
-            showingAbout: $showingAbout,
             showingSettings: $showingSettings,
             headerHeight: $headerHeight,
             selectedMapTypeBinding: .constant(.standard)
