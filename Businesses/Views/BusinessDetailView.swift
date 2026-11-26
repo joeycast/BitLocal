@@ -103,11 +103,100 @@ private func openCoordinateInMaps(coordinate: CLLocationCoordinate2D, name: Stri
     mapItem.openInMaps(launchOptions: nil)
 }
 
+// MARK: - Verification State Model
+
+private enum PlaceVerificationState: Equatable {
+    case verified(Date)
+    case outdated(Date)
+    case loading
+    case unverified
+
+    var icon: String {
+        switch self {
+        case .verified:
+            return "checkmark.seal.fill"
+        case .outdated:
+            return "exclamationmark.triangle.fill"
+        case .loading:
+            return "clock"
+        case .unverified:
+            return "questionmark.circle.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .verified:
+            return .green
+        case .outdated:
+            return .orange
+        case .loading, .unverified:
+            return .secondary
+        }
+    }
+
+    var compactBadgeTitle: LocalizedStringKey {
+        switch self {
+        case .verified:
+            return "Verified"
+        case .outdated:
+            return "Not Recently Verified"
+        case .loading:
+            return "Checking…"
+        case .unverified:
+            return "Unverified"
+        }
+    }
+
+    var detailTitle: LocalizedStringKey {
+        switch self {
+        case .verified:
+            return "Verified"
+        case .outdated:
+            return "Not Recently Verified"
+        case .loading:
+            return "Loading verification status…"
+        case .unverified:
+            return "Not Yet Verified"
+        }
+    }
+
+    var explanation: LocalizedStringKey {
+        switch self {
+        case .verified:
+            return "Someone physically confirmed this place accepts bitcoin within the past year."
+        case .outdated:
+            return "It has been more than a year since someone reported that this location accepts bitcoin. It likely still does, but no one has confirmed so recently."
+        case .loading:
+            return "Checking community verification history on BTC Map."
+        case .unverified:
+            return "This place was added to BitLocal but hasn't been physically checked by a community member."
+        }
+    }
+
+    var formattedDate: String? {
+        switch self {
+        case .verified(let date), .outdated(let date):
+            return date.formatted(date: .abbreviated, time: .omitted)
+        case .loading, .unverified:
+            return nil
+        }
+    }
+}
+
+// MARK: - BusinessDetailView
+
 struct BusinessDetailView: View {
-    @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    @State private var region = MKCoordinateRegion()
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
     @State private var showingShareErrorAlert = false
+    @State private var showingFeaturedInfo = false
     @State private var shareItem: ShareURLItem?
+    @State private var isHeroScrolledPast = false
+    @State private var hydratedVerifiedAt: String?
+    @State private var isLoadingVerifiedAt = false
+    @State private var hasAttemptedVerificationHydration = false
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
 
@@ -116,7 +205,9 @@ struct BusinessDetailView: View {
     var element: Element
     var userLocation: CLLocation?
     @Binding private var currentDetent: PresentationDetent?
-    
+
+    private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
+
     init(
         element: Element,
         userLocation: CLLocation?,
@@ -126,10 +217,93 @@ struct BusinessDetailView: View {
         self.element = element
         self.userLocation = userLocation
         self._currentDetent = currentDetent
-        self._elementCellViewModel = StateObject(wrappedValue: ElementCellViewModel(element: element, userLocation: userLocation, viewModel: contentViewModel))
+        self._elementCellViewModel = StateObject(
+            wrappedValue: ElementCellViewModel(
+                element: element,
+                userLocation: userLocation,
+                viewModel: contentViewModel
+            )
+        )
     }
-    
-    fileprivate func localizedDistanceString() -> String? {
+
+    private var displayName: String {
+        element.displayNameForUI ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available")
+    }
+
+    private var categoryBadgeSymbolName: String {
+        ElementCategoryBadgeHelper.badgeSymbolName(for: element)
+    }
+
+    private var primaryCategoryLabel: String? {
+        ElementCategoryBadgeHelper.primaryCategoryLabel(for: element)
+    }
+
+    private var websiteInfo: (display: String, url: URL)? {
+        guard let raw = element.osmJSON?.tags?.website ?? element.osmJSON?.tags?.contactWebsite,
+              let url = raw.cleanedWebsiteURL() else {
+            return nil
+        }
+        return (raw.cleanedForDisplay(), url)
+    }
+
+    private var phoneInfo: (display: String, url: URL)? {
+        guard let raw = element.osmJSON?.tags?.phone ?? element.osmJSON?.tags?.contactPhone else {
+            return nil
+        }
+        let (cleanPhone, isValid) = raw.cleanedPhoneNumber()
+        guard isValid, let url = URL(string: "tel:\(cleanPhone)") else {
+            return nil
+        }
+        return (raw.displayablePhoneNumber(), url)
+    }
+
+    private var emailInfo: (display: String, url: URL)? {
+        guard let raw = element.v4Metadata?.email,
+              !raw.isEmpty,
+              let url = URL(string: "mailto:\(raw)") else {
+            return nil
+        }
+        return (raw, url)
+    }
+
+    private var descriptionText: String? {
+        let raw = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private var openingHoursRaw: String? {
+        guard let raw = element.osmJSON?.tags?.openingHours?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+        return raw
+    }
+
+    private var parsedOpeningSchedule: OSMOpeningHoursWeekSchedule? {
+        guard let openingHoursRaw else { return nil }
+        return OSMOpeningHoursParser.parseWeekSchedule(openingHoursRaw)
+    }
+
+    private var verificationState: PlaceVerificationState {
+        let raw = hydratedVerifiedAt ?? element.v4Metadata?.verifiedAt
+        if let raw, let verifiedDate = raw.parsedBTCMapDate(),
+           let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) {
+            return verifiedDate > oneYearAgo ? .verified(verifiedDate) : .outdated(verifiedDate)
+        }
+        if isLoadingVerifiedAt {
+            return .loading
+        }
+        return .unverified
+    }
+
+    private var reviewsCount: Int {
+        element.v4Metadata?.commentsCount ?? 0
+    }
+
+    private func localizedDistanceString() -> String? {
         guard let userLocation = userLocation, let coord = element.mapCoordinate else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         let distanceInMeters = userLocation.distance(from: location)
@@ -150,36 +324,61 @@ struct BusinessDetailView: View {
             return String(format: "%.1f mi", miles)
         }
     }
-    
+
     var body: some View {
-        List {
-            BusinessDescriptionSection(element: element)
-                .featuredHeader(isFeatured: shouldShowFeaturedBadgeInExpandedContent)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BusinessDetailsSection(
-                element: element,
-                elementCellViewModel: elementCellViewModel,
-                isFirstVisibleSection: shouldShowFeaturedBadgeInExpandedContent && !element.hasBusinessDescription
-            )
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapSocialsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            PaymentDetailsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapRequiredAppSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapPlaceCommentsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapVerificationSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BTCMapPaidActionsSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            BusinessMapSection(element: element)
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
+        ScrollViewReader { scrollProxy in
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 14) {
+                    heroHeader(scrollProxy: scrollProxy)
+
+                    quickActionBar
+
+                    PlacePaymentRailsCard(element: element)
+
+                    if let openingHoursRaw {
+                        PlaceOpeningHoursCard(
+                            rawOpeningHours: openingHoursRaw,
+                            parsedSchedule: parsedOpeningSchedule
+                        )
+                    }
+
+                    PlaceContactInfoCard(
+                        element: element,
+                        elementCellViewModel: elementCellViewModel,
+                        websiteInfo: websiteInfo,
+                        phoneInfo: phoneInfo,
+                        emailInfo: emailInfo
+                    )
+
+                    if let descriptionText {
+                        PlaceDescriptionCard(description: descriptionText)
+                    }
+
+                    if reviewsCount > 0 {
+                        PlaceReviewsCard(element: element, count: reviewsCount)
+                    }
+
+                    PlaceTrustAndBoostCard(
+                        element: element,
+                        verificationState: verificationState
+                    )
+                    .id("place-verification-card")
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 28)
+            }
+            .background(Color.clear)
+            .scrollContentBackground(.hidden)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top > 56
+            } action: { _, scrolledPast in
+                guard isHeroScrolledPast != scrolledPast else { return }
+                withAnimation(BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)) {
+                    isHeroScrolledPast = scrolledPast
+                }
+            }
         }
-        .listStyle(.insetGrouped)
-        .contentMargins(.top, 0, for: .scrollContent)
-        .scrollContentBackground(.automatic)
         // Only observes live height while collapsed-like; expanded detail is free of drag churn.
         .sheetCollapsedReveal(
             geometry: contentViewModel.sheetGeometry,
@@ -190,18 +389,28 @@ struct BusinessDetailView: View {
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
             elementCellViewModel.onCellAppear()
         }
-        .navigationTitle(element.displayNameForUI ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available"))
+        .task(id: element.id) {
+            hydrateVerificationIfNeeded()
+        }
+        .navigationTitle((isHeroScrolledPast || isCollapsedLikeDetent) ? displayName : "")
         .navigationBarTitleDisplayMode(.inline)
         .bitLocalDetailNavigationChrome()
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                shareToolbarItem
+            if isHeroScrolledPast && FeatureFlags.isSharePlaceLinksEnabled {
+                ToolbarItem(placement: .topBarTrailing) {
+                    shareToolbarItem
+                }
             }
         }
         .alert("Unable to share this place", isPresented: $showingShareErrorAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("The place link could not be created.")
+        }
+        .alert("Featured Merchant", isPresented: $showingFeaturedInfo) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("This business has been boosted on BTC Map, which means someone in the community has paid to help more people discover it.")
         }
         .sheet(item: $shareItem) { item in
             if let name = item.merchantName, !name.isEmpty {
@@ -213,80 +422,1267 @@ struct BusinessDetailView: View {
     }
 }
 
-extension BusinessDetailView {
+// MARK: - Hero Header & Quick Actions
+
+private extension BusinessDetailView {
     @ViewBuilder
-    private var shareToolbarItem: some View {
-        if FeatureFlags.isSharePlaceLinksEnabled {
-            Button {
-                if let shareURL = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
-                    shareItem = ShareURLItem(url: shareURL, merchantName: element.displayName)
-                } else {
-                    Debug.log("Share link generation failed for place id: \(element.id)")
-                    showingShareErrorAlert = true
+    func heroHeader(scrollProxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                // Solid map-pin badge linking the place card 1:1 to its map marker.
+                let isBoosted = element.isCurrentlyBoosted()
+                Image(systemName: categoryBadgeSymbolName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        isBoosted ? Color.orange : Color("MarkerColor"),
+                        in: Circle()
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                Color.white.opacity(isBoosted ? 0.36 : 0.24),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(
+                        color: (isBoosted ? Color.orange : Color("MarkerColor")).opacity(colorScheme == .dark ? 0.32 : 0.18),
+                        radius: 6,
+                        y: 2
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(displayName)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let metadataLine = heroMetadataLine {
+                        Text(metadataLine)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
-            } label: {
-                Label("Share place", systemImage: "square.and.arrow.up")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Compact scannable status pills (live hours, verification, featured)
+            if parsedOpeningSchedule != nil || verificationState != .loading || shouldShowFeaturedBadgeInExpandedContent {
+                BitLocalFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+                    if let schedule = parsedOpeningSchedule {
+                        let status = OpeningHoursLiveStatus.evaluate(schedule: schedule)
+                        heroStatusPill(
+                            dotColor: status.isOpen ? .green : .secondary,
+                            title: status.shortLabel,
+                            tint: status.isOpen ? .green : .secondary
+                        )
+                    }
+
+                    if verificationState != .loading {
+                        Button {
+                            BitLocalHaptics.selection()
+                            withAnimation(BitLocalMotion.animation(BitLocalMotion.disclosureSpring, reduceMotion: reduceMotion)) {
+                                scrollProxy.scrollTo("place-verification-card", anchor: .center)
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: verificationState.icon)
+                                    .font(.system(size: 10.5, weight: .semibold))
+                                Text(verificationState.compactBadgeTitle)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(verificationState.tint)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                verificationState.tint.opacity(colorScheme == .dark ? 0.18 : 0.12),
+                                in: Capsule()
+                            )
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(verificationState.tint.opacity(0.24), lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(.tactilePress(scale: 0.96))
+                    }
+
+                    if shouldShowFeaturedBadgeInExpandedContent {
+                        Button {
+                            BitLocalHaptics.selection()
+                            showingFeaturedInfo = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text("Featured")
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                Color.orange.opacity(colorScheme == .dark ? 0.18 : 0.12),
+                                in: Capsule()
+                            )
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(Color.orange.opacity(0.28), lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(.tactilePress(scale: 0.96))
+                    }
+                }
             }
         }
+        .padding(.top, 2)
     }
 
-    private var shouldUseGlassyRows: Bool {
-        false
+    var heroMetadataLine: String? {
+        var parts: [String] = []
+        if let category = primaryCategoryLabel, !category.isEmpty {
+            parts.append(category)
+        }
+        if let distance = localizedDistanceString() {
+            parts.append(distance)
+        }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: " · ")
     }
 
-    private var shouldShowFeaturedBadgeInExpandedContent: Bool {
-        // Detent-based only so featured chrome does not thrash during drag.
-        element.isCurrentlyBoosted() && !isCollapsedLikeDetent
+    func heroStatusPill(dotColor: Color, title: LocalizedStringKey, tint: Color) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 6, height: 6)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(
+            tint.opacity(colorScheme == .dark ? 0.18 : 0.12),
+            in: Capsule()
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(tint.opacity(0.24), lineWidth: 0.5)
+        )
     }
 
-    private var isCollapsedLikeDetent: Bool {
-        guard let currentDetent else { return false }
-        return currentDetent == BottomSheetDetents.collapsed || detentIdentifier(currentDetent).contains("fraction 0.11")
-    }
+    @ViewBuilder
+    var quickActionBar: some View {
+        let hasAnyAction = element.mapCoordinate != nil || phoneInfo != nil || websiteInfo != nil || FeatureFlags.isSharePlaceLinksEnabled
+        if hasAnyAction {
+            HStack(spacing: 8) {
+                if let coord = element.mapCoordinate {
+                    quickActionButton(
+                        title: LocalizedStringKey("Directions"),
+                        systemImage: "arrow.triangle.turn.up.right.diamond.fill",
+                        isPrimary: true
+                    ) {
+                        BitLocalHaptics.lightTap()
+                        openLocationInMaps(
+                            coordinate: coord,
+                            name: element.displayName,
+                            address: elementCellViewModel.address
+                        )
+                    }
+                }
 
-    private func detentIdentifier(_ detent: PresentationDetent) -> String {
-        String(describing: detent).lowercased()
-    }
-}
+                if let phone = phoneInfo {
+                    quickActionButton(
+                        title: LocalizedStringKey("Call"),
+                        systemImage: "phone.fill",
+                        isPrimary: false
+                    ) {
+                        BitLocalHaptics.lightTap()
+                        openURL(phone.url)
+                    }
+                }
 
-private struct ShareURLItem: Identifiable {
-    let id = UUID()
-    let url: URL
-    let merchantName: String?
-}
+                if let website = websiteInfo {
+                    quickActionButton(
+                        title: LocalizedStringKey("Website"),
+                        systemImage: "safari.fill",
+                        isPrimary: false
+                    ) {
+                        BitLocalHaptics.lightTap()
+                        openURL(website.url)
+                    }
+                }
 
-private struct ShareActivityView: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-struct BTCMapPlaceCommentsSection: View {
-    let element: Element
-
-    private var expectedCount: Int? { element.v4Metadata?.commentsCount }
-
-    var body: some View {
-        if shouldShowSection {
-            Section(header: Text("Community Reviews")) {
-                NavigationLink {
-                    BTCMapPlaceCommentsListView(element: element)
-                } label: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(String(format: NSLocalizedString("%lld review%@", comment: "Review count label"), expectedCount ?? 0, (expectedCount ?? 0) == 1 ? "" : "s"))
-                            .foregroundStyle(.primary)
+                if FeatureFlags.isSharePlaceLinksEnabled {
+                    quickActionButton(
+                        title: LocalizedStringKey("Share"),
+                        systemImage: "square.and.arrow.up",
+                        isPrimary: false
+                    ) {
+                        BitLocalHaptics.lightTap()
+                        triggerShare()
                     }
                 }
             }
         }
     }
 
-    private var shouldShowSection: Bool {
-        (expectedCount ?? 0) > 0
+    func quickActionButton(
+        title: LocalizedStringKey,
+        systemImage: String,
+        isPrimary: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(isPrimary ? Color.white : Color.accentColor)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(
+                isPrimary
+                    ? Color.accentColor
+                    : placeDetailCardSurfaceColor(for: colorScheme),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(
+                        isPrimary
+                            ? Color.white.opacity(0.18)
+                            : placeDetailCardBorderColor(for: colorScheme),
+                        lineWidth: 0.5
+                    )
+            )
+        }
+        .buttonStyle(.tactilePress(scale: 0.96))
+    }
+
+    @ViewBuilder
+    var shareToolbarItem: some View {
+        if FeatureFlags.isSharePlaceLinksEnabled {
+            Button {
+                BitLocalHaptics.lightTap()
+                triggerShare()
+            } label: {
+                Label("Share place", systemImage: "square.and.arrow.up")
+            }
+        }
+    }
+
+    func triggerShare() {
+        if let shareURL = PlaceShareLinkBuilder.makeShareURL(forPlaceID: element.id) {
+            shareItem = ShareURLItem(url: shareURL, merchantName: element.displayName)
+        } else {
+            Debug.log("Share link generation failed for place id: \(element.id)")
+            showingShareErrorAlert = true
+        }
+    }
+
+    var shouldShowFeaturedBadgeInExpandedContent: Bool {
+        // Detent-based only so featured chrome does not thrash during drag.
+        element.isCurrentlyBoosted() && !isCollapsedLikeDetent
+    }
+
+    var isCollapsedLikeDetent: Bool {
+        guard let currentDetent else { return false }
+        return currentDetent == BottomSheetDetents.collapsed || detentIdentifier(currentDetent).contains("fraction 0.11")
+    }
+
+    func detentIdentifier(_ detent: PresentationDetent) -> String {
+        String(describing: detent).lowercased()
+    }
+
+    func hydrateVerificationIfNeeded() {
+        let existing = hydratedVerifiedAt ?? element.v4Metadata?.verifiedAt
+        guard existing == nil else { return }
+        guard !isLoadingVerifiedAt else { return }
+        guard !hasAttemptedVerificationHydration else { return }
+
+        hasAttemptedVerificationHydration = true
+        isLoadingVerifiedAt = true
+
+        repository.fetchPlace(id: element.id) { result in
+            DispatchQueue.main.async {
+                if case .success(let record) = result,
+                   let verifiedAt = record.verifiedAt,
+                   !verifiedAt.isEmpty {
+                    hydratedVerifiedAt = verifiedAt
+                }
+                isLoadingVerifiedAt = false
+            }
+        }
+    }
+}
+
+// MARK: - Translucent Liquid Glass Card Surface
+
+private func placeDetailCardSurfaceColor(for colorScheme: ColorScheme) -> Color {
+    Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.64)
+}
+
+private func placeDetailCardBorderColor(for colorScheme: ColorScheme) -> Color {
+    Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08)
+}
+
+private struct PlaceDetailCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    var padding: EdgeInsets = EdgeInsets(top: 14, leading: 14, bottom: 14, trailing: 14)
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                placeDetailCardSurfaceColor(for: colorScheme),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(placeDetailCardBorderColor(for: colorScheme), lineWidth: 0.5)
+            )
+    }
+}
+
+private struct PlaceCardSectionLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.semibold))
+            .tracking(0.6)
+            .foregroundStyle(.secondary)
+    }
+}
+
+// MARK: - Payment Rails Card (Above the Fold)
+
+private struct PlacePaymentRailsCard: View {
+    let element: Element
+    @Environment(\.colorScheme) private var colorScheme
+
+    private struct PaymentRail: Identifiable {
+        let id: String
+        let icon: String
+        let shortLabel: String
+        let accessibilityLabel: String
+        let tint: Color
+    }
+
+    private var rails: [PaymentRail] {
+        var items: [PaymentRail] = []
+        if acceptsLightning(element: element) {
+            items.append(
+                PaymentRail(
+                    id: "lightning",
+                    icon: "bolt.fill",
+                    shortLabel: "Lightning",
+                    accessibilityLabel: NSLocalizedString("accepts_bitcoin_lightning", comment: "Label for accepting Bitcoin over Lightning"),
+                    tint: .orange
+                )
+            )
+        }
+        if acceptsContactlessLightning(element: element) {
+            items.append(
+                PaymentRail(
+                    id: "nfc",
+                    icon: "wave.3.right",
+                    shortLabel: "NFC",
+                    accessibilityLabel: NSLocalizedString("accepts_contactless_lightning", comment: "Label for accepting Contactless Lightning"),
+                    tint: .accentColor
+                )
+            )
+        }
+        if acceptsBitcoinOnChain(element: element) {
+            items.append(
+                PaymentRail(
+                    id: "onchain",
+                    icon: "bitcoinsign",
+                    shortLabel: "On-Chain",
+                    accessibilityLabel: NSLocalizedString("accepts_bitcoin_onchain", comment: "Label for accepting Bitcoin on Chain"),
+                    tint: .orange
+                )
+            )
+        }
+        if acceptsBitcoin(element: element) {
+            items.append(
+                PaymentRail(
+                    id: "bitcoin",
+                    icon: "bitcoinsign",
+                    shortLabel: NSLocalizedString("accepts_bitcoin", comment: "Label for accepting Bitcoin"),
+                    accessibilityLabel: NSLocalizedString("accepts_bitcoin", comment: "Label for accepting Bitcoin"),
+                    tint: .orange
+                )
+            )
+        }
+        return items
+    }
+
+    private var requiredApp: (raw: String, url: URL)? {
+        guard let raw = element.v4Metadata?.requiredAppURL,
+              !raw.isEmpty,
+              let url = URL(string: raw) else {
+            return nil
+        }
+        return (raw, url)
+    }
+
+    var body: some View {
+        if !rails.isEmpty || requiredApp != nil {
+            PlaceDetailCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    PlaceCardSectionLabel(
+                        title: NSLocalizedString("payment_details_section", comment: "Section header for payment details")
+                    )
+
+                    if !rails.isEmpty {
+                        BitLocalFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                            ForEach(rails) { rail in
+                                HStack(spacing: 6) {
+                                    Image(systemName: rail.icon)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(rail.tint)
+                                    Text(rail.shortLabel)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    rail.tint.opacity(colorScheme == .dark ? 0.16 : 0.10),
+                                    in: Capsule()
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(rail.tint.opacity(0.24), lineWidth: 0.5)
+                                )
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(rail.accessibilityLabel)
+                            }
+                        }
+                    }
+
+                    if let requiredApp {
+                        if !rails.isEmpty {
+                            Divider()
+                                .opacity(0.5)
+                        }
+                        Link(destination: requiredApp.url) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "app.badge.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 28, height: 28)
+                                    .background(Color.orange.opacity(0.14), in: Circle())
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Required App")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                    Text(requiredApp.raw.cleanedForDisplay())
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.accent)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer(minLength: 0)
+
+                                Image(systemName: "arrow.up.forward")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.tactileRow(cornerRadius: 10))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Smart Collapsible Opening Hours Card
+
+private struct OpeningHoursLiveStatus {
+    let isOpen: Bool
+    let shortLabel: LocalizedStringKey
+
+    static func evaluate(
+        schedule: OSMOpeningHoursWeekSchedule,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> OpeningHoursLiveStatus {
+        if schedule.isTwentyFourSeven {
+            return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open 24/7")
+        }
+
+        let today = weekday(for: calendar.component(.weekday, from: now))
+        let components = calendar.dateComponents([.hour, .minute], from: now)
+        let nowMinutes = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+
+        if let todaySchedule = schedule.days.first(where: { $0.weekday == today }) {
+            for range in todaySchedule.ranges {
+                if range.isAllDay {
+                    return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                }
+                if range.endMinutes >= range.startMinutes {
+                    if nowMinutes >= range.startMinutes && nowMinutes < range.endMinutes {
+                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                    }
+                } else {
+                    // Overnight range starting today (e.g. 18:00 - 02:00)
+                    if nowMinutes >= range.startMinutes {
+                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                    }
+                }
+            }
+        }
+
+        // Check spillover from yesterday's overnight range (e.g. 18:00 - 02:00 or 18:00 - 26:00)
+        if let yesterdayDate = calendar.date(byAdding: .day, value: -1, to: now) {
+            let yesterday = weekday(for: calendar.component(.weekday, from: yesterdayDate))
+            if let yesterdaySchedule = schedule.days.first(where: { $0.weekday == yesterday }) {
+                for range in yesterdaySchedule.ranges {
+                    if range.endMinutes > 24 * 60 {
+                        let spilloverEnd = range.endMinutes - 24 * 60
+                        if nowMinutes < spilloverEnd {
+                            return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                        }
+                    } else if range.endMinutes < range.startMinutes && nowMinutes < range.endMinutes {
+                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                    }
+                }
+            }
+        }
+
+        return OpeningHoursLiveStatus(isOpen: false, shortLabel: "Closed")
+    }
+
+    static func weekday(for calendarWeekday: Int) -> WeeklyHours.Weekday {
+        switch calendarWeekday {
+        case 1: return .sunday
+        case 2: return .monday
+        case 3: return .tuesday
+        case 4: return .wednesday
+        case 5: return .thursday
+        case 6: return .friday
+        case 7: return .saturday
+        default: return .monday
+        }
+    }
+}
+
+private struct PlaceOpeningHoursCard: View {
+    let rawOpeningHours: String
+    let parsedSchedule: OSMOpeningHoursWeekSchedule?
+
+    @State private var isExpanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var todayWeekday: WeeklyHours.Weekday {
+        OpeningHoursLiveStatus.weekday(for: Calendar.current.component(.weekday, from: Date()))
+    }
+
+    var body: some View {
+        PlaceDetailCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
+            if let parsedSchedule {
+                let status = OpeningHoursLiveStatus.evaluate(schedule: parsedSchedule)
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        BitLocalHaptics.selection()
+                        withAnimation(
+                            BitLocalMotion.animation(
+                                BitLocalMotion.disclosureSpring,
+                                reduceMotion: reduceMotion
+                            )
+                        ) {
+                            isExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(status.isOpen ? Color.green : Color.secondary)
+                                .frame(width: 30, height: 30)
+                                .background(
+                                    (status.isOpen ? Color.green : Color.secondary).opacity(0.14),
+                                    in: Circle()
+                                )
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text(status.shortLabel)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(status.isOpen ? Color.green : Color.secondary)
+                                    Text("·")
+                                        .foregroundStyle(.tertiary)
+                                    Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Text(todaySummaryText(for: parsedSchedule))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                    .monospacedDigit()
+                                    .lineLimit(1)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Image(systemName: "chevron.down")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        }
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.tactileRow(cornerRadius: 10))
+                    .accessibilityHint(isExpanded ? "Double-tap to collapse weekly hours" : "Double-tap to view weekly hours")
+
+                    if isExpanded {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Divider()
+                                .padding(.vertical, 6)
+
+                            ForEach(parsedSchedule.days, id: \.weekday) { day in
+                                let isToday = day.weekday == todayWeekday
+                                HStack(alignment: .top, spacing: 12) {
+                                    HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(isToday ? Color.accentColor : Color.clear)
+                                            .frame(width: 5, height: 5)
+                                        Text(shortWeekdayLabel(for: day.weekday))
+                                            .font(.subheadline)
+                                            .fontWeight(isToday ? .semibold : .regular)
+                                            .foregroundStyle(isToday ? .primary : .secondary)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(width: 54, alignment: .leading)
+
+                                    hoursText(for: day, isToday: isToday)
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                }
+                            }
+                        }
+                        .padding(.top, 2)
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
+                        )
+                    }
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.accent)
+                        .frame(width: 30, height: 30)
+                        .background(Color.accentColor.opacity(0.14), in: Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Text(rawOpeningHours)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+            }
+        }
+    }
+
+    private func todaySummaryText(for schedule: OSMOpeningHoursWeekSchedule) -> String {
+        if schedule.isTwentyFourSeven {
+            return "24/7"
+        }
+        guard let today = schedule.days.first(where: { $0.weekday == todayWeekday }) else {
+            return NSLocalizedString("hours_closed", comment: "Closed label for business hours")
+        }
+        if today.ranges.isEmpty {
+            return NSLocalizedString("hours_closed", comment: "Closed label for business hours")
+        }
+        if today.ranges.count == 1, today.ranges[0].isAllDay {
+            return "24/7"
+        }
+        return today.ranges
+            .map { formattedTime($0.startMinutes) + " \u{2013} " + formattedTime($0.endMinutes) }
+            .joined(separator: ", ")
+    }
+
+    @ViewBuilder
+    private func hoursText(for day: OSMOpeningHoursDaySchedule, isToday: Bool) -> some View {
+        if day.ranges.isEmpty {
+            Text(NSLocalizedString("hours_closed", comment: "Closed label for business hours"))
+                .font(.subheadline)
+                .fontWeight(isToday ? .semibold : .regular)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        } else if day.ranges.count == 1, day.ranges[0].isAllDay {
+            Text("24/7")
+                .font(.subheadline)
+                .fontWeight(isToday ? .semibold : .regular)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+                .lineLimit(1)
+        } else {
+            VStack(alignment: .trailing, spacing: 2) {
+                ForEach(Array(day.ranges.enumerated()), id: \.offset) { _, range in
+                    Text(formattedTime(range.startMinutes) + " \u{2013} " + formattedTime(range.endMinutes))
+                        .font(.subheadline)
+                        .fontWeight(isToday ? .semibold : .regular)
+                        .foregroundStyle(isToday ? .primary : .secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func shortWeekdayLabel(for weekday: WeeklyHours.Weekday) -> String {
+        let localizedWeekday: String
+        switch weekday {
+        case .monday:
+            localizedWeekday = NSLocalizedString("weekday_mo", comment: "Monday abbreviation for business hours")
+        case .tuesday:
+            localizedWeekday = NSLocalizedString("weekday_tu", comment: "Tuesday abbreviation for business hours")
+        case .wednesday:
+            localizedWeekday = NSLocalizedString("weekday_we", comment: "Wednesday abbreviation for business hours")
+        case .thursday:
+            localizedWeekday = NSLocalizedString("weekday_th", comment: "Thursday abbreviation for business hours")
+        case .friday:
+            localizedWeekday = NSLocalizedString("weekday_fr", comment: "Friday abbreviation for business hours")
+        case .saturday:
+            localizedWeekday = NSLocalizedString("weekday_sa", comment: "Saturday abbreviation for business hours")
+        case .sunday:
+            localizedWeekday = NSLocalizedString("weekday_su", comment: "Sunday abbreviation for business hours")
+        }
+
+        let trimmed = localizedWeekday.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count <= 3 {
+            return trimmed
+        }
+        return String(trimmed.prefix(3))
+    }
+
+    private func formattedTime(_ totalMinutes: Int) -> String {
+        let clampedMinutes = max(0, min(totalMinutes, 24 * 60))
+        let hour = clampedMinutes / 60
+        let minute = clampedMinutes % 60
+
+        var components = DateComponents()
+        components.calendar = Calendar.current
+        components.hour = hour == 24 ? 0 : hour
+        components.minute = minute
+
+        guard let date = Calendar.current.date(from: components) else {
+            return String(format: "%02d:%02d", hour, minute)
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - Unified Contact & Location Card
+
+private struct PlaceContactInfoCard: View {
+    let element: Element
+    @ObservedObject var elementCellViewModel: ElementCellViewModel
+    let websiteInfo: (display: String, url: URL)?
+    let phoneInfo: (display: String, url: URL)?
+    let emailInfo: (display: String, url: URL)?
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
+
+    private struct SocialItem: Identifiable {
+        let id: String
+        let label: String
+        let icon: String
+        let value: String
+        let url: URL?
+    }
+
+    private var addressDisplayText: String {
+        elementCellViewModel.address?.formatted(.compact) ?? ""
+    }
+
+    private var socialItems: [SocialItem] {
+        guard let metadata = element.v4Metadata else { return [] }
+        let candidates: [(String, String, String?, URL?)] = [
+            ("X", "xmark", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
+            ("Instagram", "camera.fill", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
+            ("Telegram", "paperplane.fill", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
+            ("Facebook", "f.cursive", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
+            ("LINE", "message.fill", metadata.line, metadata.line.flatMap(URL.init(string:)))
+        ]
+        return candidates.compactMap { item in
+            guard let raw = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+                return nil
+            }
+            return SocialItem(
+                id: item.0,
+                label: item.0,
+                icon: item.1,
+                value: raw.cleanedForDisplay(),
+                url: item.3
+            )
+        }
+    }
+
+    private var hasAddress: Bool { element.mapCoordinate != nil }
+    private var hasWebsite: Bool { websiteInfo != nil }
+    private var hasPhone: Bool { phoneInfo != nil }
+    private var hasEmail: Bool { emailInfo != nil }
+    private var hasContactRows: Bool { hasAddress || hasWebsite || hasPhone || hasEmail }
+
+    private var hasAnyContent: Bool {
+        hasContactRows || !socialItems.isEmpty
+    }
+
+    var body: some View {
+        if hasAnyContent {
+            PlaceDetailCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if hasContactRows {
+                        PlaceCardSectionLabel(
+                            title: NSLocalizedString("business_details_section", comment: "Section header for business details")
+                        )
+                        .padding(.bottom, 8)
+                    }
+
+                    if let coord = element.mapCoordinate {
+                        contactRow(
+                            icon: "mappin.and.ellipse",
+                            label: NSLocalizedString("address_label", comment: "Label for address"),
+                            value: addressDisplayText.isEmpty ? "Open in Apple Maps" : addressDisplayText,
+                            copyValue: addressDisplayText.isEmpty ? nil : addressDisplayText,
+                            copyTitle: "Copy Address",
+                            valueLineLimit: 3
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openLocationInMaps(
+                                coordinate: coord,
+                                name: element.displayName,
+                                address: elementCellViewModel.address
+                            )
+                        }
+                    }
+
+                    if let website = websiteInfo {
+                        if hasAddress { rowDivider }
+                        contactRow(
+                            icon: "globe",
+                            label: NSLocalizedString("website_label", comment: "Label for website"),
+                            value: website.display,
+                            copyValue: website.display,
+                            copyTitle: "Copy Website",
+                            valueLineLimit: 2
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openURL(website.url)
+                        }
+                    }
+
+                    if let phone = phoneInfo {
+                        if hasAddress || hasWebsite { rowDivider }
+                        contactRow(
+                            icon: "phone.fill",
+                            label: NSLocalizedString("phone_label", comment: "Label for phone"),
+                            value: phone.display,
+                            copyValue: phone.display,
+                            copyTitle: "Copy Phone",
+                            valueLineLimit: 1
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openURL(phone.url)
+                        }
+                    }
+
+                    if let email = emailInfo {
+                        if hasAddress || hasWebsite || hasPhone { rowDivider }
+                        contactRow(
+                            icon: "envelope.fill",
+                            label: "Email",
+                            value: email.display,
+                            copyValue: email.display,
+                            copyTitle: "Copy Email",
+                            valueLineLimit: 2
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openURL(email.url)
+                        }
+                    }
+
+                    if !socialItems.isEmpty {
+                        if hasContactRows {
+                            Divider()
+                                .padding(.vertical, 10)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            PlaceCardSectionLabel(title: "Socials")
+
+                            BitLocalFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                                ForEach(socialItems) { social in
+                                    socialChip(social)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var rowDivider: some View {
+        Divider()
+            .padding(.leading, 42)
+            .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private func contactRow(
+        icon: String,
+        label: String,
+        value: String,
+        copyValue: String?,
+        copyTitle: String,
+        valueLineLimit: Int,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Button(action: action) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: icon)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(.accent)
+                        .frame(width: 30, height: 30)
+                        .background(Color.accentColor.opacity(0.12), in: Circle())
+                        .padding(.top, 1)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(label)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Text(value)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(valueLineLimit)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 2)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.tactileRow(cornerRadius: 10))
+            .copyValueContextMenu(copyValue, title: copyTitle)
+
+            if let copyValue, !copyValue.isEmpty {
+                TactileCopyButton(value: copyValue, accessibilityLabel: copyTitle)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func socialChip(_ social: SocialItem) -> some View {
+        let chipLabel = HStack(spacing: 6) {
+            Image(systemName: social.icon)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.accent)
+            Text(social.label)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(
+            Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06),
+            in: Capsule()
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+        )
+
+        if let url = social.url {
+            Button {
+                BitLocalHaptics.lightTap()
+                openURL(url)
+            } label: {
+                chipLabel
+            }
+            .buttonStyle(.tactilePress(scale: 0.96))
+            .copyValueContextMenu(social.value, title: "Copy \(social.label)")
+        } else {
+            chipLabel
+                .copyValueContextMenu(social.value, title: "Copy \(social.label)")
+        }
+    }
+}
+
+// MARK: - Inline Tactile Copy Button (Blur + Scale Icon Morph)
+
+private struct TactileCopyButton: View {
+    let value: String
+    let accessibilityLabel: String
+
+    @State private var copied = false
+    @State private var resetTask: Task<Void, Never>?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button {
+            UIPasteboard.general.string = value
+            BitLocalHaptics.success()
+
+            resetTask?.cancel()
+            withAnimation(
+                BitLocalMotion.animation(BitLocalMotion.morphSpring, reduceMotion: reduceMotion)
+            ) {
+                copied = true
+            }
+
+            resetTask = Task {
+                try? await Task.sleep(for: .milliseconds(1600))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    withAnimation(
+                        BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)
+                    ) {
+                        copied = false
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(copied ? Color.green : Color.secondary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 32, height: 32)
+                .background(
+                    (copied ? Color.green.opacity(colorScheme == .dark ? 0.18 : 0.12) : Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05)),
+                    in: Circle()
+                )
+        }
+        .buttonStyle(.tactilePress(scale: 0.92))
+        .accessibilityLabel(copied ? "Copied" : accessibilityLabel)
+        .onDisappear {
+            resetTask?.cancel()
+        }
+    }
+}
+
+// MARK: - Description Card (with Smooth Apple Translate)
+
+private struct PlaceDescriptionCard: View {
+    let description: String
+
+    var body: some View {
+        PlaceDetailCard {
+            VStack(alignment: .leading, spacing: 8) {
+                PlaceCardSectionLabel(
+                    title: NSLocalizedString("business_description_section", comment: "Section header for business description")
+                )
+
+                TranslatableBusinessDescriptionView(description: description)
+            }
+        }
+    }
+}
+
+private struct TranslatableBusinessDescriptionView: View {
+    let description: String
+
+    @State private var translatedDescription: String?
+    @State private var translationConfiguration: TranslationSession.Configuration?
+    @State private var translationError: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var hasSuccessfulTranslation: Bool {
+        guard let translatedDescription else { return false }
+        return !translatedDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var detectedLanguageCode: String? {
+        guard description.count >= 20 else { return nil }
+        return NLLanguageRecognizer.dominantLanguage(for: description)?.rawValue
+    }
+
+    private var preferredLanguageCode: String? {
+        guard let preferredIdentifier = Locale.preferredLanguages.first else { return nil }
+        return normalizedLanguageCode(preferredIdentifier)
+    }
+
+    private var sourceLanguage: Locale.Language? {
+        guard let detectedLanguageCode else { return nil }
+        return Locale.Language(identifier: detectedLanguageCode)
+    }
+
+    private var targetLanguage: Locale.Language? {
+        guard let preferredLanguageCode else { return nil }
+        return Locale.Language(identifier: preferredLanguageCode)
+    }
+
+    private var shouldOfferTranslation: Bool {
+        guard let detectedLanguageCode, let preferredLanguageCode else { return false }
+        return normalizedLanguageCode(detectedLanguageCode) != preferredLanguageCode
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(description)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .lineSpacing(3)
+
+            if let translatedDescription, !translatedDescription.isEmpty {
+                Text(translatedDescription)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(3)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
+                    )
+            }
+
+            if shouldOfferTranslation && !hasSuccessfulTranslation {
+                Button(action: startTranslation) {
+                    Label("Translate", systemImage: "translate")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.tactilePress(scale: 0.96))
+            }
+
+            if hasSuccessfulTranslation {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Translated on device with Apple Translate")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+                .transition(.opacity)
+            }
+
+            if let translationError, !translationError.isEmpty {
+                Text(translationError)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .translationTask(translationConfiguration) { session in
+            do {
+                let response = try await session.translate(description)
+                await MainActor.run {
+                    withAnimation(
+                        BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion)
+                    ) {
+                        translatedDescription = response.targetText
+                        translationError = nil
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    withAnimation(
+                        BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)
+                    ) {
+                        translationError = error.localizedDescription
+                    }
+                }
+            }
+        }
+    }
+
+    private func startTranslation() {
+        guard let sourceLanguage, let targetLanguage else { return }
+        BitLocalHaptics.selection()
+        translationError = nil
+        translationConfiguration = TranslationSession.Configuration(
+            source: sourceLanguage,
+            target: targetLanguage
+        )
+    }
+
+    private func normalizedLanguageCode(_ identifier: String) -> String {
+        let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
+        return normalized.split(separator: "-", maxSplits: 1).first.map(String.init) ?? normalized
+    }
+}
+
+// MARK: - Community Reviews Card & List View
+
+private struct PlaceReviewsCard: View {
+    let element: Element
+    let count: Int
+
+    var body: some View {
+        NavigationLink {
+            BTCMapPlaceCommentsListView(element: element)
+        } label: {
+            PlaceDetailCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
+                HStack(spacing: 12) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(.accent)
+                        .frame(width: 30, height: 30)
+                        .background(Color.accentColor.opacity(0.12), in: Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Community Reviews")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text(
+                            String(
+                                format: NSLocalizedString("%lld review%@", comment: "Review count label"),
+                                count,
+                                count == 1 ? "" : "s"
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .buttonStyle(.tactileRow(cornerRadius: 18))
     }
 }
 
@@ -313,6 +1709,7 @@ struct BTCMapPlaceCommentsListView: View {
                     .foregroundStyle(.red)
                     .font(.subheadline)
                 Button("Retry") {
+                    BitLocalHaptics.lightTap()
                     loadComments(force: true)
                 }
             } else if comments.isEmpty {
@@ -402,6 +1799,7 @@ private struct TranslatableReviewBodyTextView: View {
     @State private var translatedText: String?
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var translationError: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var hasSuccessfulTranslation: Bool {
         guard let translatedText else { return false }
@@ -443,14 +1841,23 @@ private struct TranslatableReviewBodyTextView: View {
                 Text(translatedText)
                     .font(.body)
                     .foregroundStyle(.secondary)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
+                    )
             }
 
             if shouldOfferTranslation && !hasSuccessfulTranslation {
                 Button(action: startTranslation) {
                     Label("Translate", systemImage: "translate")
-                        .font(.subheadline)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.accentColor.opacity(0.12), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.tactilePress(scale: 0.96))
             }
 
             if hasSuccessfulTranslation {
@@ -461,6 +1868,7 @@ private struct TranslatableReviewBodyTextView: View {
                         .foregroundStyle(.secondary)
                 }
                 .font(.footnote)
+                .transition(.opacity)
             }
 
             if let translationError, !translationError.isEmpty {
@@ -473,12 +1881,20 @@ private struct TranslatableReviewBodyTextView: View {
             do {
                 let response = try await session.translate(text)
                 await MainActor.run {
-                    translatedText = response.targetText
-                    translationError = nil
+                    withAnimation(
+                        BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion)
+                    ) {
+                        translatedText = response.targetText
+                        translationError = nil
+                    }
                 }
             } catch {
                 await MainActor.run {
-                    translationError = error.localizedDescription
+                    withAnimation(
+                        BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)
+                    ) {
+                        translationError = error.localizedDescription
+                    }
                 }
             }
         }
@@ -486,6 +1902,7 @@ private struct TranslatableReviewBodyTextView: View {
 
     private func startTranslation() {
         guard let sourceLanguage, let targetLanguage else { return }
+        BitLocalHaptics.selection()
         translationError = nil
         translationConfiguration = TranslationSession.Configuration(
             source: sourceLanguage,
@@ -499,259 +1916,140 @@ private struct TranslatableReviewBodyTextView: View {
     }
 }
 
-struct BTCMapPaidActionsSection: View {
+// MARK: - Verification & Boost Footer Card
+
+private struct PlaceTrustAndBoostCard: View {
     let element: Element
-    
+    let verificationState: PlaceVerificationState
+    @Environment(\.openURL) private var openURL
+
     private var btcMapMerchantURL: URL? {
         BTCMapMerchantURLBuilder.makeURL(for: element)
     }
 
     var body: some View {
-        if let btcMapMerchantURL {
-            Section(
-                header: Text("Feature This Merchant"),
-                footer: Text("Opening the link above will direct you to btcmap.org where you can boost this merchant. Boosted merchants are featured on BitLocal.")
-            ) {
-                Link(destination: btcMapMerchantURL) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "star.circle.fill")
-                            .foregroundStyle(.orange)
-                            .frame(width: 18)
+        PlaceDetailCard {
+            VStack(alignment: .leading, spacing: 12) {
+                PlaceCardSectionLabel(title: "Verification")
 
-                        Text("Boost on BTC Map")
+                HStack(alignment: .top, spacing: 12) {
+                    if verificationState == .loading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 30, height: 30)
+                    } else {
+                        Image(systemName: verificationState.icon)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(verificationState.tint)
+                            .frame(width: 30, height: 30)
+                            .background(verificationState.tint.opacity(0.14), in: Circle())
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(verificationState.detailTitle)
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
 
-                        Spacer(minLength: 0)
-
-                        Image(systemName: "arrow.up.forward")
-                            .font(.footnote.weight(.semibold))
+                        if let dateText = verificationState.formattedDate {
+                            Text(
+                                String(
+                                    format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"),
+                                    dateText
+                                )
+                            )
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
-
-struct BTCMapSocialsSection: View {
-    let element: Element
-
-    private var metadata: ElementV4Metadata? { element.v4Metadata }
-
-    private var socialLinks: [(label: String, icon: String, value: String, url: URL?)] {
-        guard let metadata else { return [] }
-        return [
-            ("X", "xmark.circle.fill", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
-            ("Facebook", "f.cursive.circle.fill", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
-            ("Instagram", "camera.circle.fill", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
-            ("Telegram", "paperplane.circle.fill", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
-            ("LINE", "message.circle.fill", metadata.line, metadata.line.flatMap(URL.init(string:)))
-        ].compactMap { item in
-            guard let value = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-                return nil
-            }
-            return (item.0, item.1, value.cleanedForDisplay(), item.3)
-        }
-    }
-
-    var body: some View {
-        if hasContent {
-            Section(header: Text("Socials")) {
-                ForEach(socialLinks, id: \.label) { social in
-                    if let url = social.url {
-                        Link(destination: url) {
-                            businessLinkValueRow(icon: social.icon, label: social.label, value: social.value)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        businessLinkValueRow(icon: social.icon, label: social.label, value: social.value)
-                    }
-                }
-
-            }
-        }
-    }
-
-    private var hasContent: Bool {
-        guard let metadata else { return false }
-        return [
-            metadata.twitter,
-            metadata.facebook,
-            metadata.instagram,
-            metadata.telegram,
-            metadata.line
-        ].contains { ($0?.isEmpty == false) }
-    }
-
-}
-
-struct BTCMapRequiredAppSection: View {
-    let element: Element
-
-    private var requiredAppURL: String? { element.v4Metadata?.requiredAppURL }
-
-    var body: some View {
-        if let requiredAppURL,
-           !requiredAppURL.isEmpty,
-           let url = URL(string: requiredAppURL) {
-            Section(header: Text("Required App")) {
-                Link(destination: url) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Image(systemName: "app.badge.fill")
-                                .foregroundStyle(.orange)
-                            Text("Required App")
-                                .font(.subheadline)
+                        } else if verificationState == .unverified {
+                            Text("No one has confirmed this location yet.")
+                                .font(.caption.weight(.medium))
                                 .foregroundStyle(.secondary)
                         }
-                        Text(requiredAppURL)
-                            .font(.footnote)
-                            .foregroundStyle(.accent)
-                            .lineLimit(2)
+
+                        Text(verificationState.explanation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
                     }
                 }
-                .buttonStyle(.plain)
+
+                if let btcMapMerchantURL {
+                    Divider()
+                        .opacity(0.5)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button {
+                            BitLocalHaptics.lightTap()
+                            openURL(btcMapMerchantURL)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 13.5, weight: .semibold))
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 30, height: 30)
+                                    .background(Color.orange.opacity(0.14), in: Circle())
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Boost on BTC Map")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    Text("Feature This Merchant")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer(minLength: 0)
+
+                                Image(systemName: "arrow.up.forward")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 2)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.tactileRow(cornerRadius: 10))
+
+                        Text("Opening the link above will direct you to btcmap.org where you can boost this merchant. Boosted merchants are featured on BitLocal.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         }
     }
 }
 
-struct BTCMapVerificationSection: View {
-    let element: Element
+// MARK: - Helpers
 
-    @State private var hydratedVerifiedAt: String?
-    @State private var isLoadingVerifiedAt = false
-    @State private var hasAttemptedHydration = false
+private struct ShareURLItem: Identifiable {
+    let id = UUID()
+    let url: URL
+    let merchantName: String?
+}
 
-    private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
-    private var metadata: ElementV4Metadata? { element.v4Metadata }
-    private var effectiveVerifiedAt: String? { hydratedVerifiedAt ?? metadata?.verifiedAt }
+private struct ShareActivityView: UIViewControllerRepresentable {
+    let items: [Any]
 
-    private enum VerificationStatus {
-        case verified
-        case outdated
-
-        var icon: String {
-            switch self {
-            case .verified:
-                return "checkmark.seal.fill"
-            case .outdated:
-                return "exclamationmark.triangle.fill"
-            }
-        }
-
-        var tint: Color {
-            switch self {
-            case .verified:
-                return .green
-            case .outdated:
-                return .orange
-            }
-        }
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .verified:
-                    return LocalizedStringKey("Verified")
-                case .outdated:
-                    return LocalizedStringKey("Not Recently Verified")
-            }
-        }
-
-        var explanation: LocalizedStringKey {
-            switch self {
-            case .verified:
-                return "Someone physically confirmed this place accepts bitcoin within the past year."
-            case .outdated:
-                return "It has been more than a year since someone reported that this location accepts bitcoin. It likely still does, but no one has confirmed so recently."
-            }
-        }
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
     }
 
-    private var verifiedDate: Date? {
-        guard let raw = effectiveVerifiedAt else { return nil }
-        return raw.parsedBTCMapDate()
-    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
 
-    private var verifiedDateText: String? {
-        guard let verifiedDate else { return nil }
-        return verifiedDate.formatted(date: .abbreviated, time: .omitted)
-    }
-
-    private var status: VerificationStatus? {
-        guard let verifiedDate else { return nil }
-        guard let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) else {
-            return nil
-        }
-        return verifiedDate > oneYearAgo ? .verified : .outdated
-    }
-
-    var body: some View {
-        Section(header: Text("Verification")) {
-            if let status, let verifiedDateText {
-                let value = String(format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"), verifiedDateText)
-                detailRow(icon: status.icon, tint: status.tint, label: status.title, value: LocalizedStringKey(value))
-                Text(status.explanation)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if isLoadingVerifiedAt {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading verification status…")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+private extension View {
+    @ViewBuilder
+    func copyValueContextMenu(_ value: String?, title: String = "Copy") -> some View {
+        if let value, !value.isEmpty {
+            self.contextMenu {
+                Button(title, systemImage: "doc.on.doc") {
+                    UIPasteboard.general.string = value
+                    BitLocalHaptics.success()
                 }
-            } else {
-                detailRow(
-                    icon: "questionmark.circle.fill",
-                    tint: .secondary,
-                    label: LocalizedStringKey("Not Yet Verified"),
-                    value: LocalizedStringKey("No one has confirmed this location yet.")
-                )
-                Text("This place was added to BitLocal but hasn't been physically checked by a community member.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
-        }
-        .onAppear {
-            hydrateVerificationIfNeeded()
-        }
-    }
-
-    private func detailRow(icon: String, tint: Color, label: LocalizedStringKey, value: LocalizedStringKey) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .foregroundStyle(.primary)
-            }
-        }
-    }
-
-    private func hydrateVerificationIfNeeded() {
-        guard effectiveVerifiedAt == nil else { return }
-        guard !isLoadingVerifiedAt else { return }
-        guard !hasAttemptedHydration else { return }
-
-        hasAttemptedHydration = true
-        isLoadingVerifiedAt = true
-
-        repository.fetchPlace(id: element.id) { result in
-            DispatchQueue.main.async {
-                if case .success(let record) = result, let verifiedAt = record.verifiedAt, !verifiedAt.isEmpty {
-                    hydratedVerifiedAt = verifiedAt
-                }
-                isLoadingVerifiedAt = false
-            }
+        } else {
+            self
         }
     }
 }
@@ -778,649 +2076,3 @@ private extension String {
         return self
     }
 }
-
-// BusinessDescriptionSection
-struct BusinessDescriptionSection: View {
-    var element: Element
-    
-    var body: some View {
-        if let description = element.osmJSON?.tags?.description ?? element.osmJSON?.tags?.descriptionEn {
-            Section(header: businessSectionHeader(
-                NSLocalizedString("business_description_section", comment: "Section header for business description")
-            )) {
-                TranslatableBusinessDescriptionView(description: description)
-            }
-        } else {
-        }
-    }
-}
-
-private struct TranslatableBusinessDescriptionView: View {
-    let description: String
-
-    @State private var translatedDescription: String?
-    @State private var translationConfiguration: TranslationSession.Configuration?
-    @State private var translationError: String?
-    
-    private var hasSuccessfulTranslation: Bool {
-        guard let translatedDescription else { return false }
-        return !translatedDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var detectedLanguageCode: String? {
-        guard description.count >= 20 else { return nil }
-        return NLLanguageRecognizer.dominantLanguage(for: description)?.rawValue
-    }
-
-    private var preferredLanguageCode: String? {
-        guard let preferredIdentifier = Locale.preferredLanguages.first else { return nil }
-        return normalizedLanguageCode(preferredIdentifier)
-    }
-
-    private var sourceLanguage: Locale.Language? {
-        guard let detectedLanguageCode else { return nil }
-        return Locale.Language(identifier: detectedLanguageCode)
-    }
-
-    private var targetLanguage: Locale.Language? {
-        guard let preferredLanguageCode else { return nil }
-        return Locale.Language(identifier: preferredLanguageCode)
-    }
-
-    private var shouldOfferTranslation: Bool {
-        guard let detectedLanguageCode, let preferredLanguageCode else { return false }
-        return normalizedLanguageCode(detectedLanguageCode) != preferredLanguageCode
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(description)
-
-            if let translatedDescription, !translatedDescription.isEmpty {
-                Text(translatedDescription)
-                    .foregroundStyle(.secondary)
-            }
-
-            if shouldOfferTranslation && !hasSuccessfulTranslation {
-                Button(action: startTranslation) {
-                    Label("Translate", systemImage: "translate")
-                        .font(.subheadline)
-                }
-                .buttonStyle(.plain)
-            }
-            
-            if hasSuccessfulTranslation {
-                HStack(spacing: 3) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text("Translated on device with Apple Translate")
-                        .foregroundStyle(.secondary)
-                }
-                .font(.footnote)
-            }
-
-            if let translationError, !translationError.isEmpty {
-                Text(translationError)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .translationTask(translationConfiguration) { session in
-            do {
-                let response = try await session.translate(description)
-                await MainActor.run {
-                    translatedDescription = response.targetText
-                    translationError = nil
-                }
-            } catch {
-                await MainActor.run {
-                    translationError = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func startTranslation() {
-        guard let sourceLanguage, let targetLanguage else { return }
-        translationError = nil
-        translationConfiguration = TranslationSession.Configuration(
-            source: sourceLanguage,
-            target: targetLanguage
-        )
-    }
-
-    private func normalizedLanguageCode(_ identifier: String) -> String {
-        let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
-        return normalized.split(separator: "-", maxSplits: 1).first.map(String.init) ?? normalized
-    }
-}
-
-// Business Details Section
-struct BusinessDetailsSection: View {
-    var element: Element
-    @ObservedObject var elementCellViewModel: ElementCellViewModel
-    var isFirstVisibleSection = false
-    
-    var body: some View {
-        Section(header: businessSectionHeader(
-            NSLocalizedString("business_details_section", comment: "Section header for business details"),
-            includesFeaturedBadge: isFirstVisibleSection
-        )) {
-            // Business Address
-            if let coord = element.mapCoordinate {
-                Button(action: {
-                    openLocationInMaps(coordinate: coord, name: element.displayName, address: elementCellViewModel.address)
-                }) {
-                    businessLinkValueRow(
-                        icon: "map",
-                        label: NSLocalizedString("address_label", comment: "Label for address"),
-                        value: addressDisplayText,
-                        valueLineLimit: 4
-                    )
-                }
-                .buttonStyle(.plain)
-                .copyValueContextMenu(addressDisplayText, title: "Copy Address")
-            }
-            
-            // Business Website - Only show if valid
-            if let website = element.osmJSON?.tags?.website ?? element.osmJSON?.tags?.contactWebsite,
-               let validURL = website.cleanedWebsiteURL() {
-
-                Link(destination: validURL) {
-                    businessLinkValueRow(
-                        icon: "globe",
-                        label: NSLocalizedString("website_label", comment: "Label for website"),
-                        value: website.cleanedForDisplay()
-                    )
-                }
-                .buttonStyle(.plain)
-                .copyValueContextMenu(website.cleanedForDisplay(), title: "Copy Website")
-            }
-            
-            // Business Phone - Simple worldwide approach
-            if let phone = element.osmJSON?.tags?.phone ?? element.osmJSON?.tags?.contactPhone {
-                let (cleanPhone, isValid) = phone.cleanedPhoneNumber()
-
-                if isValid, let url = URL(string: "tel:\(cleanPhone)") {
-                    Link(destination: url) {
-                        businessLinkValueRow(
-                            icon: "phone.fill",
-                            label: NSLocalizedString("phone_label", comment: "Label for phone"),
-                            value: phone.displayablePhoneNumber()
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .copyValueContextMenu(phone.displayablePhoneNumber(), title: "Copy Phone")
-                } else {
-                    let _ = Debug.log("Invalid phone number: '\(phone)'")
-                }
-            }
-
-            // Business Email
-            if let email = element.v4Metadata?.email,
-               !email.isEmpty,
-               let url = URL(string: "mailto:\(email)") {
-                Link(destination: url) {
-                    businessLinkValueRow(
-                        icon: "envelope.fill",
-                        label: "Email",
-                        value: email
-                    )
-                }
-                .buttonStyle(.plain)
-                .copyValueContextMenu(email, title: "Copy Email")
-            }
-            
-            // Opening Hours
-            if let openingHours = element.osmJSON?.tags?.openingHours {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "clock.fill")
-                        .foregroundStyle(.accent)
-                        .frame(width: 18)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
-                            .foregroundStyle(.accent)
-                        OpeningHoursDisplayView(rawOpeningHours: openingHours)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-        }
-    }
-}
-
-private func businessLinkValueRow(
-    icon: String,
-    label: String,
-    value: String,
-    valueLineLimit: Int = 2
-) -> some View {
-    HStack(alignment: .top, spacing: 12) {
-        Image(systemName: icon)
-            .foregroundStyle(.accent)
-            .frame(width: 18)
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .foregroundStyle(.accent)
-            Text(value)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(valueLineLimit)
-                .multilineTextAlignment(.leading)
-        }
-        Spacer(minLength: 0)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .contentShape(.rect)
-}
-
-private extension BusinessDetailsSection {
-    var addressDisplayText: String {
-        elementCellViewModel.address?.formatted(.compact) ?? ""
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func featuredHeader(isFeatured: Bool) -> some View {
-        self
-            .environment(\.businessSectionShowsFeaturedBadge, isFeatured)
-    }
-
-    func copyValueContextMenu(_ value: String, title: String = "Copy") -> some View {
-        contextMenu {
-            Button(title) {
-                UIPasteboard.general.string = value
-            }
-        }
-    }
-}
-
-private extension Element {
-    var hasBusinessDescription: Bool {
-        let description = osmJSON?.tags?.description ?? osmJSON?.tags?.descriptionEn
-        guard let description else { return false }
-        return !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-}
-
-private struct BusinessSectionShowsFeaturedBadgeKey: EnvironmentKey {
-    static let defaultValue = false
-}
-
-private extension EnvironmentValues {
-    var businessSectionShowsFeaturedBadge: Bool {
-        get { self[BusinessSectionShowsFeaturedBadgeKey.self] }
-        set { self[BusinessSectionShowsFeaturedBadgeKey.self] = newValue }
-    }
-}
-
-private struct BusinessSectionHeader: View {
-    let title: String
-    var includesFeaturedBadge = false
-
-    @Environment(\.businessSectionShowsFeaturedBadge) private var showsFeaturedBadge
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var showingFeaturedInfo = false
-
-    private var shouldShowBadge: Bool {
-        includesFeaturedBadge || showsFeaturedBadge
-    }
-
-    private var isLight: Bool { colorScheme == .light }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: shouldShowBadge ? 10 : 0) {
-            if shouldShowBadge {
-                Button {
-                    showingFeaturedInfo = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color.orange, Color(red: 0.9, green: 0.5, blue: 0.0)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        Text("Featured Merchant")
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(isLight ? Color(red: 0.8, green: 0.4, blue: 0.0) : Color.orange)
-                            .tracking(0.3)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.orange.opacity(isLight ? 0.2 : 0.14),
-                                        Color.orange.opacity(isLight ? 0.12 : 0.07)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color.orange.opacity(isLight ? 0.45 : 0.25), lineWidth: isLight ? 1 : 0.5)
-                    )
-                }
-                .buttonStyle(.plain)
-                .padding(.bottom, 2)
-                .alert("Featured Merchant", isPresented: $showingFeaturedInfo) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    Text("This business has been boosted on BTC Map, which means someone in the community has paid to help more people discover it.")
-                }
-            }
-
-            Text(title)
-        }
-        .padding(.top, shouldShowBadge ? -4 : 0)
-    }
-}
-
-private func businessSectionHeader(_ title: String, includesFeaturedBadge: Bool = false) -> some View {
-    BusinessSectionHeader(title: title, includesFeaturedBadge: includesFeaturedBadge)
-}
-
-private struct OpeningHoursDisplayView: View {
-    let rawOpeningHours: String
-
-    private var parsedSchedule: OSMOpeningHoursWeekSchedule? {
-        OSMOpeningHoursParser.parseWeekSchedule(rawOpeningHours)
-    }
-    
-    private var todayWeekday: WeeklyHours.Weekday {
-        switch Calendar.current.component(.weekday, from: Date()) {
-        case 1: return .sunday
-        case 2: return .monday
-        case 3: return .tuesday
-        case 4: return .wednesday
-        case 5: return .thursday
-        case 6: return .friday
-        case 7: return .saturday
-        default: return .monday
-        }
-    }
-
-    var body: some View {
-        if let parsedSchedule {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(parsedSchedule.days, id: \.weekday) { day in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(shortWeekdayLabel(for: day.weekday))
-                            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
-                            .foregroundStyle(day.weekday == todayWeekday ? .primary : .secondary)
-                            .lineLimit(1)
-                            .frame(width: 36, alignment: .leading)
-
-                        hoursText(for: day)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        } else {
-            Text(rawOpeningHours)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.leading)
-        }
-    }
-
-    @ViewBuilder
-    private func hoursText(for day: OSMOpeningHoursDaySchedule) -> some View {
-        if day.ranges.isEmpty {
-            Text(NSLocalizedString("hours_closed", comment: "Closed label for business hours"))
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            .font(.body)
-            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
-            .foregroundStyle(.secondary)
-        } else if day.ranges.count == 1, day.ranges[0].isAllDay {
-            Text("24/7")
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            .font(.body)
-            .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
-            .foregroundStyle(.primary)
-        } else {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(Array(day.ranges.enumerated()), id: \.offset) { _, range in
-                    Text(formattedTime(range.startMinutes) + " \u{2013} " + formattedTime(range.endMinutes))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    .font(.body)
-                    .fontWeight(day.weekday == todayWeekday ? .semibold : .regular)
-                    .foregroundStyle(.primary)
-                }
-            }
-        }
-    }
-
-    private func shortWeekdayLabel(for weekday: WeeklyHours.Weekday) -> String {
-        let localizedWeekday: String
-        switch weekday {
-        case .monday:
-            localizedWeekday = NSLocalizedString("weekday_mo", comment: "Monday abbreviation for business hours")
-        case .tuesday:
-            localizedWeekday = NSLocalizedString("weekday_tu", comment: "Tuesday abbreviation for business hours")
-        case .wednesday:
-            localizedWeekday = NSLocalizedString("weekday_we", comment: "Wednesday abbreviation for business hours")
-        case .thursday:
-            localizedWeekday = NSLocalizedString("weekday_th", comment: "Thursday abbreviation for business hours")
-        case .friday:
-            localizedWeekday = NSLocalizedString("weekday_fr", comment: "Friday abbreviation for business hours")
-        case .saturday:
-            localizedWeekday = NSLocalizedString("weekday_sa", comment: "Saturday abbreviation for business hours")
-        case .sunday:
-            localizedWeekday = NSLocalizedString("weekday_su", comment: "Sunday abbreviation for business hours")
-        }
-        
-        let trimmed = localizedWeekday.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.count <= 3 {
-            return trimmed
-        }
-        return String(trimmed.prefix(3))
-    }
-
-    private func formattedTime(_ totalMinutes: Int) -> String {
-        let clampedMinutes = max(0, min(totalMinutes, 24 * 60))
-        let hour = clampedMinutes / 60
-        let minute = clampedMinutes % 60
-
-        var components = DateComponents()
-        components.calendar = Calendar.current
-        components.hour = hour == 24 ? 0 : hour
-        components.minute = minute
-
-        guard let date = Calendar.current.date(from: components) else {
-            return String(format: "%02d:%02d", hour, minute)
-        }
-
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter.string(from: date)
-    }
-}
-
-
-// Payment Details Section
-struct PaymentDetailsSection: View {
-    var element: Element
-    
-    var body: some View {
-        Section(header: Text(NSLocalizedString("payment_details_section", comment: "Section header for payment details"))) {
-            // Accepts Bitcoin (details regarding on chain/lightning/contactless lightning not available)
-            if acceptsBitcoin(element: element) {
-                HStack {
-                    Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.accentColor)
-                    Text(NSLocalizedString("accepts_bitcoin", comment: "Label for accepting Bitcoin"))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-            }
-            
-            // Business Accepts Bitcoin
-            if acceptsBitcoinOnChain(element: element) {
-                HStack {
-                    Image(systemName: "bitcoinsign.circle.fill")
-                        .foregroundColor(.accentColor)
-                    Text(NSLocalizedString("accepts_bitcoin_onchain", comment: "Label for accepting Bitcoin on Chain"))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-            }
-            
-            // Business Accepts Lightning
-            if acceptsLightning(element: element) {
-                HStack {
-                    Image(systemName: "bolt.circle.fill")
-                        .foregroundColor(.accentColor)
-                    Text(NSLocalizedString("accepts_bitcoin_lightning", comment: "Label for accepting Bitcoin over Lightning"))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-            }
-            if acceptsContactlessLightning(element: element) {
-                HStack {
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .foregroundColor(.accentColor)
-                    Text(NSLocalizedString("accepts_contactless_lightning", comment: "Label for accepting Contactless Lightning"))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-            }
-        }
-    }
-}
-
-// BusinessMapSection
-struct BusinessMapSection: View {
-    var element: Element
-    @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    
-    var body: some View {
-        BusinessMiniMapView(element: element)
-            .frame(height: horizontalSizeClass == .compact ? 200 : 300) // Adjust height based on device
-            .cornerRadius(10)
-    }
-}
-
-// Map View
-// TODO: Refactor to reuse annotation customization code from ContentViewModel
-struct BusinessMiniMapView: UIViewRepresentable {
-    var element: Element
-    
-    // Read the persisted map type using AppStorage.
-    // This value is stored as an Int (the rawValue of MKMapType)
-    @AppStorage("selectedMapType") private var storedMapType: Int = Int(MKMapType.standard.rawValue)
-    
-    // Convert the stored integer back to MKMapType
-    var mapType: MKMapType {
-        MKMapType(rawValue: UInt(storedMapType)) ?? .standard
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    func makeUIView(context: Context) -> MKMapView {
-        let mapView = MKMapView()
-        mapView.delegate = context.coordinator
-        
-        // Set the map type based on the persisted value
-        mapView.mapType = mapType
-        
-        return mapView
-    }
-    
-    func updateUIView(_ uiView: MKMapView, context: Context) {
-        // Update map type if it has changed
-        if uiView.mapType != mapType {
-            uiView.mapType = mapType
-        }
-        updateAnnotations(from: uiView)
-    }
-    
-    private func updateAnnotations(from mapView: MKMapView) {
-        mapView.removeAnnotations(mapView.annotations)
-        
-        let annotation = Annotation(element: element)
-        mapView.addAnnotation(annotation)
-        
-        let coordinate = annotation.coordinate
-        let region = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005))
-        mapView.setRegion(region, animated: true)
-    }
-    
-    class Coordinator: NSObject, MKMapViewDelegate {
-        var parent: BusinessMiniMapView
-        
-        init(_ parent: BusinessMiniMapView) {
-            self.parent = parent
-        }
-        
-        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            let reuseIdentifier = "AnnotationView"
-            var view: MKMarkerAnnotationView?
-            
-            if let annotation = annotation as? Annotation {
-                view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
-                view?.canShowCallout = true
-                view?.glyphText = nil
-                view?.glyphTintColor = .white
-                if let element = annotation.element {
-                    view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
-                    let symbolName = ElementCategorySymbols.symbolName(for: element)
-                    Debug.logMap("MiniMap: Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
-                    view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
-                } else {
-                    view?.markerTintColor = UIColor(named: "MarkerColor")
-                }
-                view?.displayPriority = .required
-            }
-            return view
-        }
-    }
-}
-
-// Troubleshooting Section
-//struct TroubleshootingSection: View {
-//    var element: Element
-//
-//    var body: some View {
-//        Section(header: Text("Troubleshooting")) {
-//            Text("ID: \(element.id)")
-//            Text("Created at: \(element.createdAt)")
-//            Text("Updated at: \(element.updatedAt ?? "")")
-//            Text("Deleted at: \(element.deletedAt ?? "")")
-//            Text("Description: \(element.osmJSON?.tags?.description ?? "")")
-//            Text("Phone: \(element.osmJSON?.tags?.phone ?? "")")
-//            Text("Contact:Phone: \(element.osmJSON?.tags?.contactPhone ?? "")")
-//            Text("Website: \(element.osmJSON?.tags?.website ?? "")")
-//            Text("Contact:Website: \(element.osmJSON?.tags?.contactWebsite ?? "")")
-//            Text("Opening Hours: \(element.osmJSON?.tags?.openingHours ?? "")")
-//            Text("Accepts payment:bitcoin: \(element.osmJSON?.tags?.paymentBitcoin ?? "no")")
-//            Text("Accepts currency:XBT: \(element.osmJSON?.tags?.currencyXBT ?? "no")")
-//            Text("Accepts Bitcoin on Chain: \(element.osmJSON?.tags?.paymentOnchain ?? "no")")
-//            Text("Accepts Lightning: \(element.osmJSON?.tags?.paymentLightning ?? "no")")
-//            Text("Accepts Contactless Lightning: \(element.osmJSON?.tags?.paymentLightningContactless ?? "no")")
-//            Text("House Number: \(element.osmJSON?.tags?.addrHousenumber ?? "")")
-//            Text("Street: \(element.osmJSON?.tags?.addrStreet ?? "")")
-//            Text("City: \(element.osmJSON?.tags?.addrCity ?? "")")
-//            Text("State: \(element.osmJSON?.tags?.addrState ?? "")")
-//            Text("Post Code: \(element.osmJSON?.tags?.addrPostcode ?? "")")
-//        }
-//    }
-//}

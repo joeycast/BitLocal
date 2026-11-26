@@ -12,6 +12,7 @@ struct BusinessesListView: View {
     @EnvironmentObject var viewModel: ContentViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     let maxListResults = 25
@@ -202,21 +203,29 @@ struct BusinessesListView: View {
                 .submitLabel(.search)
             if !viewModel.unifiedSearchText.isEmpty {
                 Button {
+                    BitLocalHaptics.selection()
                     viewModel.clearMerchantSearch(userInitiated: true)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                         .font(.subheadline)
                 }
+                .buttonStyle(.tactilePress(scale: 0.92))
                 .accessibilityLabel("Clear search")
             }
             if viewModel.isSearchActive {
                 Button("Cancel") {
+                    BitLocalHaptics.selection()
                     isSearchFieldFocused = false
                     viewModel.clearMerchantSearch(userInitiated: true)
                 }
                 .font(.subheadline.weight(.medium))
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .buttonStyle(.tactilePress(scale: 0.96))
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .move(edge: .trailing).combined(with: .opacity)
+                )
             }
         }
         .padding(.horizontal, 12)
@@ -227,7 +236,10 @@ struct BusinessesListView: View {
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
         )
         .padding(.horizontal, 16)
-        .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
+        .animation(
+            BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
+            value: viewModel.isSearchActive
+        )
         .featureHintAnchor(.merchantSearch)
     }
 
@@ -690,10 +702,14 @@ struct BusinessesListView: View {
                                     lineWidth: 0.5
                                 )
                         )
+                        .animation(
+                            BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
+                            value: isSelected
+                        )
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.tactilePress(scale: 0.96))
                     .accessibilityLabel(Text(chip.localizedLabel))
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                     .accessibilityHint(
@@ -723,6 +739,7 @@ struct BusinessesListView: View {
     }
 
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {
+        BitLocalHaptics.selection()
         if activeCategoryChipGroup == chip.group {
             viewModel.clearMerchantSearch(userInitiated: true)
         } else {
@@ -773,7 +790,7 @@ struct BusinessesListView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.tactileRow)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -799,7 +816,7 @@ struct BusinessesListView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.tactileRow)
         .onAppear {
             viewModel.requestPlaceholderNameHydration(for: [element])
         }
@@ -824,7 +841,7 @@ struct BusinessesListView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.tactileRow)
         .onAppear {
             viewModel.hydrateMerchantSearchPreviewIfNeeded(result)
         }
@@ -1040,27 +1057,7 @@ struct ElementCell: View {
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     private var categoryBadgeSymbolName: String {
-        let raw: String
-        if let group = ElementCategorySymbols.merchantCategoryGroups(for: viewModel.element).first {
-            raw = ElementCategorySymbols.merchantCategoryDescriptor(for: group).chipSymbolName
-        } else {
-            raw = ElementCategorySymbols.symbolName(for: viewModel.element)
-        }
-        return Self.uncircledSymbolName(from: raw)
-    }
-
-    private static func uncircledSymbolName(from raw: String) -> String {
-        for suffix in [".circle.fill", ".circle"] where raw.hasSuffix(suffix) {
-            let base = String(raw.dropLast(suffix.count))
-            let filled = "\(base).fill"
-            if UIImage(systemName: filled) != nil {
-                return filled
-            }
-            if UIImage(systemName: base) != nil {
-                return base
-            }
-        }
-        return raw
+        ElementCategoryBadgeHelper.badgeSymbolName(for: viewModel.element)
     }
 
     private var formattedDistance: String? {

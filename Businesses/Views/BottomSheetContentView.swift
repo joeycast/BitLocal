@@ -283,7 +283,7 @@ struct CommunitiesListView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.tactileRow)
                             .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
                             .clearListRowBackground(if: shouldUseUnifiedSheetRows)
                         }
@@ -758,20 +758,22 @@ struct CommunityDetailView: View {
                     if let payload = payableLightningPayload {
                         HStack(alignment: .top, spacing: 10) {
                             Button {
+                                BitLocalHaptics.lightTap()
                                 showLightningAlert = true
                             } label: {
                                 tipActionRow(payload: payload)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.tactileRow)
                             .copyValueContextMenu(payload, title: "Copy Lightning Address")
 
                             Button {
+                                BitLocalHaptics.selection()
                                 showTipsDisclaimerAlert = true
                             } label: {
                                 Image(systemName: "info.circle")
                                     .foregroundStyle(.secondary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.tactilePress(scale: 0.92))
                             .accessibilityLabel("Tipping disclaimer")
                         }
                     } else if let tipFallbackURL {
@@ -988,11 +990,12 @@ struct CommunityDetailView: View {
         Group {
             if item.isInteractive {
                 Button {
+                    BitLocalHaptics.lightTap()
                     openCommunityLink(item)
                 } label: {
                     platformLinkRow(icon: item.icon, label: item.label, value: item.value)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.tactileRow)
             } else {
                 platformLinkRow(icon: item.icon, label: item.label, value: item.value)
             }

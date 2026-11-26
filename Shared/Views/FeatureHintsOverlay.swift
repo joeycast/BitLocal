@@ -3,6 +3,7 @@ import UIKit
 
 struct FeatureHintsOverlay: View {
     @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
@@ -23,8 +24,14 @@ struct FeatureHintsOverlay: View {
                     }
                 }
                 .transition(.opacity)
-                .animation(.easeInOut(duration: 0.18), value: step.id)
-                .animation(.easeInOut(duration: 0.25), value: targetFrame != nil)
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion),
+                    value: step.id
+                )
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
+                    value: targetFrame != nil
+                )
             }
         }
         .ignoresSafeArea()

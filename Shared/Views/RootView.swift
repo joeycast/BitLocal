@@ -15,6 +15,7 @@ struct RootView: View {
     @StateObject private var featureHintsController = FeatureHintsController()
     @StateObject private var releaseNotesController = ReleaseNotesController()
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
         ZStack {
@@ -26,7 +27,11 @@ struct RootView: View {
             if !didCompleteOnboarding {
                 OnboardingView()
                     .environmentObject(contentViewModel)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .move(edge: .bottom))
+                    )
                     .zIndex(999)
             }
         }
@@ -106,7 +111,10 @@ struct RootView: View {
             guard let digest = merchantAlertsManager.activeDigest else { return }
             contentViewModel.activateMerchantAlertDigest(digest)
         }
-        .animation(.easeInOut(duration: 0.3), value: didCompleteOnboarding)
+        .animation(
+            BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
+            value: didCompleteOnboarding
+        )
     }
 
     private func triggerInitialFetchIfNeeded(source: String) {

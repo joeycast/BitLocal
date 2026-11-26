@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import Foundation // for Debug logging
 import MapKit
 import CoreLocation
@@ -471,3 +472,232 @@ enum BTCMapMerchantURLBuilder {
         return URL(string: "https://btcmap.org/merchant/\(trimmedID)")
     }
 }
+
+// MARK: - Design-Engineering Motion, Tactile Press & Layout Primitives
+
+enum BitLocalMotion {
+    /// Strong ease-out (cubic-bezier(0.23, 1, 0.32, 1)) for responsive UI entrances.
+    static let strongEaseOut = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.22)
+
+    /// Crisp tactile press/release feedback under 160ms.
+    static let press = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.14)
+
+    /// Asymmetric faster exit for dismissals and secondary reveals.
+    static let fastExit = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.16)
+
+    /// Interruptible, zero-bounce spring for disclosures (opening hours, info reveals).
+    static let disclosureSpring = Animation.spring(duration: 0.28, bounce: 0.0)
+
+    /// Subtle spring for micro icon state morphs (copy -> checkmark).
+    static let morphSpring = Animation.spring(duration: 0.26, bounce: 0.12)
+
+    /// Gentle opacity-only fallback when Reduce Motion is enabled.
+    static let reducedFade = Animation.easeOut(duration: 0.16)
+
+    static func animation(_ standard: Animation, reduceMotion: Bool) -> Animation {
+        reduceMotion ? reducedFade : standard
+    }
+}
+
+@MainActor
+enum BitLocalHaptics {
+    static func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+
+    static func lightTap() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+
+    static func success() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.success)
+    }
+}
+
+struct TactilePressButtonStyle: ButtonStyle {
+    var scale: CGFloat = 0.97
+    var pressedOpacity: Double = 0.88
+
+    func makeBody(configuration: Configuration) -> some View {
+        Content(
+            configuration: configuration,
+            scale: scale,
+            pressedOpacity: pressedOpacity
+        )
+    }
+
+    private struct Content: View {
+        let configuration: Configuration
+        let scale: CGFloat
+        let pressedOpacity: Double
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduceMotion ? scale : 1.0)
+                .opacity(configuration.isPressed ? pressedOpacity : 1.0)
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
+                    value: configuration.isPressed
+                )
+        }
+    }
+}
+
+struct TactileRowButtonStyle: ButtonStyle {
+    var scale: CGFloat = 0.985
+    var cornerRadius: CGFloat = 12
+
+    func makeBody(configuration: Configuration) -> some View {
+        Content(
+            configuration: configuration,
+            scale: scale,
+            cornerRadius: cornerRadius
+        )
+    }
+
+    private struct Content: View {
+        let configuration: Configuration
+        let scale: CGFloat
+        let cornerRadius: CGFloat
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color.primary.opacity(configuration.isPressed ? 0.06 : 0))
+                )
+                .scaleEffect(configuration.isPressed && !reduceMotion ? scale : 1.0)
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
+                    value: configuration.isPressed
+                )
+        }
+    }
+}
+
+extension ButtonStyle where Self == TactilePressButtonStyle {
+    static var tactilePress: TactilePressButtonStyle { TactilePressButtonStyle() }
+
+    static func tactilePress(
+        scale: CGFloat,
+        pressedOpacity: Double = 0.88
+    ) -> TactilePressButtonStyle {
+        TactilePressButtonStyle(scale: scale, pressedOpacity: pressedOpacity)
+    }
+}
+
+extension ButtonStyle where Self == TactileRowButtonStyle {
+    static var tactileRow: TactileRowButtonStyle { TactileRowButtonStyle() }
+
+    static func tactileRow(
+        scale: CGFloat = 0.985,
+        cornerRadius: CGFloat = 12
+    ) -> TactileRowButtonStyle {
+        TactileRowButtonStyle(scale: scale, cornerRadius: cornerRadius)
+    }
+}
+
+/// Wrapping horizontal flow layout for compact badges, payment rails, and social chips.
+struct BitLocalFlowLayout: Layout {
+    var horizontalSpacing: CGFloat = 8
+    var verticalSpacing: CGFloat = 8
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let maxWidth = proposal.width ?? .greatestFiniteMagnitude
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var measuredWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX > 0 && currentX + size.width > maxWidth {
+                currentX = 0
+                currentY += lineHeight + verticalSpacing
+                lineHeight = 0
+            }
+            measuredWidth = max(measuredWidth, currentX + size.width)
+            lineHeight = max(lineHeight, size.height)
+            currentX += size.width + horizontalSpacing
+        }
+
+        let totalHeight = subviews.isEmpty ? 0 : currentY + lineHeight
+        let resolvedWidth = proposal.width ?? measuredWidth
+        return CGSize(width: resolvedWidth, height: totalHeight)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        var currentX = bounds.minX
+        var currentY = bounds.minY
+        var lineHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX > bounds.minX && currentX + size.width > bounds.maxX {
+                currentX = bounds.minX
+                currentY += lineHeight + verticalSpacing
+                lineHeight = 0
+            }
+            subview.place(
+                at: CGPoint(x: currentX, y: currentY),
+                proposal: ProposedViewSize(size)
+            )
+            lineHeight = max(lineHeight, size.height)
+            currentX += size.width + horizontalSpacing
+        }
+    }
+}
+
+enum ElementCategoryBadgeHelper {
+    /// Returns the crisp uncircled SF Symbol matching the map marker glyph 1:1.
+    static func badgeSymbolName(for element: Element) -> String {
+        let raw: String
+        if let group = ElementCategorySymbols.merchantCategoryGroups(for: element).first {
+            raw = ElementCategorySymbols.merchantCategoryDescriptor(for: group).chipSymbolName
+        } else {
+            raw = ElementCategorySymbols.symbolName(for: element)
+        }
+        return uncircledSymbolName(from: raw)
+    }
+
+    static func primaryCategoryLabel(for element: Element) -> String? {
+        if let group = ElementCategorySymbols.merchantCategoryGroups(for: element).first {
+            return group.localizedLabel
+        }
+        return ElementCategorySymbols.friendlyCategoryLabel(
+            forIcon: element.v4Metadata?.icon ?? element.tags?.iconPlatform
+        )
+    }
+
+    static func uncircledSymbolName(from raw: String) -> String {
+        for suffix in [".circle.fill", ".circle"] where raw.hasSuffix(suffix) {
+            let base = String(raw.dropLast(suffix.count))
+            let filled = "\(base).fill"
+            if UIImage(systemName: filled) != nil {
+                return filled
+            }
+            if UIImage(systemName: base) != nil {
+                return base
+            }
+        }
+        return raw
+    }
+}
+
