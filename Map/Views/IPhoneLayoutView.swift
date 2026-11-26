@@ -159,6 +159,8 @@ private struct IPhoneLayoutContent: View {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 16, weight: .medium))
                                 .imageScale(.medium)
+                                .foregroundStyle(toolbarIconColor)
+                                .id("about-\(effectiveColorScheme == .dark)")
                         }
                         .accessibilityLabel(NSLocalizedString("about_accessibility_label", comment: ""))
 
@@ -168,6 +170,8 @@ private struct IPhoneLayoutContent: View {
                             Image(systemName: "gearshape")
                                 .font(.system(size: 16, weight: .medium))
                                 .imageScale(.medium)
+                                .foregroundStyle(toolbarIconColor)
+                                .id("settings-\(effectiveColorScheme == .dark)")
                         }
                         .accessibilityLabel(NSLocalizedString("settings_label_accessibility", comment: ""))
                     }
@@ -176,7 +180,8 @@ private struct IPhoneLayoutContent: View {
                         viewModel: viewModel,
                         selectedMapTypeBinding: selectedMapTypeBinding,
                         recenterController: recenterController,
-                        placement: .topBarTrailing
+                        placement: .topBarTrailing,
+                        colorScheme: effectiveColorScheme
                     )
                 } else if usesNativeHorizontalBar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -186,6 +191,8 @@ private struct IPhoneLayoutContent: View {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 16, weight: .medium))
                                 .imageScale(.medium)
+                                .foregroundStyle(toolbarIconColor)
+                                .id("about-h-\(effectiveColorScheme == .dark)")
                         }
                         .accessibilityLabel(NSLocalizedString("about_accessibility_label", comment: ""))
                     }
@@ -201,13 +208,16 @@ private struct IPhoneLayoutContent: View {
                             Image(systemName: "gearshape")
                                 .font(.system(size: 16, weight: .medium))
                                 .imageScale(.medium)
+                                .foregroundStyle(toolbarIconColor)
+                                .id("settings-h-\(effectiveColorScheme == .dark)")
                         }
                         .accessibilityLabel(NSLocalizedString("settings_label_accessibility", comment: ""))
                     }
                 }
             }
             .toolbar(showsLegacyHeader ? .hidden : .visible, for: .navigationBar)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(effectiveColorScheme, for: .navigationBar)
+            .modifier(LegacyHiddenToolbarBackgroundModifier())
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("")
             .sheet(isPresented: .constant(shouldPresentBottomSheet), onDismiss: {
@@ -399,6 +409,10 @@ private struct IPhoneLayoutContent: View {
         case .dark:
             return .dark
         }
+    }
+
+    private var toolbarIconColor: Color {
+        effectiveColorScheme == .dark ? .white : .black
     }
 
     private func mapOverlayTopOffset(for safeTopInset: CGFloat) -> CGFloat {
@@ -699,5 +713,18 @@ private final class SheetTrackingHitContainerView: UIView {
         guard let transformedView else { return false }
         let transformedPoint = transformedView.convert(point, from: self)
         return transformedView.point(inside: transformedPoint, with: event)
+    }
+}
+
+/// Only hides the legacy solid navigation bar background prior to iOS 26;
+/// on iOS 26+, Liquid Glass manages bar chrome and adaptive contrast natively.
+private struct LegacyHiddenToolbarBackgroundModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+        } else {
+            content.toolbarBackground(.hidden, for: .navigationBar)
+        }
     }
 }

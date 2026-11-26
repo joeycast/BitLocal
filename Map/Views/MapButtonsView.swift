@@ -116,8 +116,17 @@ struct MapControlToolbarContent: ToolbarContent {
     var selectedMapTypeBinding: Binding<MKMapType>
     var recenterController: MapLocationRecenterController
     var placement: ToolbarItemPlacement = .bottomBar
+    var colorScheme: ColorScheme? = nil
 
     private var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+    private var iconForeground: Color {
+        switch colorScheme {
+        case .dark: return .white
+        case .light: return .black
+        case nil: return .primary
+        @unknown default: return .primary
+        }
+    }
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: placement) {
@@ -127,6 +136,8 @@ struct MapControlToolbarContent: ToolbarContent {
                 Image(systemName: selectedMapType == .hybrid ? "map" : "globe")
                     .font(.system(size: 16, weight: .medium))
                     .imageScale(.medium)
+                    .foregroundStyle(iconForeground)
+                    .id("map-type-\(selectedMapType == .hybrid)-\(colorScheme == .dark)")
             }
             .accessibilityLabel(selectedMapType == .standard ? "Show satellite map" : "Show standard map")
 
@@ -136,6 +147,8 @@ struct MapControlToolbarContent: ToolbarContent {
                 Image(systemName: "location")
                     .font(.system(size: 16, weight: .medium))
                     .imageScale(.medium)
+                    .foregroundStyle(iconForeground)
+                    .id("recenter-\(colorScheme == .dark)")
             }
             .accessibilityLabel("Center map on location")
         }

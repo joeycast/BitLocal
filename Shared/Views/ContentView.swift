@@ -6,7 +6,7 @@ import MapKit
 import CoreLocationUI
 import Combine
 import Foundation
-import Foundation // for Debug logging
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
@@ -95,11 +95,15 @@ struct ContentView: View {
                 containerSize = windowSize
             }
             syncLayoutMode(layoutMode)
+            syncWindowInterfaceStyle(appearanceManager.appearance)
 
             cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation
             }
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
+        }
+        .onChange(of: appearanceManager.appearance) { _, newAppearance in
+            syncWindowInterfaceStyle(newAppearance)
         }
         .onChange(of: layoutMode) { _, newMode in
             syncLayoutMode(newMode)
@@ -121,6 +125,23 @@ struct ContentView: View {
         viewModel.updateLayoutMode(newMode)
         if newMode == .splitSidebar, headerHeight != 0 {
             headerHeight = 0
+        }
+    }
+
+    private func syncWindowInterfaceStyle(_ appearance: Appearance) {
+        let style: UIUserInterfaceStyle
+        switch appearance {
+        case .system: style = .unspecified
+        case .light:  style = .light
+        case .dark:   style = .dark
+        }
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows {
+                if window.overrideUserInterfaceStyle != style {
+                    window.overrideUserInterfaceStyle = style
+                }
+            }
         }
     }
 
