@@ -1040,14 +1040,24 @@ struct ElementCell: View {
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     private var categoryBadgeSymbolName: String {
+        let raw: String
         if let group = ElementCategorySymbols.merchantCategoryGroups(for: viewModel.element).first {
-            return ElementCategorySymbols.merchantCategoryDescriptor(for: group).chipSymbolName
+            raw = ElementCategorySymbols.merchantCategoryDescriptor(for: group).chipSymbolName
+        } else {
+            raw = ElementCategorySymbols.symbolName(for: viewModel.element)
         }
-        let raw = ElementCategorySymbols.symbolName(for: viewModel.element)
-        if raw.hasSuffix(".circle.fill") {
-            let stripped = String(raw.dropLast(".circle.fill".count))
-            if UIImage(systemName: stripped) != nil {
-                return stripped
+        return Self.uncircledSymbolName(from: raw)
+    }
+
+    private static func uncircledSymbolName(from raw: String) -> String {
+        for suffix in [".circle.fill", ".circle"] where raw.hasSuffix(suffix) {
+            let base = String(raw.dropLast(suffix.count))
+            let filled = "\(base).fill"
+            if UIImage(systemName: filled) != nil {
+                return filled
+            }
+            if UIImage(systemName: base) != nil {
+                return base
             }
         }
         return raw
@@ -1077,12 +1087,17 @@ struct ElementCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                // Leading category badge ties each row visually to its map pin.
+                // Solid map-pin badge (MarkerColor circle + crisp white symbol)
+                // links each row 1:1 to its map marker in both Light and Dark Mode.
                 Image(systemName: categoryBadgeSymbolName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 34, height: 34)
-                    .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Color("MarkerColor"), in: Circle())
+                    .overlay(
+                        Circle()
+                            .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
+                    )
                     .padding(.top, 2)
                     .accessibilityHidden(true)
 
