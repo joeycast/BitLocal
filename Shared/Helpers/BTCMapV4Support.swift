@@ -984,11 +984,12 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         let finishRefresh: ([Element]?) -> Void = { [weak self] elements in
             self?.finishV4Refresh(elements: elements)
         }
-        let startIncremental: (String?, [Element]?) -> Void = { [weak self] initialAnchorOverride, initialExistingOverride in
+        let startIncremental: (String?, [Element]?, V4SyncState?) -> Void = { [weak self] initialAnchorOverride, initialExistingOverride, initialSyncStateOverride in
             Debug.logTiming("sync", "starting v4 incremental sync (hadCache=\(hadV4Cache))")
             self?.performV4IncrementalSync(
                 initialAnchorOverride: initialAnchorOverride,
                 initialExistingOverride: initialExistingOverride,
+                initialSyncStateOverride: initialSyncStateOverride,
                 completion: { result in
                 switch result {
                 case .success(let elements):
@@ -1028,7 +1029,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
                     syncState.incrementalAnchorUpdatedSince = initialIncrementalAnchor
                     syncState.schemaVersion = V4SyncState.currentSchemaVersion
                     self.saveV4SyncState(syncState)
-                    startIncremental(initialIncrementalAnchor, mapped)
+                    startIncremental(initialIncrementalAnchor, mapped, syncState)
                 case .failure(let error):
                     Debug.logAPI("BTCMap v4 snapshot bootstrap failed: \(error.localizedDescription)")
                     if allowV2Fallback {
@@ -1041,7 +1042,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
             return
         }
 
-        startIncremental(nil, nil)
+        startIncremental(nil, nil, nil)
     }
 
     private func finishV4Refresh(elements: [Element]?) {
@@ -1058,10 +1059,11 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     private func performV4IncrementalSync(
         initialAnchorOverride: String? = nil,
         initialExistingOverride: [Element]? = nil,
+        initialSyncStateOverride: V4SyncState? = nil,
         completion: @escaping (Result<[Element], Error>) -> Void
     ) {
         let existing = initialExistingOverride ?? loadV4Elements() ?? []
-        var syncState = loadV4SyncState()
+        var syncState = initialSyncStateOverride ?? loadV4SyncState()
         var anchor = initialAnchorOverride
             ?? syncState.incrementalAnchorUpdatedSince
             ?? Self.rfc1123ToISO8601(syncState.snapshotLastModifiedRFC1123)

@@ -132,6 +132,8 @@ final class BTCMapV4SyncTests: XCTestCase {
         let suiteName = "BTCMapV4SyncTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        defaults.set(currentVersion, forKey: "btcmap_last_app_version")
         return defaults
     }
 }
