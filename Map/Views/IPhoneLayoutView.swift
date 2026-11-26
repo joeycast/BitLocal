@@ -20,6 +20,30 @@ struct IPhoneLayoutView: View {
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
 
+    var body: some View {
+        NavigationStack {
+            IPhoneLayoutContent(
+                viewModel: viewModel,
+                elements: elements,
+                visibleElements: visibleElements,
+                showingAbout: $showingAbout,
+                showingSettings: $showingSettings,
+                headerHeight: $headerHeight,
+                selectedMapTypeBinding: selectedMapTypeBinding
+            )
+        }
+    }
+}
+
+private struct IPhoneLayoutContent: View {
+    @ObservedObject var viewModel: ContentViewModel
+    var elements: [Element]?
+    var visibleElements: [Element]
+    @Binding var showingAbout: Bool
+    @Binding var showingSettings: Bool
+    @Binding var headerHeight: CGFloat
+    var selectedMapTypeBinding: Binding<MKMapType>
+
     // Add this to track onboarding state
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
 
@@ -27,8 +51,10 @@ struct IPhoneLayoutView: View {
     @EnvironmentObject var appearanceManager: AppearanceManager
     @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
-    
+    @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
+
     private var appearance: Appearance { appearanceManager.appearance }
+    @StateObject private var recenterController = MapLocationRecenterController()
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.3)
     @State private var settingsSheetDetent: PresentationDetent = .medium
     @State private var hasLiveSheetMeasurement = false
@@ -42,9 +68,21 @@ struct IPhoneLayoutView: View {
         !releaseNotesController.isPresenting
     }
 
+    private var usesNativeHorizontalBar: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+
+    private var showsLegacyHeader: Bool {
+        !isVerticalToolbarActive && !usesNativeHorizontalBar
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let elements = self.elements
+            let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
 
             ZStack {
                 if let elements = elements {
@@ -62,62 +100,92 @@ struct IPhoneLayoutView: View {
                     // onChange of bottomPadding / detent), not live drag height.
                     .overlay(
                         OpenStreetMapAttributionView()
-                            .padding(.bottom, attributionBottomInset(for: geometry.size.height) + 1)
+                            .padding(.bottom, attributionBottomInset(for: fullHeight) + 6)
                             .padding(.leading, geometry.safeAreaInsets.leading + 16),
                         alignment: .bottomLeading
                     )
                 }
-                VStack {
-                    IPhoneHeaderView(
-                        screenWidth: geometry.size.width,
-                        viewModel: viewModel,
-                        showingAbout: $showingAbout,
-                        showingSettings: $showingSettings,
-                        selectedMapTypeBinding: selectedMapTypeBinding
-                        // Removed appearance and systemColorScheme parameters
-                    )
-                    Spacer()
+                if showsLegacyHeader {
+                    VStack {
+                        IPhoneHeaderView(
+                            screenWidth: geometry.size.width,
+                            viewModel: viewModel,
+                            showingAbout: $showingAbout,
+                            showingSettings: $showingSettings,
+                            selectedMapTypeBinding: selectedMapTypeBinding
+                        )
+                        Spacer()
+                    }
                 }
             }
             // Map buttons live in a child that observes `sheetGeometry` only, so
             // continuous drag height does not rebuild MapView / this ZStack.
+            // On iPhone Duo poses with a vertical side bar, they move into `.toolbar`.
             .overlay(alignment: shouldPresentBottomSheet ? .bottomTrailing : .topTrailing) {
-                IPhoneMapButtonsChrome(
-                    viewModel: viewModel,
-                    sheetGeometry: viewModel.sheetGeometry,
-                    selectedMapTypeBinding: selectedMapTypeBinding,
-                    mapHeight: geometry.size.height,
-                    safeTopInset: geometry.safeAreaInsets.top,
-                    safeBottomInset: geometry.safeAreaInsets.bottom,
-                    headerHeight: headerHeight,
-                    shouldPresentBottomSheet: shouldPresentBottomSheet,
-                    showingSettings: showingSettings
-                )
+                if !isVerticalToolbarActive {
+                    IPhoneMapButtonsChrome(
+                        viewModel: viewModel,
+                        sheetGeometry: viewModel.sheetGeometry,
+                        selectedMapTypeBinding: selectedMapTypeBinding,
+                        mapHeight: geometry.size.height,
+                        safeTopInset: geometry.safeAreaInsets.top,
+                        safeBottomInset: geometry.safeAreaInsets.bottom,
+                        headerHeight: headerHeight,
+                        shouldPresentBottomSheet: shouldPresentBottomSheet,
+                        showingSettings: showingSettings
+                    )
+                }
             }
-//            // Only show bottom sheet after onboarding is complete
-//            .bottomSheet(
-//                presentationDetents: [.fraction(0.3), .medium, .large],
-//                isPresented: .constant(didCompleteOnboarding), // Changed this line
-//                dragIndicator: .visible,
-//                sheetCornerRadius: 20,
-//                largestUndimmedIdentifier: .medium,
-//                interactiveDisabled: true,
-//                forcedColorScheme: nil, // Let the content handle its own color scheme
-//                content: {
-//                    BottomSheetContentView(visibleElements: visibleElements)
-//                        .id("\(appearance.rawValue)-\(systemColorScheme)")
-//                        .environmentObject(viewModel)
-//                        .background(Color(UIColor.systemBackground))
-//                        .preferredColorScheme(effectiveColorScheme)
-//                        .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
-//                        .sheet(isPresented: $showingAbout) {
-//                            AboutView()
-//                        }
-//                },
-//                onDismiss: {
-//                    Debug.log("Bottom sheet dismissed")
-//                }
-//            )
+            .toolbar {
+                if isVerticalToolbarActive {
+                    ToolbarItemGroup(placement: .topBarLeading) {
+                        Button {
+                            showingAbout = true
+                        } label: {
+                            Label(
+                                NSLocalizedString("about_accessibility_label", comment: ""),
+                                systemImage: "info.circle.fill"
+                            )
+                        }
+                        .tint(.accentColor)
+
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label(
+                                NSLocalizedString("settings_label_accessibility", comment: ""),
+                                systemImage: "gearshape.fill"
+                            )
+                        }
+                        .tint(.accentColor)
+                    }
+
+                    MapControlToolbarContent(
+                        viewModel: viewModel,
+                        selectedMapTypeBinding: selectedMapTypeBinding,
+                        recenterController: recenterController,
+                        placement: .topBarTrailing
+                    )
+                } else if usesNativeHorizontalBar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        InfoButtonView(showingAbout: $showingAbout)
+                    }
+                    ToolbarItem(placement: .principal) {
+                        Text("bitlocal")
+                            .font(.custom("Fredoka-Medium", size: 28))
+                            .foregroundColor(.accentColor)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SettingsButtonView(
+                            onSettingsSelected: { showingSettings = true }
+                        )
+                    }
+                }
+            }
+            .toolbar(showsLegacyHeader ? .hidden : .visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("")
             .sheet(isPresented: .constant(shouldPresentBottomSheet), onDismiss: {
                 Debug.log("Bottom sheet dismissed")
             }) {
@@ -128,7 +196,6 @@ struct IPhoneLayoutView: View {
                     .id("\(appearance.rawValue)-\(systemColorScheme)")
                     .environmentObject(viewModel)
                     .preferredColorScheme(effectiveColorScheme)  // To respect appearance
-//                    .presentationBackground(Color(UIColor.systemBackground))  // Keeps background opaque, resolves based on the preferred scheme
                     .presentationDetents([
                         collapsedSheetDetent,
                         defaultSheetDetent,
@@ -158,23 +225,30 @@ struct IPhoneLayoutView: View {
                     }
             }
             .onAppear {
+                syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
                 hasLiveSheetMeasurement = false
                 hasAcceptedDefaultLiveMeasurement = false
                 pendingLaunchOutlier = nil
                 if shouldPresentBottomSheet {
-                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
                 }
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = attributionBottomInset(for: fullHeight)
                 Debug.logMap(
                     "Attribution launch: detent=\(bottomSheetDetent), " +
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
-                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
+                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(fullHeight), inset=\(inset)"
                 )
+            }
+            .onChange(of: isVerticalToolbarActive) { _, _ in
+                syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
+            }
+            .onChange(of: geometry.safeAreaInsets.top) { _, newTop in
+                syncTopPadding(safeTopInset: newTop)
             }
             .onChange(of: shouldPresentBottomSheet) { _, isPresented in
                 if isPresented {
-                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
                 }
                 Debug.logTiming(
@@ -191,9 +265,9 @@ struct IPhoneLayoutView: View {
             }
             .onChange(of: viewModel.bottomPadding) { _, newValue in
                 if newValue > 1 {
-                    let expected = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    let expected = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     let isDefaultDetent = isDefaultLikeDetent(bottomSheetDetent)
-                    let isPlausibleAtDefault = abs(newValue - expected) <= 8
+                    let isPlausibleAtDefault = abs(newValue - expected) <= 24
 
                     if isDefaultDetent && !hasAcceptedDefaultLiveMeasurement {
                         if isPlausibleAtDefault {
@@ -206,7 +280,7 @@ struct IPhoneLayoutView: View {
                             pendingLaunchOutlier = nil
                         } else {
                             pendingLaunchOutlier = newValue
-                            let inset = attributionBottomInset(for: geometry.size.height)
+                            let inset = attributionBottomInset(for: fullHeight)
                             Debug.logMap(
                                 "Attribution bottomPadding ignored (launch outlier): detent=\(bottomSheetDetent), " +
                                 "bottomPadding=\(newValue), expected=\(expected), inset=\(inset)"
@@ -216,11 +290,11 @@ struct IPhoneLayoutView: View {
                     }
                     hasLiveSheetMeasurement = true
                 }
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = attributionBottomInset(for: fullHeight)
                 Debug.logMap(
                     "Attribution bottomPadding changed: detent=\(bottomSheetDetent), " +
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
-                    "bottomPadding=\(newValue), mapHeight=\(geometry.size.height), inset=\(inset)"
+                    "bottomPadding=\(newValue), mapHeight=\(fullHeight), inset=\(inset)"
                 )
             }
             .onChange(of: bottomSheetDetent) { _, newDetent in
@@ -230,21 +304,21 @@ struct IPhoneLayoutView: View {
                 }
                 // The selection changes at the start of UIKit's snap animation.
                 // Defer map padding publication until the measured card stops moving.
-                let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                 viewModel.prepareForSheetDetentTransition(estimatedHeight: settledHeight)
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = attributionBottomInset(for: fullHeight)
                 Debug.logMap(
                     "Attribution detent changed: detent=\(newDetent), " +
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
-                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
+                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(fullHeight), inset=\(inset)"
                 )
             }
-            .onChange(of: geometry.size) { _, newSize in
-                guard shouldPresentBottomSheet, newSize.height > 1 else { return }
+            .onChange(of: geometry.size) { _, _ in
+                guard shouldPresentBottomSheet, fullHeight > 1 else { return }
                 hasLiveSheetMeasurement = false
                 hasAcceptedDefaultLiveMeasurement = false
                 pendingLaunchOutlier = nil
-                let settledHeight = estimatedBottomInsetForDetent(mapHeight: newSize.height)
+                let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                 viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
             }
             .onChange(of: showingSettings) { _, isShowing in
@@ -255,6 +329,17 @@ struct IPhoneLayoutView: View {
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.25), value: appearance)
             .animation(.easeInOut(duration: 0.25), value: systemColorScheme)
+        }
+    }
+
+    private func syncTopPadding(safeTopInset: CGFloat) {
+        guard !showsLegacyHeader else { return }
+        let resolvedTop = isVerticalToolbarActive ? 0 : safeTopInset
+        if headerHeight != resolvedTop {
+            headerHeight = resolvedTop
+        }
+        if viewModel.topPadding != resolvedTop {
+            viewModel.topPadding = resolvedTop
         }
     }
 

@@ -260,6 +260,7 @@ struct AboutView: View {
                     }
                 }
             }
+            .disableVerticalToolbarIfAvailable()
         }
         .modifier(AboutNavigationBackgroundModifier(enabled: usesPopoverStyling))
         .sheet(isPresented: $showingAddBusinessForm) {

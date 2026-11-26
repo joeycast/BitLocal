@@ -22,7 +22,6 @@ struct IPadLayoutView: View {
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     private var appearance: Appearance { appearanceManager.appearance }
     private let toolbarContentTopPadding: CGFloat = 6
-    private let sidebarRootTopCompensation: CGFloat = 30
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var containerSize: CGSize = .zero
 
@@ -125,15 +124,9 @@ struct IPadLayoutView: View {
 
     @ViewBuilder
     private var sidePanelRootContentWithSafeAreaBehavior: some View {
-        if #available(iOS 26.0, *) {
-            sidePanelRootContent
-                // The iPadOS 26 transparent nav bar keeps the toolbar animation we want,
-                // but it also leaves extra visible space before our custom search row.
-                .padding(.top, sidebarRootTopCompensation)
-                .ignoresSafeArea(.container, edges: .top)
-        } else {
-            sidePanelRootContent
-        }
+        // Respect the navigation bar top safe area so the search bar sits cleanly
+        // below the toolbar on both iPadOS and iPhone Duo unfolded landscape.
+        sidePanelRootContent
     }
 
     @ViewBuilder
@@ -147,47 +140,16 @@ struct IPadLayoutView: View {
         }
     }
 
-    private var mapPanel: some View {
-        ZStack {
-            if let elements = elements {
-                MapView(
-                    elements: elements,
-                    topPadding: headerHeight,
-                    bottomPadding: viewModel.bottomPadding,
-                    mapType: selectedMapType
-                )
-                .id("PersistentMap")
-                .ignoresSafeArea()
-                .onAppear {
-                    viewModel.locationManager.startUpdatingLocation()
-                }
-            }
-        }
-        .overlay(alignment: .bottomLeading) {
-            if elements != nil {
-                OpenStreetMapAttributionView()
-                    .padding(.bottom, 7)
-                    .padding(.leading, 100)
-            }
-        }
-        .overlay(
-            MapButtonsView(
-                viewModel: viewModel,
-                selectedMapTypeBinding: selectedMapTypeBinding,
-                userLocation: viewModel.userLocation,
-                isIPad: true
-            )
-            .padding(.trailing, 20)
-            .padding(.bottom, 28),
-            alignment: .bottomTrailing
-        )
-    }
-
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidePanel
         } detail: {
-            mapPanel
+            SplitMapDetailView(
+                viewModel: viewModel,
+                elements: elements,
+                headerHeight: headerHeight,
+                selectedMapTypeBinding: selectedMapTypeBinding
+            )
         }
         .navigationSplitViewStyle(.balanced)
         .onGeometryChange(for: CGSize.self) { proxy in
@@ -239,6 +201,72 @@ struct IPadLayoutView: View {
                 }
             }
         )
+    }
+}
+
+/// Detail map column inside `NavigationSplitView`. Reads `isVerticalToolbarActive`
+/// from the detail column environment so iPhone Duo unfolded landscape places the
+/// map controls in the system vertical side rail while iPad keeps the floating pill.
+private struct SplitMapDetailView: View {
+    @ObservedObject var viewModel: ContentViewModel
+    var elements: [Element]?
+    var headerHeight: CGFloat
+    var selectedMapTypeBinding: Binding<MKMapType>
+
+    @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
+    @StateObject private var recenterController = MapLocationRecenterController()
+
+    private var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+
+    var body: some View {
+        ZStack {
+            if let elements = elements {
+                MapView(
+                    elements: elements,
+                    topPadding: headerHeight,
+                    bottomPadding: viewModel.bottomPadding,
+                    mapType: selectedMapType
+                )
+                .id("PersistentMap")
+                .ignoresSafeArea()
+                .onAppear {
+                    viewModel.locationManager.startUpdatingLocation()
+                }
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if elements != nil {
+                OpenStreetMapAttributionView()
+                    .padding(.bottom, 7)
+                    .padding(.leading, 100)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if !isVerticalToolbarActive {
+                MapButtonsView(
+                    viewModel: viewModel,
+                    selectedMapTypeBinding: selectedMapTypeBinding,
+                    userLocation: viewModel.userLocation,
+                    isIPad: true
+                )
+                .padding(.trailing, 20)
+                .padding(.bottom, 28)
+            }
+        }
+        .toolbar {
+            if isVerticalToolbarActive {
+                MapControlToolbarContent(
+                    viewModel: viewModel,
+                    selectedMapTypeBinding: selectedMapTypeBinding,
+                    recenterController: recenterController,
+                    placement: .topBarTrailing
+                )
+            }
+        }
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("")
+        .toolbar(removing: .sidebarToggle)
     }
 }
 

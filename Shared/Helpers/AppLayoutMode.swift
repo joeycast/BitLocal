@@ -52,3 +52,33 @@ enum ActiveWindowScene {
         return scene.windows.first(where: \.isKeyWindow) ?? scene.windows.first
     }
 }
+
+extension EnvironmentValues {
+    /// True when iOS 27.1+ places navigation/toolbar controls in iPhone Duo's
+    /// vertical side rail (outer display, unfolded landscape detail, Split View).
+    var isVerticalToolbarActive: Bool {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            return toolbarVerticalEdge != nil
+        }
+        #endif
+        return false
+    }
+}
+
+extension View {
+    /// Opts a sheet or presentation out of iPhone Duo's vertical side bar so its
+    /// contents span full width without an empty trailing vertical-bar safe-area inset.
+    @ViewBuilder
+    func disableVerticalToolbarIfAvailable() -> some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            self.toolbarVerticalBehavior(.disabled)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}

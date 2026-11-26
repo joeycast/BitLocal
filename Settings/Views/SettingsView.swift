@@ -76,6 +76,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .disableVerticalToolbarIfAvailable()
         .task {
             await merchantAlertsManager.refreshStatus()
         }

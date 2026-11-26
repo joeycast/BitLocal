@@ -63,6 +63,7 @@ struct BottomSheetContentView: View {
         NavigationStack(path: $viewModel.path) {
             sheetRootContentWithSafeAreaBehavior
                 .modifier(RootSheetNavigationBarModifier())
+                .disableVerticalToolbarIfAvailable()
                 .navigationDestination(for: Element.self) { element in
                     businessDetailDestination(for: element)
                 }
@@ -71,6 +72,7 @@ struct BottomSheetContentView: View {
                 }
                 .clearNavigationContainerBackgroundIfAvailable()
         }
+        .disableVerticalToolbarIfAvailable()
     }
 
     @ViewBuilder
@@ -106,6 +108,7 @@ struct BottomSheetContentView: View {
         )
         .id(element.id)
         .clearNavigationContainerBackgroundIfAvailable()
+        .disableVerticalToolbarIfAvailable()
     }
 
     @ViewBuilder
@@ -118,6 +121,7 @@ struct BottomSheetContentView: View {
             .id(area.id)
             .environmentObject(viewModel)
             .clearNavigationContainerBackgroundIfAvailable()
+            .disableVerticalToolbarIfAvailable()
         }
     }
 

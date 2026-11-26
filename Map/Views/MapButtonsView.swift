@@ -5,9 +5,163 @@
 //  Created by Joe Castagnaro on 5/24/25.
 //
 
+import Combine
 import SwiftUI
 import MapKit
 import UIKit
+
+@MainActor
+final class MapLocationRecenterController: ObservableObject {
+    private var locationCancellable: AnyCancellable?
+    private var timeoutWorkItem: DispatchWorkItem?
+
+    func handleRecenterTap(viewModel: ContentViewModel) {
+        switch viewModel.locationManager.authorizationStatus {
+        case .denied, .restricted:
+            presentLocationSettingsAlert()
+        case .notDetermined:
+            requestAndCenterOnNextLocation(viewModel: viewModel)
+        case .authorizedAlways, .authorizedWhenInUse:
+            if viewModel.userLocation != nil {
+                viewModel.centerMapToUserLocation()
+            } else {
+                requestAndCenterOnNextLocation(viewModel: viewModel)
+            }
+        @unknown default:
+            requestAndCenterOnNextLocation(viewModel: viewModel)
+        }
+    }
+
+    func cancel() {
+        locationCancellable?.cancel()
+        locationCancellable = nil
+        timeoutWorkItem?.cancel()
+        timeoutWorkItem = nil
+    }
+
+    private func requestAndCenterOnNextLocation(viewModel: ContentViewModel) {
+        cancel()
+        viewModel.locationManager.requestWhenInUseAuthorization()
+        viewModel.isUpdatingLocation = true
+        viewModel.locationManager.startUpdatingLocation()
+
+        locationCancellable = viewModel.$userLocation
+            .compactMap { $0 }
+            .first()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak viewModel] _ in
+                guard let self, let viewModel else { return }
+                self.cancel()
+                viewModel.centerMapToUserLocation()
+                viewModel.locationManager.stopUpdatingLocation()
+                viewModel.isUpdatingLocation = false
+            }
+
+        let workItem = DispatchWorkItem { [weak self, weak viewModel] in
+            guard let self, let viewModel, viewModel.isUpdatingLocation else { return }
+            self.cancel()
+            self.presentLocationTimeoutAlert()
+            viewModel.locationManager.stopUpdatingLocation()
+            viewModel.isUpdatingLocation = false
+        }
+        timeoutWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: workItem)
+    }
+
+    private func presentLocationTimeoutAlert() {
+        let alert = UIAlertController(
+            title: NSLocalizedString("location_alert_title", comment: ""),
+            message: nil,
+            preferredStyle: .alert
+        )
+        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
+                              style: .default))
+        presentAlert(alert)
+    }
+
+    private func presentLocationSettingsAlert() {
+        let alert = UIAlertController(
+            title: NSLocalizedString("location_alert_title", comment: ""),
+            message: NSLocalizedString("location_settings_message", comment: ""),
+            preferredStyle: .alert
+        )
+        alert.addAction(.init(title: NSLocalizedString("open_settings_button", comment: ""),
+                              style: .default,
+                              handler: { _ in
+                                  guard let settingsURL = URL(string: UIApplication.openSettingsURLString),
+                                        UIApplication.shared.canOpenURL(settingsURL) else {
+                                      return
+                                  }
+                                  UIApplication.shared.open(settingsURL)
+                              }))
+        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
+                              style: .cancel))
+        presentAlert(alert)
+    }
+
+    private func presentAlert(_ alert: UIAlertController) {
+        if let rootVC = ActiveWindowScene.keyWindow?.rootViewController {
+            rootVC.topMostViewController()
+                .present(alert, animated: true)
+        }
+    }
+}
+
+/// Native SwiftUI toolbar items for map controls so iPhone Duo renders them
+/// directly inside the system vertical side button bar.
+struct MapControlToolbarContent: ToolbarContent {
+    @ObservedObject var viewModel: ContentViewModel
+    var selectedMapTypeBinding: Binding<MKMapType>
+    var recenterController: MapLocationRecenterController
+    var placement: ToolbarItemPlacement = .bottomBar
+
+    private var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: placement) {
+            Button {
+                selectedMapTypeBinding.wrappedValue = (selectedMapType == .standard) ? .hybrid : .standard
+            } label: {
+                Label(
+                    selectedMapType == .standard ? "Show satellite map" : "Show standard map",
+                    systemImage: selectedMapType == .hybrid ? "map.fill" : "globe.americas.fill"
+                )
+            }
+
+            Button {
+                recenterController.handleRecenterTap(viewModel: viewModel)
+            } label: {
+                Label("Center map on location", systemImage: "location.fill")
+            }
+            .tint(.accentColor)
+
+            Button {
+                Debug.log("⏱ mapMode button TAPPED")
+                viewModel.toggleMapMode()
+                Debug.log("⏱ mapMode button action DONE")
+            } label: {
+                Label(
+                    viewModel.mapDisplayMode == .merchants
+                        ? NSLocalizedString("Show communities", comment: "VoiceOver label to switch map to communities")
+                        : NSLocalizedString("Show merchants", comment: "VoiceOver label to switch map to merchants"),
+                    systemImage: viewModel.mapDisplayMode == .merchants ? "person.3.fill" : "mappin.and.ellipse"
+                )
+            }
+            .tint(.accentColor)
+            .accessibilityValue(
+                viewModel.mapDisplayMode == .merchants
+                    ? NSLocalizedString("Merchants map", comment: "VoiceOver current map mode value")
+                    : NSLocalizedString("Communities map", comment: "VoiceOver current map mode value")
+            )
+            .accessibilityHint(
+                NSLocalizedString(
+                    "Switches between merchant pins and community areas",
+                    comment: "VoiceOver hint for map mode toggle"
+                )
+            )
+        }
+    }
+}
 
 struct MapButtonsView: View {
     @ObservedObject var viewModel: ContentViewModel
@@ -15,21 +169,11 @@ struct MapButtonsView: View {
     var userLocation: CLLocation?
     var isIPad: Bool
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
-    
-    // 🔑 State to know when the button was tapped and we should center on next location update:
-    @State private var shouldCenterOnLocation = false
-    
+
+    @StateObject private var recenterController = MapLocationRecenterController()
+
     var body: some View {
         controlPill
-        // 🔄 FIXED: Watch for the first non-nil userLocation after tapping and use forced centering
-        .onReceive(viewModel.$userLocation.compactMap { $0 }) { newLocation in
-            guard shouldCenterOnLocation else { return }
-            // FIXED: Use centerMapToUserLocation which forces centering
-            viewModel.centerMapToUserLocation()
-            shouldCenterOnLocation = false
-            viewModel.locationManager.stopUpdatingLocation()
-            viewModel.isUpdatingLocation = false
-        }
     }
 
     private var controlPill: some View {
@@ -94,73 +238,7 @@ struct MapButtonsView: View {
     }
 
     private func handleRecenterTap() {
-        switch viewModel.locationManager.authorizationStatus {
-        case .denied, .restricted:
-            presentLocationSettingsAlert()
-        case .notDetermined:
-            requestAndCenterOnNextLocation()
-        case .authorizedAlways, .authorizedWhenInUse:
-            if viewModel.userLocation != nil {
-                viewModel.centerMapToUserLocation()
-            } else {
-                requestAndCenterOnNextLocation()
-            }
-        @unknown default:
-            requestAndCenterOnNextLocation()
-        }
-    }
-
-    private func requestAndCenterOnNextLocation() {
-        viewModel.locationManager.requestWhenInUseAuthorization()
-        viewModel.isUpdatingLocation = true
-        viewModel.locationManager.startUpdatingLocation()
-        shouldCenterOnLocation = true
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            guard viewModel.isUpdatingLocation else { return }
-            presentLocationTimeoutAlert()
-            viewModel.locationManager.stopUpdatingLocation()
-            viewModel.isUpdatingLocation = false
-            shouldCenterOnLocation = false
-        }
-    }
-
-    private func presentLocationTimeoutAlert() {
-        let alert = UIAlertController(
-            title: NSLocalizedString("location_alert_title", comment: ""),
-            message: nil,
-            preferredStyle: .alert
-        )
-        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
-                              style: .default))
-        presentAlert(alert)
-    }
-
-    private func presentLocationSettingsAlert() {
-        let alert = UIAlertController(
-            title: NSLocalizedString("location_alert_title", comment: ""),
-            message: NSLocalizedString("location_settings_message", comment: ""),
-            preferredStyle: .alert
-        )
-        alert.addAction(.init(title: NSLocalizedString("open_settings_button", comment: ""),
-                              style: .default,
-                              handler: { _ in
-                                  guard let settingsURL = URL(string: UIApplication.openSettingsURLString),
-                                        UIApplication.shared.canOpenURL(settingsURL) else {
-                                      return
-                                  }
-                                  UIApplication.shared.open(settingsURL)
-                              }))
-        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
-                              style: .cancel))
-        presentAlert(alert)
-    }
-
-    private func presentAlert(_ alert: UIAlertController) {
-        if let rootVC = ActiveWindowScene.keyWindow?.rootViewController {
-            rootVC.topMostViewController()
-                .present(alert, animated: true)
-        }
+        recenterController.handleRecenterTap(viewModel: viewModel)
     }
 
     private var mapTypeIcon: some View {
