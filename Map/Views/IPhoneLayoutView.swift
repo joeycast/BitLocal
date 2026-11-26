@@ -158,7 +158,7 @@ private struct IPhoneLayoutContent: View {
                         } label: {
                             Label(
                                 NSLocalizedString("about_accessibility_label", comment: ""),
-                                systemImage: "info.circle.fill"
+                                systemImage: "info.circle"
                             )
                         }
 
@@ -167,7 +167,7 @@ private struct IPhoneLayoutContent: View {
                         } label: {
                             Label(
                                 NSLocalizedString("settings_label_accessibility", comment: ""),
-                                systemImage: "gearshape.fill"
+                                systemImage: "gearshape"
                             )
                         }
                     }
@@ -185,7 +185,7 @@ private struct IPhoneLayoutContent: View {
                         } label: {
                             Label(
                                 NSLocalizedString("about_accessibility_label", comment: ""),
-                                systemImage: "info.circle.fill"
+                                systemImage: "info.circle"
                             )
                         }
                     }
@@ -200,7 +200,7 @@ private struct IPhoneLayoutContent: View {
                         } label: {
                             Label(
                                 NSLocalizedString("settings_label_accessibility", comment: ""),
-                                systemImage: "gearshape.fill"
+                                systemImage: "gearshape"
                             )
                         }
                     }
@@ -226,7 +226,12 @@ private struct IPhoneLayoutContent: View {
                         .medium,
                         .large
                     ], selection: $bottomSheetDetent)
-                    .presentationSizing(AdaptiveLeadingSheetSizing(maxWidth: leadingSheetWidth))
+                    .presentationSizing(
+                        AdaptiveLeadingSheetSizing(
+                            maxWidth: leadingSheetWidth,
+                            maxHeight: fullHeight
+                        )
+                    )
                     .adaptiveSheetPlacement(leading: isLeadingSheet)
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(true)

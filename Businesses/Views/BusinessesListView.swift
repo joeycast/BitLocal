@@ -412,7 +412,9 @@ struct BusinessesListView: View {
                         .font(.footnote.weight(.semibold))
                     }
                     .padding(.vertical, 4)
+                    .clearListRowBackground(if: shouldUseGlassyRows)
                 }
+                .clearListRowBackground(if: shouldUseGlassyRows)
             }
 
             Section {
@@ -421,6 +423,7 @@ struct BusinessesListView: View {
                 }
 
                 footerView
+                    .clearListRowBackground(if: shouldUseGlassyRows)
             }
             .clearListRowBackground(if: shouldUseGlassyRows)
         }
@@ -445,12 +448,14 @@ struct BusinessesListView: View {
                     Text("Type at least 2 characters to search")
                         .foregroundStyle(.secondary)
                         .listRowSeparator(.hidden, edges: .top)
+                        .clearListRowBackground(if: shouldUseGlassyRows)
                 } else if trimmedSearchQuery.count >= 2 {
                     if let statusText = searchStatusText {
                         Text(statusText)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .listRowSeparator(.hidden, edges: .top)
+                            .clearListRowBackground(if: shouldUseGlassyRows)
                     }
 
                     if displayedPrimaryResults.isEmpty &&
@@ -459,6 +464,7 @@ struct BusinessesListView: View {
                         Text(noResultsText)
                             .foregroundStyle(.secondary)
                             .listRowSeparator(.hidden, edges: .top)
+                            .clearListRowBackground(if: shouldUseGlassyRows)
                     } else {
                         if !displayedFeaturedPrimaryResults.isEmpty {
                             Section {
@@ -478,6 +484,7 @@ struct BusinessesListView: View {
                                     bottomPadding: -10
                                 )
                             }
+                            .clearListRowBackground(if: shouldUseGlassyRows)
                         }
 
                         if !displayedRegularPrimaryResults.isEmpty || displayedFeaturedPrimaryResults.isEmpty {
@@ -496,6 +503,7 @@ struct BusinessesListView: View {
                                     )
                                 }
                             }
+                            .clearListRowBackground(if: shouldUseGlassyRows)
                         }
                     }
 
@@ -505,6 +513,7 @@ struct BusinessesListView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(.accent)
+                        .clearListRowBackground(if: shouldUseGlassyRows)
                     }
                 }
             }
@@ -677,6 +686,7 @@ struct BusinessesListView: View {
         }
         .listRowSeparator(hidesTopSeparator ? .hidden : .visible, edges: .top)
         .listRowSeparator(showsBottomDivider ? .hidden : .visible, edges: .bottom)
+        .clearListRowBackground(if: shouldUseGlassyRows)
     }
 
     private func merchantRow(
@@ -727,6 +737,7 @@ struct BusinessesListView: View {
         .onAppear {
             viewModel.hydrateMerchantSearchPreviewIfNeeded(result)
         }
+        .clearListRowBackground(if: shouldUseGlassyRows)
     }
 
     private func handleUserLocationChange(_ newLocation: CLLocation?) {
@@ -838,13 +849,18 @@ struct BusinessesListView: View {
     }
     private var shouldHideSheetBackground: Bool {
         guard let detent = currentDetent else { return false }
+        if #available(iOS 26.0, *) {
+            // Keep the List transparent at every detent (including `.large`) so
+            // rows never render stark white over the system sheet's tinted surface.
+            return true
+        }
         return detent != .large
     }
 
     private var shouldUseGlassyRows: Bool {
-        guard let detent = currentDetent else { return false }
+        guard currentDetent != nil else { return false }
         guard #available(iOS 26.0, *) else { return false }
-        return detent != .large
+        return true
     }
 
     private var shouldShowEmptyState: Bool {

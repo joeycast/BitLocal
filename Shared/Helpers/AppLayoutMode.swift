@@ -63,8 +63,9 @@ enum ActiveWindowScene {
 /// Constrains the persistent bottom sheet width on wide unfolded poses (e.g.
 /// iPhone Duo landscape) so it sits cleanly on the leading side while preserving
 /// collapsible detents, and falls back to default full width everywhere else.
-struct AdaptiveLeadingSheetSizing: PresentationSizing {
+struct AdaptiveLeadingSheetSizing: PresentationSizing, Equatable {
     let maxWidth: CGFloat?
+    let maxHeight: CGFloat
 
     func proposedSize(
         for root: PresentationSizingRoot,
@@ -73,14 +74,17 @@ struct AdaptiveLeadingSheetSizing: PresentationSizing {
         guard let maxWidth else {
             return AutomaticPresentationSizing.automatic.proposedSize(for: root, context: context)
         }
-        return ProposedViewSize(width: maxWidth, height: .infinity)
+        // UIKit ignores custom preferredContentSize if height is `.infinity`,
+        // falling back to default ~620pt page-sheet width. Supply a finite height.
+        let finiteHeight: CGFloat? = maxHeight > 1 ? maxHeight : nil
+        return ProposedViewSize(width: maxWidth, height: finiteHeight)
     }
 }
 
 extension GeometryProxy {
-    /// Returns a left-column max width for a leading-pinned collapsible sheet
-    /// on wide regular displays (e.g. iPhone Duo unfolded landscape), or `nil`
-    /// when the sheet should span full width at the bottom.
+    /// Returns a left-column width (~1/3 of the display, clamped to 300–340 pt)
+    /// for a leading-pinned collapsible sheet on wide regular displays (e.g.
+    /// iPhone Duo unfolded landscape), or `nil` when the sheet should span full width.
     func leadingCollapsibleSheetWidth(
         horizontalSizeClass: UserInterfaceSizeClass?
     ) -> CGFloat? {
@@ -90,16 +94,18 @@ extension GeometryProxy {
             return nil
         }
 
+        let targetWidth = min(max(fullWidth * 0.34, 300), 340)
+
         #if compiler(>=6.4)
         if #available(iOS 27.1, *),
            let fold = reservedRegions(kind: .division, options: .includeInactive).first,
            fold.frame.height > fold.frame.width {
             let leftOfFold = fold.frame.minX + safeAreaInsets.leading
-            return min(max(leftOfFold - 12, 320), 420)
+            return min(targetWidth, max(leftOfFold - 16, 280))
         }
         #endif
 
-        return min(max(fullWidth * 0.44, 320), 420)
+        return targetWidth
     }
 }
 

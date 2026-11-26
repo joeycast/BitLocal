@@ -196,7 +196,9 @@ struct CommunitiesListView: View {
                             Text("Loading communities…")
                                 .foregroundStyle(.secondary)
                         }
+                        .clearListRowBackground(if: shouldUseUnifiedSheetRows)
                     }
+                    .clearListRowBackground(if: shouldUseUnifiedSheetRows)
                 }
 
                 Section {
@@ -204,6 +206,7 @@ struct CommunitiesListView: View {
                         Text(emptyStateMessage)
                             .foregroundStyle(.secondary)
                             .listRowSeparator(.hidden, edges: .top)
+                            .clearListRowBackground(if: shouldUseUnifiedSheetRows)
                     } else {
                         ForEach(Array(displayed.enumerated()), id: \.element.id) { index, area in
                             Button {
@@ -222,6 +225,7 @@ struct CommunitiesListView: View {
                             }
                             .buttonStyle(.plain)
                             .listRowSeparator(index == 0 ? .hidden : .visible, edges: .top)
+                            .clearListRowBackground(if: shouldUseUnifiedSheetRows)
                         }
 
                         if hasMore {
@@ -230,11 +234,15 @@ struct CommunitiesListView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .foregroundStyle(.accent)
+                            .clearListRowBackground(if: shouldUseUnifiedSheetRows)
                         }
                     }
                 }
+                .clearListRowBackground(if: shouldUseUnifiedSheetRows)
             }
             .listStyle(.plain)
+            .scrollContentBackground(shouldUseUnifiedSheetRows ? .hidden : .automatic)
+            .background(Color.clear)
         }
         .onAppear {
             // Returning from detail should always restore the visible-community browsing state.
@@ -287,6 +295,14 @@ struct CommunitiesListView: View {
             return 20
         }
         return 16
+    }
+
+    private var shouldUseUnifiedSheetRows: Bool {
+        guard currentDetent != nil else { return false }
+        if #available(iOS 26.0, *) {
+            return true
+        }
+        return false
     }
 
     private var filteredCommunities: [V2AreaRecord] {

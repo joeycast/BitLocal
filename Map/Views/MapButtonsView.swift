@@ -124,14 +124,14 @@ struct MapControlToolbarContent: ToolbarContent {
             } label: {
                 Label(
                     selectedMapType == .standard ? "Show satellite map" : "Show standard map",
-                    systemImage: selectedMapType == .hybrid ? "map.fill" : "globe.americas.fill"
+                    systemImage: selectedMapType == .hybrid ? "map" : "globe.americas"
                 )
             }
 
             Button {
                 recenterController.handleRecenterTap(viewModel: viewModel)
             } label: {
-                Label("Center map on location", systemImage: "location.fill")
+                Label("Center map on location", systemImage: "location")
             }
 
             Button {
@@ -143,7 +143,7 @@ struct MapControlToolbarContent: ToolbarContent {
                     viewModel.mapDisplayMode == .merchants
                         ? NSLocalizedString("Show communities", comment: "VoiceOver label to switch map to communities")
                         : NSLocalizedString("Show merchants", comment: "VoiceOver label to switch map to merchants"),
-                    systemImage: viewModel.mapDisplayMode == .merchants ? "person.3.fill" : "mappin.and.ellipse"
+                    systemImage: viewModel.mapDisplayMode == .merchants ? "person.3" : "mappin.and.ellipse"
                 )
             }
             .accessibilityValue(
@@ -190,7 +190,7 @@ struct MapButtonsView: View {
                 .padding(.horizontal, 8)
 
             Button(action: handleRecenterTap) {
-                Image(systemName: "location.fill")
+                Image(systemName: useMonochromeIcons ? "location" : "location.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(useMonochromeIcons ? Color.primary : Color.accentColor)
                     .frame(width: controlWidth, height: controlHeight)
@@ -242,11 +242,11 @@ struct MapButtonsView: View {
 
     private var mapTypeIcon: some View {
         ZStack {
-            Image(systemName: "map.fill")
+            Image(systemName: useMonochromeIcons ? "map" : "map.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 1 : 0)
-            Image(systemName: "globe.americas.fill")
+            Image(systemName: useMonochromeIcons ? "globe.americas" : "globe.americas.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 0 : 1)
@@ -257,7 +257,7 @@ struct MapButtonsView: View {
     private var mapModeIcon: some View {
         let iconColor: Color = useMonochromeIcons ? .primary : .accentColor
         return ZStack {
-            Image(systemName: "person.3.fill")
+            Image(systemName: useMonochromeIcons ? "person.3" : "person.3.fill")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(iconColor)
                 .opacity(viewModel.mapDisplayMode == .merchants ? 1 : 0)
