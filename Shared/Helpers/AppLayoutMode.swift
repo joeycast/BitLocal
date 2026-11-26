@@ -85,9 +85,9 @@ struct AdaptiveLeadingSheetSizing: PresentationSizing, Equatable {
 }
 
 extension GeometryProxy {
-    /// Returns a left-column width (~1/3 of the display, clamped to 300–336 pt)
+    /// Returns a left-column width (~42% of the display, clamped to 380–420 pt)
     /// for a leading-pinned collapsible sheet on wide regular displays (e.g.
-    /// iPhone Duo unfolded landscape), or `nil` when the sheet should span full width.
+    /// iPhone Duo unfolded landscape), staying comfortably clear of the center fold.
     func leadingCollapsibleSheetWidth(
         horizontalSizeClass: UserInterfaceSizeClass?
     ) -> CGFloat? {
@@ -97,14 +97,14 @@ extension GeometryProxy {
             return nil
         }
 
-        let targetWidth = min(max(fullWidth * 0.33, 300), 336)
+        let targetWidth = min(max(fullWidth * 0.42, 380), 420)
 
         #if compiler(>=6.4)
         if #available(iOS 27.1, *),
            let fold = reservedRegions(kind: .division, options: .includeInactive).first,
            fold.frame.height > fold.frame.width {
             let leftOfFold = fold.frame.minX + safeAreaInsets.leading
-            return min(targetWidth, max(leftOfFold - 16, 280))
+            return min(targetWidth, max(leftOfFold - 16, 340))
         }
         #endif
 

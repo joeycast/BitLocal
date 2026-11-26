@@ -56,13 +56,13 @@ private struct IPhoneLayoutContent: View {
 
     private var appearance: Appearance { appearanceManager.appearance }
     @StateObject private var recenterController = MapLocationRecenterController()
-    @State private var bottomSheetDetent: PresentationDetent = .fraction(0.3)
+    @State private var bottomSheetDetent: PresentationDetent = .fraction(0.37)
     @State private var settingsSheetDetent: PresentationDetent = .medium
     @State private var hasLiveSheetMeasurement = false
     @State private var hasAcceptedDefaultLiveMeasurement = false
     @State private var pendingLaunchOutlier: CGFloat?
     private let collapsedSheetDetent: PresentationDetent = BottomSheetDetents.collapsed
-    private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
+    private let defaultSheetDetent: PresentationDetent = .fraction(0.37)
     private var shouldPresentBottomSheet: Bool {
         didCompleteOnboarding &&
         viewModel.isReadyForPostOnboardingPresentation &&
@@ -427,13 +427,13 @@ private struct IPhoneLayoutContent: View {
             return BottomSheetDetents.collapsedHeight
         }
         if isDefaultLikeDetent(bottomSheetDetent) {
-            return mapHeight * 0.30
+            return mapHeight * 0.37
         }
         if isMediumDetent(bottomSheetDetent) {
             return mapHeight * 0.50
         }
         // Keep large detent aligned with default viewport behavior.
-        return mapHeight * 0.30
+        return mapHeight * 0.37
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
@@ -445,7 +445,7 @@ private struct IPhoneLayoutContent: View {
     }
 
     private func isDefaultLikeDetent(_ detent: PresentationDetent) -> Bool {
-        if detent == BottomSheetDetents.expandedLeading {
+        if detent == defaultSheetDetent || detent == BottomSheetDetents.expandedLeading {
             return true
         }
         let id = detentIdentifier(detent)
