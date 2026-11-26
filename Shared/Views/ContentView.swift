@@ -14,6 +14,7 @@ struct ContentView: View {
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
     @StateObject private var appearanceManager = AppearanceManager()
 
     @State public var showingAbout = false
@@ -37,13 +38,15 @@ struct ContentView: View {
     }
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
-    /// Size-class + container-geometry shell selection (never `userInterfaceIdiom`)
-    /// so iPhone Duo unfolded landscape, iPad, and resizable windows adapt seamlessly.
+    /// Size-class + container-geometry shell selection (never `userInterfaceIdiom`):
+    /// iPhone Duo keeps the collapsible sheet shell across all poses (pinning the
+    /// sheet to the leading side in unfolded landscape), while iPad uses split view.
     private var layoutMode: AppLayoutMode {
         AppLayoutMode.resolve(
             horizontalSizeClass: horizontalSizeClass,
             verticalSizeClass: verticalSizeClass,
-            containerSize: containerSize
+            containerSize: containerSize,
+            isVerticalToolbarActive: isVerticalToolbarActive
         )
     }
 

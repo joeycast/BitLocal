@@ -18,8 +18,15 @@ enum AppLayoutMode: Equatable, Sendable {
     static func resolve(
         horizontalSizeClass: UserInterfaceSizeClass?,
         verticalSizeClass: UserInterfaceSizeClass?,
-        containerSize: CGSize
+        containerSize: CGSize,
+        isVerticalToolbarActive: Bool = false
     ) -> AppLayoutMode {
+        // iPhone Duo poses with a vertical side bar (outer display, Split View,
+        // and unfolded landscape) stay in the unified collapsible-sheet shell
+        // (with a leading-side collapsible sheet in unfolded landscape).
+        guard !isVerticalToolbarActive else {
+            return .compactSheet
+        }
         guard horizontalSizeClass == .regular else {
             return .compactSheet
         }
@@ -53,6 +60,49 @@ enum ActiveWindowScene {
     }
 }
 
+/// Constrains the persistent bottom sheet width on wide unfolded poses (e.g.
+/// iPhone Duo landscape) so it sits cleanly on the leading side while preserving
+/// collapsible detents, and falls back to default full width everywhere else.
+struct AdaptiveLeadingSheetSizing: PresentationSizing {
+    let maxWidth: CGFloat?
+
+    func proposedSize(
+        for root: PresentationSizingRoot,
+        context: PresentationSizingContext
+    ) -> ProposedViewSize {
+        guard let maxWidth else {
+            return AutomaticPresentationSizing.automatic.proposedSize(for: root, context: context)
+        }
+        return ProposedViewSize(width: maxWidth, height: .infinity)
+    }
+}
+
+extension GeometryProxy {
+    /// Returns a left-column max width for a leading-pinned collapsible sheet
+    /// on wide regular displays (e.g. iPhone Duo unfolded landscape), or `nil`
+    /// when the sheet should span full width at the bottom.
+    func leadingCollapsibleSheetWidth(
+        horizontalSizeClass: UserInterfaceSizeClass?
+    ) -> CGFloat? {
+        let fullWidth = size.width + safeAreaInsets.leading + safeAreaInsets.trailing
+        let fullHeight = size.height + safeAreaInsets.top + safeAreaInsets.bottom
+        guard horizontalSizeClass == .regular, fullWidth > fullHeight else {
+            return nil
+        }
+
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *),
+           let fold = reservedRegions(kind: .division, options: .includeInactive).first,
+           fold.frame.height > fold.frame.width {
+            let leftOfFold = fold.frame.minX + safeAreaInsets.leading
+            return min(max(leftOfFold - 12, 320), 420)
+        }
+        #endif
+
+        return min(max(fullWidth * 0.44, 320), 420)
+    }
+}
+
 extension EnvironmentValues {
     /// True when iOS 27.1+ places navigation/toolbar controls in iPhone Duo's
     /// vertical side rail (outer display, unfolded landscape detail, Split View).
@@ -74,6 +124,21 @@ extension View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
             self.toolbarVerticalBehavior(.disabled)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+
+    /// Pins a sheet to the leading edge on iOS 27+ when wide landscape space is
+    /// available (e.g. iPhone Duo unfolded landscape), and leaves default placement otherwise.
+    @ViewBuilder
+    func adaptiveSheetPlacement(leading: Bool) -> some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            self.presentationPlacement(leading ? .leading : .automatic)
         } else {
             self
         }

@@ -393,10 +393,17 @@ struct MapView: UIViewRepresentable {
             let zoomOutScale: Double = 1.3
             rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1), dy: -rect.size.height * (zoomOutScale - 1))
             
-            // Edge padding for header and bottom sheet in compact-sheet mode
+            // Edge padding for header and sheet in compact-sheet mode
             let edgePadding: UIEdgeInsets
             if viewModel.layoutMode == .splitSidebar {
                 edgePadding = UIEdgeInsets(top: 10, left: 20, bottom: 20, right: 20)
+            } else if viewModel.leadingSheetInset > 1 {
+                edgePadding = UIEdgeInsets(
+                    top: viewModel.topPadding + 10,
+                    left: viewModel.leadingSheetInset + 20,
+                    bottom: 20,
+                    right: 20
+                )
             } else {
                 edgePadding = UIEdgeInsets(
                     top: viewModel.topPadding + 10,
@@ -679,10 +686,17 @@ struct MapView: UIViewRepresentable {
                 rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1),
                                     dy: -rect.size.height * (zoomOutScale - 1))
                 
-                // Edge padding to respect header and bottom sheet in compact-sheet mode
+                // Edge padding to respect header and sheet in compact-sheet mode
                 let edgePadding: UIEdgeInsets
                 if viewModel.layoutMode == .splitSidebar {
                     edgePadding = UIEdgeInsets(top: 10, left: 20, bottom: 20, right: 20)
+                } else if viewModel.leadingSheetInset > 1 {
+                    edgePadding = UIEdgeInsets(
+                        top: viewModel.topPadding + 10,
+                        left: viewModel.leadingSheetInset + 20,
+                        bottom: 20,
+                        right: 20
+                    )
                 } else {
                     edgePadding = UIEdgeInsets(
                         top: viewModel.topPadding + 10,

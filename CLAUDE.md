@@ -113,9 +113,9 @@ Default repository mode is **auto**: prefer v4, fall back to v2 when needed.
 
 ## Important Conventions
 
-- Adaptive layout (`AppLayoutMode`): shell switches by size class + container geometry (never `UIDevice.current.userInterfaceIdiom` or `UIScreen.main`)
-  - Compact / portrait-narrow (standard iPhone, iPhone Duo outer display & unfolded portrait, Split View / Slide Over): floating header + bottom sheet with multiple detents
-  - Wide regular canvas (iPhone Duo unfolded landscape, iPad regular width): `NavigationSplitView` sidebar + map
+- Adaptive layout (`AppLayoutMode`): shell switches by size class + container geometry + vertical toolbar environment (never `UIDevice.current.userInterfaceIdiom` or `UIScreen.main`)
+  - Standard iPhone, Split View / Slide Over, and all iPhone Duo poses: unified collapsible sheet shell (full-width bottom sheet on compact/portrait, leading-side collapsible sheet in iPhone Duo unfolded landscape, with native vertical side-rail toolbar controls when active)
+  - Wide regular canvas without vertical toolbar (iPad regular width): `NavigationSplitView` sidebar + map
 - Map uses Bitcoin-orange markers (`MarkerColor`); boosted merchants use system orange tint
 - ~25-mile radius visible pin range from map center
 - Location permission: “When In Use” only (privacy-first)

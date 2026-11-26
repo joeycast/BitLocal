@@ -45,13 +45,14 @@ final class AppLayoutModeTests: XCTestCase {
 
     // MARK: - iPhone Duo unfolded inner display
 
-    func testIPhoneDuoUnfoldedLandscapeUsesSplitSidebar() {
+    func testIPhoneDuoUnfoldedLandscapeUsesCollapsibleLeadingSheetShell() {
         let mode = AppLayoutMode.resolve(
             horizontalSizeClass: .regular,
             verticalSizeClass: .regular,
-            containerSize: CGSize(width: 951, height: 669)
+            containerSize: CGSize(width: 951, height: 669),
+            isVerticalToolbarActive: true
         )
-        XCTAssertEqual(mode, .splitSidebar)
+        XCTAssertEqual(mode, .compactSheet)
     }
 
     func testIPhoneDuoUnfoldedPortraitUsesCompactSheet() {
@@ -130,6 +131,24 @@ final class AppLayoutModeTests: XCTestCase {
         XCTAssertEqual(viewModel.layoutMode, .splitSidebar)
         XCTAssertEqual(viewModel.topPadding, 0)
         XCTAssertEqual(viewModel.bottomPadding, 0)
+        XCTAssertEqual(viewModel.leadingSheetInset, 0)
         XCTAssertEqual(viewModel.mapListViewportInsets(for: mapView), .zero)
+    }
+
+    @MainActor
+    func testLeadingSheetInsetShiftsViewportLeftInsteadOfBottom() {
+        let viewModel = ContentViewModel()
+        viewModel.updateLayoutMode(.compactSheet)
+        viewModel.topPadding = 0
+        viewModel.bottomPadding = 260
+        viewModel.leadingSheetInset = 420
+
+        let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 951, height: 669))
+        let insets = viewModel.mapListViewportInsets(for: mapView)
+
+        XCTAssertEqual(insets.left, 420)
+        XCTAssertEqual(insets.bottom, 0)
+        XCTAssertEqual(insets.top, 0)
+        XCTAssertEqual(insets.right, 0)
     }
 }

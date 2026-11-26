@@ -133,7 +133,6 @@ struct MapControlToolbarContent: ToolbarContent {
             } label: {
                 Label("Center map on location", systemImage: "location.fill")
             }
-            .tint(.accentColor)
 
             Button {
                 Debug.log("⏱ mapMode button TAPPED")
@@ -147,7 +146,6 @@ struct MapControlToolbarContent: ToolbarContent {
                     systemImage: viewModel.mapDisplayMode == .merchants ? "person.3.fill" : "mappin.and.ellipse"
                 )
             }
-            .tint(.accentColor)
             .accessibilityValue(
                 viewModel.mapDisplayMode == .merchants
                     ? NSLocalizedString("Merchants map", comment: "VoiceOver current map mode value")
@@ -168,6 +166,7 @@ struct MapButtonsView: View {
     var selectedMapTypeBinding: Binding<MKMapType>
     var userLocation: CLLocation?
     var isIPad: Bool
+    var useMonochromeIcons: Bool = false
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
     @StateObject private var recenterController = MapLocationRecenterController()
@@ -193,7 +192,7 @@ struct MapButtonsView: View {
             Button(action: handleRecenterTap) {
                 Image(systemName: "location.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(useMonochromeIcons ? Color.primary : Color.accentColor)
                     .frame(width: controlWidth, height: controlHeight)
             }
             .accessibilityLabel("Center map on location")
@@ -256,14 +255,15 @@ struct MapButtonsView: View {
     }
 
     private var mapModeIcon: some View {
-        ZStack {
+        let iconColor: Color = useMonochromeIcons ? .primary : .accentColor
+        return ZStack {
             Image(systemName: "person.3.fill")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.accent)
+                .foregroundStyle(iconColor)
                 .opacity(viewModel.mapDisplayMode == .merchants ? 1 : 0)
             Image(systemName: "mappin.and.ellipse")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.accent)
+                .foregroundStyle(iconColor)
                 .opacity(viewModel.mapDisplayMode == .merchants ? 0 : 1)
         }
         .animation(.easeOut(duration: 0.16), value: viewModel.mapDisplayMode == .merchants)

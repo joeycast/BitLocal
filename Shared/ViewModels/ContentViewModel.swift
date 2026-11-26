@@ -126,6 +126,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Settled sheet bottom inset for map edge padding / camera math.
     /// Updated only when a detent selection settles — not during drag sampling.
     @Published var bottomPadding: CGFloat = 0
+    /// Leading column inset when the collapsible sheet is pinned to the leading edge
+    /// (e.g. iPhone Duo unfolded landscape), so map centering avoids hiding pins under it.
+    var leadingSheetInset: CGFloat = 0
     /// Active layout shell derived from size classes + container geometry.
     private(set) var layoutMode: AppLayoutMode = .compactSheet
     /// Live sheet geometry isolated from this object so detent drag does not
@@ -858,6 +861,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         layoutMode = newMode
         pendingSheetDetentHeight = nil
         if newMode == .splitSidebar {
+            leadingSheetInset = 0
             if topPadding != 0 {
                 topPadding = 0
             }
@@ -921,6 +925,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return .zero
         }
         let topInset = max(topPadding, 0)
+        if leadingSheetInset > 1 {
+            let clampedLeft = min(leadingSheetInset, max(mapView.bounds.width - 1, 0))
+            return UIEdgeInsets(top: topInset, left: clampedLeft, bottom: 0, right: 0)
+        }
         let bottomInset = effectiveIPhoneViewportBottomInset(mapHeight: mapView.bounds.height)
         return UIEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
     }
@@ -1278,6 +1286,13 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 let edgePadding: UIEdgeInsets
                 if layoutMode == .splitSidebar {
                     edgePadding = UIEdgeInsets(top: 10, left: 20, bottom: 20, right: 20)
+                } else if leadingSheetInset > 1 {
+                    edgePadding = UIEdgeInsets(
+                        top: topPadding + 10,
+                        left: leadingSheetInset + 20,
+                        bottom: 20,
+                        right: 20
+                    )
                 } else {
                     edgePadding = UIEdgeInsets(
                         top: topPadding + 10,
@@ -1376,6 +1391,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 // In split sidebar mode, center with no sheet inset so the map pane centers the user dot visually.
                 if self.layoutMode == .splitSidebar {
                     let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+                    mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
+                } else if self.leadingSheetInset > 1 {
+                    let edgePadding = UIEdgeInsets(top: 0, left: self.leadingSheetInset, bottom: 0, right: 0)
                     mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
                 } else {
                     // Compact bottom-sheet mode: size the sheet inset from the map/window bounds

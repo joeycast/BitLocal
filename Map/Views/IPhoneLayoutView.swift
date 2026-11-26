@@ -51,6 +51,7 @@ private struct IPhoneLayoutContent: View {
     @EnvironmentObject var appearanceManager: AppearanceManager
     @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
 
     private var appearance: Appearance { appearanceManager.appearance }
@@ -83,6 +84,8 @@ private struct IPhoneLayoutContent: View {
         GeometryReader { geometry in
             let elements = self.elements
             let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+            let leadingSheetWidth = geometry.leadingCollapsibleSheetWidth(horizontalSizeClass: horizontalSizeClass)
+            let isLeadingSheet = leadingSheetWidth != nil
 
             ZStack {
                 if let elements = elements {
@@ -100,8 +103,18 @@ private struct IPhoneLayoutContent: View {
                     // onChange of bottomPadding / detent), not live drag height.
                     .overlay(
                         OpenStreetMapAttributionView()
-                            .padding(.bottom, attributionBottomInset(for: fullHeight) + 6)
-                            .padding(.leading, geometry.safeAreaInsets.leading + 16),
+                            .padding(
+                                .bottom,
+                                isLeadingSheet
+                                    ? max(geometry.safeAreaInsets.bottom, 8)
+                                    : attributionBottomInset(for: fullHeight) + 6
+                            )
+                            .padding(
+                                .leading,
+                                isLeadingSheet
+                                    ? (leadingSheetWidth ?? 0) + 28
+                                    : geometry.safeAreaInsets.leading + 16
+                            ),
                         alignment: .bottomLeading
                     )
                 }
@@ -132,7 +145,8 @@ private struct IPhoneLayoutContent: View {
                         safeBottomInset: geometry.safeAreaInsets.bottom,
                         headerHeight: headerHeight,
                         shouldPresentBottomSheet: shouldPresentBottomSheet,
-                        showingSettings: showingSettings
+                        showingSettings: showingSettings,
+                        useMonochromeIcons: horizontalSizeClass == .regular
                     )
                 }
             }
@@ -147,7 +161,6 @@ private struct IPhoneLayoutContent: View {
                                 systemImage: "info.circle.fill"
                             )
                         }
-                        .tint(.accentColor)
 
                         Button {
                             showingSettings = true
@@ -157,7 +170,6 @@ private struct IPhoneLayoutContent: View {
                                 systemImage: "gearshape.fill"
                             )
                         }
-                        .tint(.accentColor)
                     }
 
                     MapControlToolbarContent(
@@ -168,7 +180,14 @@ private struct IPhoneLayoutContent: View {
                     )
                 } else if usesNativeHorizontalBar {
                     ToolbarItem(placement: .topBarLeading) {
-                        InfoButtonView(showingAbout: $showingAbout)
+                        Button {
+                            showingAbout = true
+                        } label: {
+                            Label(
+                                NSLocalizedString("about_accessibility_label", comment: ""),
+                                systemImage: "info.circle.fill"
+                            )
+                        }
                     }
                     ToolbarItem(placement: .principal) {
                         Text("bitlocal")
@@ -176,9 +195,14 @@ private struct IPhoneLayoutContent: View {
                             .foregroundColor(.accentColor)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        SettingsButtonView(
-                            onSettingsSelected: { showingSettings = true }
-                        )
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label(
+                                NSLocalizedString("settings_label_accessibility", comment: ""),
+                                systemImage: "gearshape.fill"
+                            )
+                        }
                     }
                 }
             }
@@ -202,6 +226,8 @@ private struct IPhoneLayoutContent: View {
                         .medium,
                         .large
                     ], selection: $bottomSheetDetent)
+                    .presentationSizing(AdaptiveLeadingSheetSizing(maxWidth: leadingSheetWidth))
+                    .adaptiveSheetPlacement(leading: isLeadingSheet)
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(true)
                     .presentationBackgroundInteraction(.enabled)
@@ -226,6 +252,7 @@ private struct IPhoneLayoutContent: View {
             }
             .onAppear {
                 syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
+                viewModel.leadingSheetInset = leadingSheetWidth ?? 0
                 hasLiveSheetMeasurement = false
                 hasAcceptedDefaultLiveMeasurement = false
                 pendingLaunchOutlier = nil
@@ -239,6 +266,12 @@ private struct IPhoneLayoutContent: View {
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
                     "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(fullHeight), inset=\(inset)"
                 )
+            }
+            .onDisappear {
+                viewModel.leadingSheetInset = 0
+            }
+            .onChange(of: leadingSheetWidth) { _, newWidth in
+                viewModel.leadingSheetInset = newWidth ?? 0
             }
             .onChange(of: isVerticalToolbarActive) { _, _ in
                 syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
@@ -420,6 +453,7 @@ private struct IPhoneMapButtonsChrome: View {
     var headerHeight: CGFloat
     var shouldPresentBottomSheet: Bool
     var showingSettings: Bool
+    var useMonochromeIcons: Bool = false
 
     private let mapButtonsPillHeight: CGFloat = 132
     /// Gap between the top of the sheet card and the bottom of the control pill.
@@ -434,7 +468,8 @@ private struct IPhoneMapButtonsChrome: View {
             safeBottomInset: safeBottomInset,
             maximumBottomOffset: maxMapButtonsBottomInset,
             sheetClearance: sheetClearance,
-            tracksSheet: shouldPresentBottomSheet
+            tracksSheet: shouldPresentBottomSheet,
+            useMonochromeIcons: useMonochromeIcons
         )
         .fixedSize()
         .padding(.trailing, 18)
@@ -474,6 +509,7 @@ private struct IPhoneMapButtonsUIKitHost: UIViewControllerRepresentable {
     var maximumBottomOffset: CGFloat
     var sheetClearance: CGFloat
     var tracksSheet: Bool
+    var useMonochromeIcons: Bool = false
 
     func makeUIViewController(context: Context) -> SheetTrackingMapButtonsController {
         let controller = SheetTrackingMapButtonsController(rootView: hostedContent)
@@ -529,7 +565,8 @@ private struct IPhoneMapButtonsUIKitHost: UIViewControllerRepresentable {
             viewModel: viewModel,
             selectedMapTypeBinding: selectedMapTypeBinding,
             userLocation: viewModel.userLocation,
-            isIPad: false
+            isIPad: false,
+            useMonochromeIcons: useMonochromeIcons
         )
     }
 }
