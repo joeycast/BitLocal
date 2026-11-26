@@ -120,7 +120,7 @@ private enum PlaceVerificationState: Equatable {
         case .loading:
             return "clock"
         case .unverified:
-            return "questionmark.circle.fill"
+            return "questionmark.circle"
         }
     }
 
@@ -135,7 +135,7 @@ private enum PlaceVerificationState: Equatable {
         }
     }
 
-    var compactBadgeTitle: LocalizedStringKey {
+    var compactStatusTitle: LocalizedStringKey {
         switch self {
         case .verified:
             return "Verified"
@@ -187,7 +187,6 @@ private enum PlaceVerificationState: Equatable {
 // MARK: - BusinessDetailView
 
 struct BusinessDetailView: View {
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openURL) private var openURL
     @State private var showingShareErrorAlert = false
@@ -328,41 +327,36 @@ struct BusinessDetailView: View {
     var body: some View {
         ScrollViewReader { scrollProxy in
             ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 18) {
                     heroHeader(scrollProxy: scrollProxy)
 
                     quickActionBar
 
-                    PlacePaymentRailsCard(element: element)
+                    PlacePaymentRailsStrip(element: element)
 
-                    if let openingHoursRaw {
-                        PlaceOpeningHoursCard(
-                            rawOpeningHours: openingHoursRaw,
-                            parsedSchedule: parsedOpeningSchedule
-                        )
-                    }
-
-                    PlaceContactInfoCard(
+                    PlaceDetailsSurface(
                         element: element,
                         elementCellViewModel: elementCellViewModel,
+                        openingHoursRaw: openingHoursRaw,
+                        parsedOpeningSchedule: parsedOpeningSchedule,
                         websiteInfo: websiteInfo,
                         phoneInfo: phoneInfo,
                         emailInfo: emailInfo
                     )
 
                     if let descriptionText {
-                        PlaceDescriptionCard(description: descriptionText)
+                        PlaceDescriptionSection(description: descriptionText)
                     }
 
                     if reviewsCount > 0 {
-                        PlaceReviewsCard(element: element, count: reviewsCount)
+                        PlaceReviewsRow(element: element, count: reviewsCount)
                     }
 
-                    PlaceTrustAndBoostCard(
+                    PlaceTrustAndBoostSection(
                         element: element,
                         verificationState: verificationState
                     )
-                    .id("place-verification-card")
+                    .id("place-verification-section")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -427,12 +421,12 @@ struct BusinessDetailView: View {
 private extension BusinessDetailView {
     @ViewBuilder
     func heroHeader(scrollProxy: ScrollViewProxy) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 12) {
                 // Solid map-pin badge linking the place card 1:1 to its map marker.
                 let isBoosted = element.isCurrentlyBoosted()
                 Image(systemName: categoryBadgeSymbolName)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
                     .background(
@@ -441,19 +435,11 @@ private extension BusinessDetailView {
                     )
                     .overlay(
                         Circle()
-                            .strokeBorder(
-                                Color.white.opacity(isBoosted ? 0.36 : 0.24),
-                                lineWidth: 1
-                            )
-                    )
-                    .shadow(
-                        color: (isBoosted ? Color.orange : Color("MarkerColor")).opacity(colorScheme == .dark ? 0.32 : 0.18),
-                        radius: 6,
-                        y: 2
+                            .strokeBorder(Color.white.opacity(0.24), lineWidth: 0.75)
                     )
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(displayName)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(.primary)
@@ -462,7 +448,7 @@ private extension BusinessDetailView {
 
                     if let metadataLine = heroMetadataLine {
                         Text(metadataLine)
-                            .font(.subheadline.weight(.medium))
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }
@@ -470,43 +456,39 @@ private extension BusinessDetailView {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Compact scannable status pills (live hours, verification, featured)
+            // Quiet inline status metadata (no extra capsule clutter)
             if parsedOpeningSchedule != nil || verificationState != .loading || shouldShowFeaturedBadgeInExpandedContent {
-                BitLocalFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+                BitLocalFlowLayout(horizontalSpacing: 12, verticalSpacing: 0) {
                     if let schedule = parsedOpeningSchedule {
                         let status = OpeningHoursLiveStatus.evaluate(schedule: schedule)
-                        heroStatusPill(
-                            dotColor: status.isOpen ? .green : .secondary,
-                            title: status.shortLabel,
-                            tint: status.isOpen ? .green : .secondary
-                        )
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(status.isOpen ? Color.green : Color.secondary)
+                                .frame(width: 6, height: 6)
+                            Text(status.shortLabel)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(status.isOpen ? Color.green : Color.secondary)
+                        }
+                        .frame(minHeight: 44)
                     }
 
                     if verificationState != .loading {
                         Button {
                             BitLocalHaptics.selection()
                             withAnimation(BitLocalMotion.animation(BitLocalMotion.disclosureSpring, reduceMotion: reduceMotion)) {
-                                scrollProxy.scrollTo("place-verification-card", anchor: .center)
+                                scrollProxy.scrollTo("place-verification-section", anchor: .center)
                             }
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: verificationState.icon)
-                                    .font(.system(size: 10.5, weight: .semibold))
-                                Text(verificationState.compactBadgeTitle)
                                     .font(.caption.weight(.semibold))
+                                Text(verificationState.compactStatusTitle)
+                                    .font(.footnote.weight(.medium))
                                     .lineLimit(1)
                             }
                             .foregroundStyle(verificationState.tint)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(
-                                verificationState.tint.opacity(colorScheme == .dark ? 0.18 : 0.12),
-                                in: Capsule()
-                            )
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(verificationState.tint.opacity(0.24), lineWidth: 0.5)
-                            )
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.tactilePress(scale: 0.96))
                     }
@@ -518,26 +500,19 @@ private extension BusinessDetailView {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "star.fill")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text("Featured")
                                     .font(.caption.weight(.semibold))
+                                Text("Featured")
+                                    .font(.footnote.weight(.semibold))
                                     .lineLimit(1)
                             }
                             .foregroundStyle(.orange)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(
-                                Color.orange.opacity(colorScheme == .dark ? 0.18 : 0.12),
-                                in: Capsule()
-                            )
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(Color.orange.opacity(0.28), lineWidth: 0.5)
-                            )
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.tactilePress(scale: 0.96))
                     }
                 }
+                .padding(.vertical, -8)
             }
         }
         .padding(.top, 2)
@@ -553,28 +528,6 @@ private extension BusinessDetailView {
         }
         guard !parts.isEmpty else { return nil }
         return parts.joined(separator: " · ")
-    }
-
-    func heroStatusPill(dotColor: Color, title: LocalizedStringKey, tint: Color) -> some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(dotColor)
-                .frame(width: 6, height: 6)
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-        }
-        .foregroundStyle(tint)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(
-            tint.opacity(colorScheme == .dark ? 0.18 : 0.12),
-            in: Capsule()
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(tint.opacity(0.24), lineWidth: 0.5)
-        )
     }
 
     @ViewBuilder
@@ -640,29 +593,31 @@ private extension BusinessDetailView {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .foregroundStyle(isPrimary ? Color.white : Color.accentColor)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(
-                isPrimary
-                    ? Color.accentColor
-                    : placeDetailCardSurfaceColor(for: colorScheme),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 8)
+            .background {
+                if isPrimary {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.accentColor)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(.regularMaterial)
+                }
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(
-                        isPrimary
-                            ? Color.white.opacity(0.18)
-                            : placeDetailCardBorderColor(for: colorScheme),
+                        isPrimary ? Color.clear : Color(.separator).opacity(0.35),
                         lineWidth: 0.5
                     )
             )
@@ -727,52 +682,29 @@ private extension BusinessDetailView {
     }
 }
 
-// MARK: - Translucent Liquid Glass Card Surface
+// MARK: - Native Material Grouped Surface
 
-private func placeDetailCardSurfaceColor(for colorScheme: ColorScheme) -> Color {
-    Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.64)
-}
-
-private func placeDetailCardBorderColor(for colorScheme: ColorScheme) -> Color {
-    Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08)
-}
-
-private struct PlaceDetailCard<Content: View>: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var padding: EdgeInsets = EdgeInsets(top: 14, leading: 14, bottom: 14, trailing: 14)
+private struct PlaceGroupedSurface<Content: View>: View {
+    var padding: EdgeInsets = EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content()
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                placeDetailCardSurfaceColor(for: colorScheme),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(placeDetailCardBorderColor(for: colorScheme), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
             )
     }
 }
 
-private struct PlaceCardSectionLabel: View {
-    let title: String
+// MARK: - Bitcoin Payment Rails Strip (Signature Unboxed Strip)
 
-    var body: some View {
-        Text(title.uppercased())
-            .font(.caption2.weight(.semibold))
-            .tracking(0.6)
-            .foregroundStyle(.secondary)
-    }
-}
-
-// MARK: - Payment Rails Card (Above the Fold)
-
-private struct PlacePaymentRailsCard: View {
+private struct PlacePaymentRailsStrip: View {
     let element: Element
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
 
     private struct PaymentRail: Identifiable {
         let id: String
@@ -842,59 +774,50 @@ private struct PlacePaymentRailsCard: View {
 
     var body: some View {
         if !rails.isEmpty || requiredApp != nil {
-            PlaceDetailCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    PlaceCardSectionLabel(
-                        title: NSLocalizedString("payment_details_section", comment: "Section header for payment details")
-                    )
-
-                    if !rails.isEmpty {
-                        BitLocalFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                            ForEach(rails) { rail in
-                                HStack(spacing: 6) {
-                                    Image(systemName: rail.icon)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(rail.tint)
-                                    Text(rail.shortLabel)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background(
-                                    rail.tint.opacity(colorScheme == .dark ? 0.16 : 0.10),
-                                    in: Capsule()
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .strokeBorder(rail.tint.opacity(0.24), lineWidth: 0.5)
-                                )
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel(rail.accessibilityLabel)
+            VStack(alignment: .leading, spacing: 10) {
+                if !rails.isEmpty {
+                    BitLocalFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                        ForEach(rails) { rail in
+                            HStack(spacing: 5) {
+                                Image(systemName: rail.icon)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(rail.tint)
+                                Text(rail.shortLabel)
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
                             }
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 6)
+                            .background(.regularMaterial, in: Capsule())
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                            )
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(rail.accessibilityLabel)
                         }
                     }
+                }
 
-                    if let requiredApp {
-                        if !rails.isEmpty {
-                            Divider()
-                                .opacity(0.5)
-                        }
-                        Link(destination: requiredApp.url) {
-                            HStack(spacing: 10) {
+                if let requiredApp {
+                    PlaceGroupedSurface(padding: EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)) {
+                        Button {
+                            BitLocalHaptics.lightTap()
+                            openURL(requiredApp.url)
+                        } label: {
+                            HStack(spacing: 12) {
                                 Image(systemName: "app.badge.fill")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundStyle(.orange)
-                                    .frame(width: 28, height: 28)
-                                    .background(Color.orange.opacity(0.14), in: Circle())
+                                    .frame(width: 20, alignment: .center)
 
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text("Required App")
-                                        .font(.caption.weight(.medium))
+                                        .font(.caption)
                                         .foregroundStyle(.secondary)
                                     Text(requiredApp.raw.cleanedForDisplay())
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.subheadline)
                                         .foregroundStyle(.accent)
                                         .lineLimit(1)
                                 }
@@ -903,8 +826,9 @@ private struct PlacePaymentRailsCard: View {
 
                                 Image(systemName: "arrow.up.forward")
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.tertiary)
                             }
+                            .frame(minHeight: 36)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.tactileRow(cornerRadius: 10))
@@ -915,7 +839,7 @@ private struct PlacePaymentRailsCard: View {
     }
 }
 
-// MARK: - Smart Collapsible Opening Hours Card
+// MARK: - Live Opening Hours Evaluator
 
 private struct OpeningHoursLiveStatus {
     let isOpen: Bool
@@ -944,7 +868,6 @@ private struct OpeningHoursLiveStatus {
                         return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
                     }
                 } else {
-                    // Overnight range starting today (e.g. 18:00 - 02:00)
                     if nowMinutes >= range.startMinutes {
                         return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
                     }
@@ -952,7 +875,6 @@ private struct OpeningHoursLiveStatus {
             }
         }
 
-        // Check spillover from yesterday's overnight range (e.g. 18:00 - 02:00 or 18:00 - 26:00)
         if let yesterdayDate = calendar.date(byAdding: .day, value: -1, to: now) {
             let yesterday = weekday(for: calendar.component(.weekday, from: yesterdayDate))
             if let yesterdaySchedule = schedule.days.first(where: { $0.weekday == yesterday }) {
@@ -986,127 +908,357 @@ private struct OpeningHoursLiveStatus {
     }
 }
 
-private struct PlaceOpeningHoursCard: View {
-    let rawOpeningHours: String
-    let parsedSchedule: OSMOpeningHoursWeekSchedule?
+// MARK: - Unified Details Surface (Hours, Address, Contact & Socials)
 
-    @State private var isExpanded = false
+private struct PlaceDetailsSurface: View {
+    let element: Element
+    @ObservedObject var elementCellViewModel: ElementCellViewModel
+    let openingHoursRaw: String?
+    let parsedOpeningSchedule: OSMOpeningHoursWeekSchedule?
+    let websiteInfo: (display: String, url: URL)?
+    let phoneInfo: (display: String, url: URL)?
+    let emailInfo: (display: String, url: URL)?
+
+    @State private var isHoursExpanded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
+
+    private struct SocialItem: Identifiable {
+        let id: String
+        let label: String
+        let icon: String
+        let value: String
+        let url: URL?
+    }
+
+    private var addressDisplayText: String {
+        elementCellViewModel.address?.formatted(.compact) ?? ""
+    }
 
     private var todayWeekday: WeeklyHours.Weekday {
         OpeningHoursLiveStatus.weekday(for: Calendar.current.component(.weekday, from: Date()))
     }
 
+    private var socialItems: [SocialItem] {
+        guard let metadata = element.v4Metadata else { return [] }
+        let candidates: [(String, String, String?, URL?)] = [
+            ("X", "xmark", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
+            ("Instagram", "camera", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
+            ("Telegram", "paperplane", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
+            ("Facebook", "f.cursive", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
+            ("LINE", "message", metadata.line, metadata.line.flatMap(URL.init(string:)))
+        ]
+        return candidates.compactMap { item in
+            guard let raw = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+                return nil
+            }
+            return SocialItem(
+                id: item.0,
+                label: item.0,
+                icon: item.1,
+                value: raw.cleanedForDisplay(),
+                url: item.3
+            )
+        }
+    }
+
+    private var hasHours: Bool { openingHoursRaw != nil }
+    private var hasAddress: Bool { element.mapCoordinate != nil }
+    private var hasWebsite: Bool { websiteInfo != nil }
+    private var hasPhone: Bool { phoneInfo != nil }
+    private var hasEmail: Bool { emailInfo != nil }
+    private var hasAnyContactOrHours: Bool { hasHours || hasAddress || hasWebsite || hasPhone || hasEmail }
+    private var hasAnyContent: Bool { hasAnyContactOrHours || !socialItems.isEmpty }
+
     var body: some View {
-        PlaceDetailCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
-            if let parsedSchedule {
-                let status = OpeningHoursLiveStatus.evaluate(schedule: parsedSchedule)
+        if hasAnyContent {
+            PlaceGroupedSurface(padding: EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 10)) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Button {
-                        BitLocalHaptics.selection()
-                        withAnimation(
-                            BitLocalMotion.animation(
-                                BitLocalMotion.disclosureSpring,
-                                reduceMotion: reduceMotion
-                            )
+                    if let openingHoursRaw {
+                        hoursSection(rawOpeningHours: openingHoursRaw)
+                    }
+
+                    if let coord = element.mapCoordinate {
+                        if hasHours { rowDivider }
+                        contactRow(
+                            icon: "mappin.and.ellipse",
+                            label: NSLocalizedString("address_label", comment: "Label for address"),
+                            value: addressDisplayText.isEmpty ? "Open in Apple Maps" : addressDisplayText,
+                            copyValue: addressDisplayText.isEmpty ? nil : addressDisplayText,
+                            copyTitle: "Copy Address",
+                            valueLineLimit: 3
                         ) {
-                            isExpanded.toggle()
+                            BitLocalHaptics.lightTap()
+                            openLocationInMaps(
+                                coordinate: coord,
+                                name: element.displayName,
+                                address: elementCellViewModel.address
+                            )
                         }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "clock.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(status.isOpen ? Color.green : Color.secondary)
-                                .frame(width: 30, height: 30)
-                                .background(
-                                    (status.isOpen ? Color.green : Color.secondary).opacity(0.14),
-                                    in: Circle()
-                                )
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    Text(status.shortLabel)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(status.isOpen ? Color.green : Color.secondary)
-                                    Text("·")
-                                        .foregroundStyle(.tertiary)
-                                    Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
-                                        .font(.caption.weight(.medium))
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Text(todaySummaryText(for: parsedSchedule))
-                                    .font(.subheadline)
-                                    .foregroundStyle(.primary)
-                                    .monospacedDigit()
-                                    .lineLimit(1)
-                            }
-
-                            Spacer(minLength: 8)
-
-                            Image(systemName: "chevron.down")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        }
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.tactileRow(cornerRadius: 10))
-                    .accessibilityHint(isExpanded ? "Double-tap to collapse weekly hours" : "Double-tap to view weekly hours")
 
-                    if isExpanded {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Divider()
-                                .padding(.vertical, 6)
-
-                            ForEach(parsedSchedule.days, id: \.weekday) { day in
-                                let isToday = day.weekday == todayWeekday
-                                HStack(alignment: .top, spacing: 12) {
-                                    HStack(spacing: 6) {
-                                        Circle()
-                                            .fill(isToday ? Color.accentColor : Color.clear)
-                                            .frame(width: 5, height: 5)
-                                        Text(shortWeekdayLabel(for: day.weekday))
-                                            .font(.subheadline)
-                                            .fontWeight(isToday ? .semibold : .regular)
-                                            .foregroundStyle(isToday ? .primary : .secondary)
-                                            .lineLimit(1)
-                                    }
-                                    .frame(width: 54, alignment: .leading)
-
-                                    hoursText(for: day, isToday: isToday)
-                                        .frame(maxWidth: .infinity, alignment: .trailing)
-                                }
-                            }
+                    if let website = websiteInfo {
+                        if hasHours || hasAddress { rowDivider }
+                        contactRow(
+                            icon: "globe",
+                            label: NSLocalizedString("website_label", comment: "Label for website"),
+                            value: website.display,
+                            copyValue: website.display,
+                            copyTitle: "Copy Website",
+                            valueLineLimit: 2
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openURL(website.url)
                         }
-                        .padding(.top, 2)
-                        .transition(
-                            reduceMotion
-                                ? .opacity
-                                : .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
-                        )
                     }
-                }
-            } else {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "clock.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.accent)
-                        .frame(width: 30, height: 30)
-                        .background(Color.accentColor.opacity(0.14), in: Circle())
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Text(rawOpeningHours)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.leading)
+                    if let phone = phoneInfo {
+                        if hasHours || hasAddress || hasWebsite { rowDivider }
+                        contactRow(
+                            icon: "phone",
+                            label: NSLocalizedString("phone_label", comment: "Label for phone"),
+                            value: phone.display,
+                            copyValue: phone.display,
+                            copyTitle: "Copy Phone",
+                            valueLineLimit: 1
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openURL(phone.url)
+                        }
+                    }
+
+                    if let email = emailInfo {
+                        if hasHours || hasAddress || hasWebsite || hasPhone { rowDivider }
+                        contactRow(
+                            icon: "envelope",
+                            label: "Email",
+                            value: email.display,
+                            copyValue: email.display,
+                            copyTitle: "Copy Email",
+                            valueLineLimit: 2
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openURL(email.url)
+                        }
+                    }
+
+                    if !socialItems.isEmpty {
+                        if hasAnyContactOrHours { rowDivider }
+                        socialsRow
                     }
                 }
             }
+        }
+    }
+
+    private var rowDivider: some View {
+        Divider()
+            .padding(.leading, 32)
+            .padding(.trailing, 4)
+    }
+
+    @ViewBuilder
+    private func hoursSection(rawOpeningHours: String) -> some View {
+        if let parsedSchedule = parsedOpeningSchedule {
+            let status = OpeningHoursLiveStatus.evaluate(schedule: parsedSchedule)
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    BitLocalHaptics.selection()
+                    withAnimation(
+                        BitLocalMotion.animation(
+                            BitLocalMotion.disclosureSpring,
+                            reduceMotion: reduceMotion
+                        )
+                    ) {
+                        isHoursExpanded.toggle()
+                    }
+                } label: {
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: "clock")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20, alignment: .center)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 5) {
+                                Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("·")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                Text(status.shortLabel)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(status.isOpen ? Color.green : Color.secondary)
+                            }
+
+                            Text(todaySummaryText(for: parsedSchedule))
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                                .monospacedDigit()
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(isHoursExpanded ? 180 : 0))
+                            .padding(.trailing, 6)
+                    }
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.tactileRow(cornerRadius: 10))
+                .accessibilityHint(isHoursExpanded ? "Double-tap to collapse weekly hours" : "Double-tap to view weekly hours")
+
+                if isHoursExpanded {
+                    VStack(alignment: .leading, spacing: 7) {
+                        ForEach(parsedSchedule.days, id: \.weekday) { day in
+                            let isToday = day.weekday == todayWeekday
+                            HStack(alignment: .top, spacing: 12) {
+                                Text(shortWeekdayLabel(for: day.weekday))
+                                    .font(.footnote)
+                                    .fontWeight(isToday ? .semibold : .regular)
+                                    .foregroundStyle(isToday ? .primary : .secondary)
+                                    .lineLimit(1)
+                                    .frame(width: 40, alignment: .leading)
+
+                                hoursText(for: day, isToday: isToday)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                        }
+                    }
+                    .padding(.leading, 32)
+                    .padding(.trailing, 8)
+                    .padding(.bottom, 10)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
+                    )
+                }
+            }
+        } else {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "clock")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, alignment: .center)
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(rawOpeningHours)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            .padding(.vertical, 8)
+            .padding(.trailing, 6)
+        }
+    }
+
+    @ViewBuilder
+    private func contactRow(
+        icon: String,
+        label: String,
+        value: String,
+        copyValue: String?,
+        copyTitle: String,
+        valueLineLimit: Int,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(alignment: .center, spacing: 4) {
+            Button(action: action) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: icon)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, alignment: .center)
+                        .padding(.top, 2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(value)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(valueLineLimit)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 8)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.tactileRow(cornerRadius: 10))
+            .copyValueContextMenu(copyValue, title: copyTitle)
+
+            if let copyValue, !copyValue.isEmpty {
+                TactileCopyButton(value: copyValue, accessibilityLabel: copyTitle)
+            }
+        }
+    }
+
+    private var socialsRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "at")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+                .padding(.top, 12)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Socials")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+
+                BitLocalFlowLayout(horizontalSpacing: 14, verticalSpacing: 0) {
+                    ForEach(socialItems) { social in
+                        socialLink(social)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.bottom, 2)
+    }
+
+    @ViewBuilder
+    private func socialLink(_ social: SocialItem) -> some View {
+        let content = HStack(spacing: 5) {
+            Image(systemName: social.icon)
+                .font(.caption.weight(.semibold))
+            Text(social.label)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(social.url != nil ? Color.accentColor : Color.primary)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+
+        if let url = social.url {
+            Button {
+                BitLocalHaptics.lightTap()
+                openURL(url)
+            } label: {
+                content
+            }
+            .buttonStyle(.tactilePress(scale: 0.96))
+            .copyValueContextMenu(social.value, title: "Copy \(social.label)")
+        } else {
+            content
+                .copyValueContextMenu(social.value, title: "Copy \(social.label)")
         }
     }
 
@@ -1132,13 +1284,13 @@ private struct PlaceOpeningHoursCard: View {
     private func hoursText(for day: OSMOpeningHoursDaySchedule, isToday: Bool) -> some View {
         if day.ranges.isEmpty {
             Text(NSLocalizedString("hours_closed", comment: "Closed label for business hours"))
-                .font(.subheadline)
+                .font(.footnote)
                 .fontWeight(isToday ? .semibold : .regular)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         } else if day.ranges.count == 1, day.ranges[0].isAllDay {
             Text("24/7")
-                .font(.subheadline)
+                .font(.footnote)
                 .fontWeight(isToday ? .semibold : .regular)
                 .foregroundStyle(.primary)
                 .monospacedDigit()
@@ -1147,7 +1299,7 @@ private struct PlaceOpeningHoursCard: View {
             VStack(alignment: .trailing, spacing: 2) {
                 ForEach(Array(day.ranges.enumerated()), id: \.offset) { _, range in
                     Text(formattedTime(range.startMinutes) + " \u{2013} " + formattedTime(range.endMinutes))
-                        .font(.subheadline)
+                        .font(.footnote)
                         .fontWeight(isToday ? .semibold : .regular)
                         .foregroundStyle(isToday ? .primary : .secondary)
                         .monospacedDigit()
@@ -1204,248 +1356,7 @@ private struct PlaceOpeningHoursCard: View {
     }
 }
 
-// MARK: - Unified Contact & Location Card
-
-private struct PlaceContactInfoCard: View {
-    let element: Element
-    @ObservedObject var elementCellViewModel: ElementCellViewModel
-    let websiteInfo: (display: String, url: URL)?
-    let phoneInfo: (display: String, url: URL)?
-    let emailInfo: (display: String, url: URL)?
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.openURL) private var openURL
-
-    private struct SocialItem: Identifiable {
-        let id: String
-        let label: String
-        let icon: String
-        let value: String
-        let url: URL?
-    }
-
-    private var addressDisplayText: String {
-        elementCellViewModel.address?.formatted(.compact) ?? ""
-    }
-
-    private var socialItems: [SocialItem] {
-        guard let metadata = element.v4Metadata else { return [] }
-        let candidates: [(String, String, String?, URL?)] = [
-            ("X", "xmark", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
-            ("Instagram", "camera.fill", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
-            ("Telegram", "paperplane.fill", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
-            ("Facebook", "f.cursive", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
-            ("LINE", "message.fill", metadata.line, metadata.line.flatMap(URL.init(string:)))
-        ]
-        return candidates.compactMap { item in
-            guard let raw = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
-                return nil
-            }
-            return SocialItem(
-                id: item.0,
-                label: item.0,
-                icon: item.1,
-                value: raw.cleanedForDisplay(),
-                url: item.3
-            )
-        }
-    }
-
-    private var hasAddress: Bool { element.mapCoordinate != nil }
-    private var hasWebsite: Bool { websiteInfo != nil }
-    private var hasPhone: Bool { phoneInfo != nil }
-    private var hasEmail: Bool { emailInfo != nil }
-    private var hasContactRows: Bool { hasAddress || hasWebsite || hasPhone || hasEmail }
-
-    private var hasAnyContent: Bool {
-        hasContactRows || !socialItems.isEmpty
-    }
-
-    var body: some View {
-        if hasAnyContent {
-            PlaceDetailCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
-                VStack(alignment: .leading, spacing: 0) {
-                    if hasContactRows {
-                        PlaceCardSectionLabel(
-                            title: NSLocalizedString("business_details_section", comment: "Section header for business details")
-                        )
-                        .padding(.bottom, 8)
-                    }
-
-                    if let coord = element.mapCoordinate {
-                        contactRow(
-                            icon: "mappin.and.ellipse",
-                            label: NSLocalizedString("address_label", comment: "Label for address"),
-                            value: addressDisplayText.isEmpty ? "Open in Apple Maps" : addressDisplayText,
-                            copyValue: addressDisplayText.isEmpty ? nil : addressDisplayText,
-                            copyTitle: "Copy Address",
-                            valueLineLimit: 3
-                        ) {
-                            BitLocalHaptics.lightTap()
-                            openLocationInMaps(
-                                coordinate: coord,
-                                name: element.displayName,
-                                address: elementCellViewModel.address
-                            )
-                        }
-                    }
-
-                    if let website = websiteInfo {
-                        if hasAddress { rowDivider }
-                        contactRow(
-                            icon: "globe",
-                            label: NSLocalizedString("website_label", comment: "Label for website"),
-                            value: website.display,
-                            copyValue: website.display,
-                            copyTitle: "Copy Website",
-                            valueLineLimit: 2
-                        ) {
-                            BitLocalHaptics.lightTap()
-                            openURL(website.url)
-                        }
-                    }
-
-                    if let phone = phoneInfo {
-                        if hasAddress || hasWebsite { rowDivider }
-                        contactRow(
-                            icon: "phone.fill",
-                            label: NSLocalizedString("phone_label", comment: "Label for phone"),
-                            value: phone.display,
-                            copyValue: phone.display,
-                            copyTitle: "Copy Phone",
-                            valueLineLimit: 1
-                        ) {
-                            BitLocalHaptics.lightTap()
-                            openURL(phone.url)
-                        }
-                    }
-
-                    if let email = emailInfo {
-                        if hasAddress || hasWebsite || hasPhone { rowDivider }
-                        contactRow(
-                            icon: "envelope.fill",
-                            label: "Email",
-                            value: email.display,
-                            copyValue: email.display,
-                            copyTitle: "Copy Email",
-                            valueLineLimit: 2
-                        ) {
-                            BitLocalHaptics.lightTap()
-                            openURL(email.url)
-                        }
-                    }
-
-                    if !socialItems.isEmpty {
-                        if hasContactRows {
-                            Divider()
-                                .padding(.vertical, 10)
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            PlaceCardSectionLabel(title: "Socials")
-
-                            BitLocalFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                                ForEach(socialItems) { social in
-                                    socialChip(social)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var rowDivider: some View {
-        Divider()
-            .padding(.leading, 42)
-            .padding(.vertical, 6)
-    }
-
-    @ViewBuilder
-    private func contactRow(
-        icon: String,
-        label: String,
-        value: String,
-        copyValue: String?,
-        copyTitle: String,
-        valueLineLimit: Int,
-        action: @escaping () -> Void
-    ) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            Button(action: action) {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: icon)
-                        .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(.accent)
-                        .frame(width: 30, height: 30)
-                        .background(Color.accentColor.opacity(0.12), in: Circle())
-                        .padding(.top, 1)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(label)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Text(value)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(valueLineLimit)
-                            .multilineTextAlignment(.leading)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 2)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.tactileRow(cornerRadius: 10))
-            .copyValueContextMenu(copyValue, title: copyTitle)
-
-            if let copyValue, !copyValue.isEmpty {
-                TactileCopyButton(value: copyValue, accessibilityLabel: copyTitle)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func socialChip(_ social: SocialItem) -> some View {
-        let chipLabel = HStack(spacing: 6) {
-            Image(systemName: social.icon)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(.accent)
-            Text(social.label)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 7)
-        .background(
-            Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06),
-            in: Capsule()
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
-        )
-
-        if let url = social.url {
-            Button {
-                BitLocalHaptics.lightTap()
-                openURL(url)
-            } label: {
-                chipLabel
-            }
-            .buttonStyle(.tactilePress(scale: 0.96))
-            .copyValueContextMenu(social.value, title: "Copy \(social.label)")
-        } else {
-            chipLabel
-                .copyValueContextMenu(social.value, title: "Copy \(social.label)")
-        }
-    }
-}
-
-// MARK: - Inline Tactile Copy Button (Blur + Scale Icon Morph)
+// MARK: - Inline Tactile Copy Button (44pt Hit Target, Symbol Morph)
 
 private struct TactileCopyButton: View {
     let value: String
@@ -1454,7 +1365,6 @@ private struct TactileCopyButton: View {
     @State private var copied = false
     @State private var resetTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button {
@@ -1481,14 +1391,11 @@ private struct TactileCopyButton: View {
             }
         } label: {
             Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(copied ? Color.green : Color.secondary)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 32, height: 32)
-                .background(
-                    (copied ? Color.green.opacity(colorScheme == .dark ? 0.18 : 0.12) : Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05)),
-                    in: Circle()
-                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.tactilePress(scale: 0.92))
         .accessibilityLabel(copied ? "Copied" : accessibilityLabel)
@@ -1498,18 +1405,19 @@ private struct TactileCopyButton: View {
     }
 }
 
-// MARK: - Description Card (with Smooth Apple Translate)
+// MARK: - About / Description Section
 
-private struct PlaceDescriptionCard: View {
+private struct PlaceDescriptionSection: View {
     let description: String
 
     var body: some View {
-        PlaceDetailCard {
-            VStack(alignment: .leading, spacing: 8) {
-                PlaceCardSectionLabel(
-                    title: NSLocalizedString("business_description_section", comment: "Section header for business description")
-                )
+        VStack(alignment: .leading, spacing: 6) {
+            Text(NSLocalizedString("business_description_section", comment: "Section header for business description"))
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
 
+            PlaceGroupedSurface {
                 TranslatableBusinessDescriptionView(description: description)
             }
         }
@@ -1578,11 +1486,11 @@ private struct TranslatableBusinessDescriptionView: View {
                     Label("Translate", systemImage: "translate")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.tactilePress(scale: 0.96))
+                .padding(.vertical, -8)
             }
 
             if hasSuccessfulTranslation {
@@ -1641,9 +1549,9 @@ private struct TranslatableBusinessDescriptionView: View {
     }
 }
 
-// MARK: - Community Reviews Card & List View
+// MARK: - Community Reviews Row & List View
 
-private struct PlaceReviewsCard: View {
+private struct PlaceReviewsRow: View {
     let element: Element
     let count: Int
 
@@ -1651,17 +1559,16 @@ private struct PlaceReviewsCard: View {
         NavigationLink {
             BTCMapPlaceCommentsListView(element: element)
         } label: {
-            PlaceDetailCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
+            PlaceGroupedSurface(padding: EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)) {
                 HStack(spacing: 12) {
-                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                        .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(.accent)
-                        .frame(width: 30, height: 30)
-                        .background(Color.accentColor.opacity(0.12), in: Circle())
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, alignment: .center)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Community Reviews")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(.primary)
                         Text(
                             String(
@@ -1677,12 +1584,13 @@ private struct PlaceReviewsCard: View {
                     Spacer(minLength: 0)
 
                     Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
+                .frame(minHeight: 36)
             }
         }
-        .buttonStyle(.tactileRow(cornerRadius: 18))
+        .buttonStyle(.tactileRow(cornerRadius: 16))
     }
 }
 
@@ -1853,11 +1761,11 @@ private struct TranslatableReviewBodyTextView: View {
                     Label("Translate", systemImage: "translate")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.tactilePress(scale: 0.96))
+                .padding(.vertical, -8)
             }
 
             if hasSuccessfulTranslation {
@@ -1916,9 +1824,9 @@ private struct TranslatableReviewBodyTextView: View {
     }
 }
 
-// MARK: - Verification & Boost Footer Card
+// MARK: - Verification & Boost Footer Section
 
-private struct PlaceTrustAndBoostCard: View {
+private struct PlaceTrustAndBoostSection: View {
     let element: Element
     let verificationState: PlaceVerificationState
     @Environment(\.openURL) private var openURL
@@ -1928,70 +1836,72 @@ private struct PlaceTrustAndBoostCard: View {
     }
 
     var body: some View {
-        PlaceDetailCard {
-            VStack(alignment: .leading, spacing: 12) {
-                PlaceCardSectionLabel(title: "Verification")
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Verification")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
 
-                HStack(alignment: .top, spacing: 12) {
-                    if verificationState == .loading {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 30, height: 30)
-                    } else {
-                        Image(systemName: verificationState.icon)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(verificationState.tint)
-                            .frame(width: 30, height: 30)
-                            .background(verificationState.tint.opacity(0.14), in: Circle())
-                    }
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(verificationState.detailTitle)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-
-                        if let dateText = verificationState.formattedDate {
-                            Text(
-                                String(
-                                    format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"),
-                                    dateText
-                                )
-                            )
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        } else if verificationState == .unverified {
-                            Text("No one has confirmed this location yet.")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
+            PlaceGroupedSurface(padding: EdgeInsets(top: 12, leading: 14, bottom: 10, trailing: 14)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 12) {
+                        if verificationState == .loading {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 20, height: 20)
+                        } else {
+                            Image(systemName: verificationState.icon)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(verificationState.tint)
+                                .frame(width: 20, alignment: .center)
+                                .padding(.top, 1)
                         }
 
-                        Text(verificationState.explanation)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 2)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(verificationState.detailTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+
+                            if let dateText = verificationState.formattedDate {
+                                Text(
+                                    String(
+                                        format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"),
+                                        dateText
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            } else if verificationState == .unverified {
+                                Text("No one has confirmed this location yet.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Text(verificationState.explanation)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
+                        }
                     }
-                }
 
-                if let btcMapMerchantURL {
-                    Divider()
-                        .opacity(0.5)
+                    if let btcMapMerchantURL {
+                        Divider()
+                            .padding(.leading, 32)
 
-                    VStack(alignment: .leading, spacing: 6) {
                         Button {
                             BitLocalHaptics.lightTap()
                             openURL(btcMapMerchantURL)
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "star.fill")
-                                    .font(.system(size: 13.5, weight: .semibold))
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundStyle(.orange)
-                                    .frame(width: 30, height: 30)
-                                    .background(Color.orange.opacity(0.14), in: Circle())
+                                    .frame(width: 20, alignment: .center)
 
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text("Boost on BTC Map")
-                                        .font(.subheadline.weight(.semibold))
+                                        .font(.subheadline.weight(.medium))
                                         .foregroundStyle(.primary)
                                     Text("Feature This Merchant")
                                         .font(.caption)
@@ -2002,19 +1912,22 @@ private struct PlaceTrustAndBoostCard: View {
 
                                 Image(systemName: "arrow.up.forward")
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.tertiary)
                             }
-                            .padding(.vertical, 2)
+                            .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.tactileRow(cornerRadius: 10))
-
-                        Text("Opening the link above will direct you to btcmap.org where you can boost this merchant. Boosted merchants are featured on BitLocal.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+            }
+
+            if btcMapMerchantURL != nil {
+                Text("Opening the link above will direct you to btcmap.org where you can boost this merchant. Boosted merchants are featured on BitLocal.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
