@@ -95,6 +95,13 @@ struct IPadLayoutView: View {
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
         }
+        .onChange(of: viewModel.isSearchActive) { _, isActive in
+            guard viewModel.mapDisplayMode != .communities else { return }
+            if !isActive {
+                // Clearing search dismisses any persisted category chip.
+                viewModel.clearMerchantSearch(userInitiated: true)
+            }
+        }
         .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 420)
     }
 
@@ -107,6 +114,8 @@ struct IPadLayoutView: View {
 
     @ViewBuilder
     private var sidePanelRootContent: some View {
+        // Both CommunitiesListView and BusinessesListView embed SheetMapModeSwitcher
+        // below their search bar (always visible when currentDetent == nil on iPad/Duo).
         if viewModel.mapDisplayMode == .communities {
             CommunitiesListView()
                 .environmentObject(viewModel)

@@ -16,6 +16,9 @@
 		F7EA00013B1D000000000001 /* MerchantSearchController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EA00013B1D000000000002 /* MerchantSearchController.swift */; };
 		F7EA00013B1D000000000003 /* MerchantSearchControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EA00013B1D000000000004 /* MerchantSearchControllerTests.swift */; };
 		F7EB00013B1E000000000001 /* AppLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EB00013B1E000000000002 /* AppLayoutMode.swift */; };
+		F7EC00013B1F000000000001 /* SavedPlacesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1F000000000002 /* SavedPlacesStore.swift */; };
+		F7EC00013B1F000000000003 /* NetworkReachabilityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1F000000000004 /* NetworkReachabilityMonitor.swift */; };
+		F7EC00013B1F000000000005 /* BitLocalAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EC00013B1F000000000006 /* BitLocalAppIntents.swift */; };
 		F7EB00013B1E000000000003 /* AppLayoutModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EB00013B1E000000000004 /* AppLayoutModeTests.swift */; };
 		F7E700013B1A000000000005 /* MerchantElementStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */; };
 		F7E700013B1A000000000003 /* BTCMapAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E700013B1A000000000004 /* BTCMapAsync.swift */; };
@@ -132,6 +135,9 @@
 		F7EA00013B1D000000000002 /* MerchantSearchController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchController.swift; sourceTree = "<group>"; };
 		F7EA00013B1D000000000004 /* MerchantSearchControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantSearchControllerTests.swift; sourceTree = "<group>"; };
 		F7EB00013B1E000000000002 /* AppLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLayoutMode.swift; sourceTree = "<group>"; };
+		F7EC00013B1F000000000002 /* SavedPlacesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesStore.swift; sourceTree = "<group>"; };
+		F7EC00013B1F000000000004 /* NetworkReachabilityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkReachabilityMonitor.swift; sourceTree = "<group>"; };
+		F7EC00013B1F000000000006 /* BitLocalAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitLocalAppIntents.swift; sourceTree = "<group>"; };
 		F7EB00013B1E000000000004 /* AppLayoutModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLayoutModeTests.swift; sourceTree = "<group>"; };
 		F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantElementStoreTests.swift; sourceTree = "<group>"; };
 		F7E700013B1A000000000004 /* BTCMapAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapAsync.swift; sourceTree = "<group>"; };
@@ -408,6 +414,9 @@
 				F7E300013B14000000000002 /* BottomSheetDetents.swift */,
 				F7E300013B14000000000010 /* SheetGeometryModel.swift */,
 				F7EB00013B1E000000000002 /* AppLayoutMode.swift */,
+				F7EC00013B1F000000000002 /* SavedPlacesStore.swift */,
+				F7EC00013B1F000000000004 /* NetworkReachabilityMonitor.swift */,
+				F7EC00013B1F000000000006 /* BitLocalAppIntents.swift */,
 				F7D100112DE33EF800D68897 /* CityIndexStore.swift */,
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
 				F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */,
@@ -728,6 +737,9 @@
 				F7E300013B14000000000001 /* BottomSheetDetents.swift in Sources */,
 				F7E300013B14000000000011 /* SheetGeometryModel.swift in Sources */,
 				F7EB00013B1E000000000001 /* AppLayoutMode.swift in Sources */,
+				F7EC00013B1F000000000001 /* SavedPlacesStore.swift in Sources */,
+				F7EC00013B1F000000000003 /* NetworkReachabilityMonitor.swift in Sources */,
+				F7EC00013B1F000000000005 /* BitLocalAppIntents.swift in Sources */,
 				F66E0BAA2DE33F1200D68897 /* PreferenceKeys.swift in Sources */,
 				F6EFC2932DE6A09300D573E1 /* LoadingScreenView.swift in Sources */,
 				F63E80782EFC2FD600ED1F00 /* BusinessSubmission.swift in Sources */,

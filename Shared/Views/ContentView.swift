@@ -11,6 +11,7 @@ import UIKit
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @ObservedObject private var intentRouter = BitLocalAppIntentRouter.shared
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -93,6 +94,7 @@ struct ContentView: View {
             }
             syncLayoutMode(layoutMode)
             syncWindowInterfaceStyle(appearanceManager.appearance)
+            routePendingAppIntent()
 
             cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation
@@ -105,6 +107,9 @@ struct ContentView: View {
         .onChange(of: layoutMode) { _, newMode in
             syncLayoutMode(newMode)
         }
+        .onChange(of: intentRouter.pendingAction) { _, _ in
+            routePendingAppIntent()
+        }
         .onChange(of: featureHintsController.activeTarget) { _, target in
             if target == .merchantAlerts {
                 showingSettings = true
@@ -116,6 +121,26 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(colorSchemeFor(appearanceManager.appearance))
+    }
+
+    private func routePendingAppIntent() {
+        guard let action = intentRouter.pendingAction else { return }
+        switch action {
+        case .openCommunities:
+            _ = intentRouter.consumePendingAction()
+            showingSettings = false
+            viewModel.path = []
+            viewModel.setMapDisplayMode(.communities)
+        case .openMerchants:
+            // Switch to merchants mode if needed so BusinessesListView mounts and consumes the filter/query.
+            showingSettings = false
+            if !viewModel.path.isEmpty {
+                viewModel.path = []
+            }
+            if viewModel.mapDisplayMode != .merchants {
+                viewModel.setMapDisplayMode(.merchants)
+            }
+        }
     }
 
     private func syncLayoutMode(_ newMode: AppLayoutMode) {

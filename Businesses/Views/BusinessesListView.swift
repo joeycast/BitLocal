@@ -25,12 +25,18 @@ struct BusinessesListView: View {
     @State private var searchResultsLimit = 20
     @State private var discoveryResultsLimit = 25
     @State private var cachedTopSortedElements: [Element] = []
+    @State private var cachedFilteredBrowseCount = 0
     @State private var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
+    @State private var activeQuickFilters: Set<MerchantQuickFilter> = []
     @State private var showFocusedSearchCategoryChips = false
     @State private var canShowEmptyState = false
     @State private var emptyStateRevealWorkItem: DispatchWorkItem?
     @State private var showingAddBusinessForm = false
     @FocusState private var isSearchFieldFocused: Bool
+
+    @ObservedObject private var savedPlacesStore = SavedPlacesStore.shared
+    @ObservedObject private var reachabilityMonitor = NetworkReachabilityMonitor.shared
+    @ObservedObject private var intentRouter = BitLocalAppIntentRouter.shared
 
     init(
         elements: [Element],
@@ -60,6 +66,17 @@ struct BusinessesListView: View {
                 .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 6)
 
+            if reachabilityMonitor.isOffline {
+                offlineTravelBanner
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
+                    .transition(.opacity)
+                    .sheetCollapsedReveal(
+                        geometry: viewModel.sheetGeometry,
+                        isCollapsedLike: isCollapsedSheet
+                    )
+            }
+
             if !viewModel.isSearchActive && viewModel.activeMerchantAlertDigest == nil {
                 SheetMapModeSwitcher(viewModel: viewModel)
                     .padding(.horizontal, 16)
@@ -70,13 +87,13 @@ struct BusinessesListView: View {
                     )
             }
 
-            if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
+            if shouldShowFilterChips && (!visibleQuickFilters.isEmpty || !visibleCategoryChips.isEmpty) {
                 categoryChipsView
                     .padding(.bottom, categoryChipsBottomPadding)
                     .sheetCollapsedReveal(
                         geometry: viewModel.sheetGeometry,
                         isCollapsedLike: isCollapsedSheet,
-                        forceRevealed: showFocusedSearchCategoryChips
+                        forceRevealed: showFocusedSearchCategoryChips || isFilteringMerchants
                     )
             }
 
@@ -90,7 +107,9 @@ struct BusinessesListView: View {
                     digestResultsView
                 } else if shouldShowDiscoveryLoadingState {
                     LoadingScreenView()
-                } else if elements.isEmpty {
+                } else if !activeQuickFilters.isEmpty && cachedFilteredBrowseCount == 0 {
+                    quickFilterEmptyStateView
+                } else if activeQuickFilters.isEmpty && elements.isEmpty {
                     if shouldShowEmptyState {
                         merchantEmptyStateView
                     } else {
@@ -114,6 +133,10 @@ struct BusinessesListView: View {
                 forceRevealed: isFilteringMerchants || showFocusedSearchCategoryChips
             )
         }
+        .animation(
+            BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
+            value: reachabilityMonitor.isOffline
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $showingAddBusinessForm) {
             AddBusinessInfoView()
@@ -139,6 +162,21 @@ struct BusinessesListView: View {
         .onChange(of: searchResultsLimit) { _, _ in
             syncDisplayedSearchResultsToMap()
         }
+        .onChange(of: activeQuickFilters) { _, _ in
+            discoveryResultsLimit = maxListResults
+            searchResultsLimit = 20
+            refreshDiscoveryCache()
+            syncDisplayedSearchResultsToMap()
+            refreshEmptyStateVisibility()
+        }
+        .onChange(of: savedPlacesStore.savedIDs) { _, _ in
+            refreshDiscoveryCache()
+            syncDisplayedSearchResultsToMap()
+            refreshEmptyStateVisibility()
+        }
+        .onChange(of: intentRouter.pendingAction) { _, _ in
+            handlePendingIntentAction()
+        }
         .onChange(of: viewModel.region.center.latitude) { _, _ in
             viewModel.handleMerchantSearchMapRegionChange()
         }
@@ -155,6 +193,7 @@ struct BusinessesListView: View {
                 viewModel.ensureEventsLoaded()
             }
             viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
+            handlePendingIntentAction()
             refreshDiscoveryCache()
             syncDisplayedSearchResultsToMap()
             refreshEmptyStateVisibility()
@@ -168,6 +207,14 @@ struct BusinessesListView: View {
         }
         .onChange(of: viewModel.allElements.count) { _, _ in
             viewModel.restorePersistedMerchantCategoryIfNeeded()
+            if activeQuickFilters.contains(.saved) {
+                refreshDiscoveryCache()
+            }
+        }
+        .onChange(of: viewModel.hideATMsFromMapAndList) { _, _ in
+            if activeQuickFilters.contains(.saved) {
+                refreshDiscoveryCache()
+            }
         }
         .onChange(of: viewModel.visibleElements.count) { _, _ in
             viewModel.restorePersistedMerchantCategoryIfNeeded()
@@ -241,6 +288,29 @@ struct BusinessesListView: View {
             value: viewModel.isSearchActive
         )
         .featureHintAnchor(.merchantSearch)
+    }
+
+    private var offlineTravelBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wifi.slash")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text("Offline · Browsing \(viewModel.allElements.count.formatted()) cached places")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
+        .accessibilityElement(children: .combine)
     }
 
     private var searchFieldSurfaceColor: Color {
@@ -412,6 +482,55 @@ struct BusinessesListView: View {
         .padding(.horizontal, 16)
     }
 
+    private var quickFilterEmptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: activeQuickFilters == [.saved] ? "bookmark.slash" : "line.3.horizontal.decrease.circle")
+                .font(.title.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(quickFilterEmptyStateTitle)
+                .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+            Text(quickFilterEmptyStateMessage)
+                .font(.subheadline)
+                .foregroundStyle(Color.primary.opacity(0.72))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Button {
+                BitLocalHaptics.selection()
+                activeQuickFilters.removeAll()
+            } label: {
+                Text(NSLocalizedString("Clear Filters", comment: "Button to clear active merchant quick filters"))
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
+    }
+
+    private var quickFilterEmptyStateTitle: String {
+        if activeQuickFilters == [.saved] {
+            return NSLocalizedString("No saved places", comment: "Empty state title when Saved filter has no matching places")
+        }
+        return NSLocalizedString("No matching places", comment: "Empty state title when quick filters yield zero matches")
+    }
+
+    private var quickFilterEmptyStateMessage: String {
+        if activeQuickFilters == [.saved] {
+            return NSLocalizedString(
+                "Save places from any merchant detail page to find them quickly here.",
+                comment: "Empty state message when Saved filter has no matching places"
+            )
+        }
+        return NSLocalizedString(
+            "No places match your active filters. Try clearing one or more filters to see more merchants.",
+            comment: "Empty state message when quick filters yield zero matches"
+        )
+    }
+
     private var emptyStateSystemImage: String {
         if viewModel.merchantSyncFailed && viewModel.allElements.isEmpty {
             return "wifi.exclamationmark"
@@ -525,10 +644,16 @@ struct BusinessesListView: View {
                     if displayedPrimaryResults.isEmpty &&
                         !viewModel.merchantSearchIsWaitingForLocalDebounce &&
                         !viewModel.merchantSearchIsLoading {
-                        Text(noResultsText)
-                            .foregroundStyle(.secondary)
-                            .listRowSeparator(.hidden, edges: .top)
-                            .clearListRowBackground(if: shouldUseGlassyRows)
+                        if !activeQuickFilters.isEmpty {
+                            quickFilterEmptyStateView
+                                .listRowSeparator(.hidden)
+                                .clearListRowBackground(if: shouldUseGlassyRows)
+                        } else {
+                            Text(noResultsText)
+                                .foregroundStyle(.secondary)
+                                .listRowSeparator(.hidden, edges: .top)
+                                .clearListRowBackground(if: shouldUseGlassyRows)
+                        }
                     } else {
                         if !displayedFeaturedPrimaryResults.isEmpty {
                             Section {
@@ -609,11 +734,20 @@ struct BusinessesListView: View {
         return cachedVisibleCategoryChips
     }
 
-    private var shouldShowCategoryChips: Bool {
+    private var visibleQuickFilters: [MerchantQuickFilter] {
+        MerchantQuickFilter.allCases.filter { filter in
+            if filter == .saved {
+                return !savedPlacesStore.savedIDs.isEmpty || activeQuickFilters.contains(.saved)
+            }
+            return true
+        }
+    }
+
+    private var shouldShowFilterChips: Bool {
         guard viewModel.hasLoadedInitialData, !isShowingInitialLoadingState else { return false }
         guard viewModel.activeMerchantAlertDigest == nil else { return false }
         // Detent-based visibility; continuous fade is handled by sheetCollapsedReveal.
-        return !isCollapsedSheet || showFocusedSearchCategoryChips
+        return !isCollapsedSheet || showFocusedSearchCategoryChips || isFilteringMerchants
     }
 
     private var shouldShowDiscoveryLoadingState: Bool {
@@ -640,9 +774,25 @@ struct BusinessesListView: View {
         NSLocalizedString("No locations match your search", comment: "Empty state for merchant search with no matches")
     }
 
+    private var browseSourceElements: [Element] {
+        if activeQuickFilters.contains(.saved) {
+            return viewModel.elementsForDisplay(viewModel.allElements)
+        }
+        return elements
+    }
+
+    private var totalDiscoveryCount: Int {
+        activeQuickFilters.isEmpty ? elements.count : cachedFilteredBrowseCount
+    }
+
+    private var filteredPrimarySearchResults: [Element] {
+        applyQuickFilters(to: viewModel.merchantSearchPrimaryResults)
+    }
+
     private var displayedPrimaryResults: [Element] {
-        let limit = min(searchResultsLimit, viewModel.merchantSearchPrimaryResults.count)
-        return Array(viewModel.merchantSearchPrimaryResults.prefix(limit))
+        let filtered = filteredPrimarySearchResults
+        let limit = min(searchResultsLimit, filtered.count)
+        return Array(filtered.prefix(limit))
     }
 
     private var displayedFeaturedPrimaryResults: [Element] {
@@ -654,12 +804,12 @@ struct BusinessesListView: View {
     }
 
     private var hasMoreSearchResults: Bool {
-        let totalCount = viewModel.merchantSearchPrimaryResults.count
+        let totalCount = filteredPrimarySearchResults.count
         return totalCount > searchResultsLimit
     }
 
     private var hasMoreDiscoveryResults: Bool {
-        elements.count > topSortedElements.count
+        totalDiscoveryCount > topSortedElements.count
     }
 
     private var activeCategoryChipGroup: MerchantCategoryGroup? {
@@ -673,6 +823,61 @@ struct BusinessesListView: View {
     private var categoryChipsView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                ForEach(visibleQuickFilters) { filter in
+                    let isSelected = activeQuickFilters.contains(filter)
+                    let title = quickFilterTitle(for: filter)
+                    Button {
+                        toggleQuickFilter(filter)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: filter.systemImage)
+                                .font(.caption.weight(.semibold))
+                            Text(title)
+                                .font(.footnote.weight(.medium))
+                            if isSelected {
+                                Image(systemName: "xmark")
+                                    .font(.caption2.weight(.bold))
+                            }
+                        }
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                        .padding(.horizontal, 13)
+                        .frame(minHeight: 36)
+                        .background(
+                            isSelected ? Color.accentColor : chipSurfaceColor,
+                            in: Capsule()
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(
+                                    isSelected ? Color.clear : Color.primary.opacity(0.08),
+                                    lineWidth: 0.5
+                                )
+                        )
+                        .animation(
+                            BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
+                            value: isSelected
+                        )
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.tactilePress(scale: 0.96))
+                    .accessibilityLabel(Text(title))
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityHint(
+                        isSelected
+                            ? NSLocalizedString("Double-tap to clear filter", comment: "VoiceOver hint for selected quick filter chip")
+                            : NSLocalizedString("Double-tap to filter merchants", comment: "VoiceOver hint for unselected quick filter chip")
+                    )
+                }
+
+                if !visibleQuickFilters.isEmpty && !visibleCategoryChips.isEmpty {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.14))
+                        .frame(width: 1, height: 18)
+                        .padding(.horizontal, 2)
+                        .accessibilityHidden(true)
+                }
+
                 ForEach(visibleCategoryChips) { chip in
                     let isSelected = activeCategoryChipGroup == chip.group
                     Button {
@@ -738,6 +943,80 @@ struct BusinessesListView: View {
         return 0
     }
 
+    private func quickFilterTitle(for filter: MerchantQuickFilter) -> String {
+        if filter == .saved, !savedPlacesStore.savedIDs.isEmpty {
+            return "\(filter.displayTitle) (\(savedPlacesStore.savedIDs.count))"
+        }
+        return filter.displayTitle
+    }
+
+    private func toggleQuickFilter(_ filter: MerchantQuickFilter) {
+        BitLocalHaptics.selection()
+        if activeQuickFilters.contains(filter) {
+            activeQuickFilters.remove(filter)
+        } else {
+            activeQuickFilters.insert(filter)
+        }
+    }
+
+    private func applyQuickFilters(to source: [Element]) -> [Element] {
+        guard !activeQuickFilters.isEmpty else { return source }
+        let now = Date()
+        let calendar = Calendar.current
+        let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: now)
+            ?? now.addingTimeInterval(-365 * 24 * 60 * 60)
+
+        let requiresSaved = activeQuickFilters.contains(.saved)
+        let requiresLightning = activeQuickFilters.contains(.lightning)
+        let requiresNFC = activeQuickFilters.contains(.nfc)
+        let requiresVerified = activeQuickFilters.contains(.verified)
+        let requiresOpenNow = activeQuickFilters.contains(.openNow)
+
+        return source.filter { element in
+            if requiresSaved && !savedPlacesStore.isSaved(element.id) {
+                return false
+            }
+            if requiresLightning && !acceptsLightning(element: element) {
+                return false
+            }
+            if requiresNFC && !acceptsContactlessLightning(element: element) {
+                return false
+            }
+            if requiresVerified {
+                guard let verifiedDate = BTCMapDateParser.parse(element.v4Metadata?.verifiedAt),
+                      verifiedDate >= oneYearAgo else {
+                    return false
+                }
+            }
+            if requiresOpenNow {
+                guard OpeningHoursLiveStatus.isOpenNow(
+                    rawOpeningHours: element.osmJSON?.tags?.openingHours,
+                    now: now,
+                    calendar: calendar
+                ) else {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
+    private func handlePendingIntentAction() {
+        guard let action = intentRouter.pendingAction else { return }
+        if case .openMerchants(let filter, let query) = action {
+            _ = intentRouter.consumePendingAction()
+            if viewModel.mapDisplayMode != .merchants {
+                viewModel.setMapDisplayMode(.merchants)
+            }
+            if let filter {
+                activeQuickFilters = [filter]
+            }
+            if let query {
+                viewModel.unifiedSearchText = query
+            }
+        }
+    }
+
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {
         BitLocalHaptics.selection()
         if activeCategoryChipGroup == chip.group {
@@ -748,7 +1027,9 @@ struct BusinessesListView: View {
     }
 
     private func refreshDiscoveryCache() {
-        cachedTopSortedElements = nearestElements(elements, limit: discoveryResultsLimit)
+        let filteredBrowse = applyQuickFilters(to: browseSourceElements)
+        cachedFilteredBrowseCount = filteredBrowse.count
+        cachedTopSortedElements = nearestElements(filteredBrowse, limit: discoveryResultsLimit)
         cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
     }
 
@@ -784,7 +1065,11 @@ struct BusinessesListView: View {
             viewModel.path = [element]
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                ElementCell(
+                    viewModel: cellVM,
+                    showsBottomDivider: showsBottomDivider,
+                    isSaved: savedPlacesStore.isSaved(element.id)
+                )
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -810,7 +1095,11 @@ struct BusinessesListView: View {
             viewModel.path = [element]
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
+                ElementCell(
+                    viewModel: cellVM,
+                    showsBottomDivider: showsBottomDivider,
+                    isSaved: savedPlacesStore.isSaved(element.id)
+                )
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -835,7 +1124,10 @@ struct BusinessesListView: View {
             )
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                ElementCell(viewModel: cellVM)
+                ElementCell(
+                    viewModel: cellVM,
+                    isSaved: savedPlacesStore.isSaved(remoteElement.id)
+                )
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -898,7 +1190,7 @@ struct BusinessesListView: View {
                     String(
                         format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
                         topSortedElements.count,
-                        elements.count
+                        totalDiscoveryCount
                     )
                 )
                 if let syncLine = lastSyncedFooterLine {
@@ -908,7 +1200,7 @@ struct BusinessesListView: View {
             .font(.footnote)
             .foregroundStyle(Color.primary.opacity(0.65))
 
-            if elements.count <= 3 && viewModel.activeMerchantAlertDigest == nil {
+            if activeQuickFilters.isEmpty && elements.count <= 3 && viewModel.activeMerchantAlertDigest == nil {
                 VStack(alignment: .leading, spacing: 8) {
                     Button {
                         viewModel.zoomOutMapToExploreNearby()
@@ -1025,6 +1317,7 @@ struct BusinessesListView: View {
         emptyStateRevealWorkItem?.cancel()
 
         let shouldDelayEmptyState = !isFilteringMerchants &&
+            activeQuickFilters.isEmpty &&
             viewModel.activeMerchantAlertDigest == nil &&
             viewModel.hasLoadedInitialData &&
             elements.isEmpty
@@ -1037,7 +1330,7 @@ struct BusinessesListView: View {
         canShowEmptyState = false
 
         let workItem = DispatchWorkItem {
-            guard elements.isEmpty else { return }
+            guard elements.isEmpty, activeQuickFilters.isEmpty else { return }
             guard !viewModel.isLoading else { return }
             canShowEmptyState = true
         }
@@ -1050,6 +1343,7 @@ struct ElementCell: View {
 
     @ObservedObject var viewModel: ElementCellViewModel
     var showsBottomDivider = false
+    var isSaved = false
     @State private var appeared = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
@@ -1106,11 +1400,22 @@ struct ElementCell: View {
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if let distance = formattedDistance {
-                            Text(distance)
-                                .font(.footnote.weight(.medium))
-                                .foregroundStyle(Color.primary.opacity(0.68))
-                                .fixedSize()
+                        if isSaved || formattedDistance != nil {
+                            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                if isSaved {
+                                    Image(systemName: "bookmark.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(Color.accentColor)
+                                        .accessibilityLabel(NSLocalizedString("Saved", comment: "VoiceOver label for saved place indicator"))
+                                }
+
+                                if let distance = formattedDistance {
+                                    Text(distance)
+                                        .font(.footnote.weight(.medium))
+                                        .foregroundStyle(Color.primary.opacity(0.68))
+                                        .fixedSize()
+                                }
+                            }
                         }
                     }
 

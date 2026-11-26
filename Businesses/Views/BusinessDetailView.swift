@@ -198,6 +198,7 @@ struct BusinessDetailView: View {
     @State private var hasAttemptedVerificationHydration = false
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
+    @ObservedObject private var savedPlacesStore = SavedPlacesStore.shared
 
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
@@ -454,6 +455,33 @@ private extension BusinessDetailView {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                let isSaved = savedPlacesStore.isSaved(element.id)
+                Button {
+                    let willSave = !isSaved
+                    withAnimation(BitLocalMotion.animation(BitLocalMotion.morphSpring, reduceMotion: reduceMotion)) {
+                        savedPlacesStore.toggleSaved(element.id)
+                    }
+                    if willSave {
+                        BitLocalHaptics.success()
+                    } else {
+                        BitLocalHaptics.selection()
+                    }
+                } label: {
+                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(isSaved ? Color.accentColor : Color.secondary)
+                        .contentTransition(.symbolEffect(.replace))
+                        .frame(width: 44, height: 44)
+                        .background(.regularMaterial, in: Circle())
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                        )
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.tactilePress(scale: 0.92))
+                .accessibilityLabel(isSaved ? "Remove from Saved" : "Save Place")
             }
 
             // Quiet inline status metadata (no extra capsule clutter)
@@ -682,24 +710,6 @@ private extension BusinessDetailView {
     }
 }
 
-// MARK: - Native Material Grouped Surface
-
-private struct PlaceGroupedSurface<Content: View>: View {
-    var padding: EdgeInsets = EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        content()
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
-            )
-    }
-}
-
 // MARK: - Bitcoin Payment Rails Strip (Signature Unboxed Strip)
 
 private struct PlacePaymentRailsStrip: View {
@@ -841,9 +851,22 @@ private struct PlacePaymentRailsStrip: View {
 
 // MARK: - Live Opening Hours Evaluator
 
-private struct OpeningHoursLiveStatus {
+struct OpeningHoursLiveStatus {
     let isOpen: Bool
     let shortLabel: LocalizedStringKey
+
+    static func isOpenNow(
+        rawOpeningHours: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard let trimmed = rawOpeningHours?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty,
+              let schedule = OSMOpeningHoursParser.parseWeekSchedule(trimmed) else {
+            return false
+        }
+        return evaluate(schedule: schedule, now: now, calendar: calendar).isOpen
+    }
 
     static func evaluate(
         schedule: OSMOpeningHoursWeekSchedule,
@@ -1367,55 +1390,6 @@ private struct PlaceDetailsSurface: View {
     }
 }
 
-// MARK: - Inline Tactile Copy Button (44pt Hit Target, Symbol Morph)
-
-private struct TactileCopyButton: View {
-    let value: String
-    let accessibilityLabel: String
-
-    @State private var copied = false
-    @State private var resetTask: Task<Void, Never>?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        Button {
-            UIPasteboard.general.string = value
-            BitLocalHaptics.success()
-
-            resetTask?.cancel()
-            withAnimation(
-                BitLocalMotion.animation(BitLocalMotion.morphSpring, reduceMotion: reduceMotion)
-            ) {
-                copied = true
-            }
-
-            resetTask = Task {
-                try? await Task.sleep(for: .milliseconds(1600))
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    withAnimation(
-                        BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)
-                    ) {
-                        copied = false
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(copied ? Color.green : Color.secondary)
-                .contentTransition(.symbolEffect(.replace))
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.tactilePress(scale: 0.92))
-        .accessibilityLabel(copied ? "Copied" : accessibilityLabel)
-        .onDisappear {
-            resetTask?.cancel()
-        }
-    }
-}
-
 // MARK: - About / Description Section
 
 private struct PlaceDescriptionSection: View {
@@ -1856,6 +1830,21 @@ private struct PlaceTrustAndBoostSection: View {
         BTCMapMerchantURLBuilder.makeURL(for: element)
     }
 
+    private var openStreetMapURL: URL? {
+        guard let raw = element.v4Metadata?.osmURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty,
+              let url = URL(string: raw),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else {
+            return nil
+        }
+        return url
+    }
+
+    private var hasActionRows: Bool {
+        btcMapMerchantURL != nil || openStreetMapURL != nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Verification")
@@ -1863,8 +1852,8 @@ private struct PlaceTrustAndBoostSection: View {
                 .foregroundStyle(.secondary)
                 .padding(.leading, 4)
 
-            PlaceGroupedSurface(padding: EdgeInsets(top: 12, leading: 14, bottom: 10, trailing: 14)) {
-                VStack(alignment: .leading, spacing: 10) {
+            PlaceGroupedSurface(padding: EdgeInsets(top: 12, leading: 14, bottom: 6, trailing: 14)) {
+                VStack(alignment: .leading, spacing: 0) {
                     HStack(alignment: .top, spacing: 12) {
                         if verificationState == .loading {
                             ProgressView()
@@ -1905,40 +1894,39 @@ private struct PlaceTrustAndBoostSection: View {
                                 .padding(.top, 2)
                         }
                     }
+                    .padding(.bottom, hasActionRows ? 10 : 6)
 
                     if let btcMapMerchantURL {
-                        Divider()
-                            .padding(.leading, 32)
+                        insetDivider
+                        externalActionRow(
+                            icon: "checkmark.seal",
+                            iconTint: .accentColor,
+                            title: "Verify or Update on BTC Map",
+                            subtitle: "Confirm bitcoin acceptance or report changes",
+                            url: btcMapMerchantURL
+                        )
+                    }
 
-                        Button {
-                            BitLocalHaptics.lightTap()
-                            openURL(btcMapMerchantURL)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "star.fill")
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.orange)
-                                    .frame(width: 20, alignment: .center)
+                    if let openStreetMapURL {
+                        insetDivider
+                        externalActionRow(
+                            icon: "map",
+                            iconTint: .secondary,
+                            title: "Edit on OpenStreetMap",
+                            subtitle: "Update hours, address, or tags",
+                            url: openStreetMapURL
+                        )
+                    }
 
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text("Boost on BTC Map")
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(.primary)
-                                    Text("Feature This Merchant")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer(minLength: 0)
-
-                                Image(systemName: "arrow.up.forward")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.tactileRow(cornerRadius: 10))
+                    if let btcMapMerchantURL {
+                        insetDivider
+                        externalActionRow(
+                            icon: "star.fill",
+                            iconTint: .orange,
+                            title: "Boost on BTC Map",
+                            subtitle: "Feature This Merchant",
+                            url: btcMapMerchantURL
+                        )
                     }
                 }
             }
@@ -1951,6 +1939,50 @@ private struct PlaceTrustAndBoostSection: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var insetDivider: some View {
+        Divider()
+            .padding(.leading, 32)
+    }
+
+    private func externalActionRow(
+        icon: String,
+        iconTint: Color,
+        title: LocalizedStringKey,
+        subtitle: LocalizedStringKey,
+        url: URL
+    ) -> some View {
+        Button {
+            BitLocalHaptics.lightTap()
+            openURL(url)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(iconTint)
+                    .frame(width: 20, alignment: .center)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "arrow.up.forward")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 6)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.tactileRow(cornerRadius: 10))
     }
 }
 

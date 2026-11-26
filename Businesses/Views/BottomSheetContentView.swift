@@ -681,17 +681,21 @@ private final class CommunityRowMetadataObservableStore: ObservableObject {
 }
 
 struct CommunityDetailView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var viewModel: ContentViewModel
+    @ObservedObject private var metadataStore = CommunityRowMetadataObservableStore.shared
     let area: V2AreaRecord
     @Binding private var currentDetent: PresentationDetent?
     @AppStorage("community.lastLightningWalletID") private var lastLightningWalletID: String = ""
+    @State private var isHeroScrolledPast = false
     @State private var showLightningAlert = false
     @State private var showWalletAlert = false
     @State private var showTipsDisclaimerAlert = false
     @State private var shareItem: ShareTextItem?
     @State private var linkOpenErrorItem: CommunityLinkOpenError?
     @State private var lightningErrorMessage: String?
+    @State private var memberElements: [Element] = []
 
     init(area: V2AreaRecord, currentDetent: Binding<PresentationDetent?> = .constant(nil)) {
         self.area = area
@@ -699,176 +703,65 @@ struct CommunityDetailView: View {
     }
 
     var body: some View {
-        List {
-            if let communityIconURL {
-                HStack {
-                    Spacer()
-                    CommunityIconImage(url: communityIconURL, placeholderSystemName: nil, scaleToFill: false)
-                        .frame(width: 72, height: 72)
-                        .clipShape(.rect(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(.secondary.opacity(0.2), lineWidth: 1)
-                        )
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 6, trailing: 0))
-                .listRowSeparator(.hidden)
-            }
+        ScrollViewReader { scrollProxy in
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 18) {
+                    heroHeader(scrollProxy: scrollProxy)
 
-            if let description = area.tags?["description"], !description.isEmpty {
-                Section("Description") {
-                    Text(description)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            }
+                    quickActionBar
 
-//            if hasAboutData {
-//                Section("About") {
-//                    if let org = area.tags?["organization"], !org.isEmpty {
-//                        detailRow(icon: "building.2", text: org)
-//                    }
-//                }
-//                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-//            }
+                    detailsSurface
 
-            if !contactInformationLinks.isEmpty {
-                Section("Contact Information") {
-                    ForEach(contactInformationLinks) { item in
-                        linkableValueRow(item)
+                    if let descriptionText {
+                        descriptionSection(descriptionText)
                     }
-                }
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            }
 
-            if !socialLinks.isEmpty {
-                Section("Socials") {
-                    ForEach(socialLinks) { social in
-                        linkableValueRow(social)
-                    }
-                }
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            }
-
-            if hasTipsData {
-                Section("Tips") {
                     if let payload = payableLightningPayload {
-                        HStack(alignment: .top, spacing: 10) {
-                            Button {
-                                BitLocalHaptics.lightTap()
-                                showLightningAlert = true
-                            } label: {
-                                tipActionRow(payload: payload)
-                            }
-                            .buttonStyle(.tactileRow)
-                            .copyValueContextMenu(payload, title: "Copy Lightning Address")
-
-                            Button {
-                                BitLocalHaptics.selection()
-                                showTipsDisclaimerAlert = true
-                            } label: {
-                                Image(systemName: "info.circle")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.tactilePress(scale: 0.92))
-                            .accessibilityLabel("Tipping disclaimer")
-                        }
+                        tippingSection(payload: payload)
                     } else if let tipFallbackURL {
-                        linkableValueRow(
-                            .init(
-                                label: "Support This Community",
-                                value: tipFallbackURL.host?.replacingOccurrences(of: "www.", with: "") ?? tipFallbackURL.absoluteString,
-                                icon: "heart.text.square.fill",
-                                linkTarget: .web(tipFallbackURL)
-                            )
-                        )
+                        tipFallbackSection(url: tipFallbackURL)
                     }
-                }
-                .groupedCardListRowBackground(if: shouldUseGlassyRows)
-            }
 
-            Section("Verification") {
-                if let verificationStatus {
-                    detailRow(
-                        icon: verificationStatus.icon,
-                        tint: verificationStatus.tint,
-                        label: verificationStatus.title,
-                        value: verificationStatus.statusText
-                    )
-                    Text(verificationStatus.explanation)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } else {
-                    detailRow(
-                        icon: "questionmark.circle.fill",
-                        tint: .secondary,
-                        label: "Not Yet Verified",
-                        value: "No verification date is available for this community."
-                    )
-                }
-            }
-            .groupedCardListRowBackground(if: shouldUseGlassyRows)
+                    merchantsSection
 
-            // MARK: Merchants
-            Section {
-                if viewModel.communityMembersIsLoading && sameSelectedCommunity {
-                    HStack {
-                        ProgressView()
-                        Text("Loading merchants…")
-                            .foregroundStyle(.secondary)
-                    }
-                } else if let error = viewModel.communityMembersError, !error.isEmpty, sameSelectedCommunity {
-                    Text(error)
-                        .foregroundStyle(.red)
-                } else if memberElements.isEmpty {
-                    Text("No merchants found for this community")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(memberElements, id: \.id) { element in
-                        NavigationLink {
-                            BusinessDetailView(
-                                element: element,
-                                userLocation: viewModel.userLocation,
-                                contentViewModel: viewModel,
-                                currentDetent: $currentDetent
-                            )
-                            .onAppear {
-                                viewModel.setSelectionSource(.list)
-                                viewModel.selectAnnotationForListSelection(
-                                    element,
-                                    animated: true,
-                                    allowCameraMovement: !isLargeSheet
-                                )
-                                viewModel.selectedElement = element
-                            }
-                        } label: {
-                            ElementCell(viewModel: cellViewModel(for: element))
-                        }
-                    }
+                    verificationSection
+                        .id("community-verification-section")
                 }
-            } header: {
-                HStack {
-                    Text("Merchants")
-                    Spacer()
-                    Text("\(memberElements.count)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(.secondary.opacity(0.12), in: Capsule())
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 28)
+            }
+            .background(Color.clear)
+            .scrollContentBackground(.hidden)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top > 56
+            } action: { _, scrolledPast in
+                guard isHeroScrolledPast != scrolledPast else { return }
+                withAnimation(BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)) {
+                    isHeroScrolledPast = scrolledPast
                 }
             }
-            .groupedCardListRowBackground(if: shouldUseGlassyRows)
         }
-        .listStyle(.insetGrouped)
-        .contentMargins(.top, 0, for: .scrollContent)
-        .scrollContentBackground(.automatic)
-        .navigationTitle(area.displayName)
+        // Only observes live height while collapsed-like; expanded detail is free of drag churn.
+        .sheetCollapsedReveal(
+            geometry: viewModel.sheetGeometry,
+            isCollapsedLike: isCollapsedLikeDetent
+        )
+        .navigationTitle((isHeroScrolledPast || isCollapsedLikeDetent) ? area.displayName : "")
         .navigationBarTitleDisplayMode(.inline)
         .bitLocalDetailNavigationChrome()
+        .toolbar {
+            if isHeroScrolledPast, let shareableURL {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        BitLocalHaptics.lightTap()
+                        shareItem = ShareTextItem(items: [area.displayName, shareableURL])
+                    } label: {
+                        Label("Share community", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
+        }
         .task(id: area.id) {
             if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
                 viewModel.selectCommunity(area, presentDetail: false)
@@ -900,6 +793,7 @@ struct CommunityDetailView: View {
             if let payload = payableLightningPayload {
                 Button("Copy Lightning Address") {
                     UIPasteboard.general.string = payload
+                    BitLocalHaptics.success()
                 }
                 Button("Share") {
                     shareItem = ShareTextItem(text: payload)
@@ -927,7 +821,7 @@ struct CommunityDetailView: View {
             Text("BitLocal does not process, custody, or guarantee tip transactions. We only open your selected wallet or link and help copy/share the Lightning address.")
         }
         .sheet(item: $shareItem) { item in
-            ActivityView(items: [item.text])
+            ActivityView(items: item.items)
         }
         .alert("Unable to Open Wallet", isPresented: Binding(
             get: { lightningErrorMessage != nil },
@@ -948,125 +842,651 @@ struct CommunityDetailView: View {
             if let copyValue = linkOpenErrorItem?.copyValue {
                 Button(String(format: NSLocalizedString("Copy %@", comment: "Button title to copy a value label"), "npub")) {
                     UIPasteboard.general.string = copyValue
+                    BitLocalHaptics.success()
                 }
             }
             Button("OK") {}
         } message: {
             Text(linkOpenErrorItem?.message ?? "")
         }
-        .opacity(shouldShowCollapsedHeaderOnly ? 0 : 1)
-        .allowsHitTesting(!shouldShowCollapsedHeaderOnly)
-        .accessibilityHidden(shouldShowCollapsedHeaderOnly)
     }
 
-    // MARK: - Helpers
+    // MARK: - Hero Header & Quick Actions
 
-    private func detailRow(icon: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .foregroundStyle(.accent)
-                .frame(width: 22)
-            Text(text)
-                .font(.body)
+    @ViewBuilder
+    private func heroHeader(scrollProxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
+                communityHeroIcon
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(area.displayName)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let metadataLine = heroMetadataLine {
+                        Text(metadataLine)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Quiet inline verification status (tappable to jump to verification section)
+            Button {
+                BitLocalHaptics.selection()
+                withAnimation(BitLocalMotion.animation(BitLocalMotion.disclosureSpring, reduceMotion: reduceMotion)) {
+                    scrollProxy.scrollTo("community-verification-section", anchor: .center)
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: heroVerificationIcon)
+                        .font(.caption.weight(.semibold))
+                    Text(heroVerificationTitle)
+                        .font(.footnote.weight(.medium))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(heroVerificationTint)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.tactilePress(scale: 0.96))
+            .padding(.vertical, -8)
+        }
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private var communityHeroIcon: some View {
+        if let communityIconURL {
+            CommunityIconImage(url: communityIconURL, placeholderSystemName: "person.3.fill", scaleToFill: true)
+                .frame(width: 48, height: 48)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                )
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: "person.3.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(Color("MarkerColor"), in: Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.24), lineWidth: 0.75)
+                )
+                .accessibilityHidden(true)
         }
     }
 
-    private func detailRow(icon: String, tint: Color, label: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .foregroundStyle(.primary)
+    private var resolvedMerchantCount: Int? {
+        if sameSelectedCommunity && !viewModel.communityMembersIsLoading {
+            return memberElements.count
+        }
+        if !memberElements.isEmpty {
+            return memberElements.count
+        }
+        return metadataStore.metadataByAreaID[area.id]?.merchantCount
+    }
+
+    private var heroMetadataLine: String? {
+        guard let count = resolvedMerchantCount else { return nil }
+        return count == 1 ? "1 merchant" : "\(count) merchants"
+    }
+
+    private var heroVerificationIcon: String {
+        verificationStatus?.icon ?? "questionmark.circle"
+    }
+
+    private var heroVerificationTitle: String {
+        verificationStatus?.title ?? "Unverified"
+    }
+
+    private var heroVerificationTint: Color {
+        verificationStatus?.tint ?? .secondary
+    }
+
+    @ViewBuilder
+    private var quickActionBar: some View {
+        let hasTip = hasTipAction
+        let websiteURL = primaryWebsiteURL
+        let shareURL = shareableURL
+        if hasTip || websiteURL != nil || shareURL != nil {
+            HStack(spacing: 8) {
+                if hasTip {
+                    quickActionButton(
+                        title: LocalizedStringKey("Tip"),
+                        systemImage: "bolt.fill",
+                        isPrimary: true
+                    ) {
+                        BitLocalHaptics.lightTap()
+                        if payableLightningPayload != nil {
+                            showLightningAlert = true
+                        } else if let tipFallbackURL {
+                            openURL(tipFallbackURL)
+                        }
+                    }
+
+                    if let websiteURL {
+                        quickActionButton(
+                            title: LocalizedStringKey("Website"),
+                            systemImage: "safari.fill",
+                            isPrimary: false
+                        ) {
+                            BitLocalHaptics.lightTap()
+                            openURL(websiteURL)
+                        }
+                    }
+                } else if let websiteURL {
+                    quickActionButton(
+                        title: LocalizedStringKey("Website"),
+                        systemImage: "safari.fill",
+                        isPrimary: true
+                    ) {
+                        BitLocalHaptics.lightTap()
+                        openURL(websiteURL)
+                    }
+                }
+
+                if let shareURL {
+                    quickActionButton(
+                        title: LocalizedStringKey("Share"),
+                        systemImage: "square.and.arrow.up",
+                        isPrimary: false
+                    ) {
+                        BitLocalHaptics.lightTap()
+                        shareItem = ShareTextItem(items: [area.displayName, shareURL])
+                    }
+                }
             }
         }
     }
 
-    private func linkableValueRow(_ item: CommunitySocialLink) -> some View {
-        Group {
+    private func quickActionButton(
+        title: LocalizedStringKey,
+        systemImage: String,
+        isPrimary: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.callout.weight(.semibold))
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(isPrimary ? Color.white : Color.accentColor)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 8)
+            .background {
+                if isPrimary {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.accentColor)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(.regularMaterial)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(
+                        isPrimary ? Color.clear : Color(.separator).opacity(0.35),
+                        lineWidth: 0.5
+                    )
+            )
+        }
+        .buttonStyle(.tactilePress(scale: 0.96))
+    }
+
+    // MARK: - Consolidated Details & Socials Surface
+
+    @ViewBuilder
+    private var detailsSurface: some View {
+        let contacts = contactInformationLinks
+        let socials = socialLinks
+        if !contacts.isEmpty || !socials.isEmpty {
+            PlaceGroupedSurface(padding: EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 10)) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(contacts.enumerated()), id: \.element.id) { index, item in
+                        if index > 0 {
+                            detailsRowDivider
+                        }
+                        communityContactRow(item)
+                    }
+
+                    if !socials.isEmpty {
+                        if !contacts.isEmpty {
+                            detailsRowDivider
+                        }
+                        communitySocialsRow(socials)
+                    }
+                }
+            }
+        }
+    }
+
+    private var detailsRowDivider: some View {
+        Divider()
+            .padding(.leading, 32)
+            .padding(.trailing, 4)
+    }
+
+    @ViewBuilder
+    private func communityContactRow(_ item: CommunitySocialLink) -> some View {
+        let copyTitle = String(
+            format: NSLocalizedString("Copy %@", comment: "Context menu title to copy a labeled value"),
+            item.label
+        )
+        HStack(alignment: .center, spacing: 4) {
             if item.isInteractive {
                 Button {
                     BitLocalHaptics.lightTap()
                     openCommunityLink(item)
                 } label: {
-                    platformLinkRow(icon: item.icon, label: item.label, value: item.value)
+                    contactRowLabel(item)
                 }
-                .buttonStyle(.tactileRow)
+                .buttonStyle(.tactileRow(cornerRadius: 10))
+                .copyValueContextMenu(item.value, title: copyTitle)
             } else {
-                platformLinkRow(icon: item.icon, label: item.label, value: item.value)
+                contactRowLabel(item)
+                    .copyValueContextMenu(item.value, title: copyTitle)
+            }
+
+            if !item.value.isEmpty {
+                TactileCopyButton(value: item.value, accessibilityLabel: copyTitle)
             }
         }
-        .copyValueContextMenu(
-            item.value,
-            title: String(format: NSLocalizedString("Copy %@", comment: "Context menu title to copy a labeled value"), item.label)
-        )
     }
 
-    private func platformLinkRow(icon: String, label: String, value: String) -> some View {
+    private func contactRowLabel(_ item: CommunitySocialLink) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(.accent)
-                .frame(width: 18)
+            Image(systemName: item.icon)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+                .padding(.top, 2)
+
             VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .foregroundStyle(.accent)
-                if !value.isEmpty, value != label {
-                    Text(value)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(.rect)
-    }
-
-    private func tipActionRow(payload: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "bolt.fill")
-                .foregroundStyle(.accent)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Tip This Community")
-                    .foregroundStyle(.accent)
-                Text("Support this community over Lightning")
+                Text(item.label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(payload)
-                    .font(.subheadline.weight(.medium))
+                Text(item.value)
+                    .font(.subheadline)
                     .foregroundStyle(.primary)
-                    .textSelection(.enabled)
-                    .lineLimit(3)
-                    .padding(.top, 2)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
             }
+
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(.rect)
+        .padding(.vertical, 8)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 
-//    private var hasAboutData: Bool {
-//        if let val = area.tags?["organization"], !val.isEmpty { return true }
-//        return false
-//    }
+    private func communitySocialsRow(_ socials: [CommunitySocialLink]) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "at")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+                .padding(.top, 12)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Socials")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+
+                BitLocalFlowLayout(horizontalSpacing: 14, verticalSpacing: 0) {
+                    ForEach(socials) { social in
+                        communitySocialLink(social)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.bottom, 2)
+    }
+
+    @ViewBuilder
+    private func communitySocialLink(_ social: CommunitySocialLink) -> some View {
+        let copyTitle = String(
+            format: NSLocalizedString("Copy %@", comment: "Context menu title to copy a labeled value"),
+            social.label
+        )
+        let content = HStack(spacing: 5) {
+            Image(systemName: social.icon)
+                .font(.caption.weight(.semibold))
+            Text(social.label)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(social.isInteractive ? Color.accentColor : Color.primary)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+
+        if social.isInteractive {
+            Button {
+                BitLocalHaptics.lightTap()
+                openCommunityLink(social)
+            } label: {
+                content
+            }
+            .buttonStyle(.tactilePress(scale: 0.96))
+            .copyValueContextMenu(social.value, title: copyTitle)
+        } else {
+            content
+                .copyValueContextMenu(social.value, title: copyTitle)
+        }
+    }
+
+    // MARK: - Description Section
+
+    private var descriptionText: String? {
+        guard let raw = area.tags?["description"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+        return raw
+    }
+
+    private func descriptionSection(_ description: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Description")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
+
+            PlaceGroupedSurface {
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    // MARK: - Tipping Section
+
+    private func tippingSection(payload: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Tips")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
+
+            PlaceGroupedSurface(padding: EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 6)) {
+                HStack(alignment: .center, spacing: 0) {
+                    Button {
+                        BitLocalHaptics.lightTap()
+                        showLightningAlert = true
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "bolt.fill")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.orange)
+                                .frame(width: 20, alignment: .center)
+                                .padding(.top, 2)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Tip This Community")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(payload)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                    .textSelection(.enabled)
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 8)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.tactileRow(cornerRadius: 10))
+                    .copyValueContextMenu(payload, title: "Copy Lightning Address")
+
+                    Button {
+                        BitLocalHaptics.selection()
+                        showTipsDisclaimerAlert = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.tactilePress(scale: 0.92))
+                    .accessibilityLabel("Tipping disclaimer")
+
+                    TactileCopyButton(
+                        value: payload,
+                        accessibilityLabel: "Copy Lightning Address"
+                    )
+                }
+            }
+        }
+    }
+
+    private func tipFallbackSection(url: URL) -> some View {
+        let displayHost = url.host?.replacingOccurrences(of: "www.", with: "") ?? url.absoluteString
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Tips")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
+
+            PlaceGroupedSurface(padding: EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 10)) {
+                HStack(alignment: .center, spacing: 4) {
+                    Button {
+                        BitLocalHaptics.lightTap()
+                        openURL(url)
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "heart")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 20, alignment: .center)
+                                .padding(.top, 2)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Support This Community")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(displayHost)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 8)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.tactileRow(cornerRadius: 10))
+                    .copyValueContextMenu(url.absoluteString, title: "Copy Support Link")
+
+                    TactileCopyButton(
+                        value: url.absoluteString,
+                        accessibilityLabel: "Copy Support Link"
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Merchants Section
+
+    private var merchantsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Merchants")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if !viewModel.communityMembersIsLoading || !memberElements.isEmpty {
+                    Text("\(memberElements.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            .padding(.horizontal, 4)
+
+            if viewModel.communityMembersIsLoading && sameSelectedCommunity {
+                PlaceGroupedSurface {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading merchants…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if let error = viewModel.communityMembersError, !error.isEmpty, sameSelectedCommunity {
+                PlaceGroupedSurface {
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else if memberElements.isEmpty {
+                PlaceGroupedSurface {
+                    Text("No merchants found for this community")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                PlaceGroupedSurface(padding: EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(memberElements.enumerated()), id: \.element.id) { index, element in
+                            if index > 0 {
+                                Divider()
+                                    .padding(.leading, 44)
+                            }
+                            NavigationLink {
+                                BusinessDetailView(
+                                    element: element,
+                                    userLocation: viewModel.userLocation,
+                                    contentViewModel: viewModel,
+                                    currentDetent: $currentDetent
+                                )
+                                .onAppear {
+                                    viewModel.setSelectionSource(.list)
+                                    viewModel.selectAnnotationForListSelection(
+                                        element,
+                                        animated: true,
+                                        allowCameraMovement: !isLargeSheet
+                                    )
+                                    viewModel.selectedElement = element
+                                }
+                            } label: {
+                                HStack(alignment: .center, spacing: 8) {
+                                    ElementCell(viewModel: cellViewModel(for: element))
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.tactileRow(cornerRadius: 10))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Verification Section
+
+    private var verificationSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Verification")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
+
+            PlaceGroupedSurface(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
+                if let verificationStatus {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: verificationStatus.icon)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(verificationStatus.tint)
+                            .frame(width: 20, alignment: .center)
+                            .padding(.top, 1)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(verificationStatus.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+
+                            Text(verificationStatus.statusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Text(verificationStatus.explanation)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
+                        }
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "questionmark.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20, alignment: .center)
+                            .padding(.top, 1)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Not Yet Verified")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+
+                            Text("No verification date is available for this community.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Data & Link Helpers
 
     private var socialLinks: [CommunitySocialLink] {
         let tags = area.tags ?? [:]
         let candidates: [(label: String, icon: String, keys: [String], base: String?)] = [
-            ("X", "xmark.circle.fill", ["contact:x", "contact:twitter", "twitter"], "https://x.com/"),
-            ("Facebook", "f.cursive.circle.fill", ["contact:facebook", "facebook"], "https://facebook.com/"),
-            ("Instagram", "camera.circle.fill", ["contact:instagram", "instagram"], "https://instagram.com/"),
-            ("Telegram", "paperplane.circle.fill", ["contact:telegram", "telegram"], "https://t.me/"),
+            ("X", "xmark", ["contact:x", "contact:twitter", "twitter"], "https://x.com/"),
+            ("Facebook", "f.cursive", ["contact:facebook", "facebook"], "https://facebook.com/"),
+            ("Instagram", "camera", ["contact:instagram", "instagram"], "https://instagram.com/"),
+            ("Telegram", "paperplane", ["contact:telegram", "telegram"], "https://t.me/"),
             ("GitHub", "chevron.left.forwardslash.chevron.right", ["contact:github"], "https://github.com/"),
-            ("LinkedIn", "briefcase.circle.fill", ["contact:linkedin"], "https://linkedin.com/in/"),
-            ("YouTube", "play.rectangle.fill", ["contact:youtube"], "https://youtube.com/"),
-            ("Reddit", "bubble.left.and.bubble.right.fill", ["contact:reddit"], "https://reddit.com/"),
+            ("LinkedIn", "briefcase", ["contact:linkedin"], "https://linkedin.com/in/"),
+            ("YouTube", "play.rectangle", ["contact:youtube"], "https://youtube.com/"),
+            ("Reddit", "bubble.left.and.bubble.right", ["contact:reddit"], "https://reddit.com/"),
             ("Nostr", "dot.radiowaves.left.and.right", ["contact:nostr"], nil)
         ]
 
@@ -1094,18 +1514,18 @@ struct CommunityDetailView: View {
         let candidates: [(label: String, icon: String, key: String)] = [
             ("Website", "globe", "contact:website"),
             ("Website", "globe", "website"),
-            ("Email", "envelope.fill", "contact:email"),
-            ("Phone", "phone.fill", "contact:phone"),
-            ("Discord", "message.circle.fill", "contact:discord"),
-            ("Eventbrite", "ticket.fill", "contact:eventbrite"),
-            ("Geyser", "bolt.circle.fill", "contact:geyser"),
-            ("Matrix", "square.grid.3x3.fill", "contact:matrix"),
-            ("Meetup", "person.3.fill", "contact:meetup"),
+            ("Email", "envelope", "contact:email"),
+            ("Phone", "phone", "contact:phone"),
+            ("Discord", "message", "contact:discord"),
+            ("Eventbrite", "ticket", "contact:eventbrite"),
+            ("Geyser", "bolt", "contact:geyser"),
+            ("Matrix", "square.grid.3x3", "contact:matrix"),
+            ("Meetup", "person.3", "contact:meetup"),
             ("RSS", "dot.radiowaves.right", "contact:rss"),
-            ("Satlantis", "sparkles.square.filled.on.square", "contact:satlantis"),
-            ("Signal", "message.badge.filled.fill", "contact:signal"),
-            ("SimpleX", "ellipsis.bubble.fill", "contact:simplex"),
-            ("WhatsApp", "phone.circle.fill", "contact:whatsapp")
+            ("Satlantis", "sparkles", "contact:satlantis"),
+            ("Signal", "message.badge", "contact:signal"),
+            ("SimpleX", "ellipsis.bubble", "contact:simplex"),
+            ("WhatsApp", "phone.bubble", "contact:whatsapp")
         ]
 
         var seen = Set<String>()
@@ -1124,8 +1544,30 @@ struct CommunityDetailView: View {
         }
     }
 
-    private var hasTipsData: Bool {
-        !tipValuesInPriority.isEmpty
+    private var primaryWebsiteURL: URL? {
+        let tags = area.tags ?? [:]
+        guard let raw = firstTagValue(for: ["contact:website", "website"], in: tags) else {
+            return nil
+        }
+        return resolvedContactURL(forKey: "contact:website", value: raw)
+    }
+
+    private var btcMapCommunityURL: URL? {
+        let rawSlug = area.tags?["url_alias"] ?? area.id
+        let trimmed = rawSlug.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            return nil
+        }
+        return URL(string: "https://btcmap.org/community/\(encoded)")
+    }
+
+    private var shareableURL: URL? {
+        primaryWebsiteURL ?? btcMapCommunityURL
+    }
+
+    private var hasTipAction: Bool {
+        payableLightningPayload != nil || tipFallbackURL != nil
     }
 
     private var tipValuesInPriority: [String] {
@@ -1392,8 +1834,6 @@ struct CommunityDetailView: View {
         viewModel.selectedCommunityArea?.id == area.id
     }
 
-    @State private var memberElements: [Element] = []
-
     private func updateMemberElements() {
         guard sameSelectedCommunity else {
             if !memberElements.isEmpty { memberElements = [] }
@@ -1424,7 +1864,7 @@ struct CommunityDetailView: View {
         return newVM
     }
 
-    private var shouldShowCollapsedHeaderOnly: Bool {
+    private var isCollapsedLikeDetent: Bool {
         guard let detent = currentDetent else { return false }
         return detent == BottomSheetDetents.collapsed || detentIdentifier(detent).contains("fraction 0.11")
     }
@@ -1432,10 +1872,6 @@ struct CommunityDetailView: View {
     private var isLargeSheet: Bool {
         guard let detent = currentDetent else { return false }
         return detentIdentifier(detent).contains("large")
-    }
-
-    private var shouldUseGlassyRows: Bool {
-        false
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
@@ -1490,7 +1926,15 @@ private struct LightningWalletOption: Identifiable {
 
 private struct ShareTextItem: Identifiable {
     let id = UUID()
-    let text: String
+    let items: [Any]
+
+    init(text: String) {
+        self.items = [text]
+    }
+
+    init(items: [Any]) {
+        self.items = items
+    }
 }
 
 private struct ActivityView: UIViewControllerRepresentable {
@@ -1595,6 +2039,7 @@ private extension View {
         contextMenu {
             Button {
                 UIPasteboard.general.string = value
+                BitLocalHaptics.success()
             } label: {
                 Label(title, systemImage: "doc.on.doc")
             }

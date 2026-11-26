@@ -718,3 +718,69 @@ enum ElementCategoryBadgeHelper {
     }
 }
 
+/// Native system material grouped container shared by Merchant and Community detail screens.
+struct PlaceGroupedSurface<Content: View>: View {
+    var padding: EdgeInsets = EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+            )
+    }
+}
+
+/// Inline 44x44pt tactile copy button with symbol morph (doc.on.doc -> green checkmark) and success haptic.
+struct TactileCopyButton: View {
+    let value: String
+    let accessibilityLabel: String
+
+    @State private var copied = false
+    @State private var resetTask: Task<Void, Never>?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button {
+            UIPasteboard.general.string = value
+            BitLocalHaptics.success()
+
+            resetTask?.cancel()
+            withAnimation(
+                BitLocalMotion.animation(BitLocalMotion.morphSpring, reduceMotion: reduceMotion)
+            ) {
+                copied = true
+            }
+
+            resetTask = Task {
+                try? await Task.sleep(for: .milliseconds(1600))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    withAnimation(
+                        BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)
+                    ) {
+                        copied = false
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(copied ? Color.green : Color.secondary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.tactilePress(scale: 0.92))
+        .accessibilityLabel(copied ? "Copied" : accessibilityLabel)
+        .onDisappear {
+            resetTask?.cancel()
+        }
+    }
+}
+
+
