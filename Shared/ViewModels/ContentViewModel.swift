@@ -2066,6 +2066,24 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         Debug.log("⏱ toggleMapMode: TOTAL \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - start) * 1000))ms")
     }
 
+    func setMapDisplayMode(_ newMode: MapDisplayMode) {
+        guard mapDisplayMode != newMode else { return }
+        toggleMapMode()
+    }
+
+    /// Smoothly widens the map viewport so users in sparse areas can discover nearby merchants.
+    func zoomOutMapToExploreNearby() {
+        guard let mapView else { return }
+        let current = mapView.region
+        let nextLatDelta = min(max(current.span.latitudeDelta * 2.5, 0.25), 40.0)
+        let nextLonDelta = min(max(current.span.longitudeDelta * 2.5, 0.25), 50.0)
+        let expandedRegion = MKCoordinateRegion(
+            center: current.center,
+            span: MKCoordinateSpan(latitudeDelta: nextLatDelta, longitudeDelta: nextLonDelta)
+        )
+        mapView.setRegion(expandedRegion, animated: true)
+    }
+
     func selectCommunity(_ area: V2AreaRecord, presentDetail: Bool = true) {
         ensureAreasLoaded()
         selectedCommunityArea = area

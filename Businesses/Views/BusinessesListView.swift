@@ -11,6 +11,7 @@ struct BusinessesListView: View {
 
     @EnvironmentObject var viewModel: ContentViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     let maxListResults = 25
@@ -27,6 +28,7 @@ struct BusinessesListView: View {
     @State private var showFocusedSearchCategoryChips = false
     @State private var canShowEmptyState = false
     @State private var emptyStateRevealWorkItem: DispatchWorkItem?
+    @State private var showingAddBusinessForm = false
     @FocusState private var isSearchFieldFocused: Bool
 
     init(
@@ -55,7 +57,17 @@ struct BusinessesListView: View {
         VStack(spacing: 0) {
             searchBar
                 .padding(.top, searchBarTopPadding)
-                .padding(.bottom, 2)
+                .padding(.bottom, 6)
+
+            if !viewModel.isSearchActive && viewModel.activeMerchantAlertDigest == nil {
+                SheetMapModeSwitcher(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 4)
+                    .sheetCollapsedReveal(
+                        geometry: viewModel.sheetGeometry,
+                        isCollapsedLike: isCollapsedSheet
+                    )
+            }
 
             if shouldShowCategoryChips && !visibleCategoryChips.isEmpty {
                 categoryChipsView
@@ -102,6 +114,9 @@ struct BusinessesListView: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .sheet(isPresented: $showingAddBusinessForm) {
+            AddBusinessInfoView()
+        }
         .onChange(of: viewModel.userLocation) { _, newLocation in
             handleUserLocationChange(newLocation)
             refreshDiscoveryCache()
@@ -174,9 +189,13 @@ struct BusinessesListView: View {
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .font(.system(size: 15))
-            TextField("Search merchants…", text: $viewModel.unifiedSearchText)
+                .foregroundStyle(Color.primary.opacity(0.65))
+                .font(.subheadline.weight(.medium))
+            TextField(
+                "",
+                text: $viewModel.unifiedSearchText,
+                prompt: Text("Search merchants…").foregroundStyle(Color.primary.opacity(0.6))
+            )
                 .textFieldStyle(.plain)
                 .font(.body)
                 .focused($isSearchFieldFocused)
@@ -187,24 +206,36 @@ struct BusinessesListView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
-                        .font(.system(size: 15))
+                        .font(.subheadline)
                 }
+                .accessibilityLabel("Clear search")
             }
             if viewModel.isSearchActive {
                 Button("Cancel") {
                     isSearchFieldFocused = false
                     viewModel.clearMerchantSearch(userInitiated: true)
                 }
+                .font(.subheadline.weight(.medium))
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .background(Color(.tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 40))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(searchFieldSurfaceColor, in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSearchActive)
         .featureHintAnchor(.merchantSearch)
+    }
+
+    private var searchFieldSurfaceColor: Color {
+        guard shouldUseGlassyRows else {
+            return Color(.tertiarySystemFill)
+        }
+        return Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.58)
     }
 
     private var searchBarTopPadding: CGFloat {
@@ -315,14 +346,14 @@ struct BusinessesListView: View {
     private var merchantEmptyStateView: some View {
         VStack(spacing: 12) {
             Image(systemName: emptyStateSystemImage)
-                .font(.system(size: 28, weight: .semibold))
+                .font(.title.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text(emptyStateTitle)
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
             Text(emptyStateMessage)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.72))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
@@ -335,12 +366,33 @@ struct BusinessesListView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .padding(.top, 4)
+            } else if !viewModel.allElements.isEmpty {
+                VStack(spacing: 8) {
+                    Button {
+                        viewModel.zoomOutMapToExploreNearby()
+                    } label: {
+                        Label("Zoom Out to Find More", systemImage: "minus.magnifyingglass")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: 240)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button {
+                        showingAddBusinessForm = true
+                    } label: {
+                        Label("Add a Bitcoin Business", systemImage: "plus.circle")
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: 240)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.top, 4)
             }
 
             if let syncLine = lastSyncedFooterLine {
                 Text(syncLine)
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .padding(.top, 4)
             }
         }
@@ -598,26 +650,57 @@ struct BusinessesListView: View {
         elements.count > topSortedElements.count
     }
 
+    private var activeCategoryChipGroup: MerchantCategoryGroup? {
+        guard isFilteringMerchants else { return nil }
+        let normalized = trimmedSearchQuery.lowercased()
+        return visibleCategoryChips.first {
+            $0.localizedLabel.lowercased() == normalized
+        }?.group
+    }
+
     private var categoryChipsView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(visibleCategoryChips) { chip in
+                    let isSelected = activeCategoryChipGroup == chip.group
                     Button {
                         applyCategoryChip(chip)
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: chip.symbolName)
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.caption.weight(.semibold))
                             Text(chip.localizedLabel)
                                 .font(.footnote.weight(.medium))
+                            if isSelected {
+                                Image(systemName: "xmark")
+                                    .font(.caption2.weight(.bold))
+                            }
                         }
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color(.secondarySystemFill), in: Capsule())
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                        .padding(.horizontal, 13)
+                        .frame(minHeight: 36)
+                        .background(
+                            isSelected ? Color.accentColor : chipSurfaceColor,
+                            in: Capsule()
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(
+                                    isSelected ? Color.clear : Color.primary.opacity(0.08),
+                                    lineWidth: 0.5
+                                )
+                        )
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(chip.localizedLabel))
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityHint(
+                        isSelected
+                            ? NSLocalizedString("Double-tap to clear category filter", comment: "VoiceOver hint for selected category chip")
+                            : NSLocalizedString("Double-tap to filter nearby merchants", comment: "VoiceOver hint for unselected category chip")
+                    )
                 }
             }
             .padding(.horizontal, 16)
@@ -625,15 +708,26 @@ struct BusinessesListView: View {
         }
     }
 
+    private var chipSurfaceColor: Color {
+        guard shouldUseGlassyRows else {
+            return Color(.secondarySystemFill)
+        }
+        return Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.60)
+    }
+
     private var categoryChipsTopPadding: CGFloat {
         if #available(iOS 26.0, *) {
-            return 6
+            return 2
         }
-        return 4
+        return 0
     }
 
     private func applyCategoryChip(_ chip: MerchantCategoryChip) {
-        viewModel.applyMerchantCategoryChip(chip)
+        if activeCategoryChipGroup == chip.group {
+            viewModel.clearMerchantSearch(userInitiated: true)
+        } else {
+            viewModel.applyMerchantCategoryChip(chip)
+        }
     }
 
     private func refreshDiscoveryCache() {
@@ -672,12 +766,11 @@ struct BusinessesListView: View {
             prepareListNavigation(for: element)
             viewModel.path = [element]
         } label: {
-            ZStack(alignment: .trailing) {
+            HStack(alignment: .center, spacing: 10) {
                 ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
-                    .padding(.trailing, 18)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.plain)
@@ -699,12 +792,11 @@ struct BusinessesListView: View {
             prepareListNavigation(for: element)
             viewModel.path = [element]
         } label: {
-            ZStack(alignment: .trailing) {
+            HStack(alignment: .center, spacing: 10) {
                 ElementCell(viewModel: cellVM, showsBottomDivider: showsBottomDivider)
-                    .padding(.trailing, 18)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.plain)
@@ -725,12 +817,11 @@ struct BusinessesListView: View {
                 allowCameraMovement: !isLargeSheet
             )
         } label: {
-            ZStack(alignment: .trailing) {
+            HStack(alignment: .center, spacing: 10) {
                 ElementCell(viewModel: cellVM)
-                    .padding(.trailing, 18)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.gray.opacity(0.6))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.plain)
@@ -784,21 +875,49 @@ struct BusinessesListView: View {
     }
 
     private var footerView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(
-                String(
-                    format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
-                    topSortedElements.count,
-                    elements.count
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(
+                    String(
+                        format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
+                        topSortedElements.count,
+                        elements.count
+                    )
                 )
-            )
-            if let syncLine = lastSyncedFooterLine {
-                Text(syncLine)
+                if let syncLine = lastSyncedFooterLine {
+                    Text(syncLine)
+                }
+            }
+            .font(.footnote)
+            .foregroundStyle(Color.primary.opacity(0.65))
+
+            if elements.count <= 3 && viewModel.activeMerchantAlertDigest == nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        viewModel.zoomOutMapToExploreNearby()
+                    } label: {
+                        Label("Zoom Out to Find More", systemImage: "minus.magnifyingglass")
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        showingAddBusinessForm = true
+                    } label: {
+                        Label("Add a Bitcoin Business", systemImage: "plus.circle")
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.top, 2)
             }
         }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
     }
 
     private func merchantSectionHeader(
@@ -877,7 +996,7 @@ struct BusinessesListView: View {
 
     private var isLargeSheet: Bool {
         guard let detent = currentDetent else { return false }
-        return detentIdentifier(detent).contains("large")
+        return detent == BottomSheetDetents.expandedLeading || detentIdentifier(detent).contains("large")
     }
 
     private var collapsedSheetDetent: PresentationDetent {
@@ -914,65 +1033,108 @@ struct BusinessesListView: View {
 }
 
 struct ElementCell: View {
-    
+
     @ObservedObject var viewModel: ElementCellViewModel
     var showsBottomDivider = false
     @State private var appeared = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
-    
+
+    private var categoryBadgeSymbolName: String {
+        if let group = ElementCategorySymbols.merchantCategoryGroups(for: viewModel.element).first {
+            return ElementCategorySymbols.merchantCategoryDescriptor(for: group).chipSymbolName
+        }
+        let raw = ElementCategorySymbols.symbolName(for: viewModel.element)
+        if raw.hasSuffix(".circle.fill") {
+            let stripped = String(raw.dropLast(".circle.fill".count))
+            if UIImage(systemName: stripped) != nil {
+                return stripped
+            }
+        }
+        return raw
+    }
+
+    private var formattedDistance: String? {
+        if let distance = localizedDistanceString(for: viewModel.element) {
+            return distance
+        }
+        if let distance = viewModel.viewModel.distanceInMiles(element: viewModel.element) {
+            if distance < 1 {
+                return String(format: "%.2f mi", distance)
+            }
+            return String(format: "%.1f mi", distance)
+        }
+        return nil
+    }
+
+    private var addressLines: [String] {
+        guard let formatted = viewModel.address?.formatted(.compact) else { return [] }
+        return formatted
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            
-            HStack {
-                Text(
-                    viewModel.element.displayNameForUI ??
-                    NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
-                )
-                    .foregroundColor(.primary)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                    .minimumScaleFactor(1)
-                    .padding(.vertical, 5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // Distance from location
-                distanceText
-                    .font(.subheadline.weight(.medium))
-            }
-            
-            HStack(alignment: .center, spacing: 8) {
-                if let formatted = viewModel.address?.formatted(.compact) {
-                    let lines = formatted.components(separatedBy: .newlines)
-                    Text(lines.first ?? "")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                // Leading category badge ties each row visually to its map pin.
+                Image(systemName: categoryBadgeSymbolName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 34, height: 34)
+                    .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .padding(.top, 2)
+                    .accessibilityHidden(true)
 
-                Spacer(minLength: 0)
-            }
-
-            HStack {
-                if let formatted = viewModel.address?.formatted(.compact) {
-                    let lines = formatted.components(separatedBy: .newlines)
-                    Text(lines.dropFirst().joined(separator: ", "))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(
+                            viewModel.element.displayNameForUI ??
+                            NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
+                        )
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Spacer()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
 
-                PaymentIcons(element: viewModel.element)
+                        if let distance = formattedDistance {
+                            Text(distance)
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(Color.primary.opacity(0.68))
+                                .fixedSize()
+                        }
+                    }
+
+                    if let firstLine = addressLines.first {
+                        Text(firstLine)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.primary.opacity(0.72))
+                            .lineLimit(1)
+                    }
+
+                    let secondaryLine = addressLines.dropFirst().joined(separator: ", ")
+                    HStack(alignment: .center, spacing: 8) {
+                        if !secondaryLine.isEmpty {
+                            Text(secondaryLine)
+                                .font(.footnote)
+                                .foregroundStyle(Color.primary.opacity(0.65))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            Spacer(minLength: 0)
+                        }
+
+                        PaymentIcons(element: viewModel.element)
+                    }
+                }
             }
+            .padding(.vertical, 4)
 
             if showsBottomDivider {
                 Rectangle()
                     .fill(Color(.separator))
                     .frame(height: 1)
-                    .padding(.top, 10)
+                    .padding(.top, 8)
                     .padding(.trailing, -22)
             }
         }
@@ -982,31 +1144,6 @@ struct ElementCell: View {
             appeared = true
             viewModel.onCellAppear()
         }
-        // REMOVED: Redundant onChange that was causing excessive logging
-        // .onChange(of: viewModel.viewModel.userLocation) { _, _ in
-        //     viewModel.onCellAppear()
-        // }
-    }
-    
-    private var distanceText: some View {
-        let formattedDistance: String? = {
-            if let distance = localizedDistanceString(for: viewModel.element) {
-                return distance
-            } else {
-                // fallback to miles for now
-                if let distance = viewModel.viewModel.distanceInMiles(element: viewModel.element) {
-                    if distance < 1 {
-                        return String(format: "%.2f mi", distance)
-                    } else {
-                        return String(format: "%.1f mi", distance)
-                    }
-                }
-                return nil
-            }
-        }()
-        return Text(formattedDistance ?? "")
-            .opacity(formattedDistance != nil ? 1 : 0)
-            .padding(.trailing, 3)
     }
     
     private func localizedDistanceString(for element: Element) -> String? {

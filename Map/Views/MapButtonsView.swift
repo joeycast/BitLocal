@@ -109,6 +109,8 @@ final class MapLocationRecenterController: ObservableObject {
 
 /// Native SwiftUI toolbar items for map controls so iPhone Duo renders them
 /// directly inside the system vertical side button bar.
+/// Merchants ↔ Communities switching lives in the labeled sheet mode switcher,
+/// keeping the vertical rail uncluttered with two crisp, balanced map controls.
 struct MapControlToolbarContent: ToolbarContent {
     @ObservedObject var viewModel: ContentViewModel
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -122,41 +124,20 @@ struct MapControlToolbarContent: ToolbarContent {
             Button {
                 selectedMapTypeBinding.wrappedValue = (selectedMapType == .standard) ? .hybrid : .standard
             } label: {
-                Label(
-                    selectedMapType == .standard ? "Show satellite map" : "Show standard map",
-                    systemImage: selectedMapType == .hybrid ? "map" : "globe.americas"
-                )
+                Image(systemName: selectedMapType == .hybrid ? "map" : "globe")
+                    .font(.system(size: 16, weight: .medium))
+                    .imageScale(.medium)
             }
+            .accessibilityLabel(selectedMapType == .standard ? "Show satellite map" : "Show standard map")
 
             Button {
                 recenterController.handleRecenterTap(viewModel: viewModel)
             } label: {
-                Label("Center map on location", systemImage: "location")
+                Image(systemName: "location")
+                    .font(.system(size: 16, weight: .medium))
+                    .imageScale(.medium)
             }
-
-            Button {
-                Debug.log("⏱ mapMode button TAPPED")
-                viewModel.toggleMapMode()
-                Debug.log("⏱ mapMode button action DONE")
-            } label: {
-                Label(
-                    viewModel.mapDisplayMode == .merchants
-                        ? NSLocalizedString("Show communities", comment: "VoiceOver label to switch map to communities")
-                        : NSLocalizedString("Show merchants", comment: "VoiceOver label to switch map to merchants"),
-                    systemImage: viewModel.mapDisplayMode == .merchants ? "person.3" : "mappin.and.ellipse"
-                )
-            }
-            .accessibilityValue(
-                viewModel.mapDisplayMode == .merchants
-                    ? NSLocalizedString("Merchants map", comment: "VoiceOver current map mode value")
-                    : NSLocalizedString("Communities map", comment: "VoiceOver current map mode value")
-            )
-            .accessibilityHint(
-                NSLocalizedString(
-                    "Switches between merchant pins and community areas",
-                    comment: "VoiceOver hint for map mode toggle"
-                )
-            )
+            .accessibilityLabel("Center map on location")
         }
     }
 }
@@ -191,40 +172,41 @@ struct MapButtonsView: View {
 
             Button(action: handleRecenterTap) {
                 Image(systemName: useMonochromeIcons ? "location" : "location.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: useMonochromeIcons ? 15 : 14, weight: useMonochromeIcons ? .medium : .semibold))
                     .foregroundStyle(useMonochromeIcons ? Color.primary : Color.accentColor)
                     .frame(width: controlWidth, height: controlHeight)
             }
             .accessibilityLabel("Center map on location")
 
-            Divider()
-                .padding(.horizontal, 8)
+            if !useMonochromeIcons {
+                Divider()
+                    .padding(.horizontal, 8)
 
-            Button {
-                Debug.log("⏱ mapMode button TAPPED")
-                viewModel.toggleMapMode()
-                Debug.log("⏱ mapMode button action DONE")
-            } label: {
-                mapModeIcon
-                    .frame(width: controlWidth, height: controlHeight)
-            }
-            .accessibilityLabel(
-                viewModel.mapDisplayMode == .merchants
-                    ? NSLocalizedString("Show communities", comment: "VoiceOver label to switch map to communities")
-                    : NSLocalizedString("Show merchants", comment: "VoiceOver label to switch map to merchants")
-            )
-            .accessibilityValue(
-                viewModel.mapDisplayMode == .merchants
-                    ? NSLocalizedString("Merchants map", comment: "VoiceOver current map mode value")
-                    : NSLocalizedString("Communities map", comment: "VoiceOver current map mode value")
-            )
-            .accessibilityHint(
-                NSLocalizedString(
-                    "Switches between merchant pins and community areas",
-                    comment: "VoiceOver hint for map mode toggle"
+                Button {
+                    Debug.log("⏱ mapMode button TAPPED")
+                    viewModel.toggleMapMode()
+                    Debug.log("⏱ mapMode button action DONE")
+                } label: {
+                    mapModeIcon
+                        .frame(width: controlWidth, height: controlHeight)
+                }
+                .accessibilityLabel(
+                    viewModel.mapDisplayMode == .merchants
+                        ? NSLocalizedString("Show communities", comment: "VoiceOver label to switch map to communities")
+                        : NSLocalizedString("Show merchants", comment: "VoiceOver label to switch map to merchants")
                 )
-            )
-            .featureHintAnchor(.communityToggle)
+                .accessibilityValue(
+                    viewModel.mapDisplayMode == .merchants
+                        ? NSLocalizedString("Merchants map", comment: "VoiceOver current map mode value")
+                        : NSLocalizedString("Communities map", comment: "VoiceOver current map mode value")
+                )
+                .accessibilityHint(
+                    NSLocalizedString(
+                        "Switches between merchant pins and community areas",
+                        comment: "VoiceOver hint for map mode toggle"
+                    )
+                )
+            }
         }
         .frame(width: controlWidth)
         .modifier(GlassCapsuleBackground())
@@ -243,11 +225,11 @@ struct MapButtonsView: View {
     private var mapTypeIcon: some View {
         ZStack {
             Image(systemName: useMonochromeIcons ? "map" : "map.fill")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: useMonochromeIcons ? 15 : 14, weight: useMonochromeIcons ? .medium : .semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 1 : 0)
-            Image(systemName: useMonochromeIcons ? "globe.americas" : "globe.americas.fill")
-                .font(.system(size: 14, weight: .semibold))
+            Image(systemName: useMonochromeIcons ? "globe" : "globe.americas.fill")
+                .font(.system(size: useMonochromeIcons ? 15 : 14, weight: useMonochromeIcons ? .medium : .semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 0 : 1)
         }
@@ -257,7 +239,7 @@ struct MapButtonsView: View {
     private var mapModeIcon: some View {
         let iconColor: Color = useMonochromeIcons ? .primary : .accentColor
         return ZStack {
-            Image(systemName: useMonochromeIcons ? "person.3" : "person.3.fill")
+            Image(systemName: "person.3.fill")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(iconColor)
                 .opacity(viewModel.mapDisplayMode == .merchants ? 1 : 0)

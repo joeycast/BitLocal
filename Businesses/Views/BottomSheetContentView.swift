@@ -15,17 +15,35 @@ import MapKit
 struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
     @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @Environment(\.colorScheme) private var colorScheme
 
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
+    var preferredLeadingWidth: CGFloat? = nil
+
+    private var glassContrastScrimOpacity: Double {
+        if currentDetent == .large {
+            return 0
+        }
+        return colorScheme == .dark ? 0.18 : 0.28
+    }
 
     var body: some View {
         navigationStack
+            .background {
+                // Softens saturated map blues/greens behind translucent Liquid Glass
+                // sheets so body and secondary text stay legible (≥4.5:1 contrast).
+                Color(.systemBackground)
+                    .opacity(glassContrastScrimOpacity)
+                    .ignoresSafeArea()
+            }
             .ignoresSafeArea(edges: .bottom)
             // UIKit reader reports screen-bottom → sheet-top using the presentation
-            // frame (not NavigationStack layout height), so map buttons clear the card.
+            // frame (not NavigationStack layout height), so map buttons clear the card,
+            // and applies preferredLeadingWidth directly to UISheetPresentationController.
             .background {
                 SheetEdgeHeightReader(
+                    preferredLeadingWidth: preferredLeadingWidth,
                     onHeightChange: { height in
                         viewModel.reportSheetHeight(height)
                     },
@@ -164,16 +182,49 @@ private struct RootSheetNavigationBarModifier: ViewModifier {
     }
 }
 
+/// Clear labeled mode switcher (`Merchants | Communities`) embedded inside the
+/// sheet/sidebar header so users never have to guess what an icon-only button does.
+struct SheetMapModeSwitcher: View {
+    @ObservedObject var viewModel: ContentViewModel
+
+    private var selectionBinding: Binding<MapDisplayMode> {
+        Binding(
+            get: { viewModel.mapDisplayMode },
+            set: { newMode in
+                viewModel.setMapDisplayMode(newMode)
+            }
+        )
+    }
+
+    var body: some View {
+        Picker("Map display mode", selection: selectionBinding) {
+            Text(NSLocalizedString("Merchants", comment: "Segmented control option for Bitcoin merchants"))
+                .tag(MapDisplayMode.merchants)
+            Text(NSLocalizedString("Communities", comment: "Segmented control option for Bitcoin communities"))
+                .tag(MapDisplayMode.communities)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .featureHintAnchor(.communityToggle)
+    }
+}
+
 struct CommunitiesListView: View {
     private let resultsPageSize = 15
 
     @EnvironmentObject private var viewModel: ContentViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var metadataStore = CommunityRowMetadataObservableStore.shared
     var currentDetent: PresentationDetent? = nil
     @State private var filterText = ""
     @State private var communityResultsLimit = 15
     @FocusState private var isSearchFieldFocused: Bool
+
+    private var isCollapsedSheet: Bool {
+        guard let detent = currentDetent else { return false }
+        return detent == BottomSheetDetents.collapsed
+    }
 
     var body: some View {
         let filtered = filteredCommunities
@@ -183,7 +234,17 @@ struct CommunitiesListView: View {
         VStack(spacing: 0) {
             searchBar
                 .padding(.top, searchBarTopPadding)
-                .padding(.bottom, 2)
+                .padding(.bottom, 6)
+
+            if !isSearchFieldFocused && filterText.isEmpty {
+                SheetMapModeSwitcher(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
+                    .sheetCollapsedReveal(
+                        geometry: viewModel.sheetGeometry,
+                        isCollapsedLike: isCollapsedSheet
+                    )
+            }
 
             List {
                 if viewModel.communityMapAreasIsLoading &&
@@ -212,15 +273,14 @@ struct CommunitiesListView: View {
                             Button {
                                 viewModel.selectCommunity(area, presentDetail: true)
                             } label: {
-                                ZStack(alignment: .trailing) {
+                                HStack(alignment: .center, spacing: 10) {
                                     CommunityRow(
                                         area: area,
                                         metadata: metadataStore.metadataByAreaID[area.id]
                                     )
-                                    .padding(.trailing, 18)
                                     Image(systemName: "chevron.right")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(.gray.opacity(0.6))
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                             .buttonStyle(.plain)
@@ -243,6 +303,11 @@ struct CommunitiesListView: View {
             .listStyle(.plain)
             .scrollContentBackground(shouldUseUnifiedSheetRows ? .hidden : .automatic)
             .background(Color.clear)
+            .sheetCollapsedReveal(
+                geometry: viewModel.sheetGeometry,
+                isCollapsedLike: isCollapsedSheet,
+                forceRevealed: isSearchFieldFocused || !filterText.isEmpty
+            )
         }
         .onAppear {
             // Returning from detail should always restore the visible-community browsing state.
@@ -262,9 +327,13 @@ struct CommunitiesListView: View {
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .font(.system(size: 15))
-            TextField("Search communities…", text: $filterText)
+                .foregroundStyle(Color.primary.opacity(0.65))
+                .font(.subheadline.weight(.medium))
+            TextField(
+                "",
+                text: $filterText,
+                prompt: Text("Search communities…").foregroundStyle(Color.primary.opacity(0.6))
+            )
                 .textFieldStyle(.plain)
                 .font(.body)
                 .focused($isSearchFieldFocused)
@@ -275,15 +344,26 @@ struct CommunitiesListView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
-                        .font(.system(size: 15))
+                        .font(.subheadline)
                 }
+                .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .background(Color(.tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 40))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(searchFieldSurfaceColor, in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
         .padding(.horizontal, 16)
+    }
+
+    private var searchFieldSurfaceColor: Color {
+        guard shouldUseUnifiedSheetRows else {
+            return Color(.tertiarySystemFill)
+        }
+        return Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.58)
     }
 
     private var searchBarTopPadding: CGFloat {

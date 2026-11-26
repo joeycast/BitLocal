@@ -74,15 +74,18 @@ struct AdaptiveLeadingSheetSizing: PresentationSizing, Equatable {
         guard let maxWidth else {
             return AutomaticPresentationSizing.automatic.proposedSize(for: root, context: context)
         }
-        // UIKit ignores custom preferredContentSize if height is `.infinity`,
-        // falling back to default ~620pt page-sheet width. Supply a finite height.
         let finiteHeight: CGFloat? = maxHeight > 1 ? maxHeight : nil
-        return ProposedViewSize(width: maxWidth, height: finiteHeight)
+        let measured = root.sizeThatFits(ProposedViewSize(width: maxWidth, height: finiteHeight))
+        let resolvedHeight = finiteHeight.map { max(measured.height, $0) } ?? measured.height
+        return ProposedViewSize(
+            width: maxWidth,
+            height: resolvedHeight > 1 ? resolvedHeight : finiteHeight
+        )
     }
 }
 
 extension GeometryProxy {
-    /// Returns a left-column width (~1/3 of the display, clamped to 300–340 pt)
+    /// Returns a left-column width (~1/3 of the display, clamped to 300–336 pt)
     /// for a leading-pinned collapsible sheet on wide regular displays (e.g.
     /// iPhone Duo unfolded landscape), or `nil` when the sheet should span full width.
     func leadingCollapsibleSheetWidth(
@@ -94,7 +97,7 @@ extension GeometryProxy {
             return nil
         }
 
-        let targetWidth = min(max(fullWidth * 0.34, 300), 340)
+        let targetWidth = min(max(fullWidth * 0.33, 300), 336)
 
         #if compiler(>=6.4)
         if #available(iOS 27.1, *),

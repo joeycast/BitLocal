@@ -78,11 +78,13 @@ final class SheetGeometryModel: ObservableObject {
 /// UIKit layout passes. More reliable than SwiftUI content-height during interactive
 /// detent changes, and matches what map chrome should clear.
 struct SheetEdgeHeightReader: UIViewRepresentable {
+    var preferredLeadingWidth: CGFloat? = nil
     var onHeightChange: (CGFloat) -> Void
     var onMotionSettled: (CGFloat) -> Void
 
     func makeUIView(context: Context) -> SheetEdgeHeightReaderView {
         let view = SheetEdgeHeightReaderView()
+        view.preferredLeadingWidth = preferredLeadingWidth
         view.onHeightChange = onHeightChange
         view.onMotionSettled = onMotionSettled
         view.isUserInteractionEnabled = false
@@ -91,16 +93,23 @@ struct SheetEdgeHeightReader: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: SheetEdgeHeightReaderView, context: Context) {
+        let widthChanged = uiView.preferredLeadingWidth != preferredLeadingWidth
+        uiView.preferredLeadingWidth = preferredLeadingWidth
         uiView.onHeightChange = onHeightChange
         uiView.onMotionSettled = onMotionSettled
+        if widthChanged {
+            uiView.applyPreferredSheetWidthIfNeeded()
+        }
     }
 }
 
 final class SheetEdgeHeightReaderView: UIView {
+    var preferredLeadingWidth: CGFloat?
     var onHeightChange: ((CGFloat) -> Void)?
     var onMotionSettled: ((CGFloat) -> Void)?
     private var lastReported: CGFloat = -1
     private var lastWindowBoundsSize: CGSize = .zero
+    private var lastAppliedLeadingWidth: CGFloat? = -1
     private var displayLink: CADisplayLink?
     private var stableFrameCount = 0
     private weak var cachedPresentedView: UIView?
@@ -112,6 +121,7 @@ final class SheetEdgeHeightReaderView: UIView {
         if let windowBoundsSize = window?.bounds.size, windowBoundsSize != lastWindowBoundsSize {
             lastWindowBoundsSize = windowBoundsSize
             lastReported = -1
+            applyPreferredSheetWidthIfNeeded(force: true)
         }
         stableFrameCount = 0
         startDisplayLinkIfNeeded()
@@ -120,10 +130,12 @@ final class SheetEdgeHeightReaderView: UIView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         cachedPresentedView = nil
+        lastAppliedLeadingWidth = -1
         if let window {
             lastWindowBoundsSize = window.bounds.size
             lastReported = -1
             stableFrameCount = 0
+            applyPreferredSheetWidthIfNeeded(force: true)
             startDisplayLinkIfNeeded()
             report()
         } else {
@@ -133,6 +145,52 @@ final class SheetEdgeHeightReaderView: UIView {
 
     deinit {
         displayLink?.invalidate()
+    }
+
+    /// Directly configures UIKit's `UISheetPresentationController` so edge-attached
+    /// detent sheets on wide displays (iPhone Duo unfolded landscape) honor a custom
+    /// ~1/3 width instead of falling back to UIKit's default ~620 pt page-sheet width.
+    func applyPreferredSheetWidthIfNeeded(force: Bool = false) {
+        guard let window,
+              let presentedVC = presentedSheetViewController(),
+              let sheet = presentedVC.sheetPresentationController else {
+            return
+        }
+
+        if !force, lastAppliedLeadingWidth == preferredLeadingWidth {
+            return
+        }
+        lastAppliedLeadingWidth = preferredLeadingWidth
+
+        if let targetWidth = preferredLeadingWidth, targetWidth > 1 {
+            let finiteHeight = max(window.bounds.height, 400)
+            let desiredSize = CGSize(width: targetWidth, height: finiteHeight)
+            let needsChange =
+                sheet.prefersPageSizing ||
+                !sheet.widthFollowsPreferredContentSizeWhenEdgeAttached ||
+                abs(presentedVC.preferredContentSize.width - targetWidth) > 0.5
+
+            if needsChange {
+                sheet.animateChanges {
+                    sheet.prefersPageSizing = false
+                    sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = true
+                    presentedVC.preferredContentSize = desiredSize
+                }
+            }
+        } else {
+            let needsReset =
+                !sheet.prefersPageSizing ||
+                sheet.widthFollowsPreferredContentSizeWhenEdgeAttached ||
+                presentedVC.preferredContentSize.width > 0.5
+
+            if needsReset {
+                sheet.animateChanges {
+                    sheet.prefersPageSizing = true
+                    sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = false
+                    presentedVC.preferredContentSize = .zero
+                }
+            }
+        }
     }
 
     private func startDisplayLinkIfNeeded() {
@@ -160,6 +218,7 @@ final class SheetEdgeHeightReaderView: UIView {
             lastWindowBoundsSize = window.bounds.size
             lastReported = -1
             stableFrameCount = 0
+            applyPreferredSheetWidthIfNeeded(force: true)
         }
 
         let sheetFrame: CGRect
@@ -213,9 +272,22 @@ final class SheetEdgeHeightReaderView: UIView {
         if let cachedPresentedView, cachedPresentedView.window != nil {
             return cachedPresentedView
         }
-        guard let viewController = nearestViewController() else { return nil }
+        guard let viewController = presentedSheetViewController() ?? nearestViewController() else {
+            return nil
+        }
         cachedPresentedView = viewController.view
         return viewController.view
+    }
+
+    private func presentedSheetViewController() -> UIViewController? {
+        var current = nearestViewController()
+        while let vc = current {
+            if vc.sheetPresentationController != nil {
+                return vc
+            }
+            current = vc.parent
+        }
+        return nil
     }
 
     private func nearestViewController() -> UIViewController? {

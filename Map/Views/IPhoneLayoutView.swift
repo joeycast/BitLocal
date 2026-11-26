@@ -156,20 +156,20 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingAbout = true
                         } label: {
-                            Label(
-                                NSLocalizedString("about_accessibility_label", comment: ""),
-                                systemImage: "info.circle"
-                            )
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 16, weight: .medium))
+                                .imageScale(.medium)
                         }
+                        .accessibilityLabel(NSLocalizedString("about_accessibility_label", comment: ""))
 
                         Button {
                             showingSettings = true
                         } label: {
-                            Label(
-                                NSLocalizedString("settings_label_accessibility", comment: ""),
-                                systemImage: "gearshape"
-                            )
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 16, weight: .medium))
+                                .imageScale(.medium)
                         }
+                        .accessibilityLabel(NSLocalizedString("settings_label_accessibility", comment: ""))
                     }
 
                     MapControlToolbarContent(
@@ -183,11 +183,11 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingAbout = true
                         } label: {
-                            Label(
-                                NSLocalizedString("about_accessibility_label", comment: ""),
-                                systemImage: "info.circle"
-                            )
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 16, weight: .medium))
+                                .imageScale(.medium)
                         }
+                        .accessibilityLabel(NSLocalizedString("about_accessibility_label", comment: ""))
                     }
                     ToolbarItem(placement: .principal) {
                         Text("bitlocal")
@@ -198,11 +198,11 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingSettings = true
                         } label: {
-                            Label(
-                                NSLocalizedString("settings_label_accessibility", comment: ""),
-                                systemImage: "gearshape"
-                            )
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 16, weight: .medium))
+                                .imageScale(.medium)
                         }
+                        .accessibilityLabel(NSLocalizedString("settings_label_accessibility", comment: ""))
                     }
                 }
             }
@@ -213,9 +213,13 @@ private struct IPhoneLayoutContent: View {
             .sheet(isPresented: .constant(shouldPresentBottomSheet), onDismiss: {
                 Debug.log("Bottom sheet dismissed")
             }) {
+                let topDetent: PresentationDetent = isLeadingSheet
+                    ? BottomSheetDetents.expandedLeading
+                    : .large
                 BottomSheetContentView(
                     visibleElements: visibleElements,
-                    currentDetent: $bottomSheetDetent
+                    currentDetent: $bottomSheetDetent,
+                    preferredLeadingWidth: leadingSheetWidth
                 )
                     .id("\(appearance.rawValue)-\(systemColorScheme)")
                     .environmentObject(viewModel)
@@ -224,7 +228,7 @@ private struct IPhoneLayoutContent: View {
                         collapsedSheetDetent,
                         defaultSheetDetent,
                         .medium,
-                        .large
+                        topDetent
                     ], selection: $bottomSheetDetent)
                     .presentationSizing(
                         AdaptiveLeadingSheetSizing(
@@ -277,6 +281,11 @@ private struct IPhoneLayoutContent: View {
             }
             .onChange(of: leadingSheetWidth) { _, newWidth in
                 viewModel.leadingSheetInset = newWidth ?? 0
+                if newWidth != nil, bottomSheetDetent == .large {
+                    bottomSheetDetent = BottomSheetDetents.expandedLeading
+                } else if newWidth == nil, bottomSheetDetent == BottomSheetDetents.expandedLeading {
+                    bottomSheetDetent = .large
+                }
             }
             .onChange(of: isVerticalToolbarActive) { _, _ in
                 syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
@@ -436,8 +445,11 @@ private struct IPhoneLayoutContent: View {
     }
 
     private func isDefaultLikeDetent(_ detent: PresentationDetent) -> Bool {
+        if detent == BottomSheetDetents.expandedLeading {
+            return true
+        }
         let id = detentIdentifier(detent)
-        return id.contains("fraction 0.3") || id.contains("large")
+        return id.contains("fraction 0.3") || id.contains("large") || id.contains("fraction 0.92")
     }
 
     private func isMediumDetent(_ detent: PresentationDetent) -> Bool {
