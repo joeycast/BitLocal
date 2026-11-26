@@ -703,6 +703,125 @@ struct CommunityDetailView: View {
     }
 
     var body: some View {
+        detailWithTipAlerts
+            .sheet(item: $shareItem) { item in
+                ActivityView(items: item.items)
+            }
+            .alert("Unable to Open Wallet", isPresented: Binding(
+                get: { lightningErrorMessage != nil },
+                set: { newValue in
+                    if !newValue { lightningErrorMessage = nil }
+                })
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(lightningErrorMessage ?? "")
+            }
+            .alert("Unable to Open", isPresented: Binding(
+                get: { linkOpenErrorItem != nil },
+                set: { newValue in
+                    if !newValue { linkOpenErrorItem = nil }
+                })
+            ) {
+                if let copyValue = linkOpenErrorItem?.copyValue {
+                    Button(String(format: NSLocalizedString("Copy %@", comment: "Button title to copy a value label"), "npub")) {
+                        UIPasteboard.general.string = copyValue
+                        BitLocalHaptics.success()
+                    }
+                }
+                Button("OK") {}
+            } message: {
+                Text(linkOpenErrorItem?.message ?? "")
+            }
+    }
+
+    private var detailWithTipAlerts: some View {
+        detailWithChromeAndLifecycle
+            .alert("Tip This Community", isPresented: $showLightningAlert) {
+                if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
+                   let payload = payableLightningPayload {
+                    Button(String(format: NSLocalizedString("Copy and Open %@", comment: "Button title to copy a value and open the selected wallet"), lastWallet.name)) {
+                        openWallet(lastWallet, payload: payload)
+                    }
+                }
+                Button("Choose Wallet") {
+                    showWalletAlert = true
+                }
+                if let payload = payableLightningPayload {
+                    Button("Copy Lightning Address") {
+                        UIPasteboard.general.string = payload
+                        BitLocalHaptics.success()
+                    }
+                    Button("Share") {
+                        shareItem = ShareTextItem(text: payload)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Choose a wallet or copy the Lightning address to tip this community.")
+            }
+            .alert("Choose Wallet", isPresented: $showWalletAlert) {
+                if let payload = payableLightningPayload {
+                    ForEach(walletsForPicker) { wallet in
+                        Button(wallet.name) {
+                            openWallet(wallet, payload: payload)
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Choose your Lightning wallet. BitLocal will copy the Lightning address, then open the wallet.")
+            }
+            .alert("Tipping Disclaimer", isPresented: $showTipsDisclaimerAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("BitLocal does not process, custody, or guarantee tip transactions. We only open your selected wallet or link and help copy/share the Lightning address.")
+            }
+    }
+
+    private var detailWithChromeAndLifecycle: some View {
+        scrollContent
+            // Only observes live height while collapsed-like; expanded detail is free of drag churn.
+            .sheetCollapsedReveal(
+                geometry: viewModel.sheetGeometry,
+                isCollapsedLike: isCollapsedLikeDetent
+            )
+            .navigationTitle((isHeroScrolledPast || isCollapsedLikeDetent) ? area.displayName : "")
+            .navigationBarTitleDisplayMode(.inline)
+            .bitLocalDetailNavigationChrome()
+            .toolbar {
+                if isHeroScrolledPast, let shareableURL {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            BitLocalHaptics.lightTap()
+                            shareItem = ShareTextItem(items: [area.displayName, shareableURL])
+                        } label: {
+                            Label("Share community", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                }
+            }
+            .task(id: area.id) {
+                if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
+                    viewModel.selectCommunity(area, presentDetail: false)
+                }
+                updateMemberElements()
+            }
+            .onChange(of: area.id) { _, _ in
+                updateMemberElements()
+            }
+            .onChange(of: viewModel.selectedCommunityArea?.id) { _, _ in
+                updateMemberElements()
+            }
+            .onChange(of: viewModel.communityMemberElements) { _, _ in
+                updateMemberElements()
+            }
+            .onAppear {
+                updateMemberElements()
+            }
+    }
+
+    private var scrollContent: some View {
         ScrollViewReader { scrollProxy in
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -741,113 +860,6 @@ struct CommunityDetailView: View {
                     isHeroScrolledPast = scrolledPast
                 }
             }
-        }
-        // Only observes live height while collapsed-like; expanded detail is free of drag churn.
-        .sheetCollapsedReveal(
-            geometry: viewModel.sheetGeometry,
-            isCollapsedLike: isCollapsedLikeDetent
-        )
-        .navigationTitle((isHeroScrolledPast || isCollapsedLikeDetent) ? area.displayName : "")
-        .navigationBarTitleDisplayMode(.inline)
-        .bitLocalDetailNavigationChrome()
-        .toolbar {
-            if isHeroScrolledPast, let shareableURL {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        BitLocalHaptics.lightTap()
-                        shareItem = ShareTextItem(items: [area.displayName, shareableURL])
-                    } label: {
-                        Label("Share community", systemImage: "square.and.arrow.up")
-                    }
-                }
-            }
-        }
-        .task(id: area.id) {
-            if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
-                viewModel.selectCommunity(area, presentDetail: false)
-            }
-            updateMemberElements()
-        }
-        .onChange(of: area.id) { _, _ in
-            updateMemberElements()
-        }
-        .onChange(of: viewModel.selectedCommunityArea?.id) { _, _ in
-            updateMemberElements()
-        }
-        .onChange(of: viewModel.communityMemberElements) { _, _ in
-            updateMemberElements()
-        }
-        .onAppear {
-            updateMemberElements()
-        }
-        .alert("Tip This Community", isPresented: $showLightningAlert) {
-            if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
-               let payload = payableLightningPayload {
-                Button(String(format: NSLocalizedString("Copy and Open %@", comment: "Button title to copy a value and open the selected wallet"), lastWallet.name)) {
-                    openWallet(lastWallet, payload: payload)
-                }
-            }
-            Button("Choose Wallet") {
-                showWalletAlert = true
-            }
-            if let payload = payableLightningPayload {
-                Button("Copy Lightning Address") {
-                    UIPasteboard.general.string = payload
-                    BitLocalHaptics.success()
-                }
-                Button("Share") {
-                    shareItem = ShareTextItem(text: payload)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Choose a wallet or copy the Lightning address to tip this community.")
-        }
-        .alert("Choose Wallet", isPresented: $showWalletAlert) {
-            if let payload = payableLightningPayload {
-                ForEach(walletsForPicker) { wallet in
-                    Button(wallet.name) {
-                        openWallet(wallet, payload: payload)
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Choose your Lightning wallet. BitLocal will copy the Lightning address, then open the wallet.")
-        }
-        .alert("Tipping Disclaimer", isPresented: $showTipsDisclaimerAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("BitLocal does not process, custody, or guarantee tip transactions. We only open your selected wallet or link and help copy/share the Lightning address.")
-        }
-        .sheet(item: $shareItem) { item in
-            ActivityView(items: item.items)
-        }
-        .alert("Unable to Open Wallet", isPresented: Binding(
-            get: { lightningErrorMessage != nil },
-            set: { newValue in
-                if !newValue { lightningErrorMessage = nil }
-            })
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(lightningErrorMessage ?? "")
-        }
-        .alert("Unable to Open", isPresented: Binding(
-            get: { linkOpenErrorItem != nil },
-            set: { newValue in
-                if !newValue { linkOpenErrorItem = nil }
-            })
-        ) {
-            if let copyValue = linkOpenErrorItem?.copyValue {
-                Button(String(format: NSLocalizedString("Copy %@", comment: "Button title to copy a value label"), "npub")) {
-                    UIPasteboard.general.string = copyValue
-                    BitLocalHaptics.success()
-                }
-            }
-            Button("OK") {}
-        } message: {
-            Text(linkOpenErrorItem?.message ?? "")
         }
     }
 

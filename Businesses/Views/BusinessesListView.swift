@@ -61,6 +61,115 @@ struct BusinessesListView: View {
     }
 
     var body: some View {
+        contentWithDiscoveryObservers
+            .onChange(of: viewModel.isLoading) { _, _ in
+                refreshEmptyStateVisibility()
+            }
+            .onChange(of: viewModel.hasLoadedInitialData) { _, _ in
+                refreshEmptyStateVisibility()
+                viewModel.restorePersistedMerchantCategoryIfNeeded()
+            }
+            .onChange(of: viewModel.allElements.count) { _, _ in
+                viewModel.restorePersistedMerchantCategoryIfNeeded()
+                if activeQuickFilters.contains(.saved) {
+                    refreshDiscoveryCache()
+                }
+            }
+            .onChange(of: viewModel.hideATMsFromMapAndList) { _, _ in
+                if activeQuickFilters.contains(.saved) {
+                    refreshDiscoveryCache()
+                }
+            }
+            .onChange(of: viewModel.visibleElements.count) { _, _ in
+                viewModel.restorePersistedMerchantCategoryIfNeeded()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+                guard isSearchFieldFocused else { return }
+                withAnimation(keyboardAnimation(for: notification)) {
+                    showFocusedSearchCategoryChips = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+                withAnimation(keyboardAnimation(for: notification)) {
+                    showFocusedSearchCategoryChips = false
+                }
+            }
+    }
+
+    private var contentWithDiscoveryObservers: some View {
+        contentWithSearchObservers
+            .onChange(of: activeQuickFilters) { _, _ in
+                discoveryResultsLimit = maxListResults
+                searchResultsLimit = 20
+                refreshDiscoveryCache()
+                syncDisplayedSearchResultsToMap()
+                refreshEmptyStateVisibility()
+            }
+            .onChange(of: savedPlacesStore.savedIDs) { _, _ in
+                refreshDiscoveryCache()
+                syncDisplayedSearchResultsToMap()
+                refreshEmptyStateVisibility()
+            }
+            .onChange(of: intentRouter.pendingAction) { _, _ in
+                handlePendingIntentAction()
+            }
+            .onChange(of: viewModel.region.center.latitude) { _, _ in
+                viewModel.handleMerchantSearchMapRegionChange()
+            }
+            .onChange(of: viewModel.region.center.longitude) { _, _ in
+                viewModel.handleMerchantSearchMapRegionChange()
+            }
+            .onChange(of: elements.map(\.id)) { _, _ in
+                discoveryResultsLimit = maxListResults
+                refreshDiscoveryCache()
+                refreshEmptyStateVisibility()
+            }
+            .onAppear {
+                if FeatureFlags.isEventsUIEnabled {
+                    viewModel.ensureEventsLoaded()
+                }
+                viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
+                handlePendingIntentAction()
+                refreshDiscoveryCache()
+                syncDisplayedSearchResultsToMap()
+                refreshEmptyStateVisibility()
+            }
+    }
+
+    private var contentWithSearchObservers: some View {
+        mainContent
+            .animation(
+                BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
+                value: reachabilityMonitor.isOffline
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .sheet(isPresented: $showingAddBusinessForm) {
+                AddBusinessInfoView()
+            }
+            .onChange(of: viewModel.userLocation) { _, newLocation in
+                handleUserLocationChange(newLocation)
+                refreshDiscoveryCache()
+            }
+            .onChange(of: isSearchFieldFocused) { _, focused in
+                if focused && !viewModel.isSearchActive {
+                    viewModel.isSearchActive = true
+                } else if !focused {
+                    showFocusedSearchCategoryChips = false
+                }
+            }
+            .onChange(of: viewModel.unifiedSearchText) { _, _ in
+                searchResultsLimit = 20
+                syncDisplayedSearchResultsToMap()
+            }
+            .onChange(of: displayedPrimaryResults.map(\.id)) { _, _ in
+                syncDisplayedSearchResultsToMap()
+            }
+            .onChange(of: searchResultsLimit) { _, _ in
+                syncDisplayedSearchResultsToMap()
+            }
+    }
+
+    private var mainContent: some View {
         VStack(spacing: 0) {
             searchBar
                 .padding(.top, searchBarTopPadding)
@@ -132,103 +241,6 @@ struct BusinessesListView: View {
                 isCollapsedLike: isCollapsedSheet,
                 forceRevealed: isFilteringMerchants || showFocusedSearchCategoryChips
             )
-        }
-        .animation(
-            BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
-            value: reachabilityMonitor.isOffline
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .sheet(isPresented: $showingAddBusinessForm) {
-            AddBusinessInfoView()
-        }
-        .onChange(of: viewModel.userLocation) { _, newLocation in
-            handleUserLocationChange(newLocation)
-            refreshDiscoveryCache()
-        }
-        .onChange(of: isSearchFieldFocused) { _, focused in
-            if focused && !viewModel.isSearchActive {
-                viewModel.isSearchActive = true
-            } else if !focused {
-                showFocusedSearchCategoryChips = false
-            }
-        }
-        .onChange(of: viewModel.unifiedSearchText) { _, _ in
-            searchResultsLimit = 20
-            syncDisplayedSearchResultsToMap()
-        }
-        .onChange(of: displayedPrimaryResults.map(\.id)) { _, _ in
-            syncDisplayedSearchResultsToMap()
-        }
-        .onChange(of: searchResultsLimit) { _, _ in
-            syncDisplayedSearchResultsToMap()
-        }
-        .onChange(of: activeQuickFilters) { _, _ in
-            discoveryResultsLimit = maxListResults
-            searchResultsLimit = 20
-            refreshDiscoveryCache()
-            syncDisplayedSearchResultsToMap()
-            refreshEmptyStateVisibility()
-        }
-        .onChange(of: savedPlacesStore.savedIDs) { _, _ in
-            refreshDiscoveryCache()
-            syncDisplayedSearchResultsToMap()
-            refreshEmptyStateVisibility()
-        }
-        .onChange(of: intentRouter.pendingAction) { _, _ in
-            handlePendingIntentAction()
-        }
-        .onChange(of: viewModel.region.center.latitude) { _, _ in
-            viewModel.handleMerchantSearchMapRegionChange()
-        }
-        .onChange(of: viewModel.region.center.longitude) { _, _ in
-            viewModel.handleMerchantSearchMapRegionChange()
-        }
-        .onChange(of: elements.map(\.id)) { _, _ in
-            discoveryResultsLimit = maxListResults
-            refreshDiscoveryCache()
-            refreshEmptyStateVisibility()
-        }
-        .onAppear {
-            if FeatureFlags.isEventsUIEnabled {
-                viewModel.ensureEventsLoaded()
-            }
-            viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
-            handlePendingIntentAction()
-            refreshDiscoveryCache()
-            syncDisplayedSearchResultsToMap()
-            refreshEmptyStateVisibility()
-        }
-        .onChange(of: viewModel.isLoading) { _, _ in
-            refreshEmptyStateVisibility()
-        }
-        .onChange(of: viewModel.hasLoadedInitialData) { _, _ in
-            refreshEmptyStateVisibility()
-            viewModel.restorePersistedMerchantCategoryIfNeeded()
-        }
-        .onChange(of: viewModel.allElements.count) { _, _ in
-            viewModel.restorePersistedMerchantCategoryIfNeeded()
-            if activeQuickFilters.contains(.saved) {
-                refreshDiscoveryCache()
-            }
-        }
-        .onChange(of: viewModel.hideATMsFromMapAndList) { _, _ in
-            if activeQuickFilters.contains(.saved) {
-                refreshDiscoveryCache()
-            }
-        }
-        .onChange(of: viewModel.visibleElements.count) { _, _ in
-            viewModel.restorePersistedMerchantCategoryIfNeeded()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
-            guard isSearchFieldFocused else { return }
-            withAnimation(keyboardAnimation(for: notification)) {
-                showFocusedSearchCategoryChips = true
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
-            withAnimation(keyboardAnimation(for: notification)) {
-                showFocusedSearchCategoryChips = false
-            }
         }
     }
 
