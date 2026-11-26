@@ -1268,13 +1268,7 @@ struct CommunityDetailView: View {
     }
 
     private func parsedBTCMapDate(_ raw: String) -> Date? {
-        if let fullISO = ISO8601DateFormatter.communityFullPrecision.date(from: raw) {
-            return fullISO
-        }
-        if let basicISO = ISO8601DateFormatter().date(from: raw) {
-            return basicISO
-        }
-        return CommunityBTCMapDateParsers.dateOnly.date(from: raw)
+        BTCMapDateParser.parse(raw)
     }
 
     private func normalizedPayableLightningPayload(from raw: String) -> String? {
@@ -1594,25 +1588,6 @@ actor CommunityIconCache {
         let hash = digest.map { String(format: "%02x", $0) }.joined()
         return "\(hash).img"
     }
-}
-
-private extension ISO8601DateFormatter {
-    static let communityFullPrecision: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-}
-
-private enum CommunityBTCMapDateParsers {
-    static let dateOnly: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
 }
 
 private extension View {

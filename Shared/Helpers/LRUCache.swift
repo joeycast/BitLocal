@@ -4,28 +4,36 @@ import CoreLocation
 // Address caching to prevent geocoding rate limiting.
 // Thread-safe: all mutations and reads are serialized with an internal lock.
 class LRUCache<Key: Hashable, Value> {
+    private final class Node {
+        let key: Key
+        var value: Value
+        weak var prev: Node?
+        var next: Node?
+
+        init(key: Key, value: Value) {
+            self.key = key
+            self.value = value
+        }
+    }
+
     private let maxSize: Int
-    private var cache: [Key: CacheItem] = [:]
-    private var lruKeys: [Key] = []
+    private var cache: [Key: Node] = [:]
+    private var head: Node? // Least recently used
+    private var tail: Node? // Most recently used
     private let lock = NSLock()
 
     init(maxSize: Int) {
-        self.maxSize = maxSize
+        self.maxSize = max(1, maxSize)
+        self.cache.reserveCapacity(min(self.maxSize, 256))
     }
 
     func getValue(forKey key: Key) -> Value? {
         lock.lock()
         defer { lock.unlock() }
 
-        guard let item = cache[key] else { return nil }
-
-        // Move the accessed key to the end (most recently used)
-        if let index = lruKeys.firstIndex(of: key) {
-            lruKeys.remove(at: index)
-            lruKeys.append(key)
-        }
-
-        return item.value
+        guard let node = cache[key] else { return nil }
+        moveToTail(node)
+        return node.value
     }
 
     func setValue(_ value: Value, forKey key: Key) {
@@ -37,41 +45,115 @@ class LRUCache<Key: Hashable, Value> {
     func allValues() -> [Key: Value] {
         lock.lock()
         defer { lock.unlock() }
-        return cache.mapValues { $0.value }
+        var snapshot: [Key: Value] = [:]
+        snapshot.reserveCapacity(cache.count)
+        for (key, node) in cache {
+            snapshot[key] = node.value
+        }
+        return snapshot
     }
 
     func setValues(_ values: [Key: Value]) {
         lock.lock()
         defer { lock.unlock() }
 
-        cache.removeAll(keepingCapacity: true)
-        lruKeys.removeAll(keepingCapacity: true)
+        removeAllUnlocked()
         for (key, value) in values {
             setValueUnlocked(value, forKey: key)
         }
     }
 
-    private func setValueUnlocked(_ value: Value, forKey key: Key) {
-        if cache[key] != nil {
-            cache[key] = CacheItem(value: value)
-            if let index = lruKeys.firstIndex(of: key) {
-                lruKeys.remove(at: index)
+    /// Merges disk-loaded entries without overwriting fresher in-memory entries.
+    func mergeMissingValues(_ values: [Key: Value]) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        for (key, value) in values where cache[key] == nil {
+            if cache.count >= maxSize {
+                break
             }
-            lruKeys.append(key)
+            let node = Node(key: key, value: value)
+            cache[key] = node
+            insertAtHead(node)
+        }
+    }
+
+    private func setValueUnlocked(_ value: Value, forKey key: Key) {
+        if let existing = cache[key] {
+            existing.value = value
+            moveToTail(existing)
             return
         }
 
-        if cache.count >= maxSize, let lruKey = lruKeys.first {
-            cache.removeValue(forKey: lruKey)
-            lruKeys.removeFirst()
+        if cache.count >= maxSize, let lru = head {
+            removeNode(lru)
+            cache.removeValue(forKey: lru.key)
         }
 
-        cache[key] = CacheItem(value: value)
-        lruKeys.append(key)
+        let node = Node(key: key, value: value)
+        cache[key] = node
+        appendToTail(node)
     }
 
-    private struct CacheItem {
-        let value: Value
+    private func removeAllUnlocked() {
+        var current = head
+        while let node = current {
+            let next = node.next
+            node.prev = nil
+            node.next = nil
+            current = next
+        }
+        head = nil
+        tail = nil
+        cache.removeAll(keepingCapacity: true)
+    }
+
+    private func moveToTail(_ node: Node) {
+        guard node !== tail else { return }
+        removeNode(node)
+        appendToTail(node)
+    }
+
+    private func appendToTail(_ node: Node) {
+        node.prev = tail
+        node.next = nil
+        if let existingTail = tail {
+            existingTail.next = node
+        } else {
+            head = node
+        }
+        tail = node
+    }
+
+    private func insertAtHead(_ node: Node) {
+        node.prev = nil
+        node.next = head
+        if let existingHead = head {
+            existingHead.prev = node
+        } else {
+            tail = node
+        }
+        head = node
+    }
+
+    private func removeNode(_ node: Node) {
+        let prev = node.prev
+        let next = node.next
+
+        if let prev {
+            prev.next = next
+        } else {
+            head = next
+        }
+
+        if let next {
+            next.prev = prev
+        } else {
+            tail = prev
+        }
+
+        node.prev = nil
+        node.next = nil
     }
 }
 

@@ -69,11 +69,17 @@ struct WeeklyHours: Codable, Equatable {
         }
     }
 
+    private static let osmTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
     // Format to OpenStreetMap opening_hours syntax
     // Example: "Mo-We 10:00-19:00; Th 08:00-20:00"
     func toOSMFormat() -> String {
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HH:mm"
+        let timeFormatter = Self.osmTimeFormatter
 
         // Group consecutive days with same hours
         var segments: [(days: [Weekday], hours: DayHours)] = []

@@ -686,18 +686,35 @@ enum ElementCategoryBadgeHelper {
         )
     }
 
+    private static let symbolCacheLock = NSLock()
+    private static var uncircledSymbolCache: [String: String] = [:]
+
     static func uncircledSymbolName(from raw: String) -> String {
+        symbolCacheLock.lock()
+        if let cached = uncircledSymbolCache[raw] {
+            symbolCacheLock.unlock()
+            return cached
+        }
+        symbolCacheLock.unlock()
+
+        var resolved = raw
         for suffix in [".circle.fill", ".circle"] where raw.hasSuffix(suffix) {
             let base = String(raw.dropLast(suffix.count))
             let filled = "\(base).fill"
             if UIImage(systemName: filled) != nil {
-                return filled
+                resolved = filled
+                break
             }
             if UIImage(systemName: base) != nil {
-                return base
+                resolved = base
+                break
             }
         }
-        return raw
+
+        symbolCacheLock.lock()
+        uncircledSymbolCache[raw] = resolved
+        symbolCacheLock.unlock()
+        return resolved
     }
 }
 

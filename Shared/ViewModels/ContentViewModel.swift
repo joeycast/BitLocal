@@ -603,43 +603,59 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         deepLinkUnavailableState = PlaceDeepLinkResolver.unavailableState(placeID: placeID)
     }
 
+    private let geocodingCacheIOQueue = DispatchQueue(label: "app.bitlocal.geocodingCacheIO", qos: .utility)
+
     func scheduleGeocodingCacheSave() {
-        geocodingCacheSaveWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.saveGeocodingCache()
+        geocodingCacheIOQueue.async { [weak self] in
+            guard let self else { return }
+            self.geocodingCacheSaveWorkItem?.cancel()
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.saveGeocodingCache(synchronous: false)
+            }
+            self.geocodingCacheSaveWorkItem = workItem
+            self.geocodingCacheIOQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
         }
-        geocodingCacheSaveWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
     }
 
     private func loadGeocodingCache() {
-        guard let data = try? Data(contentsOf: geocodingCacheFileURL) else { return }
-        do {
-            let decoded = try JSONDecoder().decode([String: ReverseGeocodingCacheEntry].self, from: data)
-            geocodingCache.setValues(decoded)
-            Debug.log("Loaded geocoding cache: \(decoded.count) entries")
-        } catch {
+        let fileURL = geocodingCacheFileURL
+        geocodingCacheIOQueue.async { [weak self] in
+            guard let self, let data = try? Data(contentsOf: fileURL) else { return }
             do {
-                let legacy = try JSONDecoder().decode([String: Address].self, from: data)
-                let migrated = legacy.mapValues { ReverseGeocodingCacheEntry.forAddress($0) }
-                geocodingCache.setValues(migrated)
-                Debug.log("Migrated geocoding cache: \(migrated.count) entries")
-                scheduleGeocodingCacheSave()
+                let decoded = try JSONDecoder().decode([String: ReverseGeocodingCacheEntry].self, from: data)
+                self.geocodingCache.mergeMissingValues(decoded)
+                Debug.log("Loaded geocoding cache: \(decoded.count) entries")
             } catch {
-                Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
+                do {
+                    let legacy = try JSONDecoder().decode([String: Address].self, from: data)
+                    let migrated = legacy.mapValues { ReverseGeocodingCacheEntry.forAddress($0) }
+                    self.geocodingCache.mergeMissingValues(migrated)
+                    Debug.log("Migrated geocoding cache: \(migrated.count) entries")
+                    self.scheduleGeocodingCacheSave()
+                } catch {
+                    Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
+                }
             }
         }
     }
 
-    private func saveGeocodingCache() {
+    private func saveGeocodingCache(synchronous: Bool = true) {
         let values = geocodingCache.allValues()
         guard !values.isEmpty else { return }
-        do {
-            let data = try JSONEncoder().encode(values)
-            try data.write(to: geocodingCacheFileURL, options: [.atomic])
-            Debug.log("Saved geocoding cache: \(values.count) entries")
-        } catch {
-            Debug.log("Failed to save geocoding cache: \(error.localizedDescription)")
+        let fileURL = geocodingCacheFileURL
+        let writeBlock = {
+            do {
+                let data = try JSONEncoder().encode(values)
+                try data.write(to: fileURL, options: [.atomic])
+                Debug.log("Saved geocoding cache: \(values.count) entries")
+            } catch {
+                Debug.log("Failed to save geocoding cache: \(error.localizedDescription)")
+            }
+        }
+        if synchronous {
+            geocodingCacheIOQueue.sync(execute: writeBlock)
+        } else {
+            geocodingCacheIOQueue.async(execute: writeBlock)
         }
     }
 
@@ -844,6 +860,58 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         }
 
         return lhs.id < rhs.id
+    }
+
+    /// Precomputes boost state, distance, and normalized name once per element (O(N))
+    /// instead of allocating CLLocation / parsing boost dates on every O(N log N) comparison.
+    func sortedElementsForMerchantBrowse(_ source: [Element], limit: Int? = nil) -> [Element] {
+        guard !source.isEmpty else { return [] }
+        let originLocation = userLocation ?? CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+        let referenceDate = Date()
+
+        struct SortEntry {
+            let element: Element
+            let isBoosted: Bool
+            let distance: CLLocationDistance
+            let normalizedName: String
+        }
+
+        var entries: [SortEntry] = []
+        entries.reserveCapacity(source.count)
+        for element in source {
+            let distance: CLLocationDistance
+            if let coord = element.mapCoordinate {
+                distance = originLocation.distance(from: CLLocation(latitude: coord.latitude, longitude: coord.longitude))
+            } else {
+                distance = .greatestFiniteMagnitude
+            }
+            entries.append(
+                SortEntry(
+                    element: element,
+                    isBoosted: element.isCurrentlyBoosted(referenceDate: referenceDate),
+                    distance: distance,
+                    normalizedName: normalizedMerchantName(element.displayName ?? "")
+                )
+            )
+        }
+
+        entries.sort { lhs, rhs in
+            if lhs.isBoosted != rhs.isBoosted {
+                return lhs.isBoosted && !rhs.isBoosted
+            }
+            if lhs.distance != rhs.distance {
+                return lhs.distance < rhs.distance
+            }
+            if lhs.normalizedName != rhs.normalizedName {
+                return lhs.normalizedName < rhs.normalizedName
+            }
+            return lhs.element.id < rhs.element.id
+        }
+
+        if let limit, limit < entries.count {
+            return entries.prefix(limit).map(\.element)
+        }
+        return entries.map(\.element)
     }
 
     private func listFocusCoordinate() -> CLLocationCoordinate2D? {

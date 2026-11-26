@@ -737,16 +737,49 @@ struct ElementCategorySymbols {
         merchantCategoryDescriptors[group]!
     }
 
+    private struct PrecomputedGroupMatcher {
+        let group: MerchantCategoryGroup
+        let lowercasedIconOverrides: Set<String>
+        let normalizedTerms: Set<String>
+    }
+
+    private static let precomputedGroupMatchers: [PrecomputedGroupMatcher] = {
+        MerchantCategoryGroup.allCases
+            .sorted {
+                merchantCategoryDescriptor(for: $0).priority < merchantCategoryDescriptor(for: $1).priority
+            }
+            .map { group in
+                let descriptor = merchantCategoryDescriptor(for: group)
+                return PrecomputedGroupMatcher(
+                    group: group,
+                    lowercasedIconOverrides: Set(descriptor.iconOverrides.map { $0.lowercased() }),
+                    normalizedTerms: normalizedSearchTerms(descriptor.matchingTagValues)
+                )
+            }
+    }()
+
+    private static let iconGroupCacheLock = NSLock()
+    private static var iconGroupCache: [String: [MerchantCategoryGroup]] = [:]
+
     static func merchantCategoryGroups(for element: Element) -> [MerchantCategoryGroup] {
-        let iconCandidates = Set(
-            [element.v4Metadata?.icon, element.tags?.iconPlatform]
-                .compactMap { $0?.lowercased() }
-        )
+        var iconCandidates = Set<String>()
+        if let icon = element.v4Metadata?.icon {
+            iconCandidates.insert(icon.lowercased())
+        }
+        if let icon = element.tags?.iconPlatform {
+            iconCandidates.insert(icon.lowercased())
+        }
+
+        // Fast path: when there are no OSM tags, reuse the icon-only cache.
+        let tags = element.osmTagsDict
+        if (tags == nil || tags?.isEmpty == true), iconCandidates.count == 1, let onlyIcon = iconCandidates.first {
+            return merchantCategoryGroups(forCategoryIcon: onlyIcon)
+        }
 
         var termCandidates = Set<String>()
-        if let tags = element.osmTagsDict {
+        if let tags {
             for value in tags.values {
-                splitComponents(value).forEach { component in
+                for component in splitComponents(value) {
                     termCandidates.insert(normalizedSearchTerm(component))
                 }
             }
@@ -759,59 +792,49 @@ struct ElementCategorySymbols {
             termCandidates.insert(normalizedSearchTerm(icon))
         }
 
-        return MerchantCategoryGroup.allCases.filter { group in
-            let descriptor = merchantCategoryDescriptor(for: group)
-            if !Set(descriptor.iconOverrides.map { $0.lowercased() }).isDisjoint(with: iconCandidates) {
-                return true
+        // precomputedGroupMatchers is already sorted by priority.
+        var matched: [MerchantCategoryGroup] = []
+        for matcher in precomputedGroupMatchers {
+            if !matcher.lowercasedIconOverrides.isDisjoint(with: iconCandidates) ||
+                !matcher.normalizedTerms.isDisjoint(with: termCandidates) {
+                matched.append(matcher.group)
             }
-
-            let descriptorTerms = normalizedSearchTerms(descriptor.matchingTagValues)
-            return !descriptorTerms.isDisjoint(with: termCandidates)
         }
-        .sorted { lhs, rhs in
-            merchantCategoryDescriptor(for: lhs).priority < merchantCategoryDescriptor(for: rhs).priority
-        }
+        return matched
     }
 
     static func merchantCategoryGroups(forCategoryIcon icon: String?) -> [MerchantCategoryGroup] {
-        guard let icon else { return [] }
-        let element = Element(
-            id: UUID().uuidString,
-            osmJSON: nil,
-            tags: Tags(
-                category: nil,
-                iconPlatform: icon,
-                paymentCoinos: nil,
-                paymentPouch: nil,
-                boostExpires: nil,
-                categoryPlural: nil,
-                paymentProvider: nil,
-                paymentURI: nil
-            ),
-            createdAt: "",
-            updatedAt: nil,
-            deletedAt: nil,
-            address: nil,
-            v4Metadata: ElementV4Metadata(
-                icon: icon,
-                commentsCount: nil,
-                verifiedAt: nil,
-                boostedUntil: nil,
-                osmID: nil,
-                osmURL: nil,
-                email: nil,
-                twitter: nil,
-                facebook: nil,
-                instagram: nil,
-                telegram: nil,
-                line: nil,
-                requiredAppURL: nil,
-                imageURL: nil,
-                paymentProvider: nil,
-                rawAddress: nil
-            )
-        )
-        return merchantCategoryGroups(for: element)
+        guard let icon, !icon.isEmpty else { return [] }
+        let key = icon.lowercased()
+
+        iconGroupCacheLock.lock()
+        if let cached = iconGroupCache[key] {
+            iconGroupCacheLock.unlock()
+            return cached
+        }
+        iconGroupCacheLock.unlock()
+
+        let iconSet: Set<String> = [key]
+        var termCandidates = Set<String>()
+        if let assignment = osmTagAssignment(forCategoryIcon: key) {
+            termCandidates.insert(normalizedSearchTerm(assignment.tagValue))
+        }
+        termCandidates.insert(normalizedSearchTerm(key))
+
+        var matched: [MerchantCategoryGroup] = []
+        for matcher in precomputedGroupMatchers {
+            if !matcher.lowercasedIconOverrides.isDisjoint(with: iconSet) ||
+                !matcher.normalizedTerms.isDisjoint(with: termCandidates) {
+                matched.append(matcher.group)
+            }
+        }
+
+        iconGroupCacheLock.lock()
+        if iconGroupCache.count < 1_024 {
+            iconGroupCache[key] = matched
+        }
+        iconGroupCacheLock.unlock()
+        return matched
     }
 
     static func merchantCategoryChips(for elements: [Element], limit: Int = 6) -> [MerchantCategoryChip] {

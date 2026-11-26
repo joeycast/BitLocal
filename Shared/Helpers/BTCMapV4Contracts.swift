@@ -26,37 +26,23 @@ struct ElementV4Metadata: Codable, Hashable {
 }
 
 enum BTCMapDateParser {
-    static func parse(_ raw: String?) -> Date? {
-        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty else {
-            return nil
-        }
-        if let fullISO = ISO8601DateFormatter.fullPrecision.date(from: raw) {
-            return fullISO
-        }
-        if let basicISO = ISO8601DateFormatter.basic.date(from: raw) {
-            return basicISO
-        }
-        return BTCMapDateParsers.dateOnly.date(from: raw)
-    }
-}
+    private static let lock = NSLock()
+    private static var cache: [String: Date?] = [:]
+    private static let maxCacheEntries = 4_096
 
-private extension ISO8601DateFormatter {
-    static let fullPrecision: ISO8601DateFormatter = {
+    private static let fullPrecisionISO: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    static let basic: ISO8601DateFormatter = {
+    private static let basicISO: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
-}
 
-private enum BTCMapDateParsers {
-    static let dateOnly: DateFormatter = {
+    private static let dateOnly: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -64,6 +50,35 @@ private enum BTCMapDateParsers {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
+
+    static func parse(_ raw: String?) -> Date? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let cached = cache[raw] {
+            return cached
+        }
+
+        let parsed: Date?
+        if let fullISO = fullPrecisionISO.date(from: raw) {
+            parsed = fullISO
+        } else if let basic = basicISO.date(from: raw) {
+            parsed = basic
+        } else {
+            parsed = dateOnly.date(from: raw)
+        }
+
+        if cache.count >= maxCacheEntries {
+            cache.removeAll(keepingCapacity: true)
+        }
+        cache[raw] = parsed
+        return parsed
+    }
 }
 
 /// CDN snapshot payload (`cdn.static.btcmap.org/api/v4/places.json`).
@@ -543,20 +558,17 @@ struct V3AreaRecord: Codable, Hashable, Identifiable {
         bounds = try container.decodeIfPresent(V3AreaBounds.self, forKey: .bounds)
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
 
-        // Decode tags as mixed-type dictionary to extract geo_json
-        if let rawTags = try container.decodeIfPresent([String: AnyCodableValue].self, forKey: .tags) {
+        // Decode tags directly via nested dynamic-key container so large geo_json polygons
+        // are decoded in a single pass without an AnyCodableValue re-encode/re-decode round-trip.
+        if let tagsContainer = try? container.nestedContainer(keyedBy: DynamicTagCodingKey.self, forKey: .tags) {
             var stringTags: [String: String] = [:]
             var parsedGeoJSON: GeoJSONFeatureCollection?
 
-            for (key, value) in rawTags {
-                if key == "geo_json" {
-                    // Re-encode the nested value and decode as GeoJSONFeatureCollection
-                    if let data = try? JSONEncoder().encode(value),
-                       let fc = try? JSONDecoder().decode(GeoJSONFeatureCollection.self, from: data) {
-                        parsedGeoJSON = fc
-                    }
-                } else if case .string(let s) = value {
-                    stringTags[key] = s
+            for key in tagsContainer.allKeys {
+                if key.stringValue == "geo_json" {
+                    parsedGeoJSON = try? tagsContainer.decode(GeoJSONFeatureCollection.self, forKey: key)
+                } else if let s = try? tagsContainer.decode(String.self, forKey: key) {
+                    stringTags[key.stringValue] = s
                 }
             }
 
@@ -585,6 +597,21 @@ struct V3AreaRecord: Codable, Hashable, Identifiable {
         if !trimmed.isEmpty { return trimmed }
         if let tagName = tags?["name"], !tagName.isEmpty { return tagName }
         return "Area #\(id)"
+    }
+}
+
+private struct DynamicTagCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = String(intValue)
+        self.intValue = intValue
     }
 }
 
@@ -683,30 +710,24 @@ struct V2AreaRecord: Codable, Hashable, Identifiable {
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
 
-        if let rawTags = try container.decodeIfPresent([String: AnyCodableValue].self, forKey: .tags) {
+        if let tagsContainer = try? container.nestedContainer(keyedBy: DynamicTagCodingKey.self, forKey: .tags) {
             var stringTags: [String: String] = [:]
             var parsedGeoJSON: GeoJSONFeatureCollection?
 
-            for (key, value) in rawTags {
-                if key == "geo_json" {
-                    if let data = try? JSONEncoder().encode(value),
-                       let fc = try? JSONDecoder().decode(GeoJSONFeatureCollection.self, from: data) {
-                        parsedGeoJSON = fc
-                    }
+            for key in tagsContainer.allKeys {
+                if key.stringValue == "geo_json" {
+                    parsedGeoJSON = try? tagsContainer.decode(GeoJSONFeatureCollection.self, forKey: key)
                     continue
                 }
 
-                switch value {
-                case .string(let s):
-                    stringTags[key] = s
-                case .bool(let b):
-                    stringTags[key] = b ? "true" : "false"
-                case .int(let i):
-                    stringTags[key] = String(i)
-                case .double(let d):
-                    stringTags[key] = String(d)
-                default:
-                    continue
+                if let s = try? tagsContainer.decode(String.self, forKey: key) {
+                    stringTags[key.stringValue] = s
+                } else if let b = try? tagsContainer.decode(Bool.self, forKey: key) {
+                    stringTags[key.stringValue] = b ? "true" : "false"
+                } else if let i = try? tagsContainer.decode(Int.self, forKey: key) {
+                    stringTags[key.stringValue] = String(i)
+                } else if let d = try? tagsContainer.decode(Double.self, forKey: key) {
+                    stringTags[key.stringValue] = String(d)
                 }
             }
 

@@ -204,6 +204,7 @@ struct BusinessDetailView: View {
     var element: Element
     var userLocation: CLLocation?
     @Binding private var currentDetent: PresentationDetent?
+    private let parsedOpeningSchedule: OSMOpeningHoursWeekSchedule?
 
     private let repository: BTCMapRepositoryProtocol = BTCMapRepository.shared
 
@@ -216,6 +217,10 @@ struct BusinessDetailView: View {
         self.element = element
         self.userLocation = userLocation
         self._currentDetent = currentDetent
+        let rawHours = element.osmJSON?.tags?.openingHours?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.parsedOpeningSchedule = (rawHours?.isEmpty == false)
+            ? rawHours.flatMap(OSMOpeningHoursParser.parseWeekSchedule)
+            : nil
         self._elementCellViewModel = StateObject(
             wrappedValue: ElementCellViewModel(
                 element: element,
@@ -279,11 +284,6 @@ struct BusinessDetailView: View {
             return nil
         }
         return raw
-    }
-
-    private var parsedOpeningSchedule: OSMOpeningHoursWeekSchedule? {
-        guard let openingHoursRaw else { return nil }
-        return OSMOpeningHoursParser.parseWeekSchedule(openingHoursRaw)
     }
 
     private var verificationState: PlaceVerificationState {
@@ -1335,6 +1335,14 @@ private struct PlaceDetailsSurface: View {
         return String(trimmed.prefix(3))
     }
 
+    private static var cachedTimeFormatterLocaleID: String = ""
+    private static let cachedTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter
+    }()
+
     private func formattedTime(_ totalMinutes: Int) -> String {
         let clampedMinutes = max(0, min(totalMinutes, 24 * 60))
         let hour = clampedMinutes / 60
@@ -1349,10 +1357,13 @@ private struct PlaceDetailsSurface: View {
             return String(format: "%02d:%02d", hour, minute)
         }
 
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter.string(from: date)
+        let currentLocaleID = Locale.current.identifier
+        if Self.cachedTimeFormatterLocaleID != currentLocaleID {
+            Self.cachedTimeFormatter.locale = Locale.current
+            Self.cachedTimeFormatter.setLocalizedDateFormatFromTemplate("jm")
+            Self.cachedTimeFormatterLocaleID = currentLocaleID
+        }
+        return Self.cachedTimeFormatter.string(from: date)
     }
 }
 
@@ -1426,20 +1437,25 @@ private struct PlaceDescriptionSection: View {
 
 private struct TranslatableBusinessDescriptionView: View {
     let description: String
+    private let detectedLanguageCode: String?
 
     @State private var translatedDescription: String?
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var translationError: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    init(description: String) {
+        self.description = description
+        if description.count >= 20 {
+            self.detectedLanguageCode = NLLanguageRecognizer.dominantLanguage(for: description)?.rawValue
+        } else {
+            self.detectedLanguageCode = nil
+        }
+    }
+
     private var hasSuccessfulTranslation: Bool {
         guard let translatedDescription else { return false }
         return !translatedDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var detectedLanguageCode: String? {
-        guard description.count >= 20 else { return nil }
-        return NLLanguageRecognizer.dominantLanguage(for: description)?.rawValue
     }
 
     private var preferredLanguageCode: String? {
@@ -1703,20 +1719,25 @@ struct BTCMapPlaceCommentsListView: View {
 
 private struct TranslatableReviewBodyTextView: View {
     let text: String
+    private let detectedLanguageCode: String?
 
     @State private var translatedText: String?
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var translationError: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    init(text: String) {
+        self.text = text
+        if text.count >= 20 {
+            self.detectedLanguageCode = NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+        } else {
+            self.detectedLanguageCode = nil
+        }
+    }
+
     private var hasSuccessfulTranslation: Bool {
         guard let translatedText else { return false }
         return !translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var detectedLanguageCode: String? {
-        guard text.count >= 20 else { return nil }
-        return NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
     }
 
     private var preferredLanguageCode: String? {

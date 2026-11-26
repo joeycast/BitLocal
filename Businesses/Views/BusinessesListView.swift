@@ -959,10 +959,7 @@ struct BusinessesListView: View {
 
     private func nearestElements(_ source: [Element], limit: Int) -> [Element] {
         guard limit > 0, !source.isEmpty else { return [] }
-        return source
-            .sorted(by: viewModel.merchantBrowseSortOrder)
-            .prefix(limit)
-            .map { $0 }
+        return viewModel.sortedElementsForMerchantBrowse(source, limit: limit)
     }
 
     private func businessDetailDestination(for element: Element) -> some View {
