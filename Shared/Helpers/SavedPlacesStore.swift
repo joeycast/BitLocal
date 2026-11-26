@@ -17,19 +17,26 @@ final class SavedPlacesStore: ObservableObject {
     private static let recordNamePrefix = "saved-"
 
     private let userDefaults: UserDefaults
+    private let enableCloudKitSync: Bool
     private lazy var container = CKContainer(identifier: Self.cloudKitContainerIdentifier)
     private var isSyncing = false
     private var pendingAdditions: Set<String>
     private var pendingRemovals: Set<String>
 
-    init(userDefaults: UserDefaults = .standard) {
+    var pendingAdditionIDs: Set<String> { pendingAdditions }
+    var pendingRemovalIDs: Set<String> { pendingRemovals }
+
+    init(userDefaults: UserDefaults = .standard, enableCloudKitSync: Bool = true) {
         self.userDefaults = userDefaults
+        self.enableCloudKitSync = enableCloudKitSync
         self.savedIDs = Set(userDefaults.stringArray(forKey: Self.userDefaultsKey) ?? [])
         self.pendingAdditions = Set(userDefaults.stringArray(forKey: Self.pendingAdditionsKey) ?? [])
         self.pendingRemovals = Set(userDefaults.stringArray(forKey: Self.pendingRemovalsKey) ?? [])
 
-        Task { [weak self] in
-            await self?.syncFromCloudIfAvailable()
+        if enableCloudKitSync {
+            Task { [weak self] in
+                await self?.syncFromCloudIfAvailable()
+            }
         }
     }
 
@@ -55,6 +62,8 @@ final class SavedPlacesStore: ObservableObject {
 
         persistToUserDefaults()
 
+        guard enableCloudKitSync else { return }
+
         Task { [weak self] in
             guard let self else { return }
             if shouldSave {
@@ -65,7 +74,18 @@ final class SavedPlacesStore: ObservableObject {
         }
     }
 
+    func applyCloudMerge(remoteIDs: Set<String>) {
+        var filteredRemote = remoteIDs
+        filteredRemote.subtract(pendingRemovals)
+        let merged = savedIDs.union(filteredRemote)
+        if merged != savedIDs {
+            savedIDs = merged
+            persistToUserDefaults()
+        }
+    }
+
     func syncFromCloudIfAvailable() async {
+        guard enableCloudKitSync else { return }
         guard !isSyncing else { return }
         isSyncing = true
         defer { isSyncing = false }
@@ -111,12 +131,7 @@ final class SavedPlacesStore: ObservableObject {
                 cursor = nextPage.queryCursor
             }
 
-            remoteIDs.subtract(pendingRemovals)
-            let merged = savedIDs.union(remoteIDs)
-            if merged != savedIDs {
-                savedIDs = merged
-                persistToUserDefaults()
-            }
+            applyCloudMerge(remoteIDs: remoteIDs)
         } catch {
             // CloudKit sync is best-effort; silently ignore errors for offline/unavailable states.
         }

@@ -1,0 +1,11 @@
+appId: app.bitlocal.bitlocal
+tags:
+  - settings
+---
+- launchApp
+- tapOn: "Settings"
+- assertVisible: "Settings"
+- tapOn: "About BitLocal"
+- assertVisible: "BitLocal"
+- tapOn: "Settings"
+- tapOn: "Done"

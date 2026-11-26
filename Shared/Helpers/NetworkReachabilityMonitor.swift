@@ -11,9 +11,9 @@ final class NetworkReachabilityMonitor: ObservableObject {
     private let driver: PathMonitorDriver
     private var lastAppliedGeneration: UInt64 = 0
 
-    init(offlineDebounceInterval: TimeInterval = 0.8) {
+    init(offlineDebounceInterval: TimeInterval = 0.8, startSystemMonitor: Bool = true) {
         self.driver = PathMonitorDriver(offlineDebounceInterval: offlineDebounceInterval)
-        driver.start { [weak self] offline, generation in
+        driver.start(startSystemMonitor: startSystemMonitor) { [weak self] offline, generation in
             Task { @MainActor [weak self] in
                 guard let self, generation >= self.lastAppliedGeneration else { return }
                 self.lastAppliedGeneration = generation
@@ -22,6 +22,10 @@ final class NetworkReachabilityMonitor: ObservableObject {
                 }
             }
         }
+    }
+
+    func handleStatusForTesting(_ status: NWPath.Status) {
+        driver.injectStatus(status)
     }
 
     deinit {
@@ -37,22 +41,33 @@ private final class PathMonitorDriver: @unchecked Sendable {
     private var debounceToken: UInt64 = 0
     private var emissionGeneration: UInt64 = 0
     private var onStateChange: (@Sendable (Bool, UInt64) -> Void)?
+    private var startedSystemMonitor = false
 
     init(offlineDebounceInterval: TimeInterval) {
         self.offlineDebounceInterval = offlineDebounceInterval
     }
 
-    func start(onStateChange: @escaping @Sendable (Bool, UInt64) -> Void) {
+    func start(startSystemMonitor: Bool = true, onStateChange: @escaping @Sendable (Bool, UInt64) -> Void) {
         self.onStateChange = onStateChange
+        guard startSystemMonitor else { return }
+        startedSystemMonitor = true
         monitor.pathUpdateHandler = { [weak self] path in
             self?.handlePathStatus(path.status)
         }
         monitor.start(queue: queue)
     }
 
+    func injectStatus(_ status: NWPath.Status) {
+        queue.async { [weak self] in
+            self?.handlePathStatus(status)
+        }
+    }
+
     func stop() {
-        monitor.pathUpdateHandler = nil
-        monitor.cancel()
+        if startedSystemMonitor {
+            monitor.pathUpdateHandler = nil
+            monitor.cancel()
+        }
         queue.async { [self] in
             pendingOfflineWorkItem?.cancel()
             pendingOfflineWorkItem = nil

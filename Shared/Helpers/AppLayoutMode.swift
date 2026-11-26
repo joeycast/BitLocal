@@ -82,6 +82,32 @@ struct AdaptiveLeadingSheetSizing: PresentationSizing, Equatable {
             height: resolvedHeight > 1 ? resolvedHeight : finiteHeight
         )
     }
+    /// Pure width resolver for wide leading-pinned collapsible sheets, factoring in
+    /// horizontal size class, orientation, optional vertical fold frame, and LTR/RTL layout direction.
+    static func resolvedWidth(
+        containerSize: CGSize,
+        safeAreaInsets: EdgeInsets,
+        horizontalSizeClass: UserInterfaceSizeClass?,
+        layoutDirection: LayoutDirection = .leftToRight,
+        verticalFoldFrame: CGRect? = nil
+    ) -> CGFloat? {
+        let fullWidth = containerSize.width + safeAreaInsets.leading + safeAreaInsets.trailing
+        let fullHeight = containerSize.height + safeAreaInsets.top + safeAreaInsets.bottom
+        guard horizontalSizeClass == .regular, fullWidth > fullHeight else {
+            return nil
+        }
+
+        let targetWidth = min(max(fullWidth * 0.42, 380), 420)
+
+        if let foldFrame = verticalFoldFrame, foldFrame.height > foldFrame.width {
+            let leadingOfFold: CGFloat = layoutDirection == .rightToLeft
+                ? containerSize.width - foldFrame.maxX + safeAreaInsets.trailing
+                : foldFrame.minX + safeAreaInsets.leading
+            return min(targetWidth, max(leadingOfFold - 16, 340))
+        }
+
+        return targetWidth
+    }
 }
 
 extension GeometryProxy {
@@ -93,26 +119,21 @@ extension GeometryProxy {
         horizontalSizeClass: UserInterfaceSizeClass?,
         layoutDirection: LayoutDirection = .leftToRight
     ) -> CGFloat? {
-        let fullWidth = size.width + safeAreaInsets.leading + safeAreaInsets.trailing
-        let fullHeight = size.height + safeAreaInsets.top + safeAreaInsets.bottom
-        guard horizontalSizeClass == .regular, fullWidth > fullHeight else {
-            return nil
-        }
-
-        let targetWidth = min(max(fullWidth * 0.42, 380), 420)
-
+        var foldFrame: CGRect?
         #if compiler(>=6.4)
         if #available(iOS 27.1, *),
-           let fold = reservedRegions(kind: .division, options: .includeInactive).first,
-           fold.frame.height > fold.frame.width {
-            let leadingOfFold: CGFloat = layoutDirection == .rightToLeft
-                ? size.width - fold.frame.maxX + safeAreaInsets.trailing
-                : fold.frame.minX + safeAreaInsets.leading
-            return min(targetWidth, max(leadingOfFold - 16, 340))
+           let fold = reservedRegions(kind: .division, options: .includeInactive).first {
+            foldFrame = fold.frame
         }
         #endif
 
-        return targetWidth
+        return AdaptiveLeadingSheetSizing.resolvedWidth(
+            containerSize: size,
+            safeAreaInsets: safeAreaInsets,
+            horizontalSizeClass: horizontalSizeClass,
+            layoutDirection: layoutDirection,
+            verticalFoldFrame: foldFrame
+        )
     }
 }
 
