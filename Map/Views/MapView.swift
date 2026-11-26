@@ -176,7 +176,7 @@ struct MapView: UIViewRepresentable {
         if canSkipAnnotationHash {
             let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
             if needsUpdate {
-                Debug.logMap("⏱ updateUIView: padding/mapType-only in \(String(format: "%.1f", elapsed))ms")
+                Debug.logMap("⏱ updateUIView: padding/mapType-only in \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
             }
             return
         }
@@ -299,9 +299,9 @@ struct MapView: UIViewRepresentable {
 
         let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
         if needsUpdate {
-            Debug.logMap("⏱ updateUIView: COMPLETED with changes in \(String(format: "%.1f", elapsed))ms")
+            Debug.logMap("⏱ updateUIView: COMPLETED with changes in \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
         } else if elapsed > 1.0 {
-            Debug.logMap("⏱ updateUIView: no-op but took \(String(format: "%.1f", elapsed))ms")
+            Debug.logMap("⏱ updateUIView: no-op but took \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
         }
     }
     
@@ -312,6 +312,7 @@ struct MapView: UIViewRepresentable {
     }
     
     // Coordinator class to handle MKMapViewDelegate methods and annotations management
+    @MainActor
     class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         private struct AnnotationPassKey: Equatable {
             let elementsHash: Int
@@ -332,7 +333,6 @@ struct MapView: UIViewRepresentable {
         // Keep track of previously displayed elements to manage annotations efficiently
         var previousElements: Set<Element> = []
         var currentAnnotations: [String: Annotation] = [:] // Keep track of current annotations
-        private var cancellable: AnyCancellable?
         private var debounceTimer: AnyCancellable?
         private struct SpatialCellKey: Hashable {
             let x: Int
@@ -482,11 +482,6 @@ struct MapView: UIViewRepresentable {
                     mapView.selectAnnotation(annotation, animated: true)
                 }
             })
-        }
-        
-        // Ensure to cancel the subscription when the Coordinator is deinitialized
-        deinit {
-            cancellable?.cancel()
         }
         
         private func ensureSpatialIndex(for elements: [Element], elementsHash: Int) {
@@ -656,7 +651,7 @@ struct MapView: UIViewRepresentable {
                 }
             }
 
-            let referenceDate = Date()
+            let referenceDate = Date.now
 
             // Drop pins that left the viewport, and pins whose map-facing content changed
             // (name, boost, icon) so marker tint/title stay current.
@@ -697,7 +692,8 @@ struct MapView: UIViewRepresentable {
                 )
                 self.viewModel.visibleElementsSubject.send(refreshedVisibleElements)
             }
-            Debug.logMap("⏱ updateAnnotations: \(elements.count) source (\(candidates.count) candidates) → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - annStart) * 1000))ms")
+            let elapsed = (CFAbsoluteTimeGetCurrent() - annStart) * 1000
+            Debug.logMap("⏱ updateAnnotations: \(elements.count) source (\(candidates.count) candidates) → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
         }
 
         @discardableResult
@@ -744,13 +740,9 @@ struct MapView: UIViewRepresentable {
                 view?.markerTintColor = Self.markerTintColor
                 let count = cluster.memberAnnotations.count
                 view?.glyphText = "\(count)"
-                // localizedStringWithFormat resolves the catalog's plural variations.
-                view?.accessibilityLabel = String.localizedStringWithFormat(
-                    NSLocalizedString(
-                        "%d Bitcoin merchants",
-                        comment: "VoiceOver label for a map cluster of merchants"
-                    ),
-                    count
+                view?.accessibilityLabel = String(
+                    localized: "^[\(count) Bitcoin merchant](inflect: true)",
+                    comment: "VoiceOver label for a map cluster of merchants"
                 )
                 view?.accessibilityTraits = .button
                 view?.accessibilityHint = NSLocalizedString(
@@ -803,7 +795,7 @@ struct MapView: UIViewRepresentable {
                 methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
             }
             if !methods.isEmpty {
-                parts.append(methods.joined(separator: ", "))
+                parts.append(methods.formatted())
             }
             return parts.joined(separator: ". ")
         }
@@ -862,7 +854,7 @@ struct MapView: UIViewRepresentable {
                 // Restore the logic to display BusinessDetailView
                 DispatchQueue.main.async {
                     self.viewModel.setSelectionSource(.mapAnnotation)
-                    self.viewModel.path = [element] // Update path for NavigationStack
+                    self.viewModel.path = [.place(element)] // Update path for NavigationStack
                     self.viewModel.selectedElement = element // Update the selected element
                     
                     Debug.logMap("Annotation tapped: \(element)")

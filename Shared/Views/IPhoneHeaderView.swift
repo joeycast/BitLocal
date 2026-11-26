@@ -6,17 +6,15 @@
 //
 
 import SwiftUI
-import MapKit
 
 struct IPhoneHeaderView: View {
     private let headerControlWidth: CGFloat = 46
-    private let headerControlHeight: CGFloat = 32
+    private let headerControlHeight: CGFloat = 44
     private let headerHorizontalInset: CGFloat = 18
 
     let screenWidth: CGFloat
     @ObservedObject var viewModel: ContentViewModel
     @Binding var showingSettings: Bool
-    var selectedMapTypeBinding: Binding<MKMapType>
 
     // Use environment object for instant updates
     @EnvironmentObject var appearanceManager: AppearanceManager
@@ -39,8 +37,8 @@ struct IPhoneHeaderView: View {
                         .accessibilityHidden(true)
                     Spacer()
                     Text("bitlocal")
-                        .font(.custom("Fredoka-Medium", size: headerTitleSize))
-                        .foregroundColor(.accentColor)
+                        .font(.custom("Fredoka-Medium", size: headerTitleSize, relativeTo: .title2))
+                        .foregroundStyle(.accent)
                     Spacer()
                     SettingsButtonView(
                         onSettingsSelected: { showingSettings = true }
@@ -52,7 +50,7 @@ struct IPhoneHeaderView: View {
                 .padding(.bottom, contentBottomPad)
             }
             .frame(maxWidth: .infinity)
-            .background(
+            .background {
                 Group {
                     if #available(iOS 26.0, *) {
                         Rectangle()
@@ -61,9 +59,9 @@ struct IPhoneHeaderView: View {
                         backgroundColorForCurrentScheme
                     }
                 }
-                .cornerRadius(10)
+                .clipShape(.rect(cornerRadius: 10))
                 .ignoresSafeArea(edges: .top)
-            )
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .onAppear {
                 viewModel.topPadding = totalHeight

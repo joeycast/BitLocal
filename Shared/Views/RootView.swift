@@ -15,6 +15,7 @@ struct RootView: View {
     @StateObject private var featureHintsController = FeatureHintsController()
     @StateObject private var releaseNotesController = ReleaseNotesController()
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
+    @State private var deferredInitialFetchTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
@@ -115,6 +116,10 @@ struct RootView: View {
             BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
             value: didCompleteOnboarding
         )
+        .onDisappear {
+            deferredInitialFetchTask?.cancel()
+            deferredInitialFetchTask = nil
+        }
     }
 
     private func triggerInitialFetchIfNeeded(source: String) {
@@ -129,7 +134,10 @@ struct RootView: View {
         hasTriggeredInitialFetch = true
 
         let delay = warmupOnly ? 0.1 : 0.2
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+        deferredInitialFetchTask?.cancel()
+        deferredInitialFetchTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
             contentViewModel.fetchElements(warmupOnly: warmupOnly) {
                 if contentViewModel.allElements.isEmpty {
                     Debug.log("Initial fetch from \(source) produced no data; allowing retry")
@@ -164,40 +172,33 @@ private struct DeepLinkUnavailableView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Image(systemName: "mappin.slash.circle.fill")
-                    .font(.system(size: 50))
-                    .foregroundStyle(.secondary)
+            ScrollView {
+                ContentUnavailableView {
+                    Label(state.title, systemImage: "mappin.slash.circle.fill")
+                } description: {
+                    VStack(spacing: 8) {
+                        Text(state.message)
+                        Text(
+                            "Place ID: \(state.placeID)",
+                            comment: "Deep link unavailable detail showing the place identifier"
+                        )
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(.secondary)
+                    }
+                } actions: {
+                    VStack(spacing: 12) {
+                        Button("Retry", action: contentViewModel.retryDeepLinkUnavailablePlaceLookup)
+                            .buttonStyle(.borderedProminent)
 
-                Text(state.title)
-                    .font(.title2.weight(.semibold))
+                        Button("Search Nearby", action: contentViewModel.searchNearbyFromDeepLinkUnavailable)
+                            .buttonStyle(.bordered)
 
-                Text(state.message)
-                    .foregroundStyle(.secondary)
-
-                Text(String(format: NSLocalizedString("Place ID: %@", comment: "Deep link unavailable detail showing the place identifier"), state.placeID))
-                    .font(.footnote.monospaced())
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 12)
-
-                Button("Retry") {
-                    contentViewModel.retryDeepLinkUnavailablePlaceLookup()
+                        Button("Open Map", action: contentViewModel.openMapHomeFromDeepLinkUnavailable)
+                            .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-
-                Button("Search Nearby") {
-                    contentViewModel.searchNearbyFromDeepLinkUnavailable()
-                }
-                .buttonStyle(.bordered)
-
-                Button("Open Map") {
-                    contentViewModel.openMapHomeFromDeepLinkUnavailable()
-                }
-                .buttonStyle(.plain)
+                .padding(20)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle("Place unavailable")
             .navigationBarTitleDisplayMode(.inline)
         }

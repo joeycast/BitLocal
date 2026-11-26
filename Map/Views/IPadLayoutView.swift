@@ -37,18 +37,34 @@ struct IPadLayoutView: View {
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
             sidePanelRootContentWithSafeAreaBehavior
-                .navigationDestination(for: Element.self) { element in
-                    BusinessDetailView(
-                        element: element,
-                        userLocation: viewModel.userLocation,
-                        contentViewModel: viewModel
-                    )
-                    .environmentObject(viewModel)
-                    .clearNavigationContainerBackgroundIfAvailable()
-                    .toolbar(removing: .sidebarToggle)
+                .navigationDestination(for: BitLocalNavigationRoute.self) { route in
+                    switch route {
+                    case .place(let element):
+                        BusinessDetailView(
+                            element: element,
+                            userLocation: viewModel.userLocation,
+                            contentViewModel: viewModel
+                        )
+                        .environmentObject(viewModel)
+                        .clearNavigationContainerBackgroundIfAvailable()
+                        .toolbar(removing: .sidebarToggle)
+                    case .placeComments(let element):
+                        BTCMapPlaceCommentsListView(element: element)
+                            .clearNavigationContainerBackgroundIfAvailable()
+                            .toolbar(removing: .sidebarToggle)
+                    case .allEvents:
+                        AllEventsListView()
+                            .environmentObject(viewModel)
+                            .clearNavigationContainerBackgroundIfAvailable()
+                            .toolbar(removing: .sidebarToggle)
+                    }
                 }
-                .navigationDestination(isPresented: communityDetailBindingIsPresented) {
-                    communityDetailDestination
+                .navigationDestination(item: $viewModel.presentedCommunityArea) { area in
+                    CommunityDetailView(area: area)
+                        .id(area.id)
+                        .environmentObject(viewModel)
+                        .clearNavigationContainerBackgroundIfAvailable()
+                        .toolbar(removing: .sidebarToggle)
                 }
                 .toolbar {
                     ToolbarItem(placement: .principal) {
@@ -57,11 +73,10 @@ struct IPadLayoutView: View {
                             .frame(maxWidth: .infinity)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        SettingsButtonView(
-                            onSettingsSelected: {
-                                showingSettings = true
-                            }
-                        )
+                        Button("settings_label_accessibility", systemImage: "gearshape") {
+                            BitLocalHaptics.selection()
+                            showingSettings = true
+                        }
                         .padding(.top, toolbarContentTopPadding)
                         .popover(isPresented: $showingSettings, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                             NavigationStack {
@@ -85,7 +100,7 @@ struct IPadLayoutView: View {
                         }
                     }
                 }
-                .toolbarBackground(.hidden, for: .navigationBar)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationTitle("")
                 .toolbar(removing: .sidebarToggle)
@@ -149,12 +164,13 @@ struct IPadLayoutView: View {
             columnVisibility = .all
         }
         .onChange(of: viewModel.path) { _, newPath in
-            if newPath.last != nil {
+            let activeElement = newPath.last?.element
+            if activeElement != nil {
                 _ = viewModel.consumeSelectionSource()
             } else {
                 viewModel.deselectAnnotation()
             }
-            viewModel.selectedElement = newPath.last
+            viewModel.selectedElement = activeElement
         }
     }
 
@@ -164,28 +180,6 @@ struct IPadLayoutView: View {
         case .light:  return .light
         case .dark:   return .dark
         }
-    }
-
-    @ViewBuilder
-    private var communityDetailDestination: some View {
-        if let area = viewModel.presentedCommunityArea {
-            CommunityDetailView(area: area)
-                .id(area.id)
-                .environmentObject(viewModel)
-                .clearNavigationContainerBackgroundIfAvailable()
-                .toolbar(removing: .sidebarToggle)
-        }
-    }
-
-    private var communityDetailBindingIsPresented: Binding<Bool> {
-        Binding(
-            get: { viewModel.presentedCommunityArea != nil },
-            set: { newValue in
-                if !newValue {
-                    viewModel.presentedCommunityArea = nil
-                }
-            }
-        )
     }
 }
 
@@ -230,9 +224,7 @@ private struct SplitMapDetailView: View {
             if !isVerticalToolbarActive {
                 MapButtonsView(
                     viewModel: viewModel,
-                    selectedMapTypeBinding: selectedMapTypeBinding,
-                    userLocation: viewModel.userLocation,
-                    isIPad: true
+                    selectedMapTypeBinding: selectedMapTypeBinding
                 )
                 .padding(.trailing, 20)
                 .padding(.bottom, 28)
@@ -248,7 +240,7 @@ private struct SplitMapDetailView: View {
                 )
             }
         }
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle("")
         .toolbar(removing: .sidebarToggle)
@@ -257,24 +249,18 @@ private struct SplitMapDetailView: View {
 
 // MARK: - Preview
 
-struct IPadLayoutView_Previews: PreviewProvider {
-    @State static var elements: [Element]? = []
-    @State static var visibleElements: [Element] = []
-    @State static var showingSettings = true
-    @State static var headerHeight: CGFloat = 80
-    @StateObject static var viewModel = ContentViewModel()
-    @State static var mapType: MKMapType = .standard
-
-    static var previews: some View {
-        IPadLayoutView(
-            viewModel: viewModel,
-            elements: elements,
-            visibleElements: visibleElements,
-            showingSettings: $showingSettings,
-            headerHeight: $headerHeight,
-            selectedMapTypeBinding: .constant(.standard)
-        )
-        .environmentObject(viewModel)
-        .previewInterfaceOrientation(.landscapeLeft)
-    }
+#Preview(traits: .landscapeLeft) {
+    @Previewable @State var showingSettings = true
+    @Previewable @State var headerHeight: CGFloat = 80
+    let viewModel = ContentViewModel()
+    IPadLayoutView(
+        viewModel: viewModel,
+        elements: [],
+        visibleElements: [],
+        showingSettings: $showingSettings,
+        headerHeight: $headerHeight,
+        selectedMapTypeBinding: .constant(.standard)
+    )
+    .environmentObject(viewModel)
+    .environmentObject(AppearanceManager())
 }

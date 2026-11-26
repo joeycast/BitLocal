@@ -27,8 +27,11 @@ struct AllRegionsListView: View {
             let areas = filteredAreas
             if areas.isEmpty && !viewModel.areaBrowserIsLoading {
                 Section {
-                    Text("No regions found")
-                        .foregroundStyle(.secondary)
+                    if !filterText.isEmpty {
+                        ContentUnavailableView.search(text: filterText)
+                    } else {
+                        ContentUnavailableView("No Regions Found", systemImage: "globe")
+                    }
                 }
             } else {
                 Section {
@@ -50,11 +53,7 @@ struct AllRegionsListView: View {
         .searchable(text: $filterText, prompt: "Filter regions…")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    viewModel.loadAreaBrowserAreas()
-                } label: {
-                    Label("Refresh regions", systemImage: "arrow.clockwise")
-                }
+                Button("Refresh regions", systemImage: "arrow.clockwise", action: viewModel.loadAreaBrowserAreas)
             }
         }
         .onAppear {

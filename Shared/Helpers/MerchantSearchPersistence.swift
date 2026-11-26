@@ -16,13 +16,13 @@ enum MerchantSearchPersistence {
     static func saveCategoryGroup(_ group: MerchantCategoryGroup?, defaults: UserDefaults = .standard) {
         if let group {
             defaults.set(group.rawValue, forKey: categoryKey)
-            defaults.set(Date().timeIntervalSince1970, forKey: savedAtKey)
+            defaults.set(Date.now.timeIntervalSince1970, forKey: savedAtKey)
         } else {
             clear(defaults: defaults)
         }
     }
 
-    static func loadCategoryGroup(defaults: UserDefaults = .standard, now: Date = Date()) -> MerchantCategoryGroup? {
+    static func loadCategoryGroup(defaults: UserDefaults = .standard, now: Date = .now) -> MerchantCategoryGroup? {
         guard let raw = defaults.string(forKey: categoryKey),
               let group = MerchantCategoryGroup(rawValue: raw) else {
             return nil

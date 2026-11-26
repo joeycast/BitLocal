@@ -3,8 +3,8 @@ import Foundation
 // Represents hours for a single day
 struct DayHours: Codable, Equatable {
     var isOpen: Bool = false
-    var openTime: Date = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? Date()
-    var closeTime: Date = Calendar.current.date(from: DateComponents(hour: 17, minute: 0)) ?? Date()
+    var openTime: Date = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? .now
+    var closeTime: Date = Calendar.current.date(from: DateComponents(hour: 17, minute: 0)) ?? .now
 }
 
 // Represents a full week of business hours
@@ -90,9 +90,10 @@ struct WeeklyHours: Codable, Equatable {
 
             // Check if we can add to the last segment
             if let lastSegment = segments.last,
+               let lastDay = lastSegment.days.last,
                lastSegment.hours.openTime == dayHours.openTime,
                lastSegment.hours.closeTime == dayHours.closeTime,
-               lastSegment.days.last!.sortOrder == day.sortOrder - 1 {
+               lastDay.sortOrder == day.sortOrder - 1 {
                 segments[segments.count - 1].days.append(day)
             } else {
                 segments.append((days: [day], hours: dayHours))
@@ -100,12 +101,15 @@ struct WeeklyHours: Codable, Equatable {
         }
 
         // Format each segment
-        let formattedSegments = segments.map { segment -> String in
+        let formattedSegments = segments.compactMap { segment -> String? in
+            guard let firstDay = segment.days.first, let lastDay = segment.days.last else {
+                return nil
+            }
             let dayRange: String
             if segment.days.count == 1 {
-                dayRange = segment.days[0].rawValue
+                dayRange = firstDay.rawValue
             } else {
-                dayRange = "\(segment.days.first!.rawValue)-\(segment.days.last!.rawValue)"
+                dayRange = "\(firstDay.rawValue)-\(lastDay.rawValue)"
             }
 
             let openTimeStr = timeFormatter.string(from: segment.hours.openTime)
@@ -122,7 +126,7 @@ struct WeeklyHours: Codable, Equatable {
     }
 }
 
-struct OSMOpeningHoursTimeRange: Equatable {
+struct OSMOpeningHoursTimeRange: Equatable, Hashable {
     let startMinutes: Int
     let endMinutes: Int
 

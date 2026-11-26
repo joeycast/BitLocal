@@ -3,7 +3,6 @@
 
 import SwiftUI
 import MapKit
-import CoreLocationUI
 import Combine
 import Foundation
 import UIKit
@@ -12,23 +11,17 @@ struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var featureHintsController: FeatureHintsController
     @ObservedObject private var intentRouter = BitLocalAppIntentRouter.shared
-    @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
     @StateObject private var appearanceManager = AppearanceManager()
 
-    @State private var userLocation: CLLocation?
-    @State private var cancellable: Cancellable?
     @State private var mapStoppedMovingCancellable: Cancellable?
-    @State private var cancellableUserLocation: Cancellable?
-    @State private var firstLocationUpdate: Bool = true
     @State private var headerHeight: CGFloat = 0
     @State private var showingSettings = false
     @State private var containerSize: CGSize = .zero
 
     @AppStorage("selectedMapType") private var storedMapType: Int = 0
-    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     var selectedMapTypeBinding: Binding<MKMapType> {
         Binding<MKMapType>(
@@ -96,9 +89,6 @@ struct ContentView: View {
             syncWindowInterfaceStyle(appearanceManager.appearance)
             routePendingAppIntent()
 
-            cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
-                userLocation = updatedUserLocation
-            }
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
         }
         .onChange(of: appearanceManager.appearance) { _, newAppearance in

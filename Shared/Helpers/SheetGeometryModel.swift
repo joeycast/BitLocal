@@ -1,29 +1,31 @@
 import Combine
+import Observation
 import SwiftUI
 import UIKit
 
 /// Isolated sheet-height state so detent dragging does not invalidate the entire
 /// `ContentViewModel` observation graph on every geometry tick.
 @MainActor
-final class SheetGeometryModel: ObservableObject {
-    /// Continuous height (screen bottom → sheet top). Not `@Published`.
+@Observable
+final class SheetGeometryModel {
+    /// Continuous height (screen bottom → sheet top). Not observed by SwiftUI.
     /// Map chrome should subscribe via `continuousHeightPublisher` so list bodies
     /// are not re-evaluated every frame.
-    private(set) var continuousHeight: CGFloat = 0
+    @ObservationIgnored private(set) var continuousHeight: CGFloat = 0
 
     /// Sparse SwiftUI-facing height for collapsed-content reveal only.
-    /// Publishes only near the collapsed band, not on every drag frame.
-    @Published private(set) var liveHeight: CGFloat = 0
+    /// Observed only near the collapsed band, not on every drag frame.
+    private(set) var liveHeight: CGFloat = 0
 
-    /// Height captured when a detent selection settles. Not observable: callers
+    /// Height captured when a detent selection settles. Not observed: callers
     /// read it synchronously so drag-time measurements never fan out through SwiftUI.
-    private(set) var settledHeight: CGFloat = 0
+    @ObservationIgnored private(set) var settledHeight: CGFloat = 0
 
-    /// High-frequency continuous height for UIKit chrome (not objectWillChange).
-    let continuousHeightPublisher = PassthroughSubject<CGFloat, Never>()
+    /// High-frequency continuous height for UIKit chrome (not observed by SwiftUI).
+    @ObservationIgnored let continuousHeightPublisher = PassthroughSubject<CGFloat, Never>()
 
-    private var lastLivePublished: CGFloat = -1
-    private var lastContinuousSent: CGFloat = -1
+    @ObservationIgnored private var lastLivePublished: CGFloat = -1
+    @ObservationIgnored private var lastContinuousSent: CGFloat = -1
 
     /// Only publish `liveHeight` for SwiftUI when near collapsed reveal.
     private static let revealPublishCeiling: CGFloat = 200
@@ -305,15 +307,17 @@ final class SheetEdgeHeightReaderView: UIView {
 // MARK: - Collapsed content reveal
 
 /// Applies opacity/offset for collapsed-sheet content reveal.
-/// Only attached when the sheet is collapsed-like, so expanded lists do not
-/// observe live height during normal drag.
+/// Guards `isActive` before reading `geometry.liveHeight` so expanded lists skip
+/// `@Observable` tracking automatically while preserving structural view identity.
 struct SheetCollapsedRevealModifier: ViewModifier {
-    @ObservedObject var geometry: SheetGeometryModel
+    var geometry: SheetGeometryModel
+    var isActive: Bool
 
     private let revealHeight: CGFloat = 140
     private let revealRange: CGFloat = 36
 
     private var progress: CGFloat {
+        guard isActive else { return 1 }
         guard geometry.liveHeight > 1 else { return 0 }
         let raw = (geometry.liveHeight - revealHeight) / revealRange
         return min(max(raw, 0), 1)
@@ -330,17 +334,16 @@ struct SheetCollapsedRevealModifier: ViewModifier {
 }
 
 extension View {
-    @ViewBuilder
     func sheetCollapsedReveal(
         geometry: SheetGeometryModel,
         isCollapsedLike: Bool,
         forceRevealed: Bool = false
     ) -> some View {
-        // Skip observation entirely when fully revealed — critical for device drag FPS.
-        if forceRevealed || !isCollapsedLike {
-            self
-        } else {
-            modifier(SheetCollapsedRevealModifier(geometry: geometry))
-        }
+        modifier(
+            SheetCollapsedRevealModifier(
+                geometry: geometry,
+                isActive: !forceRevealed && isCollapsedLike
+            )
+        )
     }
 }

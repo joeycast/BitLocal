@@ -49,7 +49,7 @@ struct BusinessDetailsView: View {
                             Text("+1")
                         }
                         .keyboardType(.phonePad)
-                        .frame(maxWidth: 60)
+                        .frame(minWidth: 56, idealWidth: 68, maxWidth: 96)
 
                         TextField(text: $submission.phoneNumber) {
                             Text("phone_number_label")
@@ -62,7 +62,7 @@ struct BusinessDetailsView: View {
                     }
                     .keyboardType(.URL)
                     .textContentType(.URL)
-                    .autocapitalization(.none)
+                    .textInputAutocapitalization(.never)
                 } header: {
                     Text("contact_section_header")
                 } footer: {

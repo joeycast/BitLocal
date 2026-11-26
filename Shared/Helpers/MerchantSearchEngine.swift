@@ -39,7 +39,7 @@ enum MerchantSearchEngine {
         } ?? []
         let iconValues = [element.v4Metadata?.icon, element.tags?.iconPlatform]
             .compactMap { $0 }
-            .flatMap { [$0, $0.replacingOccurrences(of: "_", with: " ")] }
+            .flatMap { [$0, $0.replacing("_", with: " ")] }
         let groupValues = ElementCategorySymbols.merchantCategoryGroups(for: element).flatMap {
             ElementCategorySymbols.searchTerms(for: $0)
         }
@@ -99,7 +99,7 @@ enum MerchantSearchEngine {
         let element = V4PlaceToElementMapper.placeRecordToElement(record)
         let groups = ElementCategorySymbols.merchantCategoryGroups(for: element)
         let groupTerms = groups.flatMap { ElementCategorySymbols.searchTerms(for: $0) }
-        let iconTerms = [record.icon].compactMap { $0 }.flatMap { [$0, $0.replacingOccurrences(of: "_", with: " ")] }
+        let iconTerms = [record.icon].compactMap { $0 }.flatMap { [$0, $0.replacing("_", with: " ")] }
 
         let names = normalizedSearchFields([record.name, record.displayName])
         let brandOperators = normalizedSearchFields([record.osmBrand, record.osmOperator])
@@ -207,7 +207,7 @@ enum MerchantSearchEngine {
             matched.map { ($0.element.id, $0.match.score) },
             uniquingKeysWith: { _, new in new }
         )
-        let strong = matched.filter { $0.match.isStrong }.count
+        let strong = matched.count(where: \.match.isStrong)
         return (matched.map(\.element), scores, strong)
     }
 
@@ -240,7 +240,7 @@ enum MerchantSearchEngine {
         var terms = searchableTextFields(for: element)
         if let icon = element.v4Metadata?.icon ?? element.tags?.iconPlatform {
             terms.append(icon)
-            terms.append(icon.replacingOccurrences(of: "_", with: " "))
+            terms.append(icon.replacing("_", with: " "))
         }
         return terms
     }

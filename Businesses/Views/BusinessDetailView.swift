@@ -188,6 +188,8 @@ private enum PlaceVerificationState: Equatable {
 
 struct BusinessDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.calendar) private var calendar
+    @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
     @State private var showingShareErrorAlert = false
     @State private var showingFeaturedInfo = false
@@ -290,7 +292,7 @@ struct BusinessDetailView: View {
     private var verificationState: PlaceVerificationState {
         let raw = hydratedVerifiedAt ?? element.v4Metadata?.verifiedAt
         if let raw, let verifiedDate = raw.parsedBTCMapDate(),
-           let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) {
+           let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: .now) {
             return verifiedDate > oneYearAgo ? .verified(verifiedDate) : .outdated(verifiedDate)
         }
         if isLoadingVerifiedAt {
@@ -310,19 +312,23 @@ struct BusinessDetailView: View {
         let useMetric: Bool
         switch distanceUnit {
         case .auto:
-            useMetric = Locale.current.measurementSystem == .metric
+            useMetric = locale.measurementSystem == .metric
         case .miles:
             useMetric = false
         case .kilometers:
             useMetric = true
         }
-        if useMetric {
-            let km = distanceInMeters / 1000
-            return String(format: "%.1f km", km)
-        } else {
-            let miles = distanceInMeters / 1609.34
-            return String(format: "%.1f mi", miles)
-        }
+        let measurement = useMetric
+            ? Measurement(value: distanceInMeters / 1000, unit: UnitLength.kilometers)
+            : Measurement(value: distanceInMeters / 1609.344, unit: UnitLength.miles)
+        return measurement.formatted(
+            .measurement(
+                width: .abbreviated,
+                usage: .asProvided,
+                numberFormatStyle: .number.precision(.fractionLength(1))
+            )
+            .locale(locale)
+        )
     }
 
     var body: some View {
@@ -398,12 +404,10 @@ struct BusinessDetailView: View {
             }
         }
         .alert("Unable to share this place", isPresented: $showingShareErrorAlert) {
-            Button("OK", role: .cancel) {}
         } message: {
             Text("The place link could not be created.")
         }
         .alert("Featured Merchant", isPresented: $showingFeaturedInfo) {
-            Button("OK", role: .cancel) {}
         } message: {
             Text("This business has been boosted on BTC Map, which means someone in the community has paid to help more people discover it.")
         }
@@ -434,10 +438,10 @@ private extension BusinessDetailView {
                         isBoosted ? Color.orange : Color("MarkerColor"),
                         in: Circle()
                     )
-                    .overlay(
+                    .overlay {
                         Circle()
                             .strokeBorder(Color.white.opacity(0.24), lineWidth: 0.75)
-                    )
+                    }
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -474,10 +478,10 @@ private extension BusinessDetailView {
                         .contentTransition(.symbolEffect(.replace))
                         .frame(width: 44, height: 44)
                         .background(.regularMaterial, in: Circle())
-                        .overlay(
+                        .overlay {
                             Circle()
                                 .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
-                        )
+                        }
                         .contentShape(Circle())
                 }
                 .buttonStyle(.tactilePress(scale: 0.92))
@@ -488,7 +492,7 @@ private extension BusinessDetailView {
             if parsedOpeningSchedule != nil || verificationState != .loading || shouldShowFeaturedBadgeInExpandedContent {
                 BitLocalFlowLayout(horizontalSpacing: 12, verticalSpacing: 0) {
                     if let schedule = parsedOpeningSchedule {
-                        let status = OpeningHoursLiveStatus.evaluate(schedule: schedule)
+                        let status = OpeningHoursLiveStatus.evaluate(schedule: schedule, now: .now, calendar: calendar)
                         HStack(spacing: 5) {
                             Circle()
                                 .fill(status.isOpen ? Color.green : Color.secondary)
@@ -635,20 +639,20 @@ private extension BusinessDetailView {
             .padding(.vertical, 8)
             .background {
                 if isPrimary {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Color.accentColor)
                 } else {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(.regularMaterial)
                 }
             }
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(
                         isPrimary ? Color.clear : Color(.separator).opacity(0.35),
                         lineWidth: 0.5
                     )
-            )
+            }
         }
         .buttonStyle(.tactilePress(scale: 0.96))
     }
@@ -800,10 +804,10 @@ private struct PlacePaymentRailsStrip: View {
                             .padding(.horizontal, 11)
                             .padding(.vertical, 6)
                             .background(.regularMaterial, in: Capsule())
-                            .overlay(
+                            .overlay {
                                 Capsule()
                                     .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
-                            )
+                            }
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(rail.accessibilityLabel)
                         }
@@ -838,7 +842,7 @@ private struct PlacePaymentRailsStrip: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }
-                            .frame(minHeight: 36)
+                            .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.tactileRow(cornerRadius: 10))
@@ -857,7 +861,7 @@ struct OpeningHoursLiveStatus {
 
     static func isOpenNow(
         rawOpeningHours: String?,
-        now: Date = Date(),
+        now: Date = .now,
         calendar: Calendar = .current
     ) -> Bool {
         guard let trimmed = rawOpeningHours?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -870,7 +874,7 @@ struct OpeningHoursLiveStatus {
 
     static func evaluate(
         schedule: OSMOpeningHoursWeekSchedule,
-        now: Date = Date(),
+        now: Date = .now,
         calendar: Calendar = .current
     ) -> OpeningHoursLiveStatus {
         if schedule.isTwentyFourSeven {
@@ -944,6 +948,8 @@ private struct PlaceDetailsSurface: View {
 
     @State private var isHoursExpanded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.calendar) private var calendar
+    @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
 
     private struct SocialItem: Identifiable {
@@ -959,7 +965,7 @@ private struct PlaceDetailsSurface: View {
     }
 
     private var todayWeekday: WeeklyHours.Weekday {
-        OpeningHoursLiveStatus.weekday(for: Calendar.current.component(.weekday, from: Date()))
+        OpeningHoursLiveStatus.weekday(for: calendar.component(.weekday, from: .now))
     }
 
     private var socialItems: [SocialItem] {
@@ -1083,7 +1089,7 @@ private struct PlaceDetailsSurface: View {
     @ViewBuilder
     private func hoursSection(rawOpeningHours: String) -> some View {
         if let parsedSchedule = parsedOpeningSchedule {
-            let status = OpeningHoursLiveStatus.evaluate(schedule: parsedSchedule)
+            let status = OpeningHoursLiveStatus.evaluate(schedule: parsedSchedule, now: .now, calendar: calendar)
             VStack(alignment: .leading, spacing: 0) {
                 Button {
                     BitLocalHaptics.selection()
@@ -1300,7 +1306,7 @@ private struct PlaceDetailsSurface: View {
         }
         return today.ranges
             .map { formattedTime($0.startMinutes) + " \u{2013} " + formattedTime($0.endMinutes) }
-            .joined(separator: ", ")
+            .formatted()
     }
 
     @ViewBuilder
@@ -1320,7 +1326,7 @@ private struct PlaceDetailsSurface: View {
                 .lineLimit(1)
         } else {
             VStack(alignment: .trailing, spacing: 2) {
-                ForEach(Array(day.ranges.enumerated()), id: \.offset) { _, range in
+                ForEach(day.ranges, id: \.self) { range in
                     Text(formattedTime(range.startMinutes) + " \u{2013} " + formattedTime(range.endMinutes))
                         .font(.footnote)
                         .fontWeight(isToday ? .semibold : .regular)
@@ -1358,35 +1364,23 @@ private struct PlaceDetailsSurface: View {
         return String(trimmed.prefix(3))
     }
 
-    private static var cachedTimeFormatterLocaleID: String = ""
-    private static let cachedTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.setLocalizedDateFormatFromTemplate("jm")
-        return formatter
-    }()
-
     private func formattedTime(_ totalMinutes: Int) -> String {
         let clampedMinutes = max(0, min(totalMinutes, 24 * 60))
         let hour = clampedMinutes / 60
         let minute = clampedMinutes % 60
 
         var components = DateComponents()
-        components.calendar = Calendar.current
+        components.calendar = calendar
         components.hour = hour == 24 ? 0 : hour
         components.minute = minute
 
-        guard let date = Calendar.current.date(from: components) else {
+        guard let date = calendar.date(from: components) else {
             return String(format: "%02d:%02d", hour, minute)
         }
 
-        let currentLocaleID = Locale.current.identifier
-        if Self.cachedTimeFormatterLocaleID != currentLocaleID {
-            Self.cachedTimeFormatter.locale = Locale.current
-            Self.cachedTimeFormatter.setLocalizedDateFormatFromTemplate("jm")
-            Self.cachedTimeFormatterLocaleID = currentLocaleID
-        }
-        return Self.cachedTimeFormatter.string(from: date)
+        return date.formatted(
+            Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar)
+        )
     }
 }
 
@@ -1411,21 +1405,12 @@ private struct PlaceDescriptionSection: View {
 
 private struct TranslatableBusinessDescriptionView: View {
     let description: String
-    private let detectedLanguageCode: String?
 
+    @State private var detectedLanguageCode: String?
     @State private var translatedDescription: String?
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var translationError: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(description: String) {
-        self.description = description
-        if description.count >= 20 {
-            self.detectedLanguageCode = NLLanguageRecognizer.dominantLanguage(for: description)?.rawValue
-        } else {
-            self.detectedLanguageCode = nil
-        }
-    }
 
     private var hasSuccessfulTranslation: Bool {
         guard let translatedDescription else { return false }
@@ -1500,6 +1485,13 @@ private struct TranslatableBusinessDescriptionView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .task(id: description) {
+            if description.count >= 20 {
+                detectedLanguageCode = NLLanguageRecognizer.dominantLanguage(for: description)?.rawValue
+            } else {
+                detectedLanguageCode = nil
+            }
+        }
         .translationTask(translationConfiguration) { session in
             do {
                 let response = try await session.translate(description)
@@ -1534,7 +1526,7 @@ private struct TranslatableBusinessDescriptionView: View {
     }
 
     private func normalizedLanguageCode(_ identifier: String) -> String {
-        let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
+        let normalized = identifier.replacing("_", with: "-").lowercased()
         return normalized.split(separator: "-", maxSplits: 1).first.map(String.init) ?? normalized
     }
 }
@@ -1546,9 +1538,7 @@ private struct PlaceReviewsRow: View {
     let count: Int
 
     var body: some View {
-        NavigationLink {
-            BTCMapPlaceCommentsListView(element: element)
-        } label: {
+        NavigationLink(value: BitLocalNavigationRoute.placeComments(element)) {
             PlaceGroupedSurface(padding: EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)) {
                 HStack(spacing: 12) {
                     Image(systemName: "bubble.left.and.bubble.right")
@@ -1560,15 +1550,9 @@ private struct PlaceReviewsRow: View {
                         Text("Community Reviews")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.primary)
-                        Text(
-                            String(
-                                format: NSLocalizedString("%lld review%@", comment: "Review count label"),
-                                count,
-                                count == 1 ? "" : "s"
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Text("^[\(count) review](inflect: true)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     Spacer(minLength: 0)
@@ -1693,21 +1677,12 @@ struct BTCMapPlaceCommentsListView: View {
 
 private struct TranslatableReviewBodyTextView: View {
     let text: String
-    private let detectedLanguageCode: String?
 
+    @State private var detectedLanguageCode: String?
     @State private var translatedText: String?
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var translationError: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(text: String) {
-        self.text = text
-        if text.count >= 20 {
-            self.detectedLanguageCode = NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
-        } else {
-            self.detectedLanguageCode = nil
-        }
-    }
 
     private var hasSuccessfulTranslation: Bool {
         guard let translatedText else { return false }
@@ -1780,6 +1755,13 @@ private struct TranslatableReviewBodyTextView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .task(id: text) {
+            if text.count >= 20 {
+                detectedLanguageCode = NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+            } else {
+                detectedLanguageCode = nil
+            }
+        }
         .translationTask(translationConfiguration) { session in
             do {
                 let response = try await session.translate(text)
@@ -1814,7 +1796,7 @@ private struct TranslatableReviewBodyTextView: View {
     }
 
     private func normalizedLanguageCode(_ identifier: String) -> String {
-        let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
+        let normalized = identifier.replacing("_", with: "-").lowercased()
         return normalized.split(separator: "-", maxSplits: 1).first.map(String.init) ?? normalized
     }
 }

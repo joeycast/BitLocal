@@ -49,9 +49,9 @@ final class MerchantSearchController: ObservableObject {
     private let btcMapRepository: BTCMapSearchServiceProtocol
     private var unifiedSearchDebounceTask: Task<Void, Never>?
     private var localMerchantSearchTask: Task<Void, Never>?
-    private let unifiedSearchDebounceNanoseconds: UInt64
-    private let unifiedSearchWorldwideDebounceNanoseconds: UInt64
-    private let localSearchWorldwideDebounceNanoseconds: UInt64
+    private let unifiedSearchDebounceDuration: Duration
+    private let unifiedSearchWorldwideDebounceDuration: Duration
+    private let localSearchWorldwideDebounceDuration: Duration
     private var latestMerchantSearchRequestID = UUID()
     private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
     private var merchantSearchAnchorQuery = ""
@@ -73,9 +73,9 @@ final class MerchantSearchController: ObservableObject {
         localSearchWorldwideDebounceNanoseconds: UInt64 = 250_000_000
     ) {
         self.btcMapRepository = btcMapRepository
-        self.unifiedSearchDebounceNanoseconds = unifiedSearchDebounceNanoseconds
-        self.unifiedSearchWorldwideDebounceNanoseconds = unifiedSearchWorldwideDebounceNanoseconds
-        self.localSearchWorldwideDebounceNanoseconds = localSearchWorldwideDebounceNanoseconds
+        self.unifiedSearchDebounceDuration = .nanoseconds(Int64(clamping: unifiedSearchDebounceNanoseconds))
+        self.unifiedSearchWorldwideDebounceDuration = .nanoseconds(Int64(clamping: unifiedSearchWorldwideDebounceNanoseconds))
+        self.localSearchWorldwideDebounceDuration = .nanoseconds(Int64(clamping: localSearchWorldwideDebounceNanoseconds))
     }
 
     // MARK: - Host state
@@ -295,9 +295,9 @@ final class MerchantSearchController: ObservableObject {
         merchantSearchIsWaitingForLocalDebounce = true
 
         localMerchantSearchTask = Task { [weak self] in
-            let debounceNanoseconds = self?.effectiveLocalMerchantSearchDebounceNanoseconds() ?? 0
-            if debounceNanoseconds > 0 {
-                try? await Task.sleep(nanoseconds: debounceNanoseconds)
+            let debounceDuration = self?.effectiveLocalMerchantSearchDebounceDuration() ?? .zero
+            if debounceDuration > .zero {
+                try? await Task.sleep(for: debounceDuration)
             }
             guard !Task.isCancelled else { return }
             await MainActor.run {
@@ -355,12 +355,16 @@ final class MerchantSearchController: ObservableObject {
 
         Debug.logAPI("Merchant search queued (legacy): query='\(query)', center=(\(region.center.latitude), \(region.center.longitude)), radiusKM=\(merchantSearchRadiusKM)")
 
-        unifiedSearchDebounceTask = Task {
-            try? await Task.sleep(nanoseconds: unifiedSearchDebounceNanoseconds)
+        unifiedSearchDebounceTask = Task { [weak self] in
+            guard let debounceDuration = self?.unifiedSearchDebounceDuration else { return }
+            if debounceDuration > .zero {
+                try? await Task.sleep(for: debounceDuration)
+            }
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                merchantSearchText = query
-                performRemoteMerchantSearch()
+                guard let self else { return }
+                self.merchantSearchText = query
+                self.performRemoteMerchantSearch()
             }
         }
     }
@@ -490,19 +494,14 @@ final class MerchantSearchController: ObservableObject {
 
         for plan in plans {
             group.enter()
-            btcMapRepository.searchPlaces(query: plan.query) { [weak self] result in
-                guard let self else {
-                    group.leave()
-                    return
-                }
-
+            btcMapRepository.searchPlaces(query: plan.query) { result in
                 switch result {
                 case .success(let records):
-                    let filtered = self.filterRemoteSearchRecords(records, normalizedQuery: normalizedQuery)
+                    let matched = MerchantSearchEngine.filterRecords(records, normalizedQuery: normalizedQuery)
                     aggregationQueue.async {
                         hadSuccess = true
-                        for record in filtered {
-                            mergedByID[record.idString] = mergedByID[record.idString] ?? record
+                        for item in matched {
+                            mergedByID[item.record.idString] = mergedByID[item.record.idString] ?? item.record
                         }
                         group.leave()
                     }
@@ -533,7 +532,10 @@ final class MerchantSearchController: ObservableObject {
             } else {
                 self.merchantSearchResults = []
                 self.merchantSearchFreshResults = []
-                self.merchantSearchError = errors.first ?? NSLocalizedString("Search unavailable", comment: "Fallback error when remote merchant search fails")
+                self.merchantSearchError = errors.first ?? String(
+                    localized: "Search unavailable",
+                    comment: "Fallback error when remote merchant search fails"
+                )
                 self.merchantSearchLoadingTimeoutTask?.cancel()
                 self.merchantSearchIsLoading = false
                 self.merchantSearchIsOfflineFallback = true
@@ -642,14 +644,18 @@ final class MerchantSearchController: ObservableObject {
 
     private func scheduleMerchantSearchLoadingTimeout(for requestID: UUID) {
         merchantSearchLoadingTimeoutTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self else { return }
                 guard self.latestMerchantSearchRequestID == requestID else { return }
                 guard self.merchantSearchIsLoading else { return }
 
                 self.merchantSearchIsLoading = false
-                self.merchantSearchError = self.merchantSearchError ?? NSLocalizedString("Search timed out", comment: "Error shown when merchant search takes too long")
+                self.merchantSearchError = self.merchantSearchError ?? String(
+                    localized: "Search timed out",
+                    comment: "Error shown when merchant search takes too long"
+                )
                 self.merchantSearchIsOfflineFallback = true
                 Debug.logAPI("Merchant search timeout: requestID=\(requestID)")
             }
@@ -665,21 +671,21 @@ final class MerchantSearchController: ObservableObject {
         }
     }
 
-    private func effectiveMerchantSearchDebounceNanoseconds() -> UInt64 {
+    private func effectiveMerchantSearchDebounceDuration() -> Duration {
         switch selectedMerchantSearchScope {
         case .onMap:
-            return unifiedSearchDebounceNanoseconds
+            return unifiedSearchDebounceDuration
         case .worldwide:
-            return unifiedSearchWorldwideDebounceNanoseconds
+            return unifiedSearchWorldwideDebounceDuration
         }
     }
 
-    private func effectiveLocalMerchantSearchDebounceNanoseconds() -> UInt64 {
+    private func effectiveLocalMerchantSearchDebounceDuration() -> Duration {
         switch selectedMerchantSearchScope {
         case .onMap:
-            return unifiedSearchDebounceNanoseconds
+            return unifiedSearchDebounceDuration
         case .worldwide:
-            return localSearchWorldwideDebounceNanoseconds
+            return localSearchWorldwideDebounceDuration
         }
     }
 

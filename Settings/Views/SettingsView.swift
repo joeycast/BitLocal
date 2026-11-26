@@ -3,20 +3,20 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @Binding var selectedMapType: MKMapType
     @Binding var currentDetent: PresentationDetent
     var onDone: (() -> Void)? = nil
 
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var appearanceManager: AppearanceManager
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     @State private var showingAddBusinessForm = false
     @State private var isRefreshingMerchants = false
 
-    private let supportBitLocalURL = URL(string: "https://strike.me/joeycast/")!
+    private static let supportBitLocalURL = URL(string: "https://strike.me/joeycast/")
 
     init(
         selectedMapType: Binding<MKMapType>,
@@ -33,8 +33,8 @@ struct SettingsView: View {
             mapAndDisplaySection
             alertsAndDataSection
             contributeSection
-            if Locale.current.region?.identifier == "US" {
-                supportSection
+            if locale.region?.identifier == "US", let supportBitLocalURL = Self.supportBitLocalURL {
+                supportSection(url: supportBitLocalURL)
             }
             aboutSection
         }
@@ -56,14 +56,15 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAddBusinessForm) {
             AddBusinessInfoView()
         }
-        .onChange(of: selectedMapType) { _, _ in
-            BitLocalHaptics.selection()
+        .sensoryFeedback(.selection, trigger: selectedMapType)
+        .sensoryFeedback(.selection, trigger: appearanceManager.appearance)
+        .sensoryFeedback(.selection, trigger: distanceUnit)
+        .sensoryFeedback(.selection, trigger: viewModel.hideATMsFromMapAndList)
+        .sensoryFeedback(.impact(weight: .light), trigger: isRefreshingMerchants) { _, isRefreshing in
+            isRefreshing
         }
-        .onChange(of: appearanceManager.appearance) { _, _ in
-            BitLocalHaptics.selection()
-        }
-        .onChange(of: distanceUnit) { _, _ in
-            BitLocalHaptics.selection()
+        .sensoryFeedback(.impact(weight: .light), trigger: showingAddBusinessForm) { _, isShowing in
+            isShowing
         }
     }
 
@@ -117,7 +118,6 @@ struct SettingsView: View {
             }
 
             Button {
-                BitLocalHaptics.lightTap()
                 refreshMerchants()
             } label: {
                 HStack(spacing: 12) {
@@ -132,7 +132,7 @@ struct SettingsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(NSLocalizedString("Refresh Merchants", comment: "About action to refresh BTC Map merchant catalog"))
+                        Text("Refresh Merchants")
                             .foregroundStyle(.primary)
                         Text(merchantRefreshSubtitle)
                             .font(.caption)
@@ -152,7 +152,6 @@ struct SettingsView: View {
     private var contributeSection: some View {
         Section(header: Text("contribute_section")) {
             Button {
-                BitLocalHaptics.lightTap()
                 showingAddBusinessForm = true
             } label: {
                 Label {
@@ -166,12 +165,12 @@ struct SettingsView: View {
         }
     }
 
-    private var supportSection: some View {
+    private func supportSection(url: URL) -> some View {
         Section(
             header: Text("support_bitlocal_section"),
             footer: Text("support_bitlocal_footer")
         ) {
-            Link(destination: supportBitLocalURL) {
+            Link(destination: url) {
                 HStack {
                     Label {
                         Text("support_bitlocal_button_label")
@@ -222,7 +221,6 @@ struct SettingsView: View {
         Binding(
             get: { !viewModel.hideATMsFromMapAndList },
             set: { showATMs in
-                BitLocalHaptics.selection()
                 viewModel.setHideATMsFromMapAndList(!showATMs)
             }
         )

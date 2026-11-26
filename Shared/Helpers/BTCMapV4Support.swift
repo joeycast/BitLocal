@@ -869,13 +869,11 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private var v4ElementsFileURL: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("btcmap_elements_v4.json")
+        URL.cachesDirectory.appending(path: "btcmap_elements_v4.json")
     }
 
     private var v4SyncStateFileURL: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("btcmap_v4_sync_state.json")
+        URL.cachesDirectory.appending(path: "btcmap_v4_sync_state.json")
     }
 
     func loadCachedElements() -> [Element]? {
@@ -1254,32 +1252,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private static func parseStaticFlexibleDate(_ value: String) -> Date? {
-        if let full = iso8601WithFractional.date(from: value) ?? iso8601Basic.date(from: value) {
-            return full
-        }
-        return dateOnly.date(from: value)
+        BTCMapDateParser.parse(value)
     }
 
-    private static let iso8601WithFractional: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private static let iso8601Basic: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    private static let dateOnly: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
+    private static let rfc1123Lock = NSLock()
     private static let rfc1123Formatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -1289,11 +1265,17 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }()
 
     private static func rfc1123ToISO8601(_ header: String?) -> String? {
-        guard let header, let date = rfc1123Formatter.date(from: header) else { return nil }
-        return iso8601Basic.string(from: date)
+        guard let header else { return nil }
+        let date: Date? = {
+            rfc1123Lock.lock()
+            defer { rfc1123Lock.unlock() }
+            return rfc1123Formatter.date(from: header)
+        }()
+        guard let date else { return nil }
+        return date.ISO8601Format()
     }
 
     private static func currentISO8601() -> String {
-        iso8601Basic.string(from: Date())
+        Date.now.ISO8601Format()
     }
 }

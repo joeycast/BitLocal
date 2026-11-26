@@ -7,6 +7,9 @@ struct ManualLocationEntryView: View {
     let onCancel: () -> Void
 
     @State private var isGeocoding = false
+    @State private var geocodingErrorMessage: String?
+    @State private var showingGeocodingError = false
+    @State private var geocodingTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -61,20 +64,27 @@ struct ManualLocationEntryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("cancel_button") {
-                        onCancel()
-                    }
+                    Button("cancel_button", action: onCancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isGeocoding {
                         ProgressView()
                     } else {
-                        Button("save_button") {
-                            geocodeAddress()
-                        }
-                        .disabled(!isValid)
+                        Button("save_button", action: geocodeAddress)
+                            .disabled(!isValid)
                     }
                 }
+            }
+            .alert("Unable to Locate Address", isPresented: $showingGeocodingError) {
+                Button("Try Again", action: geocodeAddress)
+                Button("cancel_button", role: .cancel) { }
+            } message: {
+                if let geocodingErrorMessage {
+                    Text(geocodingErrorMessage)
+                }
+            }
+            .onDisappear {
+                geocodingTask?.cancel()
             }
         }
     }
@@ -89,7 +99,9 @@ struct ManualLocationEntryView: View {
     }
 
     private func geocodeAddress() {
+        geocodingTask?.cancel()
         isGeocoding = true
+        geocodingErrorMessage = nil
 
         // Construct full address string
         let addressComponents = [
@@ -103,22 +115,25 @@ struct ManualLocationEntryView: View {
 
         let addressString = addressComponents.joined(separator: ", ")
 
-        let geocoder = CLGeocoder()
-        geocoder.geocodeAddressString(addressString) { placemarks, error in
-            isGeocoding = false
+        geocodingTask = Task {
+            defer { isGeocoding = false }
+            let geocoder = CLGeocoder()
+            do {
+                let placemarks = try await geocoder.geocodeAddressString(addressString)
+                guard !Task.isCancelled else { return }
 
-            if let error = error {
-                print("Geocoding error: \(error.localizedDescription)")
-                // Still save even if geocoding fails, coordinates will be nil
-                onSave(CLLocationCoordinate2D(latitude: 0, longitude: 0))
-                return
-            }
-
-            if let coordinate = placemarks?.first?.location?.coordinate {
-                onSave(coordinate)
-            } else {
-                // No coordinates found, but still save
-                onSave(CLLocationCoordinate2D(latitude: 0, longitude: 0))
+                if let coordinate = placemarks.first?.location?.coordinate {
+                    onSave(coordinate)
+                } else {
+                    geocodingErrorMessage = String(
+                        localized: "We couldn’t find coordinates for this address. Please double-check the address and try again."
+                    )
+                    showingGeocodingError = true
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                geocodingErrorMessage = error.localizedDescription
+                showingGeocodingError = true
             }
         }
     }

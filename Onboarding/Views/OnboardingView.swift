@@ -8,7 +8,6 @@
 import SwiftUI
 import CoreLocation
 import Foundation // for DebugUtils
-import UIKit
 
 enum OnboardingPageKind {
     case info
@@ -27,22 +26,29 @@ struct OnboardingPage {
 struct OnboardingView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @State private var currentPage = 0
-    @State private var iconScale: CGFloat = 1.0
     @StateObject private var alertCityPickerModel = MerchantAlertCityPickerModel()
     @State private var selectedAlertCity: MerchantAlertCityChoice?
     @State private var hasManuallySelectedAlertCity = false
     @State private var isEnablingAlerts = false
+    @State private var locationPermissionAdvanceTask: Task<Void, Never>?
+
+    @ScaledMetric(relativeTo: .largeTitle) private var iPadSmallTitleSize: CGFloat = 36
+    @ScaledMetric(relativeTo: .largeTitle) private var iPadLargeTitleSize: CGFloat = 42
+    @ScaledMetric(relativeTo: .title) private var iPadSubtitleSize: CGFloat = 26
+    @ScaledMetric(relativeTo: .headline) private var iPhoneLargeButtonSize: CGFloat = 19
+    @ScaledMetric(relativeTo: .title2) private var iPadLargeButtonSize: CGFloat = 24
 
     // ──────────────── Adaptive Layout Helpers ────────────────
     /// Categorize available container space using size classes + dimensions
     /// (never `userInterfaceIdiom`) so iPhone Duo outer, unfolded portrait,
     /// unfolded landscape, Split View, and iPad all scale cleanly without clipping.
     private func screenSizeCategory(width: CGFloat, height: CGFloat) -> ScreenCategory {
-        let isRegularCanvas = horizontalSizeClass == .regular && verticalSizeClass != .compact
+        let isRegularCanvas = horizontalSizeClass == .regular && verticalSizeClass == .regular
         let minDimension = min(width, height)
 
         if isRegularCanvas && height >= 760 {
@@ -149,12 +155,12 @@ struct OnboardingView: View {
             ZStack {
                 // Background layers
                 pages[currentPage].bgColor.ignoresSafeArea()
-                Color(UIColor.systemBackground)
+                Color(uiColor: .systemBackground)
                     .opacity(0.95)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    ScrollView(showsIndicators: false) {
+                    ScrollView {
                         VStack(spacing: 0) {
                             Spacer()
                                 .frame(height: topSpacerHeight)
@@ -179,6 +185,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 12)
                     }
+                    .scrollIndicators(.hidden)
                     .scrollBounceBehavior(.basedOnSize)
 
                     onboardingIndicator(spacing: spacing)
@@ -195,6 +202,9 @@ struct OnboardingView: View {
                 .padding(.horizontal, screenCategory.usesGenerousMargins ? 32 : 16)
                 .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
             }
+        }
+        .onDisappear {
+            locationPermissionAdvanceTask?.cancel()
         }
         .task(id: alertContextRefreshID) {
             guard pages[currentPage].kind == .alertsSetup else { return }
@@ -233,15 +243,13 @@ struct OnboardingView: View {
     private func getTitleFont(for category: ScreenCategory, isLandscape: Bool, width: CGFloat) -> Font {
         switch category {
         case .iPhoneSmall:
-            return .system(size: 28, weight: .bold)
-        case .iPhoneMedium:
+            return .title.bold()
+        case .iPhoneMedium, .iPhoneLarge:
             return .largeTitle.bold()
-        case .iPhoneLarge:
-            return .system(size: 34, weight: .bold)
         case .iPadSmall:
-            return .system(size: 36, weight: .bold)
+            return .system(size: iPadSmallTitleSize, weight: .bold)
         case .iPadMedium, .iPadLarge:
-            return .system(size: 42, weight: .bold)
+            return .system(size: iPadLargeTitleSize, weight: .bold)
         }
     }
     
@@ -256,22 +264,20 @@ struct OnboardingView: View {
         case .iPadSmall:
             return .title
         case .iPadMedium, .iPadLarge:
-            return .system(size: 26)
+            return .system(size: iPadSubtitleSize)
         }
     }
     
     private func getButtonFont(for category: ScreenCategory, isLandscape: Bool) -> Font {
         switch category {
-        case .iPhoneSmall:
-            return .system(size: 17, weight: .semibold)
-        case .iPhoneMedium:
+        case .iPhoneSmall, .iPhoneMedium:
             return .headline
         case .iPhoneLarge:
-            return .system(size: 19, weight: .semibold)
+            return .system(size: iPhoneLargeButtonSize, weight: .semibold)
         case .iPadSmall:
-            return .system(size: 22, weight: .semibold)
+            return .title2.weight(.semibold)
         case .iPadMedium, .iPadLarge:
-            return .system(size: 24, weight: .semibold)
+            return .system(size: iPadLargeButtonSize, weight: .semibold)
         }
     }
     
@@ -423,7 +429,6 @@ struct OnboardingView: View {
                 .scaledToFit()
                 .frame(width: iconSize, height: iconSize)
                 .foregroundStyle(.white)
-                .scaleEffect(iconScale)
                 .offset(
                     y: pages[currentPage].symbolName == "location.fill" ? 2 : 0
                 )
@@ -435,7 +440,7 @@ struct OnboardingView: View {
                 )
         }
         .id(currentPage)
-        .animation(.easeInOut(duration: 0.5), value: currentPage)
+        .animation(BitLocalMotion.animation(.easeInOut(duration: 0.5), reduceMotion: reduceMotion), value: currentPage)
     }
 
     private func onboardingTextBlock(
@@ -451,9 +456,9 @@ struct OnboardingView: View {
                 .lineLimit(3)
                 .minimumScaleFactor(0.82)
                 .fixedSize(horizontal: false, vertical: true)
-                .transition(.move(edge: .leading).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
                 .id("title\(currentPage)")
-                .animation(.spring(), value: currentPage)
+                .animation(BitLocalMotion.animation(.spring(), reduceMotion: reduceMotion), value: currentPage)
 
             Text(LocalizedStringKey(pages[currentPage].subtitleKey))
                 .font(subtitleFont)
@@ -461,9 +466,9 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, spacing.textHorizontal)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
                 .id("subtitle\(currentPage)")
-                .animation(.spring(response: 0.6), value: currentPage)
+                .animation(BitLocalMotion.animation(.spring(response: 0.6), reduceMotion: reduceMotion), value: currentPage)
         }
     }
 
@@ -480,7 +485,7 @@ struct OnboardingView: View {
                         width: i == currentPage ? spacing.indicatorWidthActive : spacing.indicatorWidth,
                         height: spacing.indicatorHeight
                     )
-                    .animation(.easeInOut(duration: 0.25), value: currentPage)
+                    .animation(BitLocalMotion.animation(.easeInOut(duration: 0.25), reduceMotion: reduceMotion), value: currentPage)
             }
         }
     }
@@ -530,8 +535,8 @@ struct OnboardingView: View {
                 .frame(maxWidth: min(maxContentWidth * 0.9, 500))
                 .padding(.vertical, spacing.buttonPadding)
                 .background(pages[currentPage].bgColor)
-                .foregroundColor(.white)
-                .cornerRadius(14)
+                .foregroundStyle(.white)
+                .clipShape(.rect(cornerRadius: 14))
                 .shadow(
                     color: pages[currentPage].bgColor.opacity(0.3),
                     radius: 6,
@@ -545,7 +550,9 @@ struct OnboardingView: View {
             } label: {
                 Text("onboarding_button_location_skip")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
+                    .frame(minHeight: 44)
+                    .contentShape(.rect)
             }
         }
         .padding(.horizontal, spacing.buttonHorizontal)
@@ -561,7 +568,7 @@ struct OnboardingView: View {
             if let errorMessage = merchantAlertsManager.errorMessage {
                 Text(errorMessage)
                     .font(.footnote)
-                    .foregroundColor(.red)
+                    .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 6)
             }
@@ -594,8 +601,8 @@ struct OnboardingView: View {
                     .frame(maxWidth: min(maxContentWidth * 0.9, 500))
                     .padding(.vertical, spacing.buttonPadding)
                     .background(pages[currentPage].bgColor.opacity(selectedAlertCity == nil || isEnablingAlerts ? 0.45 : 1))
-                    .foregroundColor(.white)
-                    .cornerRadius(14)
+                    .foregroundStyle(.white)
+                    .clipShape(.rect(cornerRadius: 14))
                     .shadow(
                         color: pages[currentPage].bgColor.opacity(0.25),
                         radius: 6,
@@ -611,7 +618,9 @@ struct OnboardingView: View {
             } label: {
                 Text(LocalizedStringKey("Skip for now"))
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
+                    .frame(minHeight: 44)
+                    .contentShape(.rect)
             }
         }
         .padding(.horizontal, spacing.buttonHorizontal)
@@ -625,7 +634,7 @@ struct OnboardingView: View {
             } else {
                 alertSearchBar
 
-                ScrollView(showsIndicators: false) {
+                ScrollView {
                     Group {
                         if alertCityPickerModel.isShowingSearchResults {
                             alertSearchResults
@@ -635,6 +644,7 @@ struct OnboardingView: View {
                     }
                     .padding(.vertical, 2)
                 }
+                .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
             }
         }
@@ -701,9 +711,9 @@ struct OnboardingView: View {
             maxHeight: getAlertsSupplementHeight(for: screenCategory),
             alignment: .top
         )
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
         .id("alertSupplement\(currentPage)")
-        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: currentPage)
+        .animation(BitLocalMotion.animation(.spring(response: 0.45, dampingFraction: 0.82), reduceMotion: reduceMotion), value: currentPage)
     }
 
     private var alertCloudKitStatusTitle: String {
@@ -768,15 +778,15 @@ struct OnboardingView: View {
             .frame(maxWidth: min(maxContentWidth * 0.9, 500))
             .padding(.vertical, spacing.buttonPadding)
             .background(pages[currentPage].bgColor)
-            .foregroundColor(.white)
-            .cornerRadius(14)
+            .foregroundStyle(.white)
+            .clipShape(.rect(cornerRadius: 14))
             .shadow(
                 color: pages[currentPage].bgColor.opacity(0.3),
                 radius: 6,
                 x: 0,
                 y: 3
             )
-            .animation(.spring(response: 0.4), value: currentPage)
+            .animation(BitLocalMotion.animation(.spring(response: 0.4), reduceMotion: reduceMotion), value: currentPage)
         }
         .padding(.horizontal, spacing.buttonHorizontal)
         .padding(.bottom, spacing.bottomPadding)
@@ -795,17 +805,20 @@ struct OnboardingView: View {
                 .submitLabel(.search)
 
             if !alertCityPickerModel.searchText.isEmpty {
-                Button {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
                     alertCityPickerModel.searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
                 }
+                .labelStyle(.iconOnly)
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(.rect)
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .frame(minHeight: 44)
+        .padding(.leading, 12)
+        .padding(.trailing, alertCityPickerModel.searchText.isEmpty ? 12 : 4)
+        .padding(.vertical, 2)
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -845,7 +858,7 @@ struct OnboardingView: View {
                     if let alertEmptyBrowseText {
                         Text(alertEmptyBrowseText)
                             .font(.footnote)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 18)
@@ -875,7 +888,7 @@ struct OnboardingView: View {
         } else if alertCityPickerModel.results.isEmpty {
             Text(LocalizedStringKey("No city matches yet. Try a city name, state, or country."))
                 .font(.footnote)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 18)
@@ -1009,12 +1022,15 @@ struct OnboardingView: View {
 
     private func requestLocationPermission() {
         Debug.log("OnboardingView: User tapped Enable Location button")
-        
+
         // Use the ContentViewModel's location manager to ensure consistency
         viewModel.requestWhenInUseLocationPermission()
-        
+
         // Proceed to next page after a brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        locationPermissionAdvanceTask?.cancel()
+        locationPermissionAdvanceTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
             proceedToNextPage()
         }
     }
@@ -1034,20 +1050,12 @@ struct OnboardingView: View {
     }
 
     private func proceedToNextPage() {
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+        withAnimation(BitLocalMotion.animation(.spring(response: 0.5, dampingFraction: 0.7), reduceMotion: reduceMotion)) {
             if currentPage < pages.count - 1 {
                 currentPage += 1
             } else {
                 didCompleteOnboarding = true
             }
         }
-    }
-}
-
-// Delegate for location permission changes
-class LocationPermissionDelegate: NSObject, CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager,
-                         didChangeAuthorization status: CLAuthorizationStatus) {
-        Debug.log("Location authorization status changed: \(status)")
     }
 }

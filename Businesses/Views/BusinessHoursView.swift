@@ -1,11 +1,12 @@
 import SwiftUI
 
 struct BusinessHoursView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var submission: BusinessSubmission
 
     @State private var hoursPreset: HoursPreset = .none
-    @State private var presetOpenTime: Date = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? Date()
-    @State private var presetCloseTime: Date = Calendar.current.date(from: DateComponents(hour: 17, minute: 0)) ?? Date()
+    @State private var presetOpenTime: Date = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? Date.now
+    @State private var presetCloseTime: Date = Calendar.current.date(from: DateComponents(hour: 17, minute: 0)) ?? Date.now
 
     enum HoursPreset: String, CaseIterable {
         case none = "None"
@@ -44,11 +45,11 @@ struct BusinessHoursView: View {
 
                             VStack(alignment: .center, spacing: 2) {
                                 Text("hours_open")
-                                    .font(.caption2)
+                                    .font(.caption)
                                     .textCase(.uppercase)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(.secondary)
                                 DatePicker(selection: $presetOpenTime, displayedComponents: .hourAndMinute) {
-                                    EmptyView()
+                                    Text("hours_open")
                                 }
                                 .labelsHidden()
                             }
@@ -57,18 +58,18 @@ struct BusinessHoursView: View {
                             
                             Image(systemName: "arrow.right")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                                 .padding(.top, 10)
                             
                             Spacer()
                             
                             VStack(alignment: .center, spacing: 2) {
                                 Text("hours_close")
-                                    .font(.caption2)
+                                    .font(.caption)
                                     .textCase(.uppercase)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(.secondary)
                                 DatePicker(selection: $presetCloseTime, displayedComponents: .hourAndMinute) {
-                                    EmptyView()
+                                    Text("hours_close")
                                 }
                                 .labelsHidden()
                             }
@@ -100,7 +101,7 @@ struct BusinessHoursView: View {
                         Text(LocalizedStringKey(day.localizedKey))
                             .font(.system(.body, design: .rounded))
                             .bold()
-                            .foregroundColor(dayHours.isOpen.wrappedValue ? .primary : .secondary)
+                            .foregroundStyle(dayHours.isOpen.wrappedValue ? .primary : .secondary)
 
                         Spacer()
 
@@ -108,8 +109,9 @@ struct BusinessHoursView: View {
                             Text("hours_closed").tag(false)
                             Text("hours_open").tag(true)
                         } label: {
-                            EmptyView()
+                            Text(LocalizedStringKey(day.localizedKey))
                         }
+                        .labelsHidden()
                         .pickerStyle(.segmented)
                         .fixedSize()
                     }
@@ -120,27 +122,27 @@ struct BusinessHoursView: View {
 
                             VStack(alignment: .center, spacing: 2) {
                                 Text("hours_open")
-                                    .font(.caption2)
+                                    .font(.caption)
                                     .textCase(.uppercase)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(.secondary)
                                 DatePicker(selection: dayHours.openTime, displayedComponents: .hourAndMinute) {
-                                    EmptyView()
+                                    Text("hours_open")
                                 }
                                 .labelsHidden()
                             }
 
                             Image(systemName: "arrow.right")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                                 .padding(.top, 10)
 
                             VStack(alignment: .center, spacing: 2) {
                                 Text("hours_close")
-                                    .font(.caption2)
+                                    .font(.caption)
                                     .textCase(.uppercase)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(.secondary)
                                 DatePicker(selection: dayHours.closeTime, displayedComponents: .hourAndMinute) {
-                                    EmptyView()
+                                    Text("hours_close")
                                 }
                                 .labelsHidden()
                             }
@@ -148,10 +150,10 @@ struct BusinessHoursView: View {
                             Spacer()
                         }
                         .padding(.vertical, 4)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                     }
                 }
-                .animation(.snappy, value: dayHours.isOpen.wrappedValue)
+                .animation(BitLocalMotion.animation(.snappy, reduceMotion: reduceMotion), value: dayHours.isOpen.wrappedValue)
             }
         } header: {
             Text("hours_custom_days_header")
@@ -159,12 +161,15 @@ struct BusinessHoursView: View {
     }
 
     private func dayHoursBinding(for day: WeeklyHours.Weekday) -> Binding<DayHours> {
-        Binding(
-            get: { submission.weeklyHours[day] },
-            set: { newValue in
-                submission.weeklyHours[day] = newValue
-            }
-        )
+        switch day {
+        case .monday: $submission.weeklyHours.monday
+        case .tuesday: $submission.weeklyHours.tuesday
+        case .wednesday: $submission.weeklyHours.wednesday
+        case .thursday: $submission.weeklyHours.thursday
+        case .friday: $submission.weeklyHours.friday
+        case .saturday: $submission.weeklyHours.saturday
+        case .sunday: $submission.weeklyHours.sunday
+        }
     }
 
     private func applyPreset(_ preset: HoursPreset) {

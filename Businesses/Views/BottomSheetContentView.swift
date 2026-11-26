@@ -11,6 +11,7 @@ import Foundation // for Debug logging
 import UIKit
 import CryptoKit
 import MapKit
+import Observation
 
 struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
@@ -68,9 +69,9 @@ struct BottomSheetContentView: View {
             }
             .onChange(of: viewModel.path) { _, newPath in
                 Debug.log("BottomSheet path changed (iPhone scenario)")
-                if newPath.last != nil {
+                if let activeElement = newPath.last?.element {
                     _ = viewModel.consumeSelectionSource()
-                    viewModel.selectedElement = newPath.last
+                    viewModel.selectedElement = activeElement
                 } else {
                     viewModel.deselectAnnotation()
                 }
@@ -82,11 +83,30 @@ struct BottomSheetContentView: View {
             sheetRootContentWithSafeAreaBehavior
                 .modifier(RootSheetNavigationBarModifier())
                 .disableVerticalToolbarIfAvailable()
-                .navigationDestination(for: Element.self) { element in
-                    businessDetailDestination(for: element)
+                .navigationDestination(for: BitLocalNavigationRoute.self) { route in
+                    switch route {
+                    case .place(let element):
+                        businessDetailDestination(for: element)
+                    case .placeComments(let element):
+                        BTCMapPlaceCommentsListView(element: element)
+                            .clearNavigationContainerBackgroundIfAvailable()
+                            .disableVerticalToolbarIfAvailable()
+                    case .allEvents:
+                        AllEventsListView()
+                            .environmentObject(viewModel)
+                            .clearNavigationContainerBackgroundIfAvailable()
+                            .disableVerticalToolbarIfAvailable()
+                    }
                 }
-                .navigationDestination(isPresented: communityDetailBindingIsPresented) {
-                    communityDetailDestination
+                .navigationDestination(item: $viewModel.presentedCommunityArea) { area in
+                    CommunityDetailView(
+                        area: area,
+                        currentDetent: currentDetentBinding
+                    )
+                    .id(area.id)
+                    .environmentObject(viewModel)
+                    .clearNavigationContainerBackgroundIfAvailable()
+                    .disableVerticalToolbarIfAvailable()
                 }
                 .clearNavigationContainerBackgroundIfAvailable()
         }
@@ -129,31 +149,6 @@ struct BottomSheetContentView: View {
         .disableVerticalToolbarIfAvailable()
     }
 
-    @ViewBuilder
-    private var communityDetailDestination: some View {
-        if let area = viewModel.presentedCommunityArea {
-            CommunityDetailView(
-                area: area,
-                currentDetent: currentDetentBinding
-            )
-            .id(area.id)
-            .environmentObject(viewModel)
-            .clearNavigationContainerBackgroundIfAvailable()
-            .disableVerticalToolbarIfAvailable()
-        }
-    }
-
-    private var communityDetailBindingIsPresented: Binding<Bool> {
-        Binding(
-            get: { viewModel.presentedCommunityArea != nil },
-            set: { newValue in
-                if !newValue {
-                    viewModel.presentedCommunityArea = nil
-                }
-            }
-        )
-    }
-
     private var currentDetentBinding: Binding<PresentationDetent?> {
         Binding(
             get: { currentDetent },
@@ -171,13 +166,13 @@ private struct RootSheetNavigationBarModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                .toolbar(.visible, for: .navigationBar)
-                .toolbarBackground(.hidden, for: .navigationBar)
+                .toolbarVisibility(.visible, for: .navigationBar)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationTitle("")
         } else {
             content
-                .toolbar(.hidden, for: .navigationBar)
+                .toolbarVisibility(.hidden, for: .navigationBar)
         }
     }
 }
@@ -213,9 +208,8 @@ struct CommunitiesListView: View {
     private let resultsPageSize = 15
 
     @EnvironmentObject private var viewModel: ContentViewModel
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var metadataStore = CommunityRowMetadataObservableStore.shared
+    private let metadataStore = CommunityRowMetadataObservableStore.shared
     var currentDetent: PresentationDetent? = nil
     @State private var filterText = ""
     @State private var communityResultsLimit = 15
@@ -339,23 +333,25 @@ struct CommunitiesListView: View {
                 .focused($isSearchFieldFocused)
                 .submitLabel(.search)
             if !filterText.isEmpty {
-                Button {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
                     filterText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
                 }
-                .accessibilityLabel("Clear search")
+                .labelStyle(.iconOnly)
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(.rect)
+                .padding(.vertical, -11)
+                .padding(.trailing, -8)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(searchFieldSurfaceColor, in: Capsule())
-        .overlay(
+        .overlay {
             Capsule()
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
+        }
         .padding(.horizontal, 16)
     }
 
@@ -589,7 +585,7 @@ private struct CommunityRow: View {
         if let merchantCount = metadata?.merchantCount {
             HStack(spacing: 8) {
                 Image(systemName: "storefront")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption.weight(.semibold))
 
                 Text("\(merchantCount)")
                     .font(.caption.weight(.semibold))
@@ -631,29 +627,35 @@ private struct PlaceholderCapsule: View {
 }
 
 private struct ShimmerShape<S: Shape>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let shape: S
     private let duration: Double = 1.5
 
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let elapsed = timeline.date.timeIntervalSinceReferenceDate
-            let phase = CGFloat(elapsed.truncatingRemainder(dividingBy: duration) / duration)
-            let mapped = -0.8 + phase * 2.6  // maps 0…1 → -0.8…1.8
-
+        if reduceMotion {
             shape
                 .fill(Color.primary.opacity(0.08))
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            .clear,
-                            Color.primary.opacity(0.14),
-                            .clear
-                        ],
-                        startPoint: UnitPoint(x: mapped - 0.3, y: 0.3),
-                        endPoint: UnitPoint(x: mapped + 0.3, y: 0.7)
-                    )
-                    .clipShape(shape)
-                }
+        } else {
+            TimelineView(.animation) { timeline in
+                let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                let phase = CGFloat(elapsed.truncatingRemainder(dividingBy: duration) / duration)
+                let mapped = -0.8 + phase * 2.6  // maps 0…1 → -0.8…1.8
+
+                shape
+                    .fill(Color.primary.opacity(0.08))
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                Color.primary.opacity(0.14),
+                                .clear
+                            ],
+                            startPoint: UnitPoint(x: mapped - 0.3, y: 0.3),
+                            endPoint: UnitPoint(x: mapped + 0.3, y: 0.7)
+                        )
+                        .clipShape(shape)
+                    }
+            }
         }
     }
 }
@@ -674,17 +676,19 @@ private actor CommunityRowMetadataCache {
 }
 
 @MainActor
-private final class CommunityRowMetadataObservableStore: ObservableObject {
+@Observable
+private final class CommunityRowMetadataObservableStore {
     static let shared = CommunityRowMetadataObservableStore()
 
-    @Published var metadataByAreaID: [String: CommunityRowMetadata] = [:]
+    var metadataByAreaID: [String: CommunityRowMetadata] = [:]
 }
 
 struct CommunityDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.calendar) private var calendar
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var viewModel: ContentViewModel
-    @ObservedObject private var metadataStore = CommunityRowMetadataObservableStore.shared
+    private let metadataStore = CommunityRowMetadataObservableStore.shared
     let area: V2AreaRecord
     @Binding private var currentDetent: PresentationDetent?
     @AppStorage("community.lastLightningWalletID") private var lastLightningWalletID: String = ""
@@ -713,7 +717,6 @@ struct CommunityDetailView: View {
                     if !newValue { lightningErrorMessage = nil }
                 })
             ) {
-                Button("OK", role: .cancel) {}
             } message: {
                 Text(lightningErrorMessage ?? "")
             }
@@ -773,7 +776,6 @@ struct CommunityDetailView: View {
                 Text("Choose your Lightning wallet. BitLocal will copy the Lightning address, then open the wallet.")
             }
             .alert("Tipping Disclaimer", isPresented: $showTipsDisclaimerAlert) {
-                Button("OK", role: .cancel) {}
             } message: {
                 Text("BitLocal does not process, custody, or guarantee tip transactions. We only open your selected wallet or link and help copy/share the Lightning address.")
             }
@@ -917,12 +919,12 @@ struct CommunityDetailView: View {
         if let communityIconURL {
             CommunityIconImage(url: communityIconURL, placeholderSystemName: "person.3.fill", scaleToFill: true)
                 .frame(width: 48, height: 48)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
-                )
+                }
                 .accessibilityHidden(true)
         } else {
             Image(systemName: "person.3.fill")
@@ -930,10 +932,10 @@ struct CommunityDetailView: View {
                 .foregroundStyle(.white)
                 .frame(width: 48, height: 48)
                 .background(Color("MarkerColor"), in: Circle())
-                .overlay(
+                .overlay {
                     Circle()
                         .strokeBorder(Color.white.opacity(0.24), lineWidth: 0.75)
-                )
+                }
                 .accessibilityHidden(true)
         }
     }
@@ -950,7 +952,7 @@ struct CommunityDetailView: View {
 
     private var heroMetadataLine: String? {
         guard let count = resolvedMerchantCount else { return nil }
-        return count == 1 ? "1 merchant" : "\(count) merchants"
+        return String(localized: "^[\(count) merchant](inflect: true)")
     }
 
     private var heroVerificationIcon: String {
@@ -1042,20 +1044,20 @@ struct CommunityDetailView: View {
             .padding(.vertical, 8)
             .background {
                 if isPrimary {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Color.accentColor)
                 } else {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(.regularMaterial)
                 }
             }
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(
                         isPrimary ? Color.clear : Color(.separator).opacity(0.35),
                         lineWidth: 0.5
                     )
-            )
+            }
         }
         .buttonStyle(.tactilePress(scale: 0.96))
     }
@@ -1390,37 +1392,23 @@ struct CommunityDetailView: View {
                 PlaceGroupedSurface(padding: EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)) {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(memberElements.enumerated()), id: \.element.id) { index, element in
-                            if index > 0 {
-                                Divider()
-                                    .padding(.leading, 44)
-                            }
-                            NavigationLink {
-                                BusinessDetailView(
-                                    element: element,
-                                    userLocation: viewModel.userLocation,
-                                    contentViewModel: viewModel,
-                                    currentDetent: $currentDetent
-                                )
-                                .onAppear {
-                                    viewModel.setSelectionSource(.list)
-                                    viewModel.selectAnnotationForListSelection(
-                                        element,
-                                        animated: true,
-                                        allowCameraMovement: !isLargeSheet
-                                    )
-                                    viewModel.selectedElement = element
+                            VStack(alignment: .leading, spacing: 0) {
+                                if index > 0 {
+                                    Divider()
+                                        .padding(.leading, 44)
                                 }
-                            } label: {
-                                HStack(alignment: .center, spacing: 8) {
-                                    ElementCell(viewModel: cellViewModel(for: element))
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.tertiary)
+                                NavigationLink(value: BitLocalNavigationRoute.place(element)) {
+                                    HStack(alignment: .center, spacing: 8) {
+                                        ElementCell(viewModel: cellViewModel(for: element))
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .padding(.vertical, 4)
+                                    .contentShape(Rectangle())
                                 }
-                                .padding(.vertical, 4)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.tactileRow(cornerRadius: 10))
                             }
-                            .buttonStyle(.tactileRow(cornerRadius: 10))
                         }
                     }
                 }
@@ -1636,7 +1624,7 @@ struct CommunityDetailView: View {
     private var verificationStatus: CommunityVerificationStatus? {
         guard let raw = area.tags?["verified:date"],
               let verifiedDate = parsedBTCMapDate(raw),
-              let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) else {
+              let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: .now) else {
             return nil
         }
         let formattedDate = verifiedDate.formatted(date: .abbreviated, time: .omitted)
@@ -1972,12 +1960,7 @@ private struct CommunityIconImage: View {
             if let uiImage {
                 Image(uiImage: uiImage)
                     .resizable()
-                    .if(scaleToFill) { view in
-                        view.scaledToFill()
-                    }
-                    .if(!scaleToFill) { view in
-                        view.scaledToFit()
-                    }
+                    .aspectRatio(contentMode: scaleToFill ? .fill : .fit)
             } else if let placeholderSystemName {
                 Image(systemName: placeholderSystemName)
                     .resizable()
@@ -2005,9 +1988,7 @@ actor CommunityIconCache {
     private let directoryURL: URL
 
     private init() {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        directoryURL = base.appendingPathComponent("CommunityIconCache", isDirectory: true)
+        directoryURL = URL.cachesDirectory.appending(path: "CommunityIconCache", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
     }
 
@@ -2017,7 +1998,7 @@ actor CommunityIconCache {
             return cached
         }
 
-        let fileURL = directoryURL.appendingPathComponent(fileName(for: url))
+        let fileURL = directoryURL.appending(path: fileName(for: url))
         if let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) {
             memoryCache.setObject(image, forKey: cacheKey)
             return image
@@ -2055,17 +2036,6 @@ private extension View {
             } label: {
                 Label(title, systemImage: "doc.on.doc")
             }
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
         }
     }
 }

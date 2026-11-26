@@ -12,8 +12,8 @@ struct CustomiPadNavigationStackTitleView: View {
     var body: some View {
         HStack(spacing: 0) {
             Text("bitlocal")
-                .font(.custom("Fredoka-Medium", size: 32))
-                .foregroundColor(.accentColor)
+                .font(.custom("Fredoka-Medium", size: 32, relativeTo: .largeTitle))
+                .foregroundStyle(.accent)
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }

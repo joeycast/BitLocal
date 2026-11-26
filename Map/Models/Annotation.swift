@@ -10,10 +10,6 @@ import Foundation
 import MapKit
 
 class Annotation: NSObject, Identifiable, MKAnnotation {
-    static func == (lhs: Annotation, rhs: Annotation) -> Bool {
-        lhs.id == rhs.id
-    }
-
     /// Stable identity for the place, not a random UUID per annotation instance.
     var id: String { element?.id ?? ObjectIdentifier(self).debugDescription }
     let element: Element?
@@ -28,5 +24,14 @@ class Annotation: NSObject, Identifiable, MKAnnotation {
 
     init(element: Element) {
         self.element = element
+    }
+
+    override func isEqual(_ object: Any?) -> Bool {
+        guard let other = object as? Annotation else { return false }
+        return id == other.id
+    }
+
+    override var hash: Int {
+        id.hashValue
     }
 }

@@ -13,7 +13,7 @@ import UIKit
 @MainActor
 final class MapLocationRecenterController: ObservableObject {
     private var locationCancellable: AnyCancellable?
-    private var timeoutWorkItem: DispatchWorkItem?
+    private var timeoutTask: Task<Void, Never>?
 
     func handleRecenterTap(viewModel: ContentViewModel) {
         switch viewModel.locationManager.authorizationStatus {
@@ -35,8 +35,8 @@ final class MapLocationRecenterController: ObservableObject {
     func cancel() {
         locationCancellable?.cancel()
         locationCancellable = nil
-        timeoutWorkItem?.cancel()
-        timeoutWorkItem = nil
+        timeoutTask?.cancel()
+        timeoutTask = nil
     }
 
     private func requestAndCenterOnNextLocation(viewModel: ContentViewModel) {
@@ -57,15 +57,14 @@ final class MapLocationRecenterController: ObservableObject {
                 viewModel.isUpdatingLocation = false
             }
 
-        let workItem = DispatchWorkItem { [weak self, weak viewModel] in
-            guard let self, let viewModel, viewModel.isUpdatingLocation else { return }
+        timeoutTask = Task { @MainActor [weak self, weak viewModel] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled, let self, let viewModel, viewModel.isUpdatingLocation else { return }
             self.cancel()
             self.presentLocationTimeoutAlert()
             viewModel.locationManager.stopUpdatingLocation()
             viewModel.isUpdatingLocation = false
         }
-        timeoutWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: workItem)
     }
 
     private func presentLocationTimeoutAlert() {
@@ -151,20 +150,23 @@ struct MapControlToolbarContent: ToolbarContent {
 struct MapButtonsView: View {
     @ObservedObject var viewModel: ContentViewModel
     var selectedMapTypeBinding: Binding<MKMapType>
-    var userLocation: CLLocation?
-    var isIPad: Bool
     var useMonochromeIcons: Bool = false
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var recenterController = MapLocationRecenterController()
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     var body: some View {
         controlPill
     }
 
     private var controlPill: some View {
-        let controlWidth: CGFloat = isIPad ? 52 : 46
-        let controlHeight: CGFloat = isIPad ? 46 : 42
+        let controlWidth: CGFloat = isRegularWidth ? 52 : 46
+        let controlHeight: CGFloat = isRegularWidth ? 46 : 44
 
         return VStack(spacing: 0) {
             Button(action: toggleMapType) {
@@ -178,7 +180,7 @@ struct MapButtonsView: View {
 
             Button(action: handleRecenterTap) {
                 Image(systemName: useMonochromeIcons ? "location" : "location.fill")
-                    .font(.system(size: useMonochromeIcons ? 15 : 14, weight: useMonochromeIcons ? .medium : .semibold))
+                    .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
                     .foregroundStyle(useMonochromeIcons ? Color.primary : Color.accentColor)
                     .frame(width: controlWidth, height: controlHeight)
             }
@@ -198,20 +200,15 @@ struct MapButtonsView: View {
                 }
                 .accessibilityLabel(
                     viewModel.mapDisplayMode == .merchants
-                        ? NSLocalizedString("Show communities", comment: "VoiceOver label to switch map to communities")
-                        : NSLocalizedString("Show merchants", comment: "VoiceOver label to switch map to merchants")
+                        ? LocalizedStringKey("Show communities")
+                        : LocalizedStringKey("Show merchants")
                 )
                 .accessibilityValue(
                     viewModel.mapDisplayMode == .merchants
-                        ? NSLocalizedString("Merchants map", comment: "VoiceOver current map mode value")
-                        : NSLocalizedString("Communities map", comment: "VoiceOver current map mode value")
+                        ? LocalizedStringKey("Merchants map")
+                        : LocalizedStringKey("Communities map")
                 )
-                .accessibilityHint(
-                    NSLocalizedString(
-                        "Switches between merchant pins and community areas",
-                        comment: "VoiceOver hint for map mode toggle"
-                    )
-                )
+                .accessibilityHint("Switches between merchant pins and community areas")
             }
         }
         .frame(width: controlWidth)
@@ -231,11 +228,11 @@ struct MapButtonsView: View {
     private var mapTypeIcon: some View {
         ZStack {
             Image(systemName: useMonochromeIcons ? "map" : "map.fill")
-                .font(.system(size: useMonochromeIcons ? 15 : 14, weight: useMonochromeIcons ? .medium : .semibold))
+                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 1 : 0)
             Image(systemName: useMonochromeIcons ? "globe" : "globe.americas.fill")
-                .font(.system(size: useMonochromeIcons ? 15 : 14, weight: useMonochromeIcons ? .medium : .semibold))
+                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 0 : 1)
         }
@@ -246,11 +243,11 @@ struct MapButtonsView: View {
         let iconColor: Color = useMonochromeIcons ? .primary : .accentColor
         return ZStack {
             Image(systemName: "person.3.fill")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(iconColor)
                 .opacity(viewModel.mapDisplayMode == .merchants ? 1 : 0)
             Image(systemName: "mappin.and.ellipse")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(iconColor)
                 .opacity(viewModel.mapDisplayMode == .merchants ? 0 : 1)
         }

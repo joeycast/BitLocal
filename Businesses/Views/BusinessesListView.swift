@@ -10,7 +10,7 @@ import UIKit
 struct BusinessesListView: View {
 
     @EnvironmentObject var viewModel: ContentViewModel
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.calendar) private var calendar
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
@@ -20,7 +20,6 @@ struct BusinessesListView: View {
     var userLocation: CLLocation?
     @Binding private var currentDetent: PresentationDetent?
 
-    @State private var cellViewModels: [String: ElementCellViewModel] = [:] // Keyed by Element ID
     @State private var lastLoggedLocation: CLLocationCoordinate2D? // Track last logged location
     @State private var searchResultsLimit = 20
     @State private var discoveryResultsLimit = 25
@@ -30,7 +29,7 @@ struct BusinessesListView: View {
     @State private var activeQuickFilters: Set<MerchantQuickFilter> = []
     @State private var showFocusedSearchCategoryChips = false
     @State private var canShowEmptyState = false
-    @State private var emptyStateRevealWorkItem: DispatchWorkItem?
+    @State private var emptyStateDelayTask: Task<Void, Never>?
     @State private var showingAddBusinessForm = false
     @FocusState private var isSearchFieldFocused: Bool
 
@@ -85,12 +84,12 @@ struct BusinessesListView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
                 guard isSearchFieldFocused else { return }
-                withAnimation(keyboardAnimation(for: notification)) {
+                withAnimation(BitLocalMotion.animation(keyboardAnimation(for: notification), reduceMotion: reduceMotion)) {
                     showFocusedSearchCategoryChips = true
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
-                withAnimation(keyboardAnimation(for: notification)) {
+                withAnimation(BitLocalMotion.animation(keyboardAnimation(for: notification), reduceMotion: reduceMotion)) {
                     showFocusedSearchCategoryChips = false
                 }
             }
@@ -261,16 +260,18 @@ struct BusinessesListView: View {
                 .focused($isSearchFieldFocused)
                 .submitLabel(.search)
             if !viewModel.unifiedSearchText.isEmpty {
-                Button {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
                     BitLocalHaptics.selection()
                     viewModel.clearMerchantSearch(userInitiated: true)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
                 }
+                .labelStyle(.iconOnly)
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(.rect)
+                .padding(.vertical, -11)
+                .padding(.horizontal, -8)
                 .buttonStyle(.tactilePress(scale: 0.92))
-                .accessibilityLabel("Clear search")
             }
             if viewModel.isSearchActive {
                 Button("Cancel") {
@@ -290,10 +291,10 @@ struct BusinessesListView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(searchFieldSurfaceColor, in: Capsule())
-        .overlay(
+        .overlay {
             Capsule()
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
+        }
         .padding(.horizontal, 16)
         .animation(
             BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
@@ -318,10 +319,10 @@ struct BusinessesListView: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: Capsule())
-        .overlay(
+        .overlay {
             Capsule()
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
+        }
         .accessibilityElement(children: .combine)
     }
 
@@ -833,7 +834,7 @@ struct BusinessesListView: View {
     }
 
     private var categoryChipsView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal) {
             HStack(spacing: 8) {
                 ForEach(visibleQuickFilters) { filter in
                     let isSelected = activeQuickFilters.contains(filter)
@@ -858,13 +859,13 @@ struct BusinessesListView: View {
                             isSelected ? Color.accentColor : chipSurfaceColor,
                             in: Capsule()
                         )
-                        .overlay(
+                        .overlay {
                             Capsule()
                                 .strokeBorder(
                                     isSelected ? Color.clear : Color.primary.opacity(0.08),
                                     lineWidth: 0.5
                                 )
-                        )
+                        }
                         .animation(
                             BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
                             value: isSelected
@@ -912,13 +913,13 @@ struct BusinessesListView: View {
                             isSelected ? Color.accentColor : chipSurfaceColor,
                             in: Capsule()
                         )
-                        .overlay(
+                        .overlay {
                             Capsule()
                                 .strokeBorder(
                                     isSelected ? Color.clear : Color.primary.opacity(0.08),
                                     lineWidth: 0.5
                                 )
-                        )
+                        }
                         .animation(
                             BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
                             value: isSelected
@@ -939,6 +940,7 @@ struct BusinessesListView: View {
             .padding(.horizontal, 16)
             .padding(.top, categoryChipsTopPadding)
         }
+        .scrollIndicators(.hidden)
     }
 
     private var chipSurfaceColor: Color {
@@ -973,8 +975,7 @@ struct BusinessesListView: View {
 
     private func applyQuickFilters(to source: [Element]) -> [Element] {
         guard !activeQuickFilters.isEmpty else { return source }
-        let now = Date()
-        let calendar = Calendar.current
+        let now = Date.now
         let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: now)
             ?? now.addingTimeInterval(-365 * 24 * 60 * 60)
 
@@ -1074,7 +1075,7 @@ struct BusinessesListView: View {
         let cellVM = cellViewModel(for: element)
         return Button {
             prepareListNavigation(for: element)
-            viewModel.path = [element]
+            viewModel.path = [.place(element)]
         } label: {
             HStack(alignment: .center, spacing: 10) {
                 ElementCell(
@@ -1104,7 +1105,7 @@ struct BusinessesListView: View {
         let cellVM = cellViewModel(for: element)
         return Button {
             prepareListNavigation(for: element)
-            viewModel.path = [element]
+            viewModel.path = [.place(element)]
         } label: {
             HStack(alignment: .center, spacing: 10) {
                 ElementCell(
@@ -1161,9 +1162,6 @@ struct BusinessesListView: View {
         }
         lastLoggedLocation = newLocation.coordinate
         Debug.log("User location updated in BusinessesListView: \(newLocation.coordinate.latitude), \(newLocation.coordinate.longitude)")
-        for cellVM in cellViewModels.values {
-            cellVM.updateUserLocationIfNeeded(newLocation)
-        }
     }
 
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
@@ -1326,7 +1324,8 @@ struct BusinessesListView: View {
     }
 
     private func refreshEmptyStateVisibility() {
-        emptyStateRevealWorkItem?.cancel()
+        emptyStateDelayTask?.cancel()
+        emptyStateDelayTask = nil
 
         let shouldDelayEmptyState = !isFilteringMerchants &&
             activeQuickFilters.isEmpty &&
@@ -1341,13 +1340,13 @@ struct BusinessesListView: View {
 
         canShowEmptyState = false
 
-        let workItem = DispatchWorkItem {
+        emptyStateDelayTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled else { return }
             guard elements.isEmpty, activeQuickFilters.isEmpty else { return }
             guard !viewModel.isLoading else { return }
             canShowEmptyState = true
         }
-        emptyStateRevealWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: workItem)
     }
 }
 
@@ -1357,6 +1356,7 @@ struct ElementCell: View {
     var showsBottomDivider = false
     var isSaved = false
     @State private var appeared = false
+    @Environment(\.locale) private var locale
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     private var categoryBadgeSymbolName: String {
@@ -1368,10 +1368,15 @@ struct ElementCell: View {
             return distance
         }
         if let distance = viewModel.viewModel.distanceInMiles(element: viewModel.element) {
-            if distance < 1 {
-                return String(format: "%.2f mi", distance)
-            }
-            return String(format: "%.1f mi", distance)
+            let fractionDigits = distance < 1 ? 2 : 1
+            return Measurement(value: distance, unit: UnitLength.miles).formatted(
+                .measurement(
+                    width: .abbreviated,
+                    usage: .asProvided,
+                    numberFormatStyle: .number.precision(.fractionLength(fractionDigits))
+                )
+                .locale(locale)
+            )
         }
         return nil
     }
@@ -1390,14 +1395,14 @@ struct ElementCell: View {
                 // Solid map-pin badge (MarkerColor circle + crisp white symbol)
                 // links each row 1:1 to its map marker in both Light and Dark Mode.
                 Image(systemName: categoryBadgeSymbolName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(Color("MarkerColor"), in: Circle())
-                    .overlay(
+                    .overlay {
                         Circle()
                             .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
-                    )
+                    }
                     .padding(.top, 2)
                     .accessibilityHidden(true)
 
@@ -1479,27 +1484,23 @@ struct ElementCell: View {
         let useMetric: Bool
         switch distanceUnit {
         case .auto:
-            useMetric = Locale.current.measurementSystem == .metric
+            useMetric = locale.measurementSystem == .metric
         case .miles:
             useMetric = false
         case .kilometers:
             useMetric = true
         }
-        if useMetric {
-            let km = distanceInMeters / 1000
-            if km < 1 {
-                return String(format: "%.2f km", km)
-            } else {
-                return String(format: "%.1f km", km)
-            }
-        } else {
-            let miles = distanceInMeters / 1609.344
-            if miles < 1 {
-                return String(format: "%.2f mi", miles)
-            } else {
-                return String(format: "%.1f mi", miles)
-            }
-        }
+        let value = useMetric ? (distanceInMeters / 1000) : (distanceInMeters / 1609.344)
+        let unit: UnitLength = useMetric ? .kilometers : .miles
+        let fractionDigits = value < 1 ? 2 : 1
+        return Measurement(value: value, unit: unit).formatted(
+            .measurement(
+                width: .abbreviated,
+                usage: .asProvided,
+                numberFormatStyle: .number.precision(.fractionLength(fractionDigits))
+            )
+            .locale(locale)
+        )
     }
 }
 
@@ -1754,7 +1755,7 @@ class ElementCellViewModel: ObservableObject {
                     self.setCachedAddressEntry(.forAddress(merged))
                 } else {
                     self.setCachedAddressEntry(
-                        .noResult(retryAfter: Date().addingTimeInterval(24 * 60 * 60))
+                        .noResult(retryAfter: Date.now.addingTimeInterval(24 * 60 * 60))
                     )
                 }
             } else if let staleFallback, staleFallback.hasAnyGeocodingFields {
@@ -1764,7 +1765,7 @@ class ElementCellViewModel: ObservableObject {
                 self.setCachedAddressEntry(.failed(retryAfter: retryAfter))
             } else {
                 self.setCachedAddressEntry(
-                    .noResult(retryAfter: Date().addingTimeInterval(24 * 60 * 60))
+                    .noResult(retryAfter: Date.now.addingTimeInterval(24 * 60 * 60))
                 )
             }
 
@@ -1915,19 +1916,19 @@ struct PaymentIcons: View {
         HStack(spacing: 6) {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
-                    .foregroundColor(.accentColor)
+                    .foregroundStyle(.accent)
                     .accessibilityLabel(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
             }
 
             if acceptsLightning(element: element) {
                 Image(systemName: "bolt.circle.fill")
-                    .foregroundColor(.accentColor)
+                    .foregroundStyle(.accent)
                     .accessibilityLabel(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
             }
 
             if acceptsContactlessLightning(element: element) {
                 Image(systemName: "wave.3.right.circle.fill")
-                    .foregroundColor(.accentColor)
+                    .foregroundStyle(.accent)
                     .accessibilityLabel(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
             }
         }
@@ -1952,7 +1953,7 @@ struct PaymentIcons: View {
         }
         return String(
             format: NSLocalizedString("Accepts %@", comment: "VoiceOver summary of accepted payment methods"),
-            methods.joined(separator: ", ")
+            methods.formatted(.list(type: .and))
         )
     }
 }

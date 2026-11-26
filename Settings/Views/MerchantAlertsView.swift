@@ -4,6 +4,7 @@ struct MerchantAlertsView: View {
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @Binding var currentDetent: PresentationDetent
     @State private var showingCityPicker = false
+    @ScaledMetric(relativeTo: .largeTitle) private var welcomeIconSize: CGFloat = 40
 
     var body: some View {
         List {
@@ -80,7 +81,7 @@ struct MerchantAlertsView: View {
         Section {
             VStack(spacing: 16) {
                 Image(systemName: "bell.and.waves.left.and.right")
-                    .font(.system(size: 40))
+                    .font(.system(size: welcomeIconSize))
                     .foregroundStyle(.accent)
                     .padding(.top, 8)
 
@@ -104,14 +105,11 @@ struct MerchantAlertsView: View {
                         .background {
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
                                 .fill(pickCityButtonBackgroundColor)
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .strokeBorder(.white.opacity(pickCityButtonBorderOpacity))
-                                }
+                                .stroke(.white.opacity(pickCityButtonBorderOpacity))
                         }
                 }
                 .buttonStyle(.plain)
-                .allowsHitTesting(merchantAlertsManager.canEnableAlerts)
+                .disabled(!merchantAlertsManager.canEnableAlerts)
                 .padding(.bottom, 4)
             }
             .frame(maxWidth: .infinity)

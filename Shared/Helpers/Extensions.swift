@@ -96,12 +96,12 @@ extension Element {
 extension UserDefaults {
     func setElements(_ elements: [Element], forKey key: String) {
         if let encoded = try? JSONEncoder().encode(elements) {
-            UserDefaults.standard.set(encoded, forKey: key)
+            self.set(encoded, forKey: key)
         }
     }
     
     func getElements(forKey key: String) -> [Element]? {
-        if let data = UserDefaults.standard.data(forKey: key),
+        if let data = self.data(forKey: key),
            let elements = try? JSONDecoder().decode([Element].self, from: data) {
             return elements
         }
@@ -164,7 +164,7 @@ extension Image {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: size, height: size)
-            .foregroundColor(color)
+            .foregroundStyle(color)
     }
 }
 
@@ -177,20 +177,15 @@ extension View {
     @ViewBuilder
     func bitLocalDetailNavigationChrome() -> some View {
         self
-            .toolbar(.visible, for: .navigationBar)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarVisibility(.visible, for: .navigationBar)
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .toolbar(removing: .sidebarToggle)
             .clearNavigationContainerBackgroundIfAvailable()
             .tint(.accentColor)
     }
     
-    @ViewBuilder
     func clearListRowBackground(if condition: Bool) -> some View {
-        if condition {
-            self.listRowBackground(Color.clear)
-        } else {
-            self
-        }
+        self.listRowBackground(condition ? Color.clear : nil)
     }
 
     @ViewBuilder
@@ -208,26 +203,18 @@ extension View {
         self.presentationSizing(.page)
     }
 
-    @ViewBuilder
     func cityPickerResultBackground(glassy: Bool) -> some View {
-        if glassy {
-            self
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        } else {
-            self
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
+        self.background(
+            glassy ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(uiColor: .secondarySystemGroupedBackground)),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
     }
 
-    @ViewBuilder
     func cityPickerSearchBackground(glassy: Bool) -> some View {
-        if glassy {
-            self
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        } else {
-            self
-                .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+        self.background(
+            glassy ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color(uiColor: .tertiarySystemFill)),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
     }
 }
 
@@ -261,8 +248,8 @@ extension String {
         // Remove multiple protocols if they exist
         let duplicatedSecurePrefix = Self.secureProtocolPrefix + Self.insecureProtocolPrefix
         let duplicatedInsecurePrefix = Self.insecureProtocolPrefix + Self.secureProtocolPrefix
-        cleanURL = cleanURL.replacingOccurrences(of: duplicatedSecurePrefix, with: Self.secureProtocolPrefix)
-        cleanURL = cleanURL.replacingOccurrences(of: duplicatedInsecurePrefix, with: Self.secureProtocolPrefix)
+        cleanURL = cleanURL.replacing(duplicatedSecurePrefix, with: Self.secureProtocolPrefix)
+        cleanURL = cleanURL.replacing(duplicatedInsecurePrefix, with: Self.secureProtocolPrefix)
         
         // Try to create URL as-is first
         if let url = URL(string: cleanURL), url.scheme != nil {
@@ -285,21 +272,9 @@ extension String {
     
     func cleanedForDisplay() -> String {
         let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
-        let withoutScheme = trimmed.replacingOccurrences(
-            of: #"^https?://"#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        let withoutWWW = withoutScheme.replacingOccurrences(
-            of: #"^www\."#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        return withoutWWW.replacingOccurrences(
-            of: #"/+$"#,
-            with: "",
-            options: .regularExpression
-        )
+        let withoutScheme = trimmed.replacing(#/^https?:\/\//#.ignoresCase(), with: "")
+        let withoutWWW = withoutScheme.replacing(#/^www\./#.ignoresCase(), with: "")
+        return withoutWWW.replacing(#/\/+$/#, with: "")
     }
 }
 
@@ -309,11 +284,11 @@ extension String {
     func cleanedPhoneNumber() -> (cleaned: String, isValid: Bool) {
         // Just remove whitespace and common separators for tel: links
         let cleaned = self.trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "-", with: "")
-            .replacingOccurrences(of: "(", with: "")
-            .replacingOccurrences(of: ")", with: "")
-            .replacingOccurrences(of: ".", with: "")
+            .replacing(" ", with: "")
+            .replacing("-", with: "")
+            .replacing("(", with: "")
+            .replacing(")", with: "")
+            .replacing(".", with: "")
         
         let isValid = isValidPhoneNumber(cleaned)
         return (cleaned, isValid)
@@ -336,7 +311,7 @@ extension String {
         }
         
         // Must be mostly digits (allow + for country codes)
-        let validChars = phone.filter({ $0.isNumber || $0 == "+" }).count
+        let validChars = phone.count(where: { $0.isNumber || $0 == "+" })
         let totalChars = phone.count
         
         // At least 70% should be digits or +
@@ -345,7 +320,7 @@ extension String {
         }
         
         // Must contain at least 4 digits
-        let digitCount = phone.filter { $0.isNumber }.count
+        let digitCount = phone.count(where: \.isNumber)
         return digitCount >= 4
     }
     
@@ -357,8 +332,8 @@ extension String {
         guard !trimmed.isEmpty else { return self }
         
         // Remove excessive whitespace but preserve intentional formatting
-        let cleaned = trimmed.replacingOccurrences(of: "  +", with: " ")
-                           .replacingOccurrences(of: "+ ", with: "+")
+        let cleaned = trimmed.replacing(#/ {2,}/#, with: " ")
+            .replacing("+ ", with: "+")
         
         return cleaned
     }
@@ -720,18 +695,26 @@ enum ElementCategoryBadgeHelper {
 
 /// Native system material grouped container shared by Merchant and Community detail screens.
 struct PlaceGroupedSurface<Content: View>: View {
-    var padding: EdgeInsets = EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
-    @ViewBuilder let content: () -> Content
+    let padding: EdgeInsets
+    let content: Content
+
+    init(
+        padding: EdgeInsets = EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14),
+        @ViewBuilder content: () -> Content
+    ) {
+        self.padding = padding
+        self.content = content()
+    }
 
     var body: some View {
-        content()
+        content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
+            .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
-            )
+            }
     }
 }
 
@@ -747,7 +730,6 @@ struct TactileCopyButton: View {
     var body: some View {
         Button {
             UIPasteboard.general.string = value
-            BitLocalHaptics.success()
 
             resetTask?.cancel()
             withAnimation(
@@ -773,10 +755,13 @@ struct TactileCopyButton: View {
                 .foregroundStyle(copied ? Color.green : Color.secondary)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .contentShape(.rect)
         }
         .buttonStyle(.tactilePress(scale: 0.92))
-        .accessibilityLabel(copied ? "Copied" : accessibilityLabel)
+        .sensoryFeedback(.success, trigger: copied) { _, isCopied in
+            isCopied
+        }
+        .accessibilityLabel(copied ? Text("Copied") : Text(accessibilityLabel))
         .onDisappear {
             resetTask?.cancel()
         }

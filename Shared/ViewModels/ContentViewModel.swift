@@ -46,7 +46,7 @@ enum SearchTextNormalizer {
         }
 
         return String(cleaned)
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .replacing(#/\s+/#, with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
     }
@@ -71,6 +71,30 @@ enum SearchTextNormalizer {
             .split(separator: " ")
             .map(String.init)
             .filter { !$0.isEmpty }
+    }
+}
+
+enum BitLocalNavigationRoute: Hashable {
+    case place(Element)
+    case placeComments(Element)
+    case allEvents
+
+    var element: Element? {
+        switch self {
+        case .place(let element), .placeComments(let element):
+            return element
+        case .allEvents:
+            return nil
+        }
+    }
+
+    var id: String {
+        switch self {
+        case .place(let element), .placeComments(let element):
+            return element.id
+        case .allEvents:
+            return "all-events"
+        }
     }
 }
 
@@ -103,7 +127,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Tracks which coarse regions already have a pending country-code geocode
     /// so we only fire one request per ~11 km area.
     var pendingRegionCodeLookups: Set<String> = []
-    @Published var path: [Element] = []
+    @Published var path: [BitLocalNavigationRoute] = []
     @Published var selectedElement: Element?
     @Published var deepLinkUnavailableState: DeepLinkUnavailableState?
     @Published var cellViewModels: [String: ElementCellViewModel] = [:]
@@ -219,11 +243,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     
     private var lastCenteredCoordinate: CLLocationCoordinate2D?
     private var geocodingCacheSaveWorkItem: DispatchWorkItem?
-    private let geocodingCacheFileURL: URL = {
-        let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-        return (cachesDirectory ?? URL(fileURLWithPath: NSTemporaryDirectory()))
-            .appendingPathComponent("geocoding_cache.json")
-    }()
+    private let geocodingCacheFileURL = URL.cachesDirectory.appending(path: "geocoding_cache.json")
     
     private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: AnyCancellable?
@@ -498,7 +518,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         boostExpiryRefreshWorkItem = nil
 
         let source = elements ?? visibleElements
-        let now = Date()
+        let now = Date.now
         let soonestExpiry = source
             .compactMap(\.boostExpirationDate)
             .filter { $0 > now }
@@ -589,7 +609,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                     }
                     self.setSelectionSource(.unknown)
                     self.selectedElement = element
-                    self.path = [element]
+                    self.path = [.place(element)]
                     self.deepLinkUnavailableState = nil
                 case .failure(let message):
                     self.presentDeepLinkUnavailable(placeID: placeID, reason: message)
@@ -730,9 +750,9 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             self.region = MKCoordinateRegion(center: latestLocation.coordinate, span: currentSpan)
             self.userLocation = latestLocation
             self.userLocationSubject.send(latestLocation)
+            self.isUpdatingLocation = false
         }
         manager.stopUpdatingLocation()
-        isUpdatingLocation = false
     }
     
     // locationManager failure scenario (could not get user location)
@@ -745,7 +765,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
     
     // Handle authorization changes
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
         Debug.log("Location authorization changed to: \(status.rawValue)")
         
         DispatchQueue.main.async { [weak self] in
@@ -786,22 +807,24 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         guard let userLocation = userLocation, let coord = element.mapCoordinate else { return nil }
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         let distanceInMeters = userLocation.distance(from: location)
-        let useMetric: Bool
+        let unit: UnitLength
         switch distanceUnit {
         case .auto:
-            useMetric = Locale.current.measurementSystem == .metric
+            unit = Locale.current.measurementSystem == .metric ? .kilometers : .miles
         case .miles:
-            useMetric = false
+            unit = .miles
         case .kilometers:
-            useMetric = true
+            unit = .kilometers
         }
-        if useMetric {
-            let km = distanceInMeters / 1000
-            return String(format: "%.1f km", km)
-        } else {
-            let miles = distanceInMeters / 1609.34
-            return String(format: "%.1f mi", miles)
-        }
+        return Measurement(value: distanceInMeters, unit: UnitLength.meters)
+            .converted(to: unit)
+            .formatted(
+                .measurement(
+                    width: .abbreviated,
+                    usage: .asProvided,
+                    numberFormatStyle: .number.precision(.fractionLength(1))
+                )
+            )
     }
     
     // Determining distance from center
@@ -867,7 +890,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func sortedElementsForMerchantBrowse(_ source: [Element], limit: Int? = nil) -> [Element] {
         guard !source.isEmpty else { return [] }
         let originLocation = userLocation ?? CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
-        let referenceDate = Date()
+        let referenceDate = Date.now
 
         struct SortEntry {
             let element: Element
@@ -1058,13 +1081,19 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         guard let mapView else {
             let latitudes = coordinates.map(\.latitude)
             let longitudes = coordinates.map(\.longitude)
+            guard let minLat = latitudes.min(),
+                  let maxLat = latitudes.max(),
+                  let minLon = longitudes.min(),
+                  let maxLon = longitudes.max() else {
+                return
+            }
             let center = CLLocationCoordinate2D(
-                latitude: (latitudes.min()! + latitudes.max()!) / 2,
-                longitude: (longitudes.min()! + longitudes.max()!) / 2
+                latitude: (minLat + maxLat) / 2,
+                longitude: (minLon + maxLon) / 2
             )
             let span = MKCoordinateSpan(
-                latitudeDelta: max((latitudes.max()! - latitudes.min()!) * 1.4, 0.02),
-                longitudeDelta: max((longitudes.max()! - longitudes.min()!) * 1.4, 0.02)
+                latitudeDelta: max((maxLat - minLat) * 1.4, 0.02),
+                longitudeDelta: max((maxLon - minLon) * 1.4, 0.02)
             )
             let region = MKCoordinateRegion(center: center, span: span)
             updateMapRegion(center: region.center, span: region.span, animated: animated)
@@ -1746,7 +1775,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     func ensureCommunityMapAreasLoaded() {
         ensureAreasLoaded() // v3 fallback can render local communities immediately.
         if communityMapAreasIsLoading { return }
-        let currentCommunityGeoJSON = communityMapAreas.filter { $0.isCommunity && !$0.isDeleted && $0.geoJSON != nil }.count
+        let currentCommunityGeoJSON = communityMapAreas.count(where: { $0.isCommunity && !$0.isDeleted && $0.geoJSON != nil })
         if hasLoadedCommunityMapAreas && !communityMapAreas.isEmpty {
             if currentCommunityGeoJSON >= 100 { return }
         }
@@ -2198,7 +2227,10 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             guard let self, let resolvedID else {
                 DispatchQueue.main.async {
                     self?.communityMembersIsLoading = false
-                    self?.communityMembersError = "Could not resolve community"
+                    self?.communityMembersError = String(
+                        localized: "Could not resolve community",
+                        comment: "Error shown when a selected community area cannot be resolved to a BTC Map v3 ID"
+                    )
                     self?.forceMapRefresh = true
                 }
                 return
@@ -2534,40 +2566,59 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             return
         }
 
-        let group = DispatchGroup()
-        let resultQueue = DispatchQueue(label: "community-members-hydration-results")
-        var hydratedMembers: [Element] = []
+        let repository = btcMapRepository
+        let maxConcurrency = 8
 
-        for id in missingIDs {
-            group.enter()
-            btcMapRepository.fetchPlace(id: id) { result in
-                defer { group.leave() }
-                guard case .success(let record) = result else { return }
-                let mapped = V4PlaceToElementMapper.placeRecordToElement(record)
-                if !(mapped.deletedAt?.isEmpty ?? true) { return }
-                resultQueue.sync {
-                    hydratedMembers.append(mapped)
+        Task { [weak self] in
+            let hydratedMembers: [Element] = await withTaskGroup(of: Element?.self) { group in
+                var results: [Element] = []
+                var iterator = missingIDs.makeIterator()
+
+                for _ in 0..<maxConcurrency {
+                    guard let id = iterator.next() else { break }
+                    group.addTask {
+                        guard let record = try? await repository.fetchPlace(id: id) else { return nil }
+                        let mapped = V4PlaceToElementMapper.placeRecordToElement(record)
+                        guard mapped.deletedAt?.isEmpty ?? true else { return nil }
+                        return mapped
+                    }
                 }
+
+                for await member in group {
+                    if let member {
+                        results.append(member)
+                    }
+                    if let id = iterator.next() {
+                        group.addTask {
+                            guard let record = try? await repository.fetchPlace(id: id) else { return nil }
+                            let mapped = V4PlaceToElementMapper.placeRecordToElement(record)
+                            guard mapped.deletedAt?.isEmpty ?? true else { return nil }
+                            return mapped
+                        }
+                    }
+                }
+
+                return results
             }
-        }
 
-        group.notify(queue: .main) { [weak self] in
-            guard let self else { return }
-            guard self.latestCommunitySelectionRequestID == requestID else { return }
+            await MainActor.run {
+                guard let self else { return }
+                guard self.latestCommunitySelectionRequestID == requestID else { return }
 
-            var byID = IdentifiableIndex.byID(seedMembers)
-            for member in hydratedMembers {
-                byID[member.id] = member
+                var byID = IdentifiableIndex.byID(seedMembers)
+                for member in hydratedMembers {
+                    byID[member.id] = member
+                }
+                self.communityMemberElements = Array(byID.values)
+
+                if !hydratedMembers.isEmpty {
+                    self.upsertMerchants(hydratedMembers, forceMapRefresh: false)
+                }
+
+                self.communityMembersIsLoading = false
+                self.communityMembersError = nil
+                self.forceMapRefresh = true
             }
-            self.communityMemberElements = Array(byID.values)
-
-            if !hydratedMembers.isEmpty {
-                self.upsertMerchants(hydratedMembers, forceMapRefresh: false)
-            }
-
-            self.communityMembersIsLoading = false
-            self.communityMembersError = nil
-            self.forceMapRefresh = true
         }
     }
 
@@ -2717,48 +2768,61 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
         let batchIDs = Array(missingCommunityIDs.prefix(100))
         batchIDs.forEach { requestedCommunityAreaDetailIDs.insert($0) }
 
-        let group = DispatchGroup()
-        let resultQueue = DispatchQueue(label: "bitlocal.community-geojson-hydration")
-        let semaphore = DispatchSemaphore(value: 8)
-        var hydrated: [V3AreaRecord] = []
+        let repository = btcMapRepository
+        let maxConcurrency = 8
 
-        for areaID in batchIDs {
-            group.enter()
-            semaphore.wait()
-            btcMapRepository.fetchV3Area(id: areaID) { [weak self] result in
-                defer {
-                    semaphore.signal()
-                    group.leave()
-                }
-                guard self != nil else { return }
-                switch result {
-                case .success(let area):
-                    if area.geoJSON != nil {
-                        resultQueue.sync { hydrated.append(area) }
+        Task { [weak self] in
+            let hydrated: [V3AreaRecord] = await withTaskGroup(of: V3AreaRecord?.self) { group in
+                var results: [V3AreaRecord] = []
+                var iterator = batchIDs.makeIterator()
+
+                for _ in 0..<maxConcurrency {
+                    guard let areaID = iterator.next() else { break }
+                    group.addTask {
+                        guard let area = try? await repository.fetchV3Area(id: areaID),
+                              area.geoJSON != nil else {
+                            return nil
+                        }
+                        return area
                     }
-                case .failure:
-                    break
                 }
-            }
-        }
 
-        group.notify(queue: .main) { [weak self] in
-            guard let self else { return }
-            self.communityGeoJSONHydrationInFlight = false
-
-            if !hydrated.isEmpty {
-                var byID = IdentifiableIndex.byID(self.areaBrowserAreas)
-                for area in hydrated {
-                    byID[area.id] = area
+                for await area in group {
+                    if let area {
+                        results.append(area)
+                    }
+                    if let areaID = iterator.next() {
+                        group.addTask {
+                            guard let area = try? await repository.fetchV3Area(id: areaID),
+                                  area.geoJSON != nil else {
+                                return nil
+                            }
+                            return area
+                        }
+                    }
                 }
-                self.areaBrowserAreas = Array(byID.values)
-                    .filter { $0.bounds != nil || $0.geoJSON != nil }
-                    .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
-                self.forceMapRefresh = true
+
+                return results
             }
 
-            // Continue in batches until we exhaust missing community polygons.
-            self.hydrateMissingCommunityAreaGeoJSONIfNeeded()
+            await MainActor.run {
+                guard let self else { return }
+                self.communityGeoJSONHydrationInFlight = false
+
+                if !hydrated.isEmpty {
+                    var byID = IdentifiableIndex.byID(self.areaBrowserAreas)
+                    for area in hydrated {
+                        byID[area.id] = area
+                    }
+                    self.areaBrowserAreas = Array(byID.values)
+                        .filter { $0.bounds != nil || $0.geoJSON != nil }
+                        .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+                    self.forceMapRefresh = true
+                }
+
+                // Continue in batches until we exhaust missing community polygons.
+                self.hydrateMissingCommunityAreaGeoJSONIfNeeded()
+            }
         }
     }
 
@@ -2775,7 +2839,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 guard let self else { return }
                 switch result {
                 case .success(let rows):
-                    let activeCount = rows.filter { ($0.deletedAt?.isEmpty ?? true) }.count
+                    let activeCount = rows.count(where: { $0.deletedAt?.isEmpty ?? true })
                     self.selectedAreaElementCount = activeCount
                 case .failure:
                     self.selectedAreaElementCount = nil
@@ -2844,7 +2908,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             allowCameraMovement: allowCameraMovement
         )
         selectedElement = element
-        path = [element]
+        path = [.place(element)]
     }
 
     func upsertElementIntoStore(_ element: Element) {
@@ -2921,10 +2985,7 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     var lastSuccessfulSyncRelativeDescription: String? {
-        guard let lastSuccessfulSyncAt else { return nil }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: lastSuccessfulSyncAt, relativeTo: Date())
+        lastSuccessfulSyncAt?.formatted(.relative(presentation: .named))
     }
 
     // Fetch elements using the APIManager and update the published elements property.
@@ -3087,15 +3148,15 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
            let parsed = BTCMapDateParser.parse(iso) {
             lastSuccessfulSyncAt = parsed
         } else {
-            lastSuccessfulSyncAt = Date()
+            lastSuccessfulSyncAt = Date.now
         }
     }
 
     private func noteMerchantSyncOutcome(receivedCount: Int, hadCache: Bool, storeEmpty: Bool) {
         if storeEmpty && receivedCount == 0 && !hadCache {
             merchantSyncFailed = true
-            merchantSyncStatusMessage = NSLocalizedString(
-                "Couldn’t update merchants. Check your connection and try again.",
+            merchantSyncStatusMessage = String(
+                localized: "Couldn’t update merchants. Check your connection and try again.",
                 comment: "Empty-state message when merchant sync fails with no cache"
             )
         } else {

@@ -4,6 +4,7 @@ import CoreLocation
 // MARK: - Merchant Search Result Row
 
 struct MerchantSearchResultRow: View {
+    @Environment(\.locale) private var locale
     let result: V4PlaceRecord
     let referenceLocation: CLLocation?
 
@@ -19,6 +20,7 @@ struct MerchantSearchResultRow: View {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.caption)
                             .foregroundStyle(.green)
+                            .accessibilityLabel("Verified")
                     }
                 }
 
@@ -49,15 +51,19 @@ struct MerchantSearchResultRow: View {
 
         let target = CLLocation(latitude: lat, longitude: lon)
         let meters = referenceLocation.distance(from: target)
-        let useMetric = Locale.current.measurementSystem == .metric
+        let useMetric = locale.measurementSystem == .metric
+        let value = useMetric ? (meters / 1000) : (meters / 1609.344)
+        let unit: UnitLength = useMetric ? .kilometers : .miles
+        let fractionDigits = value < 10 ? 1 : 0
 
-        if useMetric {
-            let km = meters / 1000
-            return km < 10 ? String(format: "%.1f km", km) : String(format: "%.0f km", km)
-        } else {
-            let miles = meters / 1609.34
-            return miles < 10 ? String(format: "%.1f mi", miles) : String(format: "%.0f mi", miles)
-        }
+        return Measurement(value: value, unit: unit).formatted(
+            .measurement(
+                width: .abbreviated,
+                usage: .asProvided,
+                numberFormatStyle: .number.precision(.fractionLength(fractionDigits))
+            )
+            .locale(locale)
+        )
     }
 }
 
@@ -81,6 +87,7 @@ struct BTCMapEventRow: View {
                     Image(systemName: "location.fill")
                         .font(.caption)
                         .foregroundStyle(.accent)
+                        .accessibilityLabel("Has map location")
                 }
             }
 
@@ -100,14 +107,14 @@ struct BTCMapEventRow: View {
         switch (start, end) {
         case let (s?, e?): return "\(s) – \(e)"
         case let (s?, nil): return s
-        case let (nil, e?): return String(format: NSLocalizedString("Until %@", comment: "Event date range label when only the end date is known"), e)
+        case let (nil, e?): return String(localized: "Until \(e)", comment: "Event date range label when only the end date is known")
         case (nil, nil): return nil
         }
     }
 
     private func formattedEventDate(_ raw: String?) -> String? {
         guard let raw, !raw.isEmpty, !raw.hasPrefix("1970-01-01") else { return nil }
-        if let date = btcMapISO8601WithFractional.date(from: raw) ?? btcMapISO8601Basic.date(from: raw) {
+        if let date = parseBTCMapISO8601Date(raw) {
             return date.formatted(date: .abbreviated, time: .shortened)
         }
         return raw
@@ -150,16 +157,9 @@ struct BTCMapAreaRow: View {
     }
 }
 
-// MARK: - Shared date formatters
+// MARK: - Shared ISO8601 Date Parsing
 
-let btcMapISO8601WithFractional: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter
-}()
-
-let btcMapISO8601Basic: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter
-}()
+func parseBTCMapISO8601Date(_ raw: String) -> Date? {
+    (try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+        ?? (try? Date(raw, strategy: .iso8601))
+}

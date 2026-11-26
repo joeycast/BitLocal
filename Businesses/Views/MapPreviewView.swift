@@ -35,6 +35,7 @@ struct MapPreviewView: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        context.coordinator.parent = self
         // Update annotation position if coordinate changed
         if let annotation = mapView.annotations.first as? DraggableAnnotation {
             if annotation.coordinate.latitude != coordinate.latitude ||
@@ -57,7 +58,7 @@ struct MapPreviewView: UIViewRepresentable {
     }
 
     class Coordinator: NSObject, MKMapViewDelegate {
-        let parent: MapPreviewView
+        var parent: MapPreviewView
 
         init(_ parent: MapPreviewView) {
             self.parent = parent

@@ -24,8 +24,7 @@ struct AllEventsListView: View {
 
             if viewModel.eventsResults.isEmpty && !viewModel.eventsIsLoading {
                 Section {
-                    Text("No events found")
-                        .foregroundStyle(.secondary)
+                    ContentUnavailableView("No Events Found", systemImage: "calendar")
                 }
             } else {
                 Section {
@@ -53,11 +52,7 @@ struct AllEventsListView: View {
                     viewModel.loadBTCMapEvents()
                 }
 
-                Button {
-                    viewModel.loadBTCMapEvents()
-                } label: {
-                    Label("Refresh events", systemImage: "arrow.clockwise")
-                }
+                Button("Refresh events", systemImage: "arrow.clockwise", action: viewModel.loadBTCMapEvents)
             }
         }
         .onAppear {

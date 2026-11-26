@@ -46,41 +46,38 @@ struct AddBusinessFormView: View {
 
                     HStack {
                         if currentStep != .location {
-                            Button(action: { goToPreviousStep() }) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: actionButtonSize, height: actionButtonSize)
-                                    .background(Color.gray.opacity(0.7))
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                            }
+                            Button("back_button", systemImage: "chevron.left", action: goToPreviousStep)
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(
+                                    CircularActionButtonStyle(
+                                        size: actionButtonSize,
+                                        backgroundColor: Color.gray.opacity(0.7)
+                                    )
+                                )
                         }
 
                         Spacer()
 
                         if currentStep == .review {
-                            Button(action: { submitForm() }) {
-                                Image(systemName: "paperplane.fill")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: actionButtonSize, height: actionButtonSize)
-                                    .background(canSubmit ? Color.accentColor : Color.gray.opacity(0.5))
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                            }
-                            .disabled(!canSubmit)
+                            Button("submit_button", systemImage: "paperplane.fill", action: submitForm)
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(
+                                    CircularActionButtonStyle(
+                                        size: actionButtonSize,
+                                        backgroundColor: canSubmit ? Color.accentColor : Color.gray.opacity(0.5)
+                                    )
+                                )
+                                .disabled(!canSubmit)
                         } else {
-                            Button(action: { goToNextStep() }) {
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(width: actionButtonSize, height: actionButtonSize)
-                                    .background(canContinue ? Color.accentColor : Color.gray.opacity(0.5))
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                            }
-                            .disabled(!canContinue)
+                            Button("onboarding_button_next", systemImage: "arrow.right", action: goToNextStep)
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(
+                                    CircularActionButtonStyle(
+                                        size: actionButtonSize,
+                                        backgroundColor: canContinue ? Color.accentColor : Color.gray.opacity(0.5)
+                                    )
+                                )
+                                .disabled(!canContinue)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -111,7 +108,6 @@ struct AddBusinessFormView: View {
                 }
             }
             .alert("validation_error_title", isPresented: $viewModel.showingValidationErrors) {
-                Button("ok_button", role: .cancel) { }
             } message: {
                 Text(validationErrorMessage())
             }
@@ -131,10 +127,10 @@ struct AddBusinessFormView: View {
                             .frame(width: 10, height: 10)
 
                         Text(step.title)
-                            .font(.caption2)
-                            .foregroundColor(step == currentStep ? .primary : .secondary)
+                            .font(.caption)
+                            .foregroundStyle(step == currentStep ? .primary : .secondary)
                             .multilineTextAlignment(.center)
-                            .frame(width: 60)
+                            .frame(minWidth: 52, maxWidth: .infinity)
                             .lineLimit(2)
                     }
 
@@ -177,11 +173,13 @@ struct AddBusinessFormView: View {
     private func validationErrorMessage() -> String {
         let errors = viewModel.submission.validationErrors()
         let errorMessages = errors.map { error in
+            let errorText = String(localized: String.LocalizationValue(error.localizedKey))
             switch error {
             case .missingField(let field):
-                return NSLocalizedString(error.localizedKey, comment: "") + ": " + NSLocalizedString(field, comment: "")
+                let fieldText = String(localized: String.LocalizationValue(field))
+                return String(localized: "\(errorText): \(fieldText)")
             default:
-                return NSLocalizedString(error.localizedKey, comment: "")
+                return errorText
             }
         }
         return errorMessages.joined(separator: "\n")
@@ -209,5 +207,22 @@ struct AddBusinessFormView: View {
 
     private var contentBottomInset: CGFloat {
         actionButtonSize + actionBarBottomPadding + actionBarSafeAreaPadding + contentBottomClearance
+    }
+}
+
+private struct CircularActionButtonStyle: ButtonStyle {
+    let size: CGFloat
+    let backgroundColor: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(backgroundColor)
+            .clipShape(.circle)
+            .contentShape(.circle)
+            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+            .opacity(configuration.isPressed ? 0.85 : 1)
     }
 }

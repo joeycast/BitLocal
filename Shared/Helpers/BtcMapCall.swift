@@ -24,8 +24,7 @@ class APIManager {
 
     // MARK: - File-based Caching Helpers
     private var elementsFileURL: URL {
-        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        return directory.appendingPathComponent("elements.json")
+        URL.cachesDirectory.appending(path: "elements.json")
     }
 
     private func saveElementsToFile(_ elements: [Element]) {
@@ -282,14 +281,9 @@ class LogManager {
     private var buffer: [String?]
     private var writeIndex = 0
     private var count = 0
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-        return formatter
-    }()
 
     func log(_ message: String) {
-        let timestamp = dateFormatter.string(from: Date())
+        let timestamp = Date.now.ISO8601Format()
         let logMessage = "[\(timestamp)] \(message)"
         lock.lock()
         defer { lock.unlock() }

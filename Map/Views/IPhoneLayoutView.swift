@@ -49,6 +49,7 @@ private struct IPhoneLayoutContent: View {
     @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
 
     private var appearance: Appearance { appearanceManager.appearance }
@@ -81,7 +82,10 @@ private struct IPhoneLayoutContent: View {
         GeometryReader { geometry in
             let elements = self.elements
             let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
-            let leadingSheetWidth = geometry.leadingCollapsibleSheetWidth(horizontalSizeClass: horizontalSizeClass)
+            let leadingSheetWidth = geometry.leadingCollapsibleSheetWidth(
+                horizontalSizeClass: horizontalSizeClass,
+                layoutDirection: layoutDirection
+            )
             let isLeadingSheet = leadingSheetWidth != nil
 
             ZStack {
@@ -98,7 +102,7 @@ private struct IPhoneLayoutContent: View {
                     }
                     // Attribution observes settled padding only (via this layout's
                     // onChange of bottomPadding / detent), not live drag height.
-                    .overlay(
+                    .overlay(alignment: .bottomLeading) {
                         OpenStreetMapAttributionView()
                             .padding(
                                 .bottom,
@@ -111,17 +115,15 @@ private struct IPhoneLayoutContent: View {
                                 isLeadingSheet
                                     ? (leadingSheetWidth ?? 0) + 28
                                     : geometry.safeAreaInsets.leading + 16
-                            ),
-                        alignment: .bottomLeading
-                    )
+                            )
+                    }
                 }
                 if showsLegacyHeader {
                     VStack {
                         IPhoneHeaderView(
                             screenWidth: geometry.size.width,
                             viewModel: viewModel,
-                            showingSettings: $showingSettings,
-                            selectedMapTypeBinding: selectedMapTypeBinding
+                            showingSettings: $showingSettings
                         )
                         Spacer()
                     }
@@ -172,8 +174,8 @@ private struct IPhoneLayoutContent: View {
                 } else if usesNativeHorizontalBar {
                     ToolbarItem(placement: .principal) {
                         Text("bitlocal")
-                            .font(.custom("Fredoka-Medium", size: 28))
-                            .foregroundColor(.accentColor)
+                            .font(.custom("Fredoka-Medium", size: 28, relativeTo: .title))
+                            .foregroundStyle(.accent)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -190,7 +192,7 @@ private struct IPhoneLayoutContent: View {
                     }
                 }
             }
-            .toolbar(showsLegacyHeader ? .hidden : .visible, for: .navigationBar)
+            .toolbarVisibility(showsLegacyHeader ? .hidden : .visible, for: .navigationBar)
             .toolbarColorScheme(effectiveColorScheme, for: .navigationBar)
             .modifier(LegacyHiddenToolbarBackgroundModifier())
             .navigationBarTitleDisplayMode(.inline)
@@ -206,7 +208,6 @@ private struct IPhoneLayoutContent: View {
                     currentDetent: $bottomSheetDetent,
                     preferredLeadingWidth: leadingSheetWidth
                 )
-                    .id("\(appearance.rawValue)-\(systemColorScheme)")
                     .environmentObject(viewModel)
                     .preferredColorScheme(effectiveColorScheme)  // To respect appearance
                     .presentationDetents([
@@ -234,7 +235,6 @@ private struct IPhoneLayoutContent: View {
                             .environmentObject(viewModel)
                             .environmentObject(MerchantAlertsManager.shared)
                         }
-                        .id("settings-sheet-\(appearance.rawValue)-\(systemColorScheme)")
                         .preferredColorScheme(effectiveColorScheme)
                         .presentationDetents([.medium, .large], selection: $settingsSheetDetent)
                         .settingsSheetBackground()
@@ -379,15 +379,6 @@ private struct IPhoneLayoutContent: View {
             return .light
         case .dark:
             return .dark
-        }
-    }
-
-    private func mapOverlayTopOffset(for safeTopInset: CGFloat) -> CGFloat {
-        let isNotch = safeTopInset >= 40
-        if isNotch {
-            return max(headerHeight - 28, 8)   // tune notch devices
-        } else {
-            return max(headerHeight - 5, 8)    // tune compact-top / Duo outer display
         }
     }
 
@@ -562,8 +553,6 @@ private struct IPhoneMapButtonsUIKitHost: UIViewControllerRepresentable {
         MapButtonsView(
             viewModel: viewModel,
             selectedMapTypeBinding: selectedMapTypeBinding,
-            userLocation: viewModel.userLocation,
-            isIPad: false,
             useMonochromeIcons: useMonochromeIcons
         )
     }
@@ -691,7 +680,7 @@ private struct LegacyHiddenToolbarBackgroundModifier: ViewModifier {
         if #available(iOS 26.0, *) {
             content
         } else {
-            content.toolbarBackground(.hidden, for: .navigationBar)
+            content.toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         }
     }
 }

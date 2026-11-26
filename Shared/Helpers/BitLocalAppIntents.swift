@@ -14,15 +14,15 @@ enum MerchantQuickFilter: String, CaseIterable, Identifiable, Hashable, AppEnum 
     var displayTitle: String {
         switch self {
         case .saved:
-            return "Saved"
+            return String(localized: "Saved", comment: "Quick filter chip for saved places")
         case .openNow:
-            return "Open Now"
+            return String(localized: "Open Now", comment: "Quick filter chip for places currently open")
         case .lightning:
-            return "Lightning"
+            return String(localized: "Lightning", comment: "Quick filter chip for Lightning-accepting places")
         case .nfc:
-            return "NFC"
+            return String(localized: "NFC", comment: "Quick filter chip for NFC/contactless Lightning places")
         case .verified:
-            return "Verified"
+            return String(localized: "Verified", comment: "Quick filter chip for recently verified places")
         }
     }
 
@@ -41,11 +41,11 @@ enum MerchantQuickFilter: String, CaseIterable, Identifiable, Hashable, AppEnum 
         }
     }
 
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = TypeDisplayRepresentation(
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(
         name: LocalizedStringResource("Place Filter")
     )
 
-    static var caseDisplayRepresentations: [MerchantQuickFilter: DisplayRepresentation] = [
+    static let caseDisplayRepresentations: [MerchantQuickFilter: DisplayRepresentation] = [
         .saved: DisplayRepresentation(
             title: LocalizedStringResource("Saved"),
             image: .init(systemName: "bookmark.fill")
@@ -94,9 +94,9 @@ final class BitLocalAppIntentRouter: ObservableObject {
 }
 
 struct FindNearbyBitcoinPlacesIntent: AppIntent {
-    static var title: LocalizedStringResource = "Find Nearby Bitcoin Places"
-    static var description: IntentDescription? = IntentDescription("Open BitLocal to browse nearby places that accept Bitcoin.")
-    static var openAppWhenRun: Bool = true
+    static let title: LocalizedStringResource = "Find Nearby Bitcoin Places"
+    static let description: IntentDescription? = IntentDescription("Open BitLocal to browse nearby places that accept Bitcoin.")
+    static let openAppWhenRun: Bool = true
 
     @Parameter(title: "Filter")
     var filter: MerchantQuickFilter?
@@ -126,9 +126,9 @@ struct FindNearbyBitcoinPlacesIntent: AppIntent {
 }
 
 struct FindLightningPlacesIntent: AppIntent {
-    static var title: LocalizedStringResource = "Find Lightning Places"
-    static var description: IntentDescription? = IntentDescription("Open BitLocal filtered to nearby places accepting Bitcoin Lightning.")
-    static var openAppWhenRun: Bool = true
+    static let title: LocalizedStringResource = "Find Lightning Places"
+    static let description: IntentDescription? = IntentDescription("Open BitLocal filtered to nearby places accepting Bitcoin Lightning.")
+    static let openAppWhenRun: Bool = true
 
     init() {}
 
@@ -141,9 +141,9 @@ struct FindLightningPlacesIntent: AppIntent {
 }
 
 struct OpenBitcoinCommunitiesIntent: AppIntent {
-    static var title: LocalizedStringResource = "Open Bitcoin Communities"
-    static var description: IntentDescription? = IntentDescription("Open the Bitcoin communities view in BitLocal.")
-    static var openAppWhenRun: Bool = true
+    static let title: LocalizedStringResource = "Open Bitcoin Communities"
+    static let description: IntentDescription? = IntentDescription("Open the Bitcoin communities view in BitLocal.")
+    static let openAppWhenRun: Bool = true
 
     init() {}
 
@@ -156,7 +156,7 @@ struct OpenBitcoinCommunitiesIntent: AppIntent {
 }
 
 struct BitLocalAppShortcuts: AppShortcutsProvider {
-    static var shortcutTileColor: ShortcutTileColor = .orange
+    static let shortcutTileColor: ShortcutTileColor = .orange
 
     static var appShortcuts: [AppShortcut] {
         AppShortcut(

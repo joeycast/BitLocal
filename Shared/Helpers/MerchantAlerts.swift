@@ -25,7 +25,7 @@ struct CitySubscription: Codable, Hashable, Identifiable {
         region: String,
         country: String,
         displayName: String,
-        createdAt: Date = Date(),
+        createdAt: Date = Date.now,
         isEnabled: Bool = true
     ) {
         self.id = id
@@ -59,7 +59,7 @@ struct CitySubscription: Codable, Hashable, Identifiable {
         region = try container.decode(String.self, forKey: .region)
         country = try container.decode(String.self, forKey: .country)
         displayName = try container.decode(String.self, forKey: .displayName)
-        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date.now
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
     }
 }
@@ -98,12 +98,18 @@ struct CityDigest: Codable, Hashable, Identifiable {
 
     var summaryLine: String {
         guard !topMerchantNames.isEmpty else {
-            return String(format: NSLocalizedString("%lld new merchants", comment: "Summary line for a digest with no merchant names"), merchantCount)
+            return String(
+                localized: "^[\(merchantCount) new merchant](inflect: true)",
+                comment: "Summary line for a digest with no merchant names"
+            )
         }
 
         let headline = topMerchantNames.prefix(2).joined(separator: ", ")
         if merchantCount > topMerchantNames.count {
-            return String(format: NSLocalizedString("%@, and more", comment: "Summary line that appends and more to merchant names"), headline)
+            return String(
+                localized: "\(headline), and more",
+                comment: "Summary line that appends and more to merchant names"
+            )
         }
         return headline
     }
@@ -196,7 +202,7 @@ enum MerchantAlertsCityNormalizer {
         )
 
         return folded
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .replacing(#/\s+/#, with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
     }
@@ -273,17 +279,17 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     var cloudKitStatusSummary: String {
         switch cloudKitAccountStatus {
         case .available:
-            return NSLocalizedString("Signed in to iCloud", comment: "Status text when iCloud is available for merchant alerts")
+            return String(localized: "Signed in to iCloud", comment: "Status text when iCloud is available for merchant alerts")
         case .noAccount:
-            return NSLocalizedString("Sign in to iCloud in Settings to turn on alerts.", comment: "Status text prompting the user to sign in to iCloud")
+            return String(localized: "Sign in to iCloud in Settings to turn on alerts.", comment: "Status text prompting the user to sign in to iCloud")
         case .restricted:
-            return NSLocalizedString("iCloud isn't available on this device.", comment: "Status text when iCloud is unavailable on device")
+            return String(localized: "iCloud isn't available on this device.", comment: "Status text when iCloud is unavailable on device")
         case .temporarilyUnavailable:
-            return NSLocalizedString("iCloud is temporarily unavailable. Try again in a bit.", comment: "Status text when iCloud is temporarily unavailable")
+            return String(localized: "iCloud is temporarily unavailable. Try again in a bit.", comment: "Status text when iCloud is temporarily unavailable")
         case .couldNotDetermine:
-            return NSLocalizedString("Checking iCloud…", comment: "Status text while checking iCloud availability")
+            return String(localized: "Checking iCloud…", comment: "Status text while checking iCloud availability")
         @unknown default:
-            return NSLocalizedString("Something went wrong checking iCloud. Try again later.", comment: "Status text when iCloud availability check fails")
+            return String(localized: "Something went wrong checking iCloud. Try again later.", comment: "Status text when iCloud availability check fails")
         }
     }
 
@@ -309,13 +315,13 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         defer { isRefreshingStatus = false }
 
         do {
-            cloudKitAccountStatus = try await container.merchantAlertsAccountStatus()
+            cloudKitAccountStatus = try await container.accountStatus()
         } catch {
             cloudKitAccountStatus = .couldNotDetermine
             errorMessage = error.localizedDescription
         }
 
-        notificationSettings = await notificationCenter.merchantAlertsSettings()
+        notificationSettings = await notificationCenter.notificationSettings()
 
         if subscriptions.isEmpty, isCloudKitAvailable {
             await restoreSubscriptionsFromCloudKitIfNeeded()
@@ -333,7 +339,10 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         let granted = await requestAuthorizationIfNeeded()
         guard granted else {
-            errorMessage = NSLocalizedString("BitLocal needs permission to send you notifications. You can turn this on in Settings.", comment: "Error shown when notification permissions are denied")
+            errorMessage = String(
+                localized: "BitLocal needs permission to send you notifications. You can turn this on in Settings.",
+                comment: "Error shown when notification permissions are denied"
+            )
             return
         }
 
@@ -376,7 +385,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
     }
 
     func requestAuthorizationIfNeeded() async -> Bool {
-        let settings = await notificationCenter.merchantAlertsSettings()
+        let settings = await notificationCenter.notificationSettings()
         notificationSettings = settings
 
         switch settings.authorizationStatus {
@@ -386,8 +395,8 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             return false
         case .notDetermined, .ephemeral:
             do {
-                let granted = try await notificationCenter.merchantAlertsRequestAuthorization(options: [.alert, .badge, .sound])
-                notificationSettings = await notificationCenter.merchantAlertsSettings()
+                let granted = try await notificationCenter.requestAuthorization(options: [.alert, .badge, .sound])
+                notificationSettings = await notificationCenter.notificationSettings()
                 return granted
             } catch {
                 errorMessage = error.localizedDescription
@@ -461,11 +470,12 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(subscriptions) {
+        do {
+            let data = try encoder.encode(subscriptions)
             userDefaults.set(data, forKey: subscriptionsKey)
             saveSubscriptionsToKeychain(data)
-        } else {
-            clearPersistedSubscriptions()
+        } catch {
+            Debug.log("Merchant alerts: failed to encode subscriptions; preserving existing persisted data: \(error.localizedDescription)")
         }
     }
 
@@ -490,15 +500,15 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         notificationInfo.shouldSendContentAvailable = true
         querySubscription.notificationInfo = notificationInfo
 
-        _ = try await publicDatabase.merchantAlertsSaveSubscription(querySubscription)
+        _ = try await publicDatabase.save(querySubscription)
     }
 
     private func deleteCloudKitSubscription(for subscription: CitySubscription) async throws {
-        _ = try await publicDatabase.merchantAlertsDeleteSubscription(withID: cloudKitSubscriptionID(for: subscription.locationID))
+        _ = try await publicDatabase.deleteSubscription(withID: cloudKitSubscriptionID(for: subscription.locationID))
     }
 
     private func fetchDigest(recordID: CKRecord.ID) async throws -> CityDigest {
-        let record = try await publicDatabase.merchantAlertsRecord(for: recordID)
+        let record = try await publicDatabase.record(for: recordID)
         return try CityDigest(record: record)
     }
 
@@ -509,10 +519,15 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
             NSSortDescriptor(key: "digestWindowEnd", ascending: false)
         ]
 
-        let records = try await publicDatabase.merchantAlertsRecords(
+        let (matchResults, _) = try await publicDatabase.records(
             matching: query,
             resultsLimit: digestCatchUpLimit
         )
+
+        var records: [CKRecord] = []
+        for (_, result) in matchResults {
+            records.append(try result.get())
+        }
 
         guard let record = records.first,
               MerchantAlertsCatchUpPolicy.isEligible(
@@ -557,7 +572,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
         notificationCenter.removeDeliveredNotifications(withIdentifiers: [identifier])
 
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
-        try await notificationCenter.merchantAlertsAdd(request)
+        try await notificationCenter.add(request)
     }
 
     private func catchUpMissedDigestIfNeeded() async {
@@ -584,27 +599,45 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
     private func notificationTitle(for digest: CityDigest) -> String {
         let city = digest.cityDisplayName.components(separatedBy: ",").first ?? digest.cityDisplayName
-        if digest.merchantCount == 1 {
-            return String(format: NSLocalizedString("New merchant in %@", comment: "Notification title for one new merchant in a city"), city)
-        }
-        return String(format: NSLocalizedString("New merchants in %@", comment: "Notification title for multiple new merchants in a city"), city)
+        return String(
+            localized: "^[\(digest.merchantCount) new merchant](inflect: true) in \(city)",
+            comment: "Notification title for new merchants in a city"
+        )
     }
 
     private func notificationBody(for digest: CityDigest) -> String {
         let names = Array(digest.topMerchantNames.prefix(2))
-
-        switch names.count {
-        case 2 where digest.merchantCount > 2:
-            return String(format: NSLocalizedString("%@, %@, and %lld more now accept bitcoin.", comment: "Notification body for two named merchants and additional merchants"), names[0], names[1], digest.merchantCount - 2)
-        case 2:
-            return String(format: NSLocalizedString("%@ and %@ now accept bitcoin.", comment: "Notification body for two named merchants"), names[0], names[1])
-        case 1 where digest.merchantCount > 1:
-            return String(format: NSLocalizedString("%@ and %lld more now accept bitcoin.", comment: "Notification body for one named merchant and additional merchants"), names[0], digest.merchantCount - 1)
-        case 1:
-            return String(format: NSLocalizedString("%@ now accepts bitcoin.", comment: "Notification body for one named merchant"), names[0])
-        default:
-            return String(format: NSLocalizedString("%lld new merchants now accept bitcoin.", comment: "Notification body when only the merchant count is known"), digest.merchantCount)
+        guard !names.isEmpty else {
+            return String(
+                localized: "^[\(digest.merchantCount) new merchant](inflect: true) now accept bitcoin.",
+                comment: "Notification body when only the merchant count is known"
+            )
         }
+
+        let remainingCount = digest.merchantCount - names.count
+        if remainingCount > 0 {
+            let moreLabel = String(
+                localized: "\(remainingCount) more",
+                comment: "Additional merchant count appended to a formatted merchant list"
+            )
+            let list = (names + [moreLabel]).formatted(.list(type: .and))
+            return String(
+                localized: "\(list) now accept bitcoin.",
+                comment: "Notification body for named merchants and additional merchants"
+            )
+        }
+
+        let list = names.formatted(.list(type: .and))
+        if names.count == 1 {
+            return String(
+                localized: "\(list) now accepts bitcoin.",
+                comment: "Notification body for one named merchant"
+            )
+        }
+        return String(
+            localized: "\(list) now accept bitcoin.",
+            comment: "Notification body for multiple named merchants"
+        )
     }
 
     private func cloudKitSubscriptionID(for locationID: String) -> String {
@@ -615,7 +648,7 @@ final class MerchantAlertsManager: NSObject, ObservableObject {
 
     private func restoreSubscriptionsFromCloudKitIfNeeded() async {
         do {
-            let allSubscriptions = try await publicDatabase.merchantAlertsFetchAllSubscriptions()
+            let allSubscriptions = try await publicDatabase.allSubscriptions()
             let querySubscriptions = allSubscriptions.compactMap { $0 as? CKQuerySubscription }
 
             guard let querySubscription = querySubscriptions.first(where: { $0.recordType == digestRecordType }),
@@ -783,7 +816,10 @@ enum MerchantAlertsError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidDigestRecord:
-            return "BitLocal received an incomplete city digest from CloudKit."
+            return String(
+                localized: "BitLocal received an incomplete city digest from CloudKit.",
+                comment: "Error shown when a CloudKit city digest record is missing required fields"
+            )
         }
     }
 }
@@ -836,143 +872,5 @@ final class BitLocalAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         await MerchantAlertsManager.shared.handleNotificationResponse(
             userInfo: response.notification.request.content.userInfo
         )
-    }
-}
-
-private extension UNUserNotificationCenter {
-    func merchantAlertsRequestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
-        try await withCheckedThrowingContinuation { continuation in
-            requestAuthorization(options: options) { granted, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: granted)
-                }
-            }
-        }
-    }
-
-    func merchantAlertsSettings() async -> UNNotificationSettings {
-        await withCheckedContinuation { continuation in
-            getNotificationSettings { settings in
-                continuation.resume(returning: settings)
-            }
-        }
-    }
-
-    func merchantAlertsAdd(_ request: UNNotificationRequest) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            add(request) { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
-                }
-            }
-        }
-    }
-}
-
-private extension CKContainer {
-    func merchantAlertsAccountStatus() async throws -> CKAccountStatus {
-        try await withCheckedThrowingContinuation { continuation in
-            accountStatus { status, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: status)
-                }
-            }
-        }
-    }
-}
-
-private extension CKDatabase {
-    func merchantAlertsSaveSubscription(_ subscription: CKSubscription) async throws -> CKSubscription {
-        try await withCheckedThrowingContinuation { continuation in
-            save(subscription) { saved, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if let saved {
-                    continuation.resume(returning: saved)
-                } else {
-                    continuation.resume(throwing: MerchantAlertsError.invalidDigestRecord)
-                }
-            }
-        }
-    }
-
-    func merchantAlertsDeleteSubscription(withID subscriptionID: String) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            delete(withSubscriptionID: subscriptionID) { deletedID, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if let deletedID {
-                    continuation.resume(returning: deletedID)
-                } else {
-                    continuation.resume(returning: subscriptionID)
-                }
-            }
-        }
-    }
-
-    func merchantAlertsRecord(for recordID: CKRecord.ID) async throws -> CKRecord {
-        try await withCheckedThrowingContinuation { continuation in
-            fetch(withRecordID: recordID) { record, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if let record {
-                    continuation.resume(returning: record)
-                } else {
-                    continuation.resume(throwing: MerchantAlertsError.invalidDigestRecord)
-                }
-            }
-        }
-    }
-
-    func merchantAlertsFetchAllSubscriptions() async throws -> [CKSubscription] {
-        try await withCheckedThrowingContinuation { continuation in
-            fetchAllSubscriptions { subscriptions, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: subscriptions ?? [])
-                }
-            }
-        }
-    }
-
-    func merchantAlertsRecords(matching query: CKQuery, resultsLimit: Int) async throws -> [CKRecord] {
-        try await withCheckedThrowingContinuation { continuation in
-            let operation = CKQueryOperation(query: query)
-            operation.resultsLimit = resultsLimit
-
-            var records: [CKRecord] = []
-            var operationError: Error?
-
-            operation.recordMatchedBlock = { _, result in
-                switch result {
-                case let .success(record):
-                    records.append(record)
-                case let .failure(error):
-                    operationError = error
-                }
-            }
-
-            operation.queryResultBlock = { result in
-                switch result {
-                case .success:
-                    if let operationError {
-                        continuation.resume(throwing: operationError)
-                    } else {
-                        continuation.resume(returning: records)
-                    }
-                case let .failure(error):
-                    continuation.resume(throwing: error)
-                }
-            }
-
-            add(operation)
-        }
     }
 }

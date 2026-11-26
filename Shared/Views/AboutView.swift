@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(\.locale) private var locale
     @EnvironmentObject private var releaseNotesController: ReleaseNotesController
     @Binding var currentDetent: PresentationDetent
     var onDismissSheet: (() -> Void)? = nil
@@ -91,19 +91,22 @@ struct AboutView: View {
                     systemImage: "lightbulb"
                 )
                 Link(destination: twitterURL) {
-                    HStack(spacing: 12) {
-                        Image("x-logo-fill")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 18, height: 18)
-                            .foregroundStyle(.accent)
-                            .frame(width: 22, alignment: .center)
-                        Text("x_twitter_label")
-                            .foregroundStyle(.primary)
+                    HStack {
+                        Label {
+                            Text("x_twitter_label")
+                                .foregroundStyle(.primary)
+                        } icon: {
+                            Image(.xLogoFill)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 18, height: 18)
+                                .foregroundStyle(.accent)
+                        }
                         Spacer(minLength: 8)
                         Image(systemName: "arrow.up.forward")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
                 }
             }
@@ -123,7 +126,7 @@ struct AboutView: View {
                     titleKey: "bitcoin_live_price_chart_button_label",
                     systemImage: "chart.line.uptrend.xyaxis"
                 )
-                if Locale.current.region?.identifier == "US" {
+                if locale.region?.identifier == "US" {
                     externalLinkRow(
                         destination: movematesMoveTogetherURL,
                         titleKey: "Movemates: Move Together",
@@ -193,6 +196,7 @@ struct AboutView: View {
                 Image(systemName: "arrow.up.forward")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
         }
     }
@@ -206,12 +210,9 @@ struct AboutView: View {
     }
 }
 
-// View preview
-struct AboutView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationStack {
-            AboutView()
-                .environmentObject(ReleaseNotesController())
-        }
+#Preview {
+    NavigationStack {
+        AboutView()
+            .environmentObject(ReleaseNotesController())
     }
 }

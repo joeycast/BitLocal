@@ -639,7 +639,7 @@ struct ElementCategorySymbols {
         }
 
         return String(cleaned)
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .replacing(#/\s+/#, with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
     }
@@ -727,14 +727,26 @@ struct ElementCategorySymbols {
             return group.localizedLabel
         }
         guard let assignment = osmTagAssignment(forCategoryIcon: icon) else { return nil }
-        let raw = assignment.tagValue.replacingOccurrences(of: "_", with: " ")
+        let raw = assignment.tagValue.replacing("_", with: " ")
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         return trimmed.localizedCapitalized
     }
 
     static func merchantCategoryDescriptor(for group: MerchantCategoryGroup) -> MerchantCategoryDescriptor {
-        merchantCategoryDescriptors[group]!
+        if let descriptor = merchantCategoryDescriptors[group] {
+            return descriptor
+        }
+        return MerchantCategoryDescriptor(
+            group: group,
+            chipSymbolName: "mappin.circle.fill",
+            priority: Int.max,
+            searchAliases: [],
+            matchingTagValues: [],
+            remoteTagFilters: [],
+            iconOverrides: [],
+            querySpecificTagFilters: [:]
+        )
     }
 
     private struct PrecomputedGroupMatcher {

@@ -30,7 +30,7 @@ enum AppLayoutMode: Equatable, Sendable {
         guard horizontalSizeClass == .regular else {
             return .compactSheet
         }
-        guard verticalSizeClass != .compact else {
+        guard verticalSizeClass == .regular else {
             return .compactSheet
         }
         guard containerSize.width > 0, containerSize.height > 0 else {
@@ -85,11 +85,13 @@ struct AdaptiveLeadingSheetSizing: PresentationSizing, Equatable {
 }
 
 extension GeometryProxy {
-    /// Returns a left-column width (~42% of the display, clamped to 380–420 pt)
+    /// Returns a leading-column width (~42% of the display, clamped to 380–420 pt)
     /// for a leading-pinned collapsible sheet on wide regular displays (e.g.
-    /// iPhone Duo unfolded landscape), staying comfortably clear of the center fold.
+    /// iPhone Duo unfolded landscape), staying comfortably clear of the center fold
+    /// in both LTR and RTL layouts.
     func leadingCollapsibleSheetWidth(
-        horizontalSizeClass: UserInterfaceSizeClass?
+        horizontalSizeClass: UserInterfaceSizeClass?,
+        layoutDirection: LayoutDirection = .leftToRight
     ) -> CGFloat? {
         let fullWidth = size.width + safeAreaInsets.leading + safeAreaInsets.trailing
         let fullHeight = size.height + safeAreaInsets.top + safeAreaInsets.bottom
@@ -103,8 +105,10 @@ extension GeometryProxy {
         if #available(iOS 27.1, *),
            let fold = reservedRegions(kind: .division, options: .includeInactive).first,
            fold.frame.height > fold.frame.width {
-            let leftOfFold = fold.frame.minX + safeAreaInsets.leading
-            return min(targetWidth, max(leftOfFold - 16, 340))
+            let leadingOfFold: CGFloat = layoutDirection == .rightToLeft
+                ? size.width - fold.frame.maxX + safeAreaInsets.trailing
+                : fold.frame.minX + safeAreaInsets.leading
+            return min(targetWidth, max(leadingOfFold - 16, 340))
         }
         #endif
 
@@ -126,8 +130,13 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// Opts a sheet or presentation out of iPhone Duo's vertical side bar so its
-    /// contents span full width without an empty trailing vertical-bar safe-area inset.
+    /// Opts a modal or bottom sheet out of iPhone Duo's vertical side bar using
+    /// `.toolbarVerticalBehavior(.disabled)`.
+    ///
+    /// On iPhone Duo's outer display, the main map scene already occupies the
+    /// outer vertical toolbar rail; disabling the vertical toolbar inside
+    /// presented sheets avoids reserving a duplicate empty trailing safe-area
+    /// inset so sheet content can span the full sheet width.
     @ViewBuilder
     func disableVerticalToolbarIfAvailable() -> some View {
         #if compiler(>=6.4)
