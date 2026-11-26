@@ -13,6 +13,7 @@ struct ContentView: View {
     @EnvironmentObject private var featureHintsController: FeatureHintsController
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @StateObject private var appearanceManager = AppearanceManager()
 
     @State public var showingAbout = false
@@ -23,6 +24,7 @@ struct ContentView: View {
     @State private var firstLocationUpdate: Bool = true
     @State private var headerHeight: CGFloat = 0
     @State private var showingSettings = false
+    @State private var containerSize: CGSize = .zero
 
     @AppStorage("selectedMapType") private var storedMapType: Int = 0
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
@@ -35,18 +37,19 @@ struct ContentView: View {
     }
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
-    /// Prefer idiom + size class over hard-coded pixel thresholds so iPad
-    /// multitasking and large phones don't flip the wrong layout shell.
-    private var usesIPadLayout: Bool {
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return horizontalSizeClass != .compact
-        }
-        return false
+    /// Size-class + container-geometry shell selection (never `userInterfaceIdiom`)
+    /// so iPhone Duo unfolded landscape, iPad, and resizable windows adapt seamlessly.
+    private var layoutMode: AppLayoutMode {
+        AppLayoutMode.resolve(
+            horizontalSizeClass: horizontalSizeClass,
+            verticalSizeClass: verticalSizeClass,
+            containerSize: containerSize
+        )
     }
 
     var body: some View {
-        Group {
-            if usesIPadLayout {
+        ZStack {
+            if layoutMode == .splitSidebar {
                 IPadLayoutView(
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
@@ -70,18 +73,33 @@ struct ContentView: View {
                 .environmentObject(appearanceManager)
             }
         }
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { newSize in
+            if newSize != containerSize {
+                containerSize = newSize
+            }
+        }
         .onPreferenceChange(HeaderHeightKey.self) { value in
+            guard layoutMode == .compactSheet else { return }
             self.headerHeight = value
             viewModel.topPadding = value
             Debug.log("Header Height reported: \(value)")
         }
         .onAppear {
             Debug.log("ContentView.onAppear called")
+            if containerSize == .zero, let windowSize = ActiveWindowScene.keyWindow?.bounds.size {
+                containerSize = windowSize
+            }
+            syncLayoutMode(layoutMode)
 
             cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
                 userLocation = updatedUserLocation
             }
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
+        }
+        .onChange(of: layoutMode) { _, newMode in
+            syncLayoutMode(newMode)
         }
         .onChange(of: featureHintsController.activeTarget) { _, target in
             if target == .merchantAlerts {
@@ -94,6 +112,13 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(colorSchemeFor(appearanceManager.appearance))
+    }
+
+    private func syncLayoutMode(_ newMode: AppLayoutMode) {
+        viewModel.updateLayoutMode(newMode)
+        if newMode == .splitSidebar, headerHeight != 0 {
+            headerHeight = 0
+        }
     }
 
     // Helper function to map Appearance -> ColorScheme?

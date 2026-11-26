@@ -21,13 +21,25 @@ struct IPadLayoutView: View {
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     private var appearance: Appearance { appearanceManager.appearance }
-    private let aboutPopoverWidth: CGFloat = 420
-    private let aboutPopoverHeight: CGFloat = 640
-    private let settingsPopoverWidth: CGFloat = 420
-    private let settingsPopoverHeight: CGFloat = 520
     private let toolbarContentTopPadding: CGFloat = 6
     private let sidebarRootTopCompensation: CGFloat = 30
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var containerSize: CGSize = .zero
+
+    private var resolvedPopoverWidth: CGFloat {
+        guard containerSize.width > 0 else { return 420 }
+        return min(420, max(320, containerSize.width - 48))
+    }
+
+    private var resolvedAboutPopoverHeight: CGFloat {
+        guard containerSize.height > 0 else { return 640 }
+        return min(640, max(340, containerSize.height - 110))
+    }
+
+    private var resolvedSettingsPopoverHeight: CGFloat {
+        guard containerSize.height > 0 else { return 520 }
+        return min(520, max(340, containerSize.height - 110))
+    }
 
     private var sidePanel: some View {
         NavigationStack(path: $viewModel.path) {
@@ -57,10 +69,10 @@ struct IPadLayoutView: View {
                                 .id("ipad-about-\(appearance.rawValue)-\(systemColorScheme)")
                                 .preferredColorScheme(effectiveColorScheme)
                                 .frame(
-                                    minWidth: aboutPopoverWidth,
-                                    idealWidth: aboutPopoverWidth,
-                                    minHeight: aboutPopoverHeight,
-                                    idealHeight: aboutPopoverHeight
+                                    minWidth: 320,
+                                    idealWidth: resolvedPopoverWidth,
+                                    minHeight: 340,
+                                    idealHeight: resolvedAboutPopoverHeight
                                 )
                             }
                     }
@@ -90,10 +102,10 @@ struct IPadLayoutView: View {
                                 .preferredColorScheme(effectiveColorScheme)
                             }
                             .frame(
-                                minWidth: settingsPopoverWidth,
-                                idealWidth: settingsPopoverWidth,
-                                minHeight: settingsPopoverHeight,
-                                idealHeight: settingsPopoverHeight
+                                minWidth: 320,
+                                idealWidth: resolvedPopoverWidth,
+                                minHeight: 340,
+                                idealHeight: resolvedSettingsPopoverHeight
                             )
                         }
                     }
@@ -108,7 +120,7 @@ struct IPadLayoutView: View {
             guard viewModel.mapDisplayMode != .communities else { return }
             viewModel.performUnifiedSearch()
         }
-        .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 430)
+        .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 420)
     }
 
     @ViewBuilder
@@ -149,12 +161,13 @@ struct IPadLayoutView: View {
                 .onAppear {
                     viewModel.locationManager.startUpdatingLocation()
                 }
-                .overlay(
-                    OpenStreetMapAttributionView()
-                        .padding(.bottom, 7)
-                        .padding(.leading, 100),
-                    alignment: .bottomLeading
-                )
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if elements != nil {
+                OpenStreetMapAttributionView()
+                    .padding(.bottom, 7)
+                    .padding(.leading, 100)
             }
         }
         .overlay(
@@ -177,6 +190,13 @@ struct IPadLayoutView: View {
             mapPanel
         }
         .navigationSplitViewStyle(.balanced)
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { newSize in
+            if newSize != containerSize {
+                containerSize = newSize
+            }
+        }
         .onChange(of: columnVisibility) { _, newValue in
             guard newValue != .all else { return }
             columnVisibility = .all

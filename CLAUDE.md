@@ -113,8 +113,9 @@ Default repository mode is **auto**: prefer v4, fall back to v2 when needed.
 
 ## Important Conventions
 
-- iPhone: portrait-oriented product UX, bottom sheet with multiple detents
-- iPad: split layout when regular size class; compact multitasking uses phone shell
+- Adaptive layout (`AppLayoutMode`): shell switches by size class + container geometry (never `UIDevice.current.userInterfaceIdiom` or `UIScreen.main`)
+  - Compact / portrait-narrow (standard iPhone, iPhone Duo outer display & unfolded portrait, Split View / Slide Over): floating header + bottom sheet with multiple detents
+  - Wide regular canvas (iPhone Duo unfolded landscape, iPad regular width): `NavigationSplitView` sidebar + map
 - Map uses Bitcoin-orange markers (`MarkerColor`); boosted merchants use system orange tint
 - ~25-mile radius visible pin range from map center
 - Location permission: “When In Use” only (privacy-first)

@@ -225,9 +225,8 @@ extension BusinessDetailView {
                     showingShareErrorAlert = true
                 }
             } label: {
-                Image(systemName: "square.and.arrow.up")
+                Label("Share place", systemImage: "square.and.arrow.up")
             }
-            .accessibilityLabel("Share place")
         }
     }
 

@@ -8,7 +8,7 @@
 import SwiftUI
 import CoreLocation
 import Foundation // for DebugUtils
-import UIKit     // ← added, for checking userInterfaceIdiom
+import UIKit
 
 enum OnboardingPageKind {
     case info
@@ -25,6 +25,8 @@ struct OnboardingPage {
 }
 
 struct OnboardingView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @EnvironmentObject private var viewModel: ContentViewModel
     @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
@@ -35,30 +37,31 @@ struct OnboardingView: View {
     @State private var hasManuallySelectedAlertCity = false
     @State private var isEnablingAlerts = false
 
-    // ──────────────── Device Detection Helpers ────────────────
-    private var isPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
-    }
-    
-    // Screen size categories based on actual dimensions
+    // ──────────────── Adaptive Layout Helpers ────────────────
+    /// Categorize available container space using size classes + dimensions
+    /// (never `userInterfaceIdiom`) so iPhone Duo outer, unfolded portrait,
+    /// unfolded landscape, Split View, and iPad all scale cleanly without clipping.
     private func screenSizeCategory(width: CGFloat, height: CGFloat) -> ScreenCategory {
+        let isRegularCanvas = horizontalSizeClass == .regular && verticalSizeClass != .compact
         let minDimension = min(width, height)
-        let maxDimension = max(width, height)
-        
-        if isPad {
-            if minDimension >= 1000 { // iPad 13" and larger
+
+        if isRegularCanvas && height >= 760 {
+            if minDimension >= 1000 { // Large tablet canvas (e.g. 13" iPad)
                 return .iPadLarge
-            } else if minDimension >= 800 { // iPad 11"
+            } else if minDimension >= 740 { // Medium tablet canvas (e.g. 11" / mini iPad)
                 return .iPadMedium
-            } else { // iPad mini
+            } else { // Compact-regular canvas (e.g. iPhone Duo unfolded portrait)
                 return .iPadSmall
             }
+        } else if isRegularCanvas {
+            // Wide but shorter regular canvas (e.g. iPhone Duo unfolded landscape ~951×669)
+            return .iPhoneMedium
         } else {
-            if minDimension <= 375 { // iPhone SE and smaller
+            if width <= 375 || height <= 680 { // Compact phone or iPhone Duo outer display
                 return .iPhoneSmall
-            } else if maxDimension >= 850 { // iPhone Pro Max
+            } else if height >= 850 { // Tall phone
                 return .iPhoneLarge
-            } else { // Regular iPhones
+            } else {
                 return .iPhoneMedium
             }
         }
@@ -71,8 +74,17 @@ struct OnboardingView: View {
         case iPadSmall
         case iPadMedium
         case iPadLarge
+
+        var usesGenerousMargins: Bool {
+            switch self {
+            case .iPadSmall, .iPadMedium, .iPadLarge:
+                return true
+            case .iPhoneSmall, .iPhoneMedium, .iPhoneLarge:
+                return false
+            }
+        }
     }
-    // ──────────────── End Device Detection ──────────────────
+    // ──────────────── End Adaptive Layout Helpers ────────────
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
@@ -116,8 +128,9 @@ struct OnboardingView: View {
         GeometryReader { fullGeo in
             let screenCategory = screenSizeCategory(width: fullGeo.size.width, height: fullGeo.size.height)
             let isLandscape = fullGeo.size.width > fullGeo.size.height
+            let isCompactHeight = fullGeo.size.height < 720
             
-            // Dynamic sizing based on screen dimensions
+            // Dynamic sizing based on container dimensions
             let circleSize = getCircleSize(for: screenCategory, isLandscape: isLandscape)
             let iconSize = getIconSize(for: screenCategory, isLandscape: isLandscape)
             let titleFont = getTitleFont(for: screenCategory, isLandscape: isLandscape, width: fullGeo.size.width)
@@ -125,6 +138,13 @@ struct OnboardingView: View {
             let spacing = getSpacing(for: screenCategory, isLandscape: isLandscape)
             let buttonFont = getButtonFont(for: screenCategory, isLandscape: isLandscape)
             let maxContentWidth = getMaxContentWidth(for: screenCategory, width: fullGeo.size.width)
+            let topAnchorFactor: CGFloat = {
+                if isCompactHeight {
+                    return pages[currentPage].kind == .alertsSetup ? 0.08 : 0.16
+                }
+                return screenCategory.usesGenerousMargins ? 0.30 : 0.25
+            }()
+            let topSpacerHeight = max(12, fullGeo.size.height * topAnchorFactor - circleSize / 2)
 
             ZStack {
                 // Background layers
@@ -134,30 +154,35 @@ struct OnboardingView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Position icon at 1/4 from top for iPhones, 1/3 for iPads
-                    Spacer()
-                        .frame(height: fullGeo.size.height * (isPad ? 0.33 : 0.25) - circleSize / 2)
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            Spacer()
+                                .frame(height: topSpacerHeight)
 
-                    onboardingIcon(circleSize: circleSize, iconSize: iconSize)
+                            onboardingIcon(circleSize: circleSize, iconSize: iconSize)
 
-                    onboardingTextBlock(
-                        titleFont: titleFont,
-                        subtitleFont: subtitleFont,
-                        spacing: spacing
-                    )
-                    .padding(.top, spacing.afterIcon)
+                            onboardingTextBlock(
+                                titleFont: titleFont,
+                                subtitleFont: subtitleFont,
+                                spacing: spacing
+                            )
+                            .padding(.top, isCompactHeight ? min(spacing.afterIcon, 24) : spacing.afterIcon)
 
-                    if pages[currentPage].kind == .alertsSetup {
-                        alertSupplementaryContent(
-                            maxContentWidth: maxContentWidth,
-                            screenCategory: screenCategory
-                        )
-                        .padding(.top, min(28, spacing.afterIcon * 0.5))
+                            if pages[currentPage].kind == .alertsSetup {
+                                alertSupplementaryContent(
+                                    maxContentWidth: maxContentWidth,
+                                    screenCategory: screenCategory
+                                )
+                                .padding(.top, min(28, spacing.afterIcon * 0.5))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 12)
                     }
-
-                    Spacer()
+                    .scrollBounceBehavior(.basedOnSize)
 
                     onboardingIndicator(spacing: spacing)
+                        .padding(.top, 8)
                         .padding(.bottom, spacing.indicatorBottom)
 
                     pageControls(
@@ -167,7 +192,7 @@ struct OnboardingView: View {
                     )
                 }
                 .frame(maxWidth: maxContentWidth)
-                .padding(.horizontal, isPad ? 32 : 16)
+                .padding(.horizontal, screenCategory.usesGenerousMargins ? 32 : 16)
                 .frame(width: fullGeo.size.width, height: fullGeo.size.height, alignment: .center)
             }
         }

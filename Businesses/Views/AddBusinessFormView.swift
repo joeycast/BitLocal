@@ -10,7 +10,7 @@ struct AddBusinessFormView: View {
     private let contentBottomClearance: CGFloat = 12
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 stepIndicator
 

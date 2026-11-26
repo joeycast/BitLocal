@@ -9,7 +9,7 @@ struct ManualLocationEntryView: View {
     @State private var isGeocoding = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     TextField(text: $submission.businessName) {

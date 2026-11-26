@@ -53,9 +53,8 @@ struct AllRegionsListView: View {
                 Button {
                     viewModel.loadAreaBrowserAreas()
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    Label("Refresh regions", systemImage: "arrow.clockwise")
                 }
-                .accessibilityLabel("Refresh regions")
             }
         }
         .onAppear {

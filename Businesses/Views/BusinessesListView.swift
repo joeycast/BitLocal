@@ -208,7 +208,8 @@ struct BusinessesListView: View {
     }
 
     private var searchBarTopPadding: CGFloat {
-        if horizontalSizeClass == .regular {
+        // Side-panel presentation (no sheet detent) gets its top offset from the split sidebar container.
+        if currentDetent == nil {
             return 0
         }
         if #available(iOS 26.0, *) {

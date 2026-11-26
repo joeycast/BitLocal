@@ -45,23 +45,18 @@ struct AllEventsListView: View {
         .navigationTitle("Events")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    Toggle(isOn: $viewModel.eventsIncludePast) {
-                        Text("Past")
-                    }
-                    .toggleStyle(.button)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .onChange(of: viewModel.eventsIncludePast) { _, _ in
-                        viewModel.loadBTCMapEvents()
-                    }
-                    Button {
-                        viewModel.loadBTCMapEvents()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .accessibilityLabel("Refresh events")
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Toggle(isOn: $viewModel.eventsIncludePast) {
+                    Label("Past", systemImage: "clock.arrow.circlepath")
+                }
+                .onChange(of: viewModel.eventsIncludePast) { _, _ in
+                    viewModel.loadBTCMapEvents()
+                }
+
+                Button {
+                    viewModel.loadBTCMapEvents()
+                } label: {
+                    Label("Refresh events", systemImage: "arrow.clockwise")
                 }
             }
         }

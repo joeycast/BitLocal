@@ -185,7 +185,7 @@ final class FeatureHintsController: ObservableObject {
     func installOverlayWindow() {
         guard FeatureFlags.isFeatureHintsEnabled else { return }
         guard overlayWindow == nil,
-              let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+              let scene = ActiveWindowScene.current else { return }
 
         let overlay = FeatureHintsOverlay()
             .environmentObject(self)

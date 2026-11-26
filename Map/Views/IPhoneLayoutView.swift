@@ -63,7 +63,7 @@ struct IPhoneLayoutView: View {
                     .overlay(
                         OpenStreetMapAttributionView()
                             .padding(.bottom, attributionBottomInset(for: geometry.size.height) + 1)
-                            .padding(.leading, 16),
+                            .padding(.leading, geometry.safeAreaInsets.leading + 16),
                         alignment: .bottomLeading
                     )
                 }
@@ -239,6 +239,14 @@ struct IPhoneLayoutView: View {
                     "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
                 )
             }
+            .onChange(of: geometry.size) { _, newSize in
+                guard shouldPresentBottomSheet, newSize.height > 1 else { return }
+                hasLiveSheetMeasurement = false
+                hasAcceptedDefaultLiveMeasurement = false
+                pendingLaunchOutlier = nil
+                let settledHeight = estimatedBottomInsetForDetent(mapHeight: newSize.height)
+                viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
+            }
             .onChange(of: showingSettings) { _, isShowing in
                 if isShowing {
                     settingsSheetDetent = .medium
@@ -264,9 +272,9 @@ struct IPhoneLayoutView: View {
     private func mapOverlayTopOffset(for safeTopInset: CGFloat) -> CGFloat {
         let isNotch = safeTopInset >= 40
         if isNotch {
-            return headerHeight - 28   // tune notch devices
+            return max(headerHeight - 28, 8)   // tune notch devices
         } else {
-            return headerHeight - 5   // tune legacy/home-button devices
+            return max(headerHeight - 5, 8)    // tune compact-top / Duo outer display
         }
     }
 
@@ -363,9 +371,9 @@ private struct IPhoneMapButtonsChrome: View {
     private var mapOverlayTopOffset: CGFloat {
         let isNotch = safeTopInset >= 40
         if isNotch {
-            return headerHeight - 28
+            return max(headerHeight - 28, 8)
         } else {
-            return headerHeight - 5
+            return max(headerHeight - 5, 8)
         }
     }
 }

@@ -24,44 +24,46 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            pickerRow(label: "Map", selection: $selectedMapType) {
-                Text("Standard").tag(MKMapType.standard)
-                Text("Hybrid").tag(MKMapType.hybrid)
+        ScrollView {
+            VStack(spacing: 24) {
+                pickerRow(label: "Map", selection: $selectedMapType) {
+                    Text("Standard").tag(MKMapType.standard)
+                    Text("Hybrid").tag(MKMapType.hybrid)
+                }
+
+                pickerRow(label: "Theme", selection: $appearanceManager.appearance) {
+                    Text("System").tag(Appearance.system)
+                    Text("Light").tag(Appearance.light)
+                    Text("Dark").tag(Appearance.dark)
+                }
+
+                pickerRow(label: "Distance", selection: $distanceUnit) {
+                    Text("Auto").tag(DistanceUnit.auto)
+                    Text("Miles").tag(DistanceUnit.miles)
+                    Text("Km").tag(DistanceUnit.kilometers)
+                }
+
+                pickerRow(label: "ATMs", selection: atmVisibilityBinding) {
+                    Text(NSLocalizedString("Show", comment: "Settings: show ATMs on map and list"))
+                        .tag(false)
+                    Text(NSLocalizedString("Hide", comment: "Settings: hide ATMs on map and list"))
+                        .tag(true)
+                }
+
+                Divider()
+                    .padding(.top, 4)
+
+                merchantAlertsSection
             }
-
-            pickerRow(label: "Theme", selection: $appearanceManager.appearance) {
-                Text("System").tag(Appearance.system)
-                Text("Light").tag(Appearance.light)
-                Text("Dark").tag(Appearance.dark)
-            }
-
-            pickerRow(label: "Distance", selection: $distanceUnit) {
-                Text("Auto").tag(DistanceUnit.auto)
-                Text("Miles").tag(DistanceUnit.miles)
-                Text("Km").tag(DistanceUnit.kilometers)
-            }
-
-            pickerRow(label: "ATMs", selection: atmVisibilityBinding) {
-                Text(NSLocalizedString("Show", comment: "Settings: show ATMs on map and list"))
-                    .tag(false)
-                Text(NSLocalizedString("Hide", comment: "Settings: hide ATMs on map and list"))
-                    .tag(true)
-            }
-
-            Divider()
-                .padding(.top, 4)
-
-            merchantAlertsSection
-
-            Spacer()
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .padding(.bottom, 20)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .scrollBounceBehavior(.basedOnSize)
         .navigationTitle(Text("Settings"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button(action: {
                     if let onDone {
                         onDone()

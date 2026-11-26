@@ -112,9 +112,12 @@ struct FeatureHintsOverlay: View {
     /// Card positioned relative to a highlighted target frame.
     private func card(step: FeatureHintStep, targetFrame: CGRect, containerSize: CGSize) -> some View {
         let horizontalPadding: CGFloat = 18
-        let bubbleWidth = min(containerSize.width - horizontalPadding * 2, 300)
-        let bubbleHeight = estimatedBubbleHeight(for: step, width: bubbleWidth)
         let safeInsets = screenSafeAreaInsets
+        let leadingMargin = safeInsets.left + horizontalPadding
+        let trailingMargin = safeInsets.right + horizontalPadding
+        let availableWidth = max(containerSize.width - leadingMargin - trailingMargin, 200)
+        let bubbleWidth = min(availableWidth, 300)
+        let bubbleHeight = estimatedBubbleHeight(for: step, width: bubbleWidth)
         let gap: CGFloat = 20
 
         let bubbleY = bubbleYPosition(
@@ -127,22 +130,26 @@ struct FeatureHintsOverlay: View {
             gap: gap
         )
 
-        let bubbleX = min(
-            max(targetFrame.midX, bubbleWidth / 2 + horizontalPadding),
-            containerSize.width - bubbleWidth / 2 - horizontalPadding
-        )
+        let minCenterX = leadingMargin + bubbleWidth / 2
+        let maxCenterX = max(minCenterX, containerSize.width - trailingMargin - bubbleWidth / 2)
+        let bubbleX = min(max(targetFrame.midX, minCenterX), maxCenterX)
 
         return cardContent(step: step, width: bubbleWidth)
             .position(x: bubbleX, y: bubbleY)
     }
 
-    /// Card centered on screen (used when target frame is not yet available).
+    /// Card centered within the safe horizontal area (used when target frame is not yet available).
     private func centeredCard(step: FeatureHintStep, containerSize: CGSize) -> some View {
         let horizontalPadding: CGFloat = 18
-        let bubbleWidth = min(containerSize.width - horizontalPadding * 2, 300)
+        let safeInsets = screenSafeAreaInsets
+        let leadingMargin = safeInsets.left + horizontalPadding
+        let trailingMargin = safeInsets.right + horizontalPadding
+        let availableWidth = max(containerSize.width - leadingMargin - trailingMargin, 200)
+        let bubbleWidth = min(availableWidth, 300)
+        let centerX = (leadingMargin + (containerSize.width - trailingMargin)) / 2
 
         return cardContent(step: step, width: bubbleWidth)
-            .position(x: containerSize.width / 2, y: containerSize.height / 2)
+            .position(x: centerX, y: containerSize.height / 2)
     }
 
     /// Shared card content used by both positioned and centered variants.
@@ -221,9 +228,7 @@ struct FeatureHintsOverlay: View {
     }
 
     private var screenSafeAreaInsets: UIEdgeInsets {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.keyWindow?.safeAreaInsets ?? UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
+        ActiveWindowScene.keyWindow?.safeAreaInsets ?? UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
     }
 
     private func estimatedBubbleHeight(for step: FeatureHintStep, width: CGFloat) -> CGFloat {

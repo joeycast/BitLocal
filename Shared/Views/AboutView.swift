@@ -252,12 +252,14 @@ struct AboutView: View {
             .navigationTitle(Text("about_title"))
             
             // Dismiss sheet when tapping Done.
-            .navigationBarItems(trailing:
-                Button(action: { handleDone() }) {
-                    Text("done_button")
-                        .bold() // or .fontWeight(.bold)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(action: { handleDone() }) {
+                        Text("done_button")
+                            .bold()
+                    }
                 }
-            )
+            }
         }
         .modifier(AboutNavigationBackgroundModifier(enabled: usesPopoverStyling))
         .sheet(isPresented: $showingAddBusinessForm) {

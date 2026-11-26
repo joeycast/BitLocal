@@ -126,6 +126,8 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Settled sheet bottom inset for map edge padding / camera math.
     /// Updated only when a detent selection settles — not during drag sampling.
     @Published var bottomPadding: CGFloat = 0
+    /// Active layout shell derived from size classes + container geometry.
+    private(set) var layoutMode: AppLayoutMode = .compactSheet
     /// Live sheet geometry isolated from this object so detent drag does not
     /// invalidate every `@EnvironmentObject` / `@ObservedObject` subscriber.
     let sheetGeometry = SheetGeometryModel()
@@ -842,13 +844,27 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func listFocusCoordinate() -> CLLocationCoordinate2D? {
-        guard UIDevice.current.userInterfaceIdiom == .phone,
+        guard layoutMode == .compactSheet,
               let mapView = mapView else { return nil }
 
         let focusRect = mapListViewportRect(for: mapView)
 
         let centerPoint = CGPoint(x: focusRect.midX, y: focusRect.midY)
         return mapView.convert(centerPoint, toCoordinateFrom: mapView)
+    }
+
+    func updateLayoutMode(_ newMode: AppLayoutMode) {
+        guard layoutMode != newMode else { return }
+        layoutMode = newMode
+        pendingSheetDetentHeight = nil
+        if newMode == .splitSidebar {
+            if topPadding != 0 {
+                topPadding = 0
+            }
+            if bottomPadding != 0 {
+                bottomPadding = 0
+            }
+        }
     }
 
     func effectiveIPhoneViewportBottomInset(mapHeight: CGFloat, enforceDefaultFloor: Bool = true) -> CGFloat {
@@ -901,13 +917,11 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func mapListViewportInsets(for mapView: MKMapView) -> UIEdgeInsets {
-        let topInset = max(topPadding, 0)
-        let bottomInset: CGFloat
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            bottomInset = effectiveIPhoneViewportBottomInset(mapHeight: mapView.bounds.height)
-        } else {
-            bottomInset = 0
+        guard layoutMode == .compactSheet else {
+            return .zero
         }
+        let topInset = max(topPadding, 0)
+        let bottomInset = effectiveIPhoneViewportBottomInset(mapHeight: mapView.bounds.height)
         return UIEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
     }
 
@@ -1261,12 +1275,17 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
                 }
                 let newZoomLevel = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                 let region = MKCoordinateRegion(center: coordinate, span: newZoomLevel)
-                let edgePadding = UIEdgeInsets(
-                    top: topPadding + 10,
-                    left: 20,
-                    bottom: bottomPadding + 100,
-                    right: 20
-                )
+                let edgePadding: UIEdgeInsets
+                if layoutMode == .splitSidebar {
+                    edgePadding = UIEdgeInsets(top: 10, left: 20, bottom: 20, right: 20)
+                } else {
+                    edgePadding = UIEdgeInsets(
+                        top: topPadding + 10,
+                        left: 20,
+                        bottom: bottomPadding + 100,
+                        right: 20
+                    )
+                }
                 
                 DispatchQueue.main.async {
                     mapView.setCameraBoundary(MKMapView.CameraBoundary(coordinateRegion: region), animated: true)
@@ -1354,14 +1373,22 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
             )
 
             DispatchQueue.main.async {
-                // If on iPad, center with NO horizontal inset—so the map pane centers user dot visually.
-                if UIDevice.current.userInterfaceIdiom == .pad {
+                // In split sidebar mode, center with no sheet inset so the map pane centers the user dot visually.
+                if self.layoutMode == .splitSidebar {
                     let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
                     mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
                 } else {
-                    // iPhone: preserve your bottom‐sheet inset (unchanged)
-                    let screenHeight = UIScreen.main.bounds.height
-                    let bottomSheetHeight = screenHeight * (0.8 / 3.0)
+                    // Compact bottom-sheet mode: size the sheet inset from the map/window bounds
+                    // rather than UIScreen.main so iPhone Duo and Split View center accurately.
+                    let containerHeight = mapView.bounds.height > 1
+                        ? mapView.bounds.height
+                        : (mapView.window?.bounds.height ?? 0)
+                    let bottomSheetHeight: CGFloat
+                    if self.bottomPadding > 1, containerHeight > 1 {
+                        bottomSheetHeight = min(self.bottomPadding, containerHeight - 1)
+                    } else {
+                        bottomSheetHeight = containerHeight * (0.8 / 3.0)
+                    }
                     let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: bottomSheetHeight, right: 0)
                     mapView.setVisibleMapRect(mapRect, edgePadding: edgePadding, animated: true)
                 }

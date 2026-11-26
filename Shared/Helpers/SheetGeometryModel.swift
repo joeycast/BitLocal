@@ -100,6 +100,7 @@ final class SheetEdgeHeightReaderView: UIView {
     var onHeightChange: ((CGFloat) -> Void)?
     var onMotionSettled: ((CGFloat) -> Void)?
     private var lastReported: CGFloat = -1
+    private var lastWindowBoundsSize: CGSize = .zero
     private var displayLink: CADisplayLink?
     private var stableFrameCount = 0
     private weak var cachedPresentedView: UIView?
@@ -107,7 +108,11 @@ final class SheetEdgeHeightReaderView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        // Layout changes mean the sheet may be moving again.
+        // Layout changes mean the sheet or window may be moving/resizing again.
+        if let windowBoundsSize = window?.bounds.size, windowBoundsSize != lastWindowBoundsSize {
+            lastWindowBoundsSize = windowBoundsSize
+            lastReported = -1
+        }
         stableFrameCount = 0
         startDisplayLinkIfNeeded()
     }
@@ -115,7 +120,9 @@ final class SheetEdgeHeightReaderView: UIView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         cachedPresentedView = nil
-        if window != nil {
+        if let window {
+            lastWindowBoundsSize = window.bounds.size
+            lastReported = -1
             stableFrameCount = 0
             startDisplayLinkIfNeeded()
             report()
@@ -147,7 +154,13 @@ final class SheetEdgeHeightReaderView: UIView {
     }
 
     private func report() {
-        guard window != nil else { return }
+        guard let window else { return }
+
+        if window.bounds.size != lastWindowBoundsSize {
+            lastWindowBoundsSize = window.bounds.size
+            lastReported = -1
+            stableFrameCount = 0
+        }
 
         let sheetFrame: CGRect
         if let presented = presentedSheetView() {
@@ -158,8 +171,8 @@ final class SheetEdgeHeightReaderView: UIView {
         }
 
         guard sheetFrame.height > 1 || sheetFrame.minY > 0 else { return }
-        let screenHeight = window?.screen.bounds.height ?? UIScreen.main.bounds.height
-        let heightFromBottom = max(0, screenHeight - sheetFrame.minY)
+        let containerHeight = window.bounds.height
+        let heightFromBottom = max(0, containerHeight - sheetFrame.minY)
         guard heightFromBottom > 1 else { return }
 
         if abs(heightFromBottom - lastReported) < 0.25 {

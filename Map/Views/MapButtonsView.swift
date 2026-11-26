@@ -157,9 +157,7 @@ struct MapButtonsView: View {
     }
 
     private func presentAlert(_ alert: UIAlertController) {
-        if let windowScene = UIApplication.shared.connectedScenes
-            .first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
+        if let rootVC = ActiveWindowScene.keyWindow?.rootViewController {
             rootVC.topMostViewController()
                 .present(alert, animated: true)
         }
