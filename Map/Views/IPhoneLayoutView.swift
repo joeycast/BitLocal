@@ -152,13 +152,14 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingSettings = true
                         } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 16, weight: .medium))
-                                .imageScale(.medium)
-                                .foregroundStyle(toolbarIconColor)
-                                .id("settings-\(effectiveColorScheme == .dark)")
+                            Label(
+                                NSLocalizedString("settings_label_accessibility", comment: ""),
+                                systemImage: "gearshape"
+                            )
+                            .foregroundStyle(.primary)
+                            .id("settings-\(effectiveColorScheme == .dark)")
                         }
-                        .accessibilityLabel(NSLocalizedString("settings_label_accessibility", comment: ""))
+                        .tint(.primary)
                     }
 
                     MapControlToolbarContent(
@@ -178,13 +179,14 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingSettings = true
                         } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 16, weight: .medium))
-                                .imageScale(.medium)
-                                .foregroundStyle(toolbarIconColor)
-                                .id("settings-h-\(effectiveColorScheme == .dark)")
+                            Label(
+                                NSLocalizedString("settings_label_accessibility", comment: ""),
+                                systemImage: "gearshape"
+                            )
+                            .foregroundStyle(.primary)
+                            .id("settings-h-\(effectiveColorScheme == .dark)")
                         }
-                        .accessibilityLabel(NSLocalizedString("settings_label_accessibility", comment: ""))
+                        .tint(.primary)
                     }
                 }
             }
@@ -378,10 +380,6 @@ private struct IPhoneLayoutContent: View {
         case .dark:
             return .dark
         }
-    }
-
-    private var toolbarIconColor: Color {
-        effectiveColorScheme == .dark ? .white : .black
     }
 
     private func mapOverlayTopOffset(for safeTopInset: CGFloat) -> CGFloat {

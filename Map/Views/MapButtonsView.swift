@@ -119,38 +119,31 @@ struct MapControlToolbarContent: ToolbarContent {
     var colorScheme: ColorScheme? = nil
 
     private var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
-    private var iconForeground: Color {
-        switch colorScheme {
-        case .dark: return .white
-        case .light: return .black
-        case nil: return .primary
-        @unknown default: return .primary
-        }
-    }
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: placement) {
             Button {
+                BitLocalHaptics.selection()
                 selectedMapTypeBinding.wrappedValue = (selectedMapType == .standard) ? .hybrid : .standard
             } label: {
-                Image(systemName: selectedMapType == .hybrid ? "map" : "globe")
-                    .font(.system(size: 16, weight: .medium))
-                    .imageScale(.medium)
-                    .foregroundStyle(iconForeground)
-                    .id("map-type-\(selectedMapType == .hybrid)-\(colorScheme == .dark)")
+                Label(
+                    selectedMapType == .standard ? "Show satellite map" : "Show standard map",
+                    systemImage: selectedMapType == .hybrid ? "map" : "globe"
+                )
+                .foregroundStyle(.primary)
+                .id("map-type-\(selectedMapType == .hybrid)-\(colorScheme == .dark)")
             }
-            .accessibilityLabel(selectedMapType == .standard ? "Show satellite map" : "Show standard map")
+            .tint(.primary)
 
             Button {
+                BitLocalHaptics.lightTap()
                 recenterController.handleRecenterTap(viewModel: viewModel)
             } label: {
-                Image(systemName: "location")
-                    .font(.system(size: 16, weight: .medium))
-                    .imageScale(.medium)
-                    .foregroundStyle(iconForeground)
+                Label("Center map on location", systemImage: "location")
+                    .foregroundStyle(.primary)
                     .id("recenter-\(colorScheme == .dark)")
             }
-            .accessibilityLabel("Center map on location")
+            .tint(.primary)
         }
     }
 }
