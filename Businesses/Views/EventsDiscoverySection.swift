@@ -95,12 +95,12 @@ private struct EventCarouselCard: View {
 
             if let distText = distanceText {
                 Text(distText)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.accent)
             }
         }
         .padding(12)
-        .frame(width: 160, minHeight: 88, alignment: .leading)
+        .frame(minWidth: 160, maxWidth: 180, minHeight: 88, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 12)
                 .fill(.ultraThinMaterial)
