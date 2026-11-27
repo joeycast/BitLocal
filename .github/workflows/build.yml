@@ -65,7 +65,7 @@ jobs:
             test-without-building
 
       - name: Upload simulator app
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ios-simulator-build
           path: build/DerivedData/Build/Products/Debug-iphonesimulator/*.app
