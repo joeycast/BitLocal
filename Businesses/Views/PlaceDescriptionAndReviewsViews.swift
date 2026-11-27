@@ -1,7 +1,7 @@
 import SwiftUI
 import NaturalLanguage
 #if canImport(Translation)
-import Translation
+@preconcurrency import Translation
 #endif
 
 // MARK: - About / Description Section
