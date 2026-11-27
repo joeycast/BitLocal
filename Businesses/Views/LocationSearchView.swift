@@ -446,7 +446,7 @@ extension LocationSearchViewModel: MKLocalSearchCompleterDelegate {
     nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.searchResults = self.completer.results.map { completion in
+            self.searchResults = self.searchCompleter.results.map { completion in
                 SearchResult(
                     title: completion.title,
                     subtitle: completion.subtitle,
