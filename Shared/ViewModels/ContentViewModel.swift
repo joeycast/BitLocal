@@ -37,6 +37,8 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     @ObservationIgnored var pendingRegionCodeLookups: Set<String> = []
     var path: [BitLocalNavigationRoute] = []
     var selectedElement: Element?
+    /// Ordered merchant IDs for adjacent previous/next navigation inside `BusinessDetailView`.
+    var merchantDetailSequenceIDs: [String] = []
     var deepLinkUnavailableState: DeepLinkUnavailableState?
     /// Row cell view-model cache. Intentionally `@ObservationIgnored` so lazy row
     /// hydration during SwiftUI `body` evaluation never triggers view invalidation.

@@ -292,6 +292,74 @@ extension ContentViewModel {
         zoomToElement(element)
     }
 
+    /// Reveals and centers a specific merchant on the map (e.g. from full-screen detail detent).
+    func showElementOnMap(_ element: Element) {
+        selectedElement = element
+        selectAnnotationForListSelection(
+            element,
+            animated: true,
+            allowCameraMovement: true,
+            allowDirectSelectionRecentering: true
+        )
+    }
+
+    func setMerchantDetailSequence(_ elements: [Element]) {
+        merchantDetailSequenceIDs = MerchantDetailSequenceNavigator.sanitizedSequence(
+            from: elements.map(\.id)
+        )
+    }
+
+    func clearMerchantDetailSequence() {
+        if !merchantDetailSequenceIDs.isEmpty {
+            merchantDetailSequenceIDs = []
+        }
+    }
+
+    /// Steps to the previous or next merchant in the active browsing list while
+    /// keeping `NavigationStack` depth constant so Back still returns straight to the list.
+    @discardableResult
+    func stepMerchantDetail(
+        from currentElement: Element,
+        direction: MerchantSequenceStepDirection,
+        allowCameraMovement: Bool
+    ) -> Element? {
+        let navigator = MerchantDetailSequenceNavigator(
+            orderedIDs: merchantDetailSequenceIDs,
+            currentID: currentElement.id
+        )
+        guard let targetID = navigator.targetID(for: direction) else { return nil }
+        guard let targetElement = resolveElementForDetailSequence(id: targetID) else { return nil }
+
+        setSelectionSource(.list)
+        selectedElement = targetElement
+        if let lastIndex = path.indices.last, case .place = path[lastIndex] {
+            path[lastIndex] = .place(targetElement)
+        } else {
+            path = [.place(targetElement)]
+        }
+
+        selectAnnotationForListSelection(
+            targetElement,
+            animated: true,
+            allowCameraMovement: allowCameraMovement,
+            allowDirectSelectionRecentering: allowCameraMovement
+        )
+        return targetElement
+    }
+
+    private func resolveElementForDetailSequence(id: String) -> Element? {
+        if let live = merchantElementStore.element(id: id) {
+            return live
+        }
+        if let member = communityMemberElements.first(where: { $0.id == id }) {
+            return member
+        }
+        if let searchMatch = merchantSearchPrimaryResults.first(where: { $0.id == id }) {
+            return searchMatch
+        }
+        return allElements.first(where: { $0.id == id })
+    }
+
     private func isAnnotationClustered(_ annotation: MKAnnotation, on mapView: MKMapView) -> Bool {
         mapView.annotations
             .compactMap { $0 as? MKClusterAnnotation }

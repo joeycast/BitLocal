@@ -263,7 +263,12 @@ extension ContentViewModel {
         }
     }
 
-    private func fitMapToCommunity(_ area: V2AreaRecord, animated: Bool) {
+    func showCommunityOnMap(_ area: V2AreaRecord) {
+        selectedCommunityArea = area
+        fitMapToCommunity(area, animated: true)
+    }
+
+    func fitMapToCommunity(_ area: V2AreaRecord, animated: Bool) {
         guard let mapView = mapView else {
             if let region = mapRegion(forCommunityArea: area) {
                 updateMapRegion(center: region.center, span: region.span, animated: animated)

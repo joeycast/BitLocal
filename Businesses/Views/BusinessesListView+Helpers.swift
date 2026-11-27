@@ -306,6 +306,9 @@ extension BusinessesListView {
     ) -> some View {
         let cellVM = cellViewModel(for: element)
         return Button {
+            viewModel.setMerchantDetailSequence(
+                displayedFeaturedPrimaryResults + displayedRegularPrimaryResults
+            )
             prepareListNavigation(for: element)
             viewModel.path = [.place(element)]
         } label: {
@@ -336,6 +339,14 @@ extension BusinessesListView {
     ) -> some View {
         let cellVM = cellViewModel(for: element)
         return Button {
+            let orderedSequence: [Element]
+            if viewModel.activeMerchantAlertDigest != nil {
+                orderedSequence = elements
+            } else {
+                orderedSequence = topSortedElements.filter { $0.isCurrentlyBoosted() }
+                    + topSortedElements.filter { !$0.isCurrentlyBoosted() }
+            }
+            viewModel.setMerchantDetailSequence(orderedSequence)
             prepareListNavigation(for: element)
             viewModel.path = [.place(element)]
         } label: {

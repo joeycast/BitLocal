@@ -191,6 +191,7 @@ struct BusinessDetailView: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
     @State private var showingShareErrorAlert = false
@@ -200,6 +201,8 @@ struct BusinessDetailView: View {
     @State private var hydratedVerifiedAt: String?
     @State private var isLoadingVerifiedAt = false
     @State private var hasAttemptedVerificationHydration = false
+    @State private var detailContainerWidth: CGFloat = 0
+    @State private var showOnMapTask: Task<Void, Never>?
     @State var elementCellViewModel: ElementCellViewModel
     @Environment(ContentViewModel.self) var contentViewModel
     private let savedPlacesStore = SavedPlacesStore.shared
@@ -389,12 +392,28 @@ struct BusinessDetailView: View {
             geometry: contentViewModel.sheetGeometry,
             isCollapsedLike: isCollapsedLikeDetent
         )
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            if detailContainerWidth != newWidth {
+                detailContainerWidth = newWidth
+            }
+        }
+        .simultaneousGesture(adjacentMerchantSwipeGesture)
+        .accessibilityAction(named: Text("Previous Place")) {
+            _ = stepToAdjacentMerchant(.previous)
+        }
+        .accessibilityAction(named: Text("Next Place")) {
+            _ = stepToAdjacentMerchant(.next)
+        }
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
             elementCellViewModel.onDetailAppear()
         }
         .onDisappear {
+            showOnMapTask?.cancel()
+            showOnMapTask = nil
             elementCellViewModel.onCellDisappear()
         }
         .task(id: element.id) {
@@ -404,6 +423,28 @@ struct BusinessDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .bitLocalDetailNavigationChrome()
         .toolbar {
+            if sequenceNavigator.hasNeighbors {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        _ = stepToAdjacentMerchant(.previous)
+                    } label: {
+                        Label("Previous place", systemImage: "chevron.left")
+                    }
+                    .disabled(!sequenceNavigator.canStepPrevious)
+
+                    Button {
+                        _ = stepToAdjacentMerchant(.next)
+                    } label: {
+                        Label("Next place", systemImage: "chevron.right")
+                    }
+                    .disabled(!sequenceNavigator.canStepNext)
+                }
+            }
+            if isFullScreenDetent && element.mapCoordinate != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    showOnMapToolbarItem
+                }
+            }
             if isHeroScrolledPast && FeatureFlags.isSharePlaceLinksEnabled {
                 ToolbarItem(placement: .topBarTrailing) {
                     shareToolbarItem
@@ -688,6 +729,66 @@ private extension BusinessDetailView {
             }
         }
         .buttonStyle(.tactilePress(scale: 0.96))
+    }
+
+    var sequenceNavigator: MerchantDetailSequenceNavigator {
+        MerchantDetailSequenceNavigator(
+            orderedIDs: contentViewModel.merchantDetailSequenceIDs,
+            currentID: element.id
+        )
+    }
+
+    var isFullScreenDetent: Bool {
+        BottomSheetDetents.isFullScreen(currentDetent)
+    }
+
+    var showOnMapToolbarItem: some View {
+        Button {
+            BitLocalHaptics.lightTap()
+            withAnimation(BitLocalMotion.animation(BitLocalMotion.disclosureSpring, reduceMotion: reduceMotion)) {
+                currentDetent = BottomSheetDetents.standard
+            }
+            showOnMapTask?.cancel()
+            showOnMapTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(80))
+                guard !Task.isCancelled else { return }
+                contentViewModel.showElementOnMap(element)
+            }
+        } label: {
+            Label("Show on Map", systemImage: "map")
+        }
+    }
+
+    var adjacentMerchantSwipeGesture: some Gesture {
+        DragGesture(
+            minimumDistance: MerchantDetailSwipeResolver.minimumHorizontalDistance,
+            coordinateSpace: .local
+        )
+        .onEnded { value in
+            guard sequenceNavigator.hasNeighbors else { return }
+            guard let direction = MerchantDetailSwipeResolver.resolveSwipeDirection(
+                startX: value.startLocation.x,
+                containerWidth: detailContainerWidth,
+                translation: value.translation,
+                predictedEndTranslation: value.predictedEndTranslation,
+                isRightToLeft: layoutDirection == .rightToLeft
+            ) else {
+                return
+            }
+            _ = stepToAdjacentMerchant(direction)
+        }
+    }
+
+    @discardableResult
+    func stepToAdjacentMerchant(_ direction: MerchantSequenceStepDirection) -> Bool {
+        let stepped = contentViewModel.stepMerchantDetail(
+            from: element,
+            direction: direction,
+            allowCameraMovement: !isFullScreenDetent
+        )
+        guard stepped != nil else { return false }
+        BitLocalHaptics.selection()
+        return true
     }
 
     @ViewBuilder

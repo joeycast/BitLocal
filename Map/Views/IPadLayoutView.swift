@@ -45,6 +45,7 @@ struct IPadLayoutView: View {
                             userLocation: viewModel.userLocation,
                             contentViewModel: viewModel
                         )
+                        .id(element.id)
                         .environment(viewModel)
                         .clearNavigationContainerBackgroundIfAvailable()
                         .toolbar(removing: .sidebarToggle)
