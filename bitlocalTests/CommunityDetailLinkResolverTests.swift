@@ -89,7 +89,7 @@ struct CommunityDetailLinkResolverTests {
         )
         #expect(
             CommunityDetailLinkResolver.resolvedContactURL(forKey: "contact:matrix", value: "#bitcoin:matrix.org")?.absoluteString
-                == "https://matrix.to/#/#bitcoin:matrix.org"
+                == "https://matrix.to/#/%23bitcoin:matrix.org"
         )
         #expect(
             CommunityDetailLinkResolver.resolvedContactURL(forKey: "contact:website", value: "bitlocal.app")?.absoluteString
