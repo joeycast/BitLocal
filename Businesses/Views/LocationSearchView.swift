@@ -444,15 +444,15 @@ final class LocationSearchViewModel: NSObject {
 // MARK: - MKLocalSearchCompleterDelegate
 extension LocationSearchViewModel: MKLocalSearchCompleterDelegate {
     nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        let mappedResults = completer.results.map { completion in
-            SearchResult(
-                title: completion.title,
-                subtitle: completion.subtitle,
-                completion: completion
-            )
-        }
         Task { @MainActor [weak self] in
-            self?.searchResults = mappedResults
+            guard let self else { return }
+            self.searchResults = self.completer.results.map { completion in
+                SearchResult(
+                    title: completion.title,
+                    subtitle: completion.subtitle,
+                    completion: completion
+                )
+            }
         }
     }
 
