@@ -75,6 +75,14 @@ private struct IPhoneLayoutContent: View {
         return false
     }
 
+    private var usesToolbarMapControls: Bool {
+        AppLayoutMode.usesToolbarMapControls(
+            horizontalSizeClass: horizontalSizeClass,
+            isVerticalToolbarActive: isVerticalToolbarActive,
+            usesNativeHorizontalBar: usesNativeHorizontalBar
+        )
+    }
+
     private var showsLegacyHeader: Bool {
         !isVerticalToolbarActive && !usesNativeHorizontalBar
     }
@@ -132,9 +140,10 @@ private struct IPhoneLayoutContent: View {
             }
             // Map buttons live in a child that observes `sheetGeometry` only, so
             // continuous drag height does not rebuild MapView / this ZStack.
-            // On iPhone Duo poses with a vertical side bar, they move into `.toolbar`.
+            // On iPhone Duo poses (outer display, unfolded landscape, and unfolded
+            // portrait on iOS 26+), they stay consistently in the native `.toolbar`.
             .overlay(alignment: shouldPresentBottomSheet ? .bottomTrailing : .topTrailing) {
-                if !isVerticalToolbarActive {
+                if !usesToolbarMapControls {
                     IPhoneMapButtonsChrome(
                         viewModel: viewModel,
                         sheetGeometry: viewModel.sheetGeometry,
@@ -150,12 +159,12 @@ private struct IPhoneLayoutContent: View {
                 }
             }
             .toolbar {
-                if isVerticalToolbarActive {
+                if usesToolbarMapControls {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
                             showingSettings = true
                         } label: {
-                            Label("settings_label_accessibility", systemImage: "gearshape")
+                            Label("settings_label_accessibility", systemImage: "gearshape.fill")
                                 .foregroundStyle(.primary)
                                 .id("settings-\(effectiveColorScheme == .dark)")
                         }
@@ -174,7 +183,7 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingSettings = true
                         } label: {
-                            Label("settings_label_accessibility", systemImage: "gearshape")
+                            Label("settings_label_accessibility", systemImage: "gearshape.fill")
                                 .foregroundStyle(.primary)
                                 .id("settings-h-\(effectiveColorScheme == .dark)")
                         }

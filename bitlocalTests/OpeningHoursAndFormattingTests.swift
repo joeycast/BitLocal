@@ -157,6 +157,40 @@ struct OpeningHoursAndFormattingTests {
         #expect(tuesday.ranges.isEmpty)
     }
 
+    @Test func placeHoursSummaryFormatterStacksSplitShiftsOntoSeparateLines() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let locale = Locale(identifier: "en_US_POSIX")
+
+        let split = try #require(OSMOpeningHoursParser.parseWeekSchedule("Mo 00:00-02:00, 10:00-23:59; Tu off"))
+        let mondayLines = PlaceHoursSummaryFormatter.todayLines(
+            for: split,
+            weekday: .monday,
+            calendar: calendar,
+            locale: locale
+        )
+        #expect(mondayLines.count == 2)
+        #expect(mondayLines.allSatisfy { !$0.contains(" and ") && $0.contains("\u{2013}") })
+
+        let tuesdayLines = PlaceHoursSummaryFormatter.todayLines(
+            for: split,
+            weekday: .tuesday,
+            calendar: calendar,
+            locale: locale
+        )
+        #expect(tuesdayLines.count == 1)
+
+        let allDay = try #require(OSMOpeningHoursParser.parseWeekSchedule("24/7"))
+        #expect(
+            PlaceHoursSummaryFormatter.todayLines(
+                for: allDay,
+                weekday: .monday,
+                calendar: calendar,
+                locale: locale
+            ) == ["24/7"]
+        )
+    }
+
     @Test func cleanedWebsiteURLAndPhoneCleanupHandleEdgeCases() {
         #expect("example.com/menu".cleanedWebsiteURL()?.absoluteString == "https://example.com/menu")
         #expect("https://bitlocal.app".cleanedWebsiteURL()?.absoluteString == "https://bitlocal.app")

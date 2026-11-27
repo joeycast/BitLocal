@@ -169,7 +169,7 @@ struct MapControlToolbarContent: ToolbarContent {
         } label: {
             Label(
                 selectedMapType == .standard ? "Show satellite map" : "Show standard map",
-                systemImage: selectedMapType == .hybrid ? "map" : "globe"
+                systemImage: selectedMapType == .hybrid ? "map.fill" : "globe.americas.fill"
             )
             .foregroundStyle(.primary)
             .id("map-type-\(selectedMapType == .hybrid)-\(colorScheme == .dark)")
@@ -182,7 +182,7 @@ struct MapControlToolbarContent: ToolbarContent {
             BitLocalHaptics.lightTap()
             recenterController.handleRecenterTap(viewModel: viewModel)
         } label: {
-            Label("Center map on location", systemImage: "location")
+            Label("Center map on location", systemImage: "location.fill")
                 .foregroundStyle(.primary)
                 .id("recenter-\(colorScheme == .dark)")
         }
@@ -197,7 +197,7 @@ struct MapControlToolbarContent: ToolbarContent {
         } label: {
             Label(
                 isCommunities ? "Show merchants" : "Show communities",
-                systemImage: isCommunities ? "mappin.and.ellipse" : "person.2"
+                systemImage: isCommunities ? "mappin.and.ellipse" : "person.2.fill"
             )
             .foregroundStyle(.primary)
             .id("map-mode-\(isCommunities)-\(colorScheme == .dark)")
@@ -267,8 +267,8 @@ struct MapButtonsView: View {
                 .padding(.horizontal, 8)
 
             Button(action: handleRecenterTap) {
-                Image(systemName: useMonochromeIcons ? "location" : "location.fill")
-                    .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+                Image(systemName: "location.fill")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .frame(width: controlWidth, height: controlHeight)
             }
@@ -290,12 +290,12 @@ struct MapButtonsView: View {
 
     private var mapTypeIcon: some View {
         ZStack {
-            Image(systemName: useMonochromeIcons ? "map" : "map.fill")
-                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+            Image(systemName: "map.fill")
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 1 : 0)
-            Image(systemName: useMonochromeIcons ? "globe" : "globe.americas.fill")
-                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+            Image(systemName: "globe.americas.fill")
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .opacity(selectedMapType == .hybrid ? 0 : 1)
         }
@@ -305,12 +305,12 @@ struct MapButtonsView: View {
     private var mapModeIcon: some View {
         let isCommunities = viewModel.mapDisplayMode == .communities
         return ZStack {
-            Image(systemName: useMonochromeIcons ? "person.2" : "person.2.fill")
-                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+            Image(systemName: "person.2.fill")
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .opacity(isCommunities ? 0 : 1)
             Image(systemName: "mappin.and.ellipse")
-                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .opacity(isCommunities ? 1 : 0)
         }

@@ -41,6 +41,21 @@ enum AppLayoutMode: Equatable, Sendable {
         let hasRoomForPortraitSplit = containerSize.width >= portraitSplitMinimumWidth
         return (isWiderThanTall || hasRoomForPortraitSplit) ? .splitSidebar : .compactSheet
     }
+
+    /// True when map controls (`Merchants/Communities`, `Map`, `Location`) should live
+    /// in the native SwiftUI `.toolbar` instead of the compact bottom-trailing pill.
+    ///
+    /// Keeps all iPhone Duo poses consistent: outer display & unfolded landscape use
+    /// the vertical side rail (`isVerticalToolbarActive`), while unfolded portrait
+    /// (`horizontalSizeClass == .regular` on iOS 26+) keeps the same controls in the
+    /// native top toolbar instead of falling back to the compact-iPhone floating pill.
+    static func usesToolbarMapControls(
+        horizontalSizeClass: UserInterfaceSizeClass?,
+        isVerticalToolbarActive: Bool,
+        usesNativeHorizontalBar: Bool
+    ) -> Bool {
+        isVerticalToolbarActive || (horizontalSizeClass == .regular && usesNativeHorizontalBar)
+    }
 }
 
 /// Active-scene lookup that avoids `.connectedScenes.first` in multi-scene

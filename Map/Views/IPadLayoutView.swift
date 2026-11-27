@@ -73,7 +73,7 @@ struct IPadLayoutView: View {
                             .frame(maxWidth: .infinity)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("settings_label_accessibility", systemImage: "gearshape") {
+                        Button("settings_label_accessibility", systemImage: "gearshape.fill") {
                             BitLocalHaptics.selection()
                             showingSettings = true
                         }

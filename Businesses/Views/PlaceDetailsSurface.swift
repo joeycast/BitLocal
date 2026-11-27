@@ -174,11 +174,12 @@ struct PlaceDetailsSurface: View {
                         isHoursExpanded.toggle()
                     }
                 } label: {
-                    HStack(alignment: .center, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "clock")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.secondary)
                             .frame(width: 20, alignment: .center)
+                            .padding(.top, 2)
 
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 5) {
@@ -193,11 +194,15 @@ struct PlaceDetailsSurface: View {
                                     .foregroundStyle(status.isOpen ? Color.green : Color.secondary)
                             }
 
-                            Text(todaySummaryText(for: parsedSchedule))
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                                .monospacedDigit()
-                                .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(Array(todaySummaryLines(for: parsedSchedule).enumerated()), id: \.offset) { _, line in
+                                    Text(line)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.primary)
+                                        .monospacedDigit()
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
                         }
 
                         Spacer(minLength: 8)
@@ -206,6 +211,7 @@ struct PlaceDetailsSurface: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.tertiary)
                             .rotationEffect(.degrees(isHoursExpanded ? 180 : 0))
+                            .padding(.top, 4)
                             .padding(.trailing, 6)
                     }
                     .padding(.vertical, 8)
@@ -368,22 +374,13 @@ struct PlaceDetailsSurface: View {
         }
     }
 
-    private func todaySummaryText(for schedule: OSMOpeningHoursWeekSchedule) -> String {
-        if schedule.isTwentyFourSeven {
-            return "24/7"
-        }
-        guard let today = schedule.days.first(where: { $0.weekday == todayWeekday }) else {
-            return NSLocalizedString("hours_closed", comment: "Closed label for business hours")
-        }
-        if today.ranges.isEmpty {
-            return NSLocalizedString("hours_closed", comment: "Closed label for business hours")
-        }
-        if today.ranges.count == 1, today.ranges[0].isAllDay {
-            return "24/7"
-        }
-        return today.ranges
-            .map { formattedTime($0.startMinutes) + " \u{2013} " + formattedTime($0.endMinutes) }
-            .formatted()
+    private func todaySummaryLines(for schedule: OSMOpeningHoursWeekSchedule) -> [String] {
+        PlaceHoursSummaryFormatter.todayLines(
+            for: schedule,
+            weekday: todayWeekday,
+            calendar: calendar,
+            locale: locale
+        )
     }
 
     @ViewBuilder
@@ -442,6 +439,39 @@ struct PlaceDetailsSurface: View {
     }
 
     private func formattedTime(_ totalMinutes: Int) -> String {
+        PlaceHoursSummaryFormatter.formattedTime(totalMinutes, calendar: calendar, locale: locale)
+    }
+}
+
+enum PlaceHoursSummaryFormatter {
+    static func todayLines(
+        for schedule: OSMOpeningHoursWeekSchedule,
+        weekday: WeeklyHours.Weekday,
+        calendar: Calendar = .current,
+        locale: Locale = .current
+    ) -> [String] {
+        if schedule.isTwentyFourSeven {
+            return ["24/7"]
+        }
+        guard let today = schedule.days.first(where: { $0.weekday == weekday }),
+              !today.ranges.isEmpty else {
+            return [NSLocalizedString("hours_closed", comment: "Closed label for business hours")]
+        }
+        if today.ranges.count == 1, today.ranges[0].isAllDay {
+            return ["24/7"]
+        }
+        return today.ranges.map {
+            formattedTime($0.startMinutes, calendar: calendar, locale: locale)
+                + " \u{2013} "
+                + formattedTime($0.endMinutes, calendar: calendar, locale: locale)
+        }
+    }
+
+    static func formattedTime(
+        _ totalMinutes: Int,
+        calendar: Calendar = .current,
+        locale: Locale = .current
+    ) -> String {
         let clampedMinutes = max(0, min(totalMinutes, 24 * 60))
         let hour = clampedMinutes / 60
         let minute = clampedMinutes % 60

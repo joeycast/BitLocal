@@ -230,4 +230,39 @@ struct AppLayoutModeTests {
                 < BitLocalSheetSurface.fillOpacity(for: .control, colorScheme: .dark, contrast: .standard)
         )
     }
+
+    @Test func toolbarMapControlsStayConsistentAcrossAllDuoPoses() {
+        // Standard iPhone keeps the floating bottom-trailing pill.
+        #expect(
+            AppLayoutMode.usesToolbarMapControls(
+                horizontalSizeClass: .compact,
+                isVerticalToolbarActive: false,
+                usesNativeHorizontalBar: true
+            ) == false
+        )
+        // iPhone Duo outer display (vertical toolbar).
+        #expect(
+            AppLayoutMode.usesToolbarMapControls(
+                horizontalSizeClass: .compact,
+                isVerticalToolbarActive: true,
+                usesNativeHorizontalBar: true
+            ) == true
+        )
+        // iPhone Duo unfolded landscape (vertical toolbar).
+        #expect(
+            AppLayoutMode.usesToolbarMapControls(
+                horizontalSizeClass: .regular,
+                isVerticalToolbarActive: true,
+                usesNativeHorizontalBar: true
+            ) == true
+        )
+        // iPhone Duo unfolded portrait (horizontal bar, regular width) stays in toolbar.
+        #expect(
+            AppLayoutMode.usesToolbarMapControls(
+                horizontalSizeClass: .regular,
+                isVerticalToolbarActive: false,
+                usesNativeHorizontalBar: true
+            ) == true
+        )
+    }
 }
