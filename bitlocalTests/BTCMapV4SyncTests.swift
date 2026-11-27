@@ -179,6 +179,53 @@ final class BTCMapV4SyncTests {
         #expect(refreshed?.map(\.id) == ["99"])
     }
 
+    @Test func concurrentRefreshesCoalesceIntoSingleUpstreamFetch() async {
+        let client = MockBTCMapV4Client()
+        client.snapshotDelayMilliseconds = 80
+        client.snapshotResult = .success((
+            records: [
+                V4PlaceSnapshotRecord(
+                    id: 42,
+                    lat: 30.26,
+                    lon: -97.74,
+                    icon: "local_cafe",
+                    comments: 1,
+                    boostedUntil: nil,
+                    name: "Coalesced Cafe",
+                    displayName: nil
+                )
+            ],
+            lastModified: "Wed, 11 Jun 2025 00:00:00 GMT"
+        ))
+        client.fetchPlacesResult = .success([])
+
+        let repository = BTCMapRepository(
+            v4Client: client,
+            userDefaults: testUserDefaults(),
+            cacheDirectory: cacheDirectory
+        )
+
+        let results: [[String]] = await withTaskGroup(of: [String].self) { group in
+            for _ in 0..<5 {
+                group.addTask {
+                    let elements = await repository.refreshElements()
+                    return elements?.map(\.id) ?? []
+                }
+            }
+            var collected: [[String]] = []
+            for await ids in group {
+                collected.append(ids)
+            }
+            return collected
+        }
+
+        #expect(client.snapshotCallCount == 1)
+        #expect(results.count == 5)
+        for ids in results {
+            #expect(ids == ["42"])
+        }
+    }
+
     private func testUserDefaults() -> UserDefaults {
         let suiteName = "BTCMapV4SyncTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -190,17 +237,42 @@ final class BTCMapV4SyncTests {
 }
 
 private final class MockBTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
+    private let lock = NSLock()
     var snapshotResult: Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error> = .success((records: [], lastModified: nil))
     var fetchPlacesResult: Result<[V4PlaceRecord], Error> = .success([])
     var fetchPlacesUpdatedSinceValues: [String] = []
+    var snapshotDelayMilliseconds: Int = 0
+    private var _snapshotCallCount = 0
+
+    var snapshotCallCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _snapshotCallCount
+    }
 
     func fetchSnapshot(completion: @escaping @Sendable (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
-        completion(snapshotResult)
+        lock.lock()
+        _snapshotCallCount += 1
+        let delay = snapshotDelayMilliseconds
+        let result = snapshotResult
+        lock.unlock()
+
+        if delay > 0 {
+            Task {
+                try? await Task.sleep(for: .milliseconds(delay))
+                completion(result)
+            }
+        } else {
+            completion(result)
+        }
     }
 
     func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
+        lock.lock()
         fetchPlacesUpdatedSinceValues.append(updatedSince)
-        completion(fetchPlacesResult)
+        let result = fetchPlacesResult
+        lock.unlock()
+        completion(result)
     }
 
     func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
