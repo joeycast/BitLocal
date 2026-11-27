@@ -234,7 +234,9 @@ struct BusinessDetailView: View {
     }
 
     private var displayName: String {
-        element.displayNameForUI ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available")
+        _ = contentViewModel.merchantStoreRevision
+        let liveElement = contentViewModel.merchantElementStore.element(id: element.id) ?? element
+        return liveElement.displayNameForUI ?? NSLocalizedString("name_not_available", comment: "Fallback name when no name is available")
     }
 
     private var categoryBadgeSymbolName: String {

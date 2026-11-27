@@ -46,6 +46,35 @@ extension ContentViewModel {
         } else {
             allElements = merchantElementStore.snapshot()
         }
+
+        let updatedByID = IdentifiableIndex.byID(elements)
+        if !visibleElements.isEmpty {
+            var patchedVisible = visibleElements
+            var didPatchVisible = false
+            for index in patchedVisible.indices {
+                if let updated = updatedByID[patchedVisible[index].id] {
+                    patchedVisible[index] = updated
+                    didPatchVisible = true
+                }
+            }
+            if didPatchVisible {
+                visibleElements = elementsForDisplay(patchedVisible)
+            }
+        }
+        if !communityMemberElements.isEmpty {
+            var patchedMembers = communityMemberElements
+            var didPatchMembers = false
+            for index in patchedMembers.indices {
+                if let updated = updatedByID[patchedMembers[index].id] {
+                    patchedMembers[index] = updated
+                    didPatchMembers = true
+                }
+            }
+            if didPatchMembers {
+                communityMemberElements = elementsForDisplay(patchedMembers)
+            }
+        }
+
         if forceMapRefresh {
             self.forceMapRefresh = true
         }

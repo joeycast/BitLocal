@@ -134,6 +134,9 @@ struct BusinessesListView: View {
                 refreshDiscoveryCache()
                 refreshEmptyStateVisibility()
             }
+            .onChange(of: viewModel.merchantStoreRevision) { _, _ in
+                refreshDiscoveryCache()
+            }
             .onAppear {
                 if FeatureFlags.isEventsUIEnabled {
                     viewModel.ensureEventsLoaded()

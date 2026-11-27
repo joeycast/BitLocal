@@ -61,7 +61,7 @@ extension BusinessesListView {
         if viewModel.activeQuickFilters.contains(.saved) {
             return viewModel.elementsForDisplay(viewModel.allElements)
         }
-        return elements
+        return elements.map { viewModel.merchantElementStore.element(id: $0.id) ?? $0 }
     }
 
     private var totalDiscoveryCount: Int {

@@ -683,7 +683,8 @@ struct MapView: UIViewRepresentable {
             }
 
             let visibleIDs = visibleElements.map(\.id)
-            if visibleIDs != lastVisibleElementIDs {
+            let annotationsContentUpdated = !annotationsToRemove.isEmpty || !elementsToAdd.isEmpty
+            if visibleIDs != lastVisibleElementIDs || annotationsContentUpdated {
                 lastVisibleElementIDs = visibleIDs
                 let refreshedVisibleElements = visibleIDs.compactMap { newByID[$0] }
                 Debug.logTiming(

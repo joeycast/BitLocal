@@ -361,6 +361,29 @@ struct MerchantSearchBehaviorTests {
         #expect(viewModel.mapElementsForCurrentDisplay.map(\.id) == ["1", "2", "3"])
     }
 
+    @Test func upsertingHydratedMerchantPatchesVisibleElementsInPlace() {
+        let repo = MockBTCMapRepository()
+        let viewModel = makeViewModel(repo: repo)
+        let placeholder = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 42, name: "", icon: "local_atm")
+        )
+        let hydrated = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 42, name: "BTM Hostel Casa Pepe", icon: "local_atm")
+        )
+
+        viewModel.setAllElementsForTesting([placeholder])
+        viewModel.visibleElements = [placeholder]
+        let revisionBefore = viewModel.merchantStoreRevision
+
+        #expect(viewModel.visibleElements.first?.displayNameForUI == MerchantCategoryGroup.finance.localizedLabel)
+
+        viewModel.upsertMerchants([hydrated], forceMapRefresh: true)
+
+        #expect(viewModel.merchantStoreRevision != revisionBefore)
+        #expect(viewModel.visibleElements.first?.displayNameForUI == "BTM Hostel Casa Pepe")
+        #expect(viewModel.merchantElementStore.element(id: "42")?.displayNameForUI == "BTM Hostel Casa Pepe")
+    }
+
     private func makeViewModel(
         repo: MockBTCMapRepository,
         unifiedSearchDebounceNanoseconds: UInt64 = 400_000_000,
