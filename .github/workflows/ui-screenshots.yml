@@ -9,7 +9,7 @@ on:
         default: "iPhone 17"
         type: string
   pull_request:
-    types: [labeled]
+    types: [labeled, synchronize]
 
 concurrency:
   group: ui-screenshots-${{ github.event.pull_request.number || github.ref }}
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   screenshots:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ui-check'
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ui-check')
     runs-on: macos-latest
     timeout-minutes: 30
     permissions:
@@ -34,33 +34,8 @@ jobs:
         env:
           PREFERRED_DEVICE: ${{ github.event.inputs.device || 'iPhone 17' }}
         run: |
-          SIM_UDID="$(
-            xcrun simctl list devices available -j | python3 - "$PREFERRED_DEVICE" <<'PY'
-          import json
-          import sys
-
-          preferred = sys.argv[1]
-          data = json.load(sys.stdin)
-          devices = []
-          for runtime, items in data.get("devices", {}).items():
-              if "iOS" not in runtime:
-                  continue
-              for item in items:
-                  if item.get("isAvailable"):
-                      devices.append((runtime, item))
-
-          devices.sort(key=lambda pair: pair[0], reverse=True)
-          for _, item in devices:
-              if item.get("name") == preferred:
-                  print(item["udid"])
-                  sys.exit(0)
-          for _, item in devices:
-              if "iPhone" in item.get("name", ""):
-                  print(item["udid"])
-                  sys.exit(0)
-          sys.exit(1)
-          PY
-          )"
+          chmod +x scripts/capture_sim_screenshots.sh
+          SIM_UDID="$(./scripts/capture_sim_screenshots.sh --device "$PREFERRED_DEVICE" --resolve-udid)"
           echo "udid=${SIM_UDID}" >> "$GITHUB_OUTPUT"
           echo "Resolved simulator UDID: ${SIM_UDID}"
 
