@@ -1850,18 +1850,7 @@ struct CommunityDetailView: View {
     }
 
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
-        if let vm = viewModel.cellViewModels[element.id] {
-            return vm
-        }
-        let newVM = ElementCellViewModel(
-            element: element,
-            userLocation: viewModel.userLocation,
-            viewModel: viewModel
-        )
-        DispatchQueue.main.async {
-            viewModel.cellViewModels[element.id] = newVM
-        }
-        return newVM
+        viewModel.cachedCellViewModel(for: element)
     }
 
     private var isCollapsedLikeDetent: Bool {

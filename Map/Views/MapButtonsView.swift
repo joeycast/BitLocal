@@ -6,19 +6,29 @@
 //
 
 import Combine
-import SwiftUI
 import MapKit
-import UIKit
+import Observation
+import SwiftUI
+
+enum LocationRecenterAlert: Identifiable, Equatable {
+    case permissionDenied
+    case timeout
+
+    var id: Self { self }
+}
 
 @MainActor
-final class MapLocationRecenterController: ObservableObject {
-    private var locationCancellable: AnyCancellable?
-    private var timeoutTask: Task<Void, Never>?
+@Observable
+final class MapLocationRecenterController {
+    var activeAlert: LocationRecenterAlert?
+
+    @ObservationIgnored private var locationCancellable: AnyCancellable?
+    @ObservationIgnored private var timeoutTask: Task<Void, Never>?
 
     func handleRecenterTap(viewModel: ContentViewModel) {
         switch viewModel.locationManager.authorizationStatus {
         case .denied, .restricted:
-            presentLocationSettingsAlert()
+            activeAlert = .permissionDenied
         case .notDetermined:
             requestAndCenterOnNextLocation(viewModel: viewModel)
         case .authorizedAlways, .authorizedWhenInUse:
@@ -61,48 +71,58 @@ final class MapLocationRecenterController: ObservableObject {
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled, let self, let viewModel, viewModel.isUpdatingLocation else { return }
             self.cancel()
-            self.presentLocationTimeoutAlert()
+            self.activeAlert = .timeout
             viewModel.locationManager.stopUpdatingLocation()
             viewModel.isUpdatingLocation = false
         }
     }
+}
 
-    private func presentLocationTimeoutAlert() {
-        let alert = UIAlertController(
-            title: NSLocalizedString("location_alert_title", comment: ""),
-            message: nil,
-            preferredStyle: .alert
+private struct LocationRecenterAlertsModifier: ViewModifier {
+    let controller: MapLocationRecenterController
+    @Environment(\.openURL) private var openURL
+
+    private var permissionDeniedBinding: Binding<Bool> {
+        Binding(
+            get: { controller.activeAlert == .permissionDenied },
+            set: { isPresented in
+                if !isPresented, controller.activeAlert == .permissionDenied {
+                    controller.activeAlert = nil
+                }
+            }
         )
-        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
-                              style: .default))
-        presentAlert(alert)
     }
 
-    private func presentLocationSettingsAlert() {
-        let alert = UIAlertController(
-            title: NSLocalizedString("location_alert_title", comment: ""),
-            message: NSLocalizedString("location_settings_message", comment: ""),
-            preferredStyle: .alert
+    private var timeoutBinding: Binding<Bool> {
+        Binding(
+            get: { controller.activeAlert == .timeout },
+            set: { isPresented in
+                if !isPresented, controller.activeAlert == .timeout {
+                    controller.activeAlert = nil
+                }
+            }
         )
-        alert.addAction(.init(title: NSLocalizedString("open_settings_button", comment: ""),
-                              style: .default,
-                              handler: { _ in
-                                  guard let settingsURL = URL(string: UIApplication.openSettingsURLString),
-                                        UIApplication.shared.canOpenURL(settingsURL) else {
-                                      return
-                                  }
-                                  UIApplication.shared.open(settingsURL)
-                              }))
-        alert.addAction(.init(title: NSLocalizedString("ok_button", comment: ""),
-                              style: .cancel))
-        presentAlert(alert)
     }
 
-    private func presentAlert(_ alert: UIAlertController) {
-        if let rootVC = ActiveWindowScene.keyWindow?.rootViewController {
-            rootVC.topMostViewController()
-                .present(alert, animated: true)
-        }
+    func body(content: Content) -> some View {
+        content
+            .alert("location_alert_title", isPresented: permissionDeniedBinding) {
+                Button("open_settings_button") {
+                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(settingsURL)
+                    }
+                }
+                Button("ok_button", role: .cancel) {}
+            } message: {
+                Text("location_settings_message")
+            }
+            .alert("location_alert_title", isPresented: timeoutBinding) {}
+    }
+}
+
+extension View {
+    func locationRecenterAlerts(controller: MapLocationRecenterController) -> some View {
+        modifier(LocationRecenterAlertsModifier(controller: controller))
     }
 }
 
@@ -120,30 +140,53 @@ struct MapControlToolbarContent: ToolbarContent {
     private var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
     var body: some ToolbarContent {
-        ToolbarItemGroup(placement: placement) {
-            Button {
-                BitLocalHaptics.selection()
-                selectedMapTypeBinding.wrappedValue = (selectedMapType == .standard) ? .hybrid : .standard
-            } label: {
-                Label(
-                    selectedMapType == .standard ? "Show satellite map" : "Show standard map",
-                    systemImage: selectedMapType == .hybrid ? "map" : "globe"
-                )
-                .foregroundStyle(.primary)
-                .id("map-type-\(selectedMapType == .hybrid)-\(colorScheme == .dark)")
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            ToolbarItemGroup(placement: placement) {
+                mapTypeButton
+                recenterButton
             }
-            .tint(.primary)
-
-            Button {
-                BitLocalHaptics.lightTap()
-                recenterController.handleRecenterTap(viewModel: viewModel)
-            } label: {
-                Label("Center map on location", systemImage: "location")
-                    .foregroundStyle(.primary)
-                    .id("recenter-\(colorScheme == .dark)")
-            }
-            .tint(.primary)
+            .visibilityPriority(.high)
+        } else {
+            legacyToolbarGroup
         }
+        #else
+        legacyToolbarGroup
+        #endif
+    }
+
+    private var legacyToolbarGroup: some ToolbarContent {
+        ToolbarItemGroup(placement: placement) {
+            mapTypeButton
+            recenterButton
+        }
+    }
+
+    private var mapTypeButton: some View {
+        Button {
+            BitLocalHaptics.selection()
+            selectedMapTypeBinding.wrappedValue = (selectedMapType == .standard) ? .hybrid : .standard
+        } label: {
+            Label(
+                selectedMapType == .standard ? "Show satellite map" : "Show standard map",
+                systemImage: selectedMapType == .hybrid ? "map" : "globe"
+            )
+            .foregroundStyle(.primary)
+            .id("map-type-\(selectedMapType == .hybrid)-\(colorScheme == .dark)")
+        }
+        .tint(.primary)
+    }
+
+    private var recenterButton: some View {
+        Button {
+            BitLocalHaptics.lightTap()
+            recenterController.handleRecenterTap(viewModel: viewModel)
+        } label: {
+            Label("Center map on location", systemImage: "location")
+                .foregroundStyle(.primary)
+                .id("recenter-\(colorScheme == .dark)")
+        }
+        .tint(.primary)
     }
 }
 
@@ -154,7 +197,7 @@ struct MapButtonsView: View {
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @StateObject private var recenterController = MapLocationRecenterController()
+    @State private var recenterController = MapLocationRecenterController()
 
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
@@ -162,6 +205,7 @@ struct MapButtonsView: View {
 
     var body: some View {
         controlPill
+            .locationRecenterAlerts(controller: recenterController)
     }
 
     private var controlPill: some View {

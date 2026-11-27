@@ -53,7 +53,7 @@ private struct IPhoneLayoutContent: View {
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
 
     private var appearance: Appearance { appearanceManager.appearance }
-    @StateObject private var recenterController = MapLocationRecenterController()
+    @State private var recenterController = MapLocationRecenterController()
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.37)
     @State private var settingsSheetDetent: PresentationDetent = .large
     @State private var hasLiveSheetMeasurement = false
@@ -154,12 +154,9 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingSettings = true
                         } label: {
-                            Label(
-                                NSLocalizedString("settings_label_accessibility", comment: ""),
-                                systemImage: "gearshape"
-                            )
-                            .foregroundStyle(.primary)
-                            .id("settings-\(effectiveColorScheme == .dark)")
+                            Label("settings_label_accessibility", systemImage: "gearshape")
+                                .foregroundStyle(.primary)
+                                .id("settings-\(effectiveColorScheme == .dark)")
                         }
                         .tint(.primary)
                     }
@@ -181,18 +178,16 @@ private struct IPhoneLayoutContent: View {
                         Button {
                             showingSettings = true
                         } label: {
-                            Label(
-                                NSLocalizedString("settings_label_accessibility", comment: ""),
-                                systemImage: "gearshape"
-                            )
-                            .foregroundStyle(.primary)
-                            .id("settings-h-\(effectiveColorScheme == .dark)")
+                            Label("settings_label_accessibility", systemImage: "gearshape")
+                                .foregroundStyle(.primary)
+                                .id("settings-h-\(effectiveColorScheme == .dark)")
                         }
                         .tint(.primary)
                     }
                 }
             }
             .toolbarVisibility(showsLegacyHeader ? .hidden : .visible, for: .navigationBar)
+            .locationRecenterAlerts(controller: recenterController)
             .toolbarColorScheme(effectiveColorScheme, for: .navigationBar)
             .modifier(LegacyHiddenToolbarBackgroundModifier())
             .navigationBarTitleDisplayMode(.inline)

@@ -2,8 +2,10 @@ import SwiftUI
 
 struct AddBusinessFormView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var viewModel = BusinessSubmissionViewModel()
     @State private var currentStep: BusinessSubmissionStep = .location
+    @State private var isSubmitting = false
     private let actionButtonSize: CGFloat = 56
     private let actionBarBottomPadding: CGFloat = 12
     private let actionBarSafeAreaPadding: CGFloat = 8
@@ -64,10 +66,10 @@ struct AddBusinessFormView: View {
                                 .buttonStyle(
                                     CircularActionButtonStyle(
                                         size: actionButtonSize,
-                                        backgroundColor: canSubmit ? Color.accentColor : Color.gray.opacity(0.5)
+                                        backgroundColor: (canSubmit && !isSubmitting) ? Color.accentColor : Color.gray.opacity(0.5)
                                     )
                                 )
-                                .disabled(!canSubmit)
+                                .disabled(!canSubmit || isSubmitting)
                         } else {
                             Button("onboarding_button_next", systemImage: "arrow.right", action: goToNextStep)
                                 .labelStyle(.iconOnly)
@@ -95,12 +97,15 @@ struct AddBusinessFormView: View {
                     }
                 }
             }
-            .sheet(isPresented: $viewModel.showingMailComposer) {
+            .sheet(isPresented: $viewModel.showingMailComposer, onDismiss: {
+                isSubmitting = false
+            }) {
                 MailComposerView(
                     recipients: ["support@bitlocal.app"],
                     subject: viewModel.emailSubject(),
                     body: viewModel.emailBody()
                 ) { result in
+                    isSubmitting = false
                     viewModel.handleMailResult(result)
                     if case .success(let mailResult) = result, mailResult == .sent {
                         dismiss()
@@ -110,6 +115,11 @@ struct AddBusinessFormView: View {
             .alert("validation_error_title", isPresented: $viewModel.showingValidationErrors) {
             } message: {
                 Text(validationErrorMessage())
+            }
+            .onChange(of: viewModel.showingValidationErrors) { _, isShowing in
+                if !isShowing {
+                    isSubmitting = false
+                }
             }
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
@@ -152,7 +162,7 @@ struct AddBusinessFormView: View {
         guard let nextStep = BusinessSubmissionStep(rawValue: currentStep.rawValue + 1) else {
             return
         }
-        withAnimation {
+        withAnimation(BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion)) {
             currentStep = nextStep
         }
     }
@@ -161,13 +171,18 @@ struct AddBusinessFormView: View {
         guard let previousStep = BusinessSubmissionStep(rawValue: currentStep.rawValue - 1) else {
             return
         }
-        withAnimation {
+        withAnimation(BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)) {
             currentStep = previousStep
         }
     }
 
     private func submitForm() {
+        guard !isSubmitting else { return }
+        isSubmitting = true
         viewModel.validateAndSubmit()
+        if !viewModel.showingMailComposer && !viewModel.showingValidationErrors {
+            isSubmitting = false
+        }
     }
 
     private func validationErrorMessage() -> String {

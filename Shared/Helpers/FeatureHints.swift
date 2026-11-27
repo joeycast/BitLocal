@@ -95,7 +95,7 @@ final class FeatureHintsController: ObservableObject {
     }
 
     var primaryButtonTitle: String {
-        activeStep?.primaryButtonTitle ?? "Done"
+        activeStep?.primaryButtonTitle ?? String(localized: "Done", comment: "Button title to finish feature hints")
     }
 
     func updateFrame(target: FeatureHintTarget, frame: CGRect) {
@@ -110,7 +110,7 @@ final class FeatureHintsController: ObservableObject {
         // Notify observers when a frame first appears or moves significantly,
         // so the overlay re-renders (targetFrames is not @Published to avoid
         // excessive re-renders during animations).
-        if existing == nil || !framesAreClose(existing!, frame) {
+        if existing.map({ !framesAreClose($0, frame) }) ?? true {
             objectWillChange.send()
         }
     }
@@ -226,7 +226,7 @@ final class FeatureHintsController: ObservableObject {
     }
 }
 
-// MARK: - Anchor modifier (UIKit-based for reliability across sheet presentations)
+// MARK: - Anchor modifier
 
 private struct FeatureHintAnchorModifier: ViewModifier {
     @EnvironmentObject private var featureHintsController: FeatureHintsController
@@ -234,56 +234,15 @@ private struct FeatureHintAnchorModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(
-                FrameReporter(target: target, controller: featureHintsController)
-            )
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { frame in
+                guard frame.width > 0, frame.height > 0 else { return }
+                featureHintsController.updateFrame(target: target, frame: frame)
+            }
             .onDisappear {
                 featureHintsController.clearFrame(target: target)
             }
-    }
-}
-
-/// UIKit-based frame reporter that fires on every layout pass, including during sheet animations.
-private struct FrameReporter: UIViewRepresentable {
-    let target: FeatureHintTarget
-    let controller: FeatureHintsController
-
-    func makeUIView(context: Context) -> FrameReporterView {
-        let view = FrameReporterView()
-        view.isUserInteractionEnabled = false
-        view.backgroundColor = .clear
-        view.target = target
-        view.controller = controller
-        return view
-    }
-
-    func updateUIView(_ uiView: FrameReporterView, context: Context) {
-        uiView.target = target
-        uiView.controller = controller
-    }
-}
-
-private class FrameReporterView: UIView {
-    var target: FeatureHintTarget?
-    weak var controller: FeatureHintsController?
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        reportFrame()
-    }
-
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        reportFrame()
-    }
-
-    private func reportFrame() {
-        guard let target, let controller, window != nil else { return }
-        let screenFrame = convert(bounds, to: nil)
-        guard screenFrame.width > 0, screenFrame.height > 0 else { return }
-        Task { @MainActor in
-            controller.updateFrame(target: target, frame: screenFrame)
-        }
     }
 }
 

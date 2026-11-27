@@ -193,7 +193,7 @@ private struct SplitMapDetailView: View {
     var selectedMapTypeBinding: Binding<MKMapType>
 
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
-    @StateObject private var recenterController = MapLocationRecenterController()
+    @State private var recenterController = MapLocationRecenterController()
 
     private var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
@@ -244,6 +244,7 @@ private struct SplitMapDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle("")
         .toolbar(removing: .sidebarToggle)
+        .locationRecenterAlerts(controller: recenterController)
     }
 }
 

@@ -86,13 +86,9 @@ struct ContentView: View {
                 containerSize = windowSize
             }
             syncLayoutMode(layoutMode)
-            syncWindowInterfaceStyle(appearanceManager.appearance)
             routePendingAppIntent()
 
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
-        }
-        .onChange(of: appearanceManager.appearance) { _, newAppearance in
-            syncWindowInterfaceStyle(newAppearance)
         }
         .onChange(of: layoutMode) { _, newMode in
             syncLayoutMode(newMode)
@@ -137,23 +133,6 @@ struct ContentView: View {
         viewModel.updateLayoutMode(newMode)
         if newMode == .splitSidebar, headerHeight != 0 {
             headerHeight = 0
-        }
-    }
-
-    private func syncWindowInterfaceStyle(_ appearance: Appearance) {
-        let style: UIUserInterfaceStyle
-        switch appearance {
-        case .system: style = .unspecified
-        case .light:  style = .light
-        case .dark:   style = .dark
-        }
-        for scene in UIApplication.shared.connectedScenes {
-            guard let windowScene = scene as? UIWindowScene else { continue }
-            for window in windowScene.windows {
-                if window.overrideUserInterfaceStyle != style {
-                    window.overrideUserInterfaceStyle = style
-                }
-            }
         }
     }
 

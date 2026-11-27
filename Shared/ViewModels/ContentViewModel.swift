@@ -130,7 +130,29 @@ final class ContentViewModel: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published var path: [BitLocalNavigationRoute] = []
     @Published var selectedElement: Element?
     @Published var deepLinkUnavailableState: DeepLinkUnavailableState?
-    @Published var cellViewModels: [String: ElementCellViewModel] = [:]
+    /// Row cell view-model cache. Intentionally not `@Published` so lazy row
+    /// hydration during SwiftUI `body` evaluation never triggers whole-model churn.
+    var cellViewModels: [String: ElementCellViewModel] = [:]
+
+    @MainActor
+    func cachedCellViewModel(for element: Element) -> ElementCellViewModel {
+        if let existing = cellViewModels[element.id] {
+            let currentName = existing.element.displayNameForUI ?? ""
+            let nextName = element.displayNameForUI ?? ""
+            let currentUpdated = existing.element.updatedAt ?? ""
+            let nextUpdated = element.updatedAt ?? ""
+            if currentName == nextName && currentUpdated == nextUpdated {
+                return existing
+            }
+        }
+        let vm = ElementCellViewModel(
+            element: element,
+            userLocation: userLocation,
+            viewModel: self
+        )
+        cellViewModels[element.id] = vm
+        return vm
+    }
     /// Published merchant catalog snapshot. Mutations go through `merchantElementStore`.
     @Published private(set) var allElements: [Element] = []
     /// Bumps when the merchant store mutates (for index invalidation / observers).

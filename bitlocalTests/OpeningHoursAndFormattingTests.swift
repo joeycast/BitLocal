@@ -121,4 +121,16 @@ final class OpeningHoursAndFormattingTests: XCTestCase {
         XCTAssertNotNil(BTCMapDateParser.parse("2026-06-10"))
         XCTAssertNil(BTCMapDateParser.parse("not-a-date"))
     }
+
+    // MARK: - Localized Country List
+
+    func testCountryListLocalizesRegionsForLocale() {
+        let english = CountryList.localizedCountries(for: Locale(identifier: "en_US"))
+        let german = CountryList.localizedCountries(for: Locale(identifier: "de_DE"))
+
+        XCTAssertGreaterThan(english.count, 150)
+        XCTAssertTrue(english.contains("United States"))
+        XCTAssertTrue(english.contains("Germany"))
+        XCTAssertTrue(german.contains("Deutschland"))
+    }
 }

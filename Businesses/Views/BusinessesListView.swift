@@ -849,7 +849,7 @@ struct BusinessesListView: View {
                                 .font(.footnote.weight(.medium))
                             if isSelected {
                                 Image(systemName: "xmark")
-                                    .font(.caption2.weight(.bold))
+                                    .font(.caption.bold())
                             }
                         }
                         .foregroundStyle(isSelected ? Color.white : Color.primary)
@@ -903,7 +903,7 @@ struct BusinessesListView: View {
                                 .font(.footnote.weight(.medium))
                             if isSelected {
                                 Image(systemName: "xmark")
-                                    .font(.caption2.weight(.bold))
+                                    .font(.caption.bold())
                             }
                         }
                         .foregroundStyle(isSelected ? Color.white : Color.primary)
@@ -1165,32 +1165,7 @@ struct BusinessesListView: View {
     }
 
     private func cellViewModel(for element: Element) -> ElementCellViewModel {
-        if let vm = viewModel.cellViewModels[element.id] {
-            let currentName = vm.element.displayNameForUI ?? ""
-            let nextName = element.displayNameForUI ?? ""
-            let currentUpdated = vm.element.updatedAt ?? ""
-            let nextUpdated = element.updatedAt ?? ""
-            if currentName != nextName || currentUpdated != nextUpdated {
-                let refreshed = ElementCellViewModel(
-                    element: element,
-                    userLocation: viewModel.userLocation,
-                    viewModel: viewModel
-                )
-                DispatchQueue.main.async {
-                    viewModel.cellViewModels[element.id] = refreshed
-                }
-                return refreshed
-            }
-            return vm
-        } else {
-            let newVM = ElementCellViewModel(element: element,
-                                             userLocation: viewModel.userLocation,
-                                             viewModel: viewModel)
-            DispatchQueue.main.async {
-                viewModel.cellViewModels[element.id] = newVM
-            }
-            return newVM
-        }
+        viewModel.cachedCellViewModel(for: element)
     }
 
     private var footerView: some View {
