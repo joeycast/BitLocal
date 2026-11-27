@@ -1,46 +1,46 @@
-import XCTest
+import Testing
 @testable import bitlocal
 
 @MainActor
-final class BitLocalAppIntentsAndRoutingTests: XCTestCase {
-    func testAppIntentRouterPostsAndConsumesPendingActionOnce() {
+@Suite(.tags(.routing))
+struct BitLocalAppIntentsAndRoutingTests {
+    @Test func appIntentRouterPostsAndConsumesPendingActionOnce() {
         let router = BitLocalAppIntentRouter()
-        XCTAssertNil(router.pendingAction)
-        XCTAssertNil(router.consumePendingAction())
+        #expect(router.pendingAction == nil)
+        #expect(router.consumePendingAction() == nil)
 
         router.post(.openMerchants(filter: .lightning, searchQuery: "coffee"))
-        XCTAssertEqual(router.pendingAction, .openMerchants(filter: .lightning, searchQuery: "coffee"))
+        #expect(router.pendingAction == .openMerchants(filter: .lightning, searchQuery: "coffee"))
 
         let consumed = router.consumePendingAction()
-        XCTAssertEqual(consumed, .openMerchants(filter: .lightning, searchQuery: "coffee"))
-        XCTAssertNil(router.pendingAction)
-        XCTAssertNil(router.consumePendingAction())
+        #expect(consumed == .openMerchants(filter: .lightning, searchQuery: "coffee"))
+        #expect(router.pendingAction == nil)
+        #expect(router.consumePendingAction() == nil)
     }
 
-    func testMerchantQuickFilterMetadataIsComplete() {
-        for filter in MerchantQuickFilter.allCases {
-            XCTAssertFalse(filter.id.isEmpty)
-            XCTAssertFalse(filter.displayTitle.isEmpty)
-            XCTAssertFalse(filter.systemImage.isEmpty)
-            XCTAssertNotNil(MerchantQuickFilter.caseDisplayRepresentations[filter])
-        }
+    @Test(arguments: MerchantQuickFilter.allCases)
+    func merchantQuickFilterMetadataIsComplete(filter: MerchantQuickFilter) {
+        #expect(filter.id.isEmpty == false)
+        #expect(filter.displayTitle.isEmpty == false)
+        #expect(filter.systemImage.isEmpty == false)
+        #expect(MerchantQuickFilter.caseDisplayRepresentations[filter] != nil)
     }
 
-    func testBitLocalNavigationRouteExposesElementAndStableID() {
+    @Test func bitLocalNavigationRouteExposesElementAndStableID() {
         let element = makeElement(id: "place-99")
 
         let placeRoute = BitLocalNavigationRoute.place(element)
-        XCTAssertEqual(placeRoute.element?.id, "place-99")
-        XCTAssertEqual(placeRoute.id, "place-99")
+        #expect(placeRoute.element?.id == "place-99")
+        #expect(placeRoute.id == "place-99")
 
         let commentsRoute = BitLocalNavigationRoute.placeComments(element)
-        XCTAssertEqual(commentsRoute.element?.id, "place-99")
-        XCTAssertEqual(commentsRoute.id, "place-99")
-        XCTAssertNotEqual(placeRoute, commentsRoute)
+        #expect(commentsRoute.element?.id == "place-99")
+        #expect(commentsRoute.id == "place-99")
+        #expect(placeRoute != commentsRoute)
 
         let eventsRoute = BitLocalNavigationRoute.allEvents
-        XCTAssertNil(eventsRoute.element)
-        XCTAssertEqual(eventsRoute.id, "all-events")
+        #expect(eventsRoute.element == nil)
+        #expect(eventsRoute.id == "all-events")
     }
 
     private func makeElement(id: String) -> Element {

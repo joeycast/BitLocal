@@ -1,30 +1,32 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class IdentifiableIndexTests: XCTestCase {
-    func testByIDKeepsLastDuplicateWithoutTrapping() {
+@Suite(.tags(.sync))
+struct IdentifiableIndexTests {
+    @Test func byIDKeepsLastDuplicateWithoutTrapping() {
         let first = makeElement(id: "1", name: "First")
         let second = makeElement(id: "1", name: "Second")
         let third = makeElement(id: "2", name: "Other")
 
         let indexed = IdentifiableIndex.byID([first, second, third])
-        XCTAssertEqual(indexed.count, 2)
-        XCTAssertEqual(indexed["1"]?.osmJSON?.tags?.name, "Second")
-        XCTAssertEqual(indexed["2"]?.osmJSON?.tags?.name, "Other")
+        #expect(indexed.count == 2)
+        #expect(indexed["1"]?.osmJSON?.tags?.name == "Second")
+        #expect(indexed["2"]?.osmJSON?.tags?.name == "Other")
     }
 
-    func testByIDFirstWinsWhenCombinePrefersExisting() {
+    @Test func byIDFirstWinsWhenCombinePrefersExisting() {
         let first = makeElement(id: "1", name: "First")
         let second = makeElement(id: "1", name: "Second")
 
         let indexed = IdentifiableIndex.byID([first, second], uniquingKeysWith: { existing, _ in existing })
-        XCTAssertEqual(indexed["1"]?.osmJSON?.tags?.name, "First")
+        #expect(indexed["1"]?.osmJSON?.tags?.name == "First")
     }
 
-    func testDictionaryHelperUniquesArbitraryKeys() {
+    @Test func dictionaryHelperUniquesArbitraryKeys() {
         let pairs = [("a", 1), ("a", 2), ("b", 3)]
         let dict = IdentifiableIndex.dictionary(pairs)
-        XCTAssertEqual(dict, ["a": 2, "b": 3])
+        #expect(dict == ["a": 2, "b": 3])
     }
 
     private func makeElement(id: String, name: String) -> Element {

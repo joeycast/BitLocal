@@ -1,121 +1,66 @@
 import MapKit
 import SwiftUI
-import XCTest
+import Testing
 @testable import bitlocal
 
-final class AppLayoutModeTests: XCTestCase {
+@Suite(.tags(.layout))
+struct AppLayoutModeTests {
 
-    // MARK: - iPhone & iPhone Duo outer display
+    struct LayoutPoseCase: Sendable {
+        let name: String
+        let horizontal: UserInterfaceSizeClass?
+        let vertical: UserInterfaceSizeClass?
+        let size: CGSize
+        let isVerticalToolbarActive: Bool
+        let expected: AppLayoutMode
 
-    func testStandardIPhonePortraitUsesCompactSheet() {
+        init(
+            _ name: String,
+            horizontal: UserInterfaceSizeClass?,
+            vertical: UserInterfaceSizeClass?,
+            size: CGSize,
+            isVerticalToolbarActive: Bool = false,
+            expected: AppLayoutMode
+        ) {
+            self.name = name
+            self.horizontal = horizontal
+            self.vertical = vertical
+            self.size = size
+            self.isVerticalToolbarActive = isVerticalToolbarActive
+            self.expected = expected
+        }
+    }
+
+    // MARK: - Adaptive Layout Resolution
+
+    @Test(arguments: [
+        LayoutPoseCase("iPhone portrait", horizontal: .compact, vertical: .regular, size: CGSize(width: 393, height: 852), expected: .compactSheet),
+        LayoutPoseCase("iPhone Duo outer portrait", horizontal: .compact, vertical: .regular, size: CGSize(width: 466, height: 678), expected: .compactSheet),
+        LayoutPoseCase("iPhone Duo outer landscape", horizontal: .compact, vertical: .compact, size: CGSize(width: 678, height: 466), expected: .compactSheet),
+        LayoutPoseCase("iPhone Duo Split View half-width", horizontal: .compact, vertical: .regular, size: CGSize(width: 470, height: 669), expected: .compactSheet),
+        LayoutPoseCase("iPhone Duo unfolded landscape", horizontal: .regular, vertical: .regular, size: CGSize(width: 951, height: 669), isVerticalToolbarActive: true, expected: .compactSheet),
+        LayoutPoseCase("iPhone Duo unfolded portrait", horizontal: .regular, vertical: .regular, size: CGSize(width: 669, height: 951), expected: .compactSheet),
+        LayoutPoseCase("iPad mini portrait", horizontal: .regular, vertical: .regular, size: CGSize(width: 744, height: 1133), expected: .splitSidebar),
+        LayoutPoseCase("iPad landscape", horizontal: .regular, vertical: .regular, size: CGSize(width: 1194, height: 834), expected: .splitSidebar),
+        LayoutPoseCase("Regular width compact height", horizontal: .regular, vertical: .compact, size: CGSize(width: 932, height: 430), expected: .compactSheet),
+        LayoutPoseCase("Nil size classes", horizontal: nil, vertical: nil, size: CGSize(width: 951, height: 669), expected: .compactSheet),
+        LayoutPoseCase("Zero container size", horizontal: .regular, vertical: .regular, size: .zero, expected: .compactSheet),
+        LayoutPoseCase("Regular horizontal with nil vertical", horizontal: .regular, vertical: nil, size: CGSize(width: 1024, height: 768), expected: .compactSheet)
+    ])
+    func resolvesExpectedShell(pose: LayoutPoseCase) {
         let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .compact,
-            verticalSizeClass: .regular,
-            containerSize: CGSize(width: 393, height: 852)
+            horizontalSizeClass: pose.horizontal,
+            verticalSizeClass: pose.vertical,
+            containerSize: pose.size,
+            isVerticalToolbarActive: pose.isVerticalToolbarActive
         )
-        XCTAssertEqual(mode, .compactSheet)
+        #expect(mode == pose.expected, "Unexpected mode for \(pose.name)")
     }
 
-    func testIPhoneDuoOuterDisplayPortraitUsesCompactSheet() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .compact,
-            verticalSizeClass: .regular,
-            containerSize: CGSize(width: 466, height: 678)
-        )
-        XCTAssertEqual(mode, .compactSheet)
-    }
-
-    func testIPhoneDuoOuterDisplayLandscapeUsesCompactSheet() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .compact,
-            verticalSizeClass: .compact,
-            containerSize: CGSize(width: 678, height: 466)
-        )
-        XCTAssertEqual(mode, .compactSheet)
-    }
-
-    func testIPhoneDuoSplitViewHalfWidthUsesCompactSheet() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .compact,
-            verticalSizeClass: .regular,
-            containerSize: CGSize(width: 470, height: 669)
-        )
-        XCTAssertEqual(mode, .compactSheet)
-    }
-
-    // MARK: - iPhone Duo unfolded inner display
-
-    func testIPhoneDuoUnfoldedLandscapeUsesCollapsibleLeadingSheetShell() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .regular,
-            verticalSizeClass: .regular,
-            containerSize: CGSize(width: 951, height: 669),
-            isVerticalToolbarActive: true
-        )
-        XCTAssertEqual(mode, .compactSheet)
-    }
-
-    func testIPhoneDuoUnfoldedPortraitUsesCompactSheet() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .regular,
-            verticalSizeClass: .regular,
-            containerSize: CGSize(width: 669, height: 951)
-        )
-        XCTAssertEqual(mode, .compactSheet)
-    }
-
-    // MARK: - iPad & edge cases
-
-    func testIPadMiniPortraitUsesSplitSidebar() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .regular,
-            verticalSizeClass: .regular,
-            containerSize: CGSize(width: 744, height: 1133)
-        )
-        XCTAssertEqual(mode, .splitSidebar)
-    }
-
-    func testIPadLandscapeUsesSplitSidebar() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .regular,
-            verticalSizeClass: .regular,
-            containerSize: CGSize(width: 1194, height: 834)
-        )
-        XCTAssertEqual(mode, .splitSidebar)
-    }
-
-    func testRegularWidthCompactHeightUsesCompactSheet() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .regular,
-            verticalSizeClass: .compact,
-            containerSize: CGSize(width: 932, height: 430)
-        )
-        XCTAssertEqual(mode, .compactSheet)
-    }
-
-    func testNilSizeClassesOrZeroSizeFallBackToCompactSheet() {
-        XCTAssertEqual(
-            AppLayoutMode.resolve(
-                horizontalSizeClass: nil,
-                verticalSizeClass: nil,
-                containerSize: CGSize(width: 951, height: 669)
-            ),
-            .compactSheet
-        )
-        XCTAssertEqual(
-            AppLayoutMode.resolve(
-                horizontalSizeClass: .regular,
-                verticalSizeClass: .regular,
-                containerSize: .zero
-            ),
-            .compactSheet
-        )
-    }
-
-    // MARK: - ContentViewModel layout transition
+    // MARK: - ContentViewModel Layout Transitions
 
     @MainActor
-    func testUpdatingLayoutModeToSplitSidebarClearsCompactPaddingAndViewportInsets() {
+    @Test func updatingLayoutModeToSplitSidebarClearsCompactPaddingAndViewportInsets() {
         let viewModel = ContentViewModel()
         viewModel.topPadding = 92
         viewModel.bottomPadding = 260
@@ -124,19 +69,19 @@ final class AppLayoutModeTests: XCTestCase {
 
         viewModel.updateLayoutMode(.compactSheet)
         let compactInsets = viewModel.mapListViewportInsets(for: mapView)
-        XCTAssertEqual(compactInsets.top, 92)
-        XCTAssertGreaterThan(compactInsets.bottom, 0)
+        #expect(compactInsets.top == 92)
+        #expect(compactInsets.bottom > 0)
 
         viewModel.updateLayoutMode(.splitSidebar)
-        XCTAssertEqual(viewModel.layoutMode, .splitSidebar)
-        XCTAssertEqual(viewModel.topPadding, 0)
-        XCTAssertEqual(viewModel.bottomPadding, 0)
-        XCTAssertEqual(viewModel.leadingSheetInset, 0)
-        XCTAssertEqual(viewModel.mapListViewportInsets(for: mapView), .zero)
+        #expect(viewModel.layoutMode == .splitSidebar)
+        #expect(viewModel.topPadding == 0)
+        #expect(viewModel.bottomPadding == 0)
+        #expect(viewModel.leadingSheetInset == 0)
+        #expect(viewModel.mapListViewportInsets(for: mapView) == .zero)
     }
 
     @MainActor
-    func testLeadingSheetInsetShiftsViewportLeftInsteadOfBottom() {
+    @Test func leadingSheetInsetShiftsViewportLeftInsteadOfBottom() {
         let viewModel = ContentViewModel()
         viewModel.updateLayoutMode(.compactSheet)
         viewModel.topPadding = 0
@@ -146,41 +91,32 @@ final class AppLayoutModeTests: XCTestCase {
         let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 951, height: 669))
         let insets = viewModel.mapListViewportInsets(for: mapView)
 
-        XCTAssertEqual(insets.left, 420)
-        XCTAssertEqual(insets.bottom, 0)
-        XCTAssertEqual(insets.top, 0)
-        XCTAssertEqual(insets.right, 0)
+        #expect(insets.left == 420)
+        #expect(insets.bottom == 0)
+        #expect(insets.top == 0)
+        #expect(insets.right == 0)
     }
 
-    // MARK: - AdaptiveLeadingSheetSizing & Optional Size Classes
+    // MARK: - AdaptiveLeadingSheetSizing
 
-    func testRegularHorizontalWithNilVerticalSizeClassFallsBackToCompactSheet() {
-        let mode = AppLayoutMode.resolve(
-            horizontalSizeClass: .regular,
-            verticalSizeClass: nil,
-            containerSize: CGSize(width: 1024, height: 768)
-        )
-        XCTAssertEqual(mode, .compactSheet)
-    }
-
-    func testLeadingSheetWidthReturnsNilOnCompactOrPortrait() {
-        XCTAssertNil(
+    @Test func leadingSheetWidthReturnsNilOnCompactOrPortrait() {
+        #expect(
             AdaptiveLeadingSheetSizing.resolvedWidth(
                 containerSize: CGSize(width: 393, height: 852),
                 safeAreaInsets: EdgeInsets(),
                 horizontalSizeClass: .compact
-            )
+            ) == nil
         )
-        XCTAssertNil(
+        #expect(
             AdaptiveLeadingSheetSizing.resolvedWidth(
                 containerSize: CGSize(width: 669, height: 951),
                 safeAreaInsets: EdgeInsets(),
                 horizontalSizeClass: .regular
-            )
+            ) == nil
         )
     }
 
-    func testLeadingSheetWidthClearsVerticalFoldInLTRAndRTL() {
+    @Test func leadingSheetWidthClearsVerticalFoldInLTRAndRTL() throws {
         let containerSize = CGSize(width: 900, height: 669)
         let safeInsets = EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 40)
         // Asymmetric vertical fold shifted slightly left of center:
@@ -188,22 +124,26 @@ final class AppLayoutModeTests: XCTestCase {
         // RTL leading space = (900 - 380) + 40 = 560 -> capped at targetWidth (~403.2)
         let foldFrame = CGRect(x: 370, y: 0, width: 10, height: 669)
 
-        let ltrWidth = AdaptiveLeadingSheetSizing.resolvedWidth(
-            containerSize: containerSize,
-            safeAreaInsets: safeInsets,
-            horizontalSizeClass: .regular,
-            layoutDirection: .leftToRight,
-            verticalFoldFrame: foldFrame
+        let ltrWidth = try #require(
+            AdaptiveLeadingSheetSizing.resolvedWidth(
+                containerSize: containerSize,
+                safeAreaInsets: safeInsets,
+                horizontalSizeClass: .regular,
+                layoutDirection: .leftToRight,
+                verticalFoldFrame: foldFrame
+            )
         )
-        let rtlWidth = AdaptiveLeadingSheetSizing.resolvedWidth(
-            containerSize: containerSize,
-            safeAreaInsets: safeInsets,
-            horizontalSizeClass: .regular,
-            layoutDirection: .rightToLeft,
-            verticalFoldFrame: foldFrame
+        let rtlWidth = try #require(
+            AdaptiveLeadingSheetSizing.resolvedWidth(
+                containerSize: containerSize,
+                safeAreaInsets: safeInsets,
+                horizontalSizeClass: .regular,
+                layoutDirection: .rightToLeft,
+                verticalFoldFrame: foldFrame
+            )
         )
 
-        XCTAssertEqual(ltrWidth ?? 0, 374, accuracy: 0.5)
-        XCTAssertEqual(rtlWidth ?? 0, 960 * 0.42, accuracy: 0.5)
+        #expect(abs(ltrWidth - 374) <= 0.5)
+        #expect(abs(rtlWidth - (960 * 0.42)) <= 0.5)
     }
 }

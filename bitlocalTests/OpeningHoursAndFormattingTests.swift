@@ -1,7 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class OpeningHoursAndFormattingTests: XCTestCase {
+@Suite(.tags(.formatting))
+struct OpeningHoursAndFormattingTests {
     private var utcCalendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -23,43 +25,41 @@ final class OpeningHoursAndFormattingTests: XCTestCase {
 
     // MARK: - OpeningHoursLiveStatus
 
-    func testTwentyFourSevenIsAlwaysOpen() {
-        // Wednesday 03:30 UTC
+    @Test func twentyFourSevenIsAlwaysOpen() {
         let date = makeUTCDate(year: 2026, month: 6, day: 10, hour: 3, minute: 30)
-        XCTAssertTrue(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "24/7", now: date, calendar: utcCalendar))
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "24/7", now: date, calendar: utcCalendar))
     }
 
-    func testWeekdayRangeEvaluatesOpenAndClosedBoundaries() {
+    @Test func weekdayRangeEvaluatesOpenAndClosedBoundaries() {
         // 2026-06-10 is Wednesday
         let midDay = makeUTCDate(year: 2026, month: 6, day: 10, hour: 12, minute: 0)
         let afterClose = makeUTCDate(year: 2026, month: 6, day: 10, hour: 17, minute: 0)
         let sundayMidDay = makeUTCDate(year: 2026, month: 6, day: 14, hour: 12, minute: 0)
 
-        XCTAssertTrue(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Mo-Fr 09:00-17:00", now: midDay, calendar: utcCalendar))
-        XCTAssertFalse(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Mo-Fr 09:00-17:00", now: afterClose, calendar: utcCalendar))
-        XCTAssertFalse(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Mo-Fr 09:00-17:00", now: sundayMidDay, calendar: utcCalendar))
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Mo-Fr 09:00-17:00", now: midDay, calendar: utcCalendar))
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Mo-Fr 09:00-17:00", now: afterClose, calendar: utcCalendar) == false)
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Mo-Fr 09:00-17:00", now: sundayMidDay, calendar: utcCalendar) == false)
     }
 
-    func testOvernightHoursCarryIntoNextMorning() {
+    @Test func overnightHoursCarryIntoNextMorning() {
         // 2026-06-12 is Friday; 2026-06-13 is Saturday
         let fridayNight = makeUTCDate(year: 2026, month: 6, day: 12, hour: 23, minute: 30)
         let saturdayEarly = makeUTCDate(year: 2026, month: 6, day: 13, hour: 1, minute: 15)
         let saturdayMorningClosed = makeUTCDate(year: 2026, month: 6, day: 13, hour: 2, minute: 30)
 
-        XCTAssertTrue(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Fr 18:00-02:00", now: fridayNight, calendar: utcCalendar))
-        XCTAssertTrue(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Fr 18:00-02:00", now: saturdayEarly, calendar: utcCalendar))
-        XCTAssertFalse(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Fr 18:00-02:00", now: saturdayMorningClosed, calendar: utcCalendar))
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Fr 18:00-02:00", now: fridayNight, calendar: utcCalendar))
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Fr 18:00-02:00", now: saturdayEarly, calendar: utcCalendar))
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "Fr 18:00-02:00", now: saturdayMorningClosed, calendar: utcCalendar) == false)
     }
 
-    func testInvalidOrEmptyOpeningHoursReturnFalse() {
-        XCTAssertFalse(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: nil, calendar: utcCalendar))
-        XCTAssertFalse(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "   ", calendar: utcCalendar))
-        XCTAssertFalse(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: "by appointment", calendar: utcCalendar))
+    @Test(arguments: [nil, "   ", "by appointment"])
+    func invalidOrEmptyOpeningHoursReturnFalse(raw: String?) {
+        #expect(OpeningHoursLiveStatus.isOpenNow(rawOpeningHours: raw, calendar: utcCalendar) == false)
     }
 
     // MARK: - WeeklyHours OSM Formatting
 
-    func testWeeklyHoursToOSMFormatGroupsConsecutiveDays() {
+    @Test func weeklyHoursToOSMFormatGroupsConsecutiveDays() {
         let open9 = Calendar.current.date(from: DateComponents(hour: 9, minute: 0))!
         let close17 = Calendar.current.date(from: DateComponents(hour: 17, minute: 0))!
         let open10 = Calendar.current.date(from: DateComponents(hour: 10, minute: 0))!
@@ -71,31 +71,34 @@ final class OpeningHoursAndFormattingTests: XCTestCase {
         }
         hours[.saturday] = DayHours(isOpen: true, openTime: open10, closeTime: close14)
 
-        XCTAssertEqual(hours.toOSMFormat(), "Mo-Fr 09:00-17:00; Sa 10:00-14:00")
-        XCTAssertTrue(hours.hasAnyOpen)
+        #expect(hours.toOSMFormat() == "Mo-Fr 09:00-17:00; Sa 10:00-14:00")
+        #expect(hours.hasAnyOpen)
     }
 
-    func testWeeklyHoursAllClosedFormatsEmpty() {
+    @Test func weeklyHoursAllClosedFormatsEmpty() {
         let hours = WeeklyHours()
-        XCTAssertEqual(hours.toOSMFormat(), "")
-        XCTAssertFalse(hours.hasAnyOpen)
+        #expect(hours.toOSMFormat() == "")
+        #expect(hours.hasAnyOpen == false)
     }
 
     // MARK: - String & UserDefaults Extensions
 
-    func testDisplayablePhoneNumberCollapsesRepeatedSpaces() {
-        XCTAssertEqual("  + 1   615    555-0100  ".displayablePhoneNumber(), "+1 615 555-0100")
-        XCTAssertEqual("   ".displayablePhoneNumber(), "   ")
+    @Test func displayablePhoneNumberCollapsesRepeatedSpaces() {
+        #expect("  + 1   615    555-0100  ".displayablePhoneNumber() == "+1 615 555-0100")
+        #expect("   ".displayablePhoneNumber() == "   ")
     }
 
-    func testCleanedForDisplayStripsSchemeWWWAndTrailingSlashes() {
-        XCTAssertEqual("https://www.BitLocal.app///".cleanedForDisplay(), "BitLocal.app")
-        XCTAssertEqual("HTTP://example.org/cafe/".cleanedForDisplay(), "example.org/cafe")
+    @Test(arguments: [
+        ("https://www.BitLocal.app///", "BitLocal.app"),
+        ("HTTP://example.org/cafe/", "example.org/cafe")
+    ])
+    func cleanedForDisplayStripsSchemeWWWAndTrailingSlashes(raw: String, expected: String) {
+        #expect(raw.cleanedForDisplay() == expected)
     }
 
-    func testUserDefaultsSetAndGetElementsUsesReceiverSuite() {
+    @Test func userDefaultsSetAndGetElementsUsesReceiverSuite() throws {
         let suiteName = "ExtensionsUserDefaultsTests-\(UUID().uuidString)"
-        let customDefaults = UserDefaults(suiteName: suiteName)!
+        let customDefaults = try #require(UserDefaults(suiteName: suiteName))
         customDefaults.removePersistentDomain(forName: suiteName)
         defer { customDefaults.removePersistentDomain(forName: suiteName) }
 
@@ -109,28 +112,34 @@ final class OpeningHoursAndFormattingTests: XCTestCase {
 
         customDefaults.setElements([element], forKey: key)
 
-        XCTAssertEqual(customDefaults.getElements(forKey: key)?.map(\.id), ["suite-1"])
-        XCTAssertNil(UserDefaults.standard.data(forKey: key))
+        #expect(customDefaults.getElements(forKey: key)?.map(\.id) == ["suite-1"])
+        #expect(UserDefaults.standard.data(forKey: key) == nil)
     }
 
     // MARK: - BTCMapDateParser
 
-    func testBTCMapDateParserHandlesFractionalBasicAndDateOnly() {
-        XCTAssertNotNil(BTCMapDateParser.parse("2026-06-10T12:34:56.789Z"))
-        XCTAssertNotNil(BTCMapDateParser.parse("2026-06-10T12:34:56Z"))
-        XCTAssertNotNil(BTCMapDateParser.parse("2026-06-10"))
-        XCTAssertNil(BTCMapDateParser.parse("not-a-date"))
+    @Test(arguments: [
+        "2026-06-10T12:34:56.789Z",
+        "2026-06-10T12:34:56Z",
+        "2026-06-10"
+    ])
+    func btcMapDateParserHandlesValidFormats(rawDate: String) {
+        #expect(BTCMapDateParser.parse(rawDate) != nil)
+    }
+
+    @Test func btcMapDateParserRejectsInvalidInput() {
+        #expect(BTCMapDateParser.parse("not-a-date") == nil)
     }
 
     // MARK: - Localized Country List
 
-    func testCountryListLocalizesRegionsForLocale() {
+    @Test func countryListLocalizesRegionsForLocale() {
         let english = CountryList.localizedCountries(for: Locale(identifier: "en_US"))
         let german = CountryList.localizedCountries(for: Locale(identifier: "de_DE"))
 
-        XCTAssertGreaterThan(english.count, 150)
-        XCTAssertTrue(english.contains("United States"))
-        XCTAssertTrue(english.contains("Germany"))
-        XCTAssertTrue(german.contains("Deutschland"))
+        #expect(english.count > 150)
+        #expect(english.contains("United States"))
+        #expect(english.contains("Germany"))
+        #expect(german.contains("Deutschland"))
     }
 }

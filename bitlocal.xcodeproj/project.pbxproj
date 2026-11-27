@@ -142,6 +142,7 @@
 		F7EE00113B22000000000013 /* ContentViewModel+MapViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000013 /* ContentViewModel+MapViewport.swift */; };
 		F7EE00113B22000000000014 /* ContentViewModel+SearchAndEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000014 /* ContentViewModel+SearchAndEvents.swift */; };
 		F7EE00113B22000000000015 /* ContentViewModelModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000015 /* ContentViewModelModels.swift */; };
+		F7EE00213B23000000000001 /* TestTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00203B23000000000001 /* TestTags.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -294,6 +295,7 @@
 		F7EE00103B22000000000013 /* ContentViewModel+MapViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentViewModel+MapViewport.swift"; sourceTree = "<group>"; };
 		F7EE00103B22000000000014 /* ContentViewModel+SearchAndEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentViewModel+SearchAndEvents.swift"; sourceTree = "<group>"; };
 		F7EE00103B22000000000015 /* ContentViewModelModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModelModels.swift; sourceTree = "<group>"; };
+		F7EE00203B23000000000001 /* TestTags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestTags.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -642,6 +644,7 @@
 				F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */,
 				F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */,
 				F60F81C32F571D6600FD7D36 /* SearchTextNormalizerTests.swift */,
+				F7EE00203B23000000000001 /* TestTags.swift */,
 			);
 			path = bitlocalTests;
 			sourceTree = "<group>";
@@ -891,6 +894,7 @@
 				F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */,
 				F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */,
 				F60F81C42F571D6600FD7D36 /* SearchTextNormalizerTests.swift in Sources */,
+				F7EE00213B23000000000001 /* TestTags.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

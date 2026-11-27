@@ -1,8 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class V4PlaceToElementMapperTests: XCTestCase {
-    func testMapsV4PlaceRecordIntoElementAndMetadata() {
+@Suite(.tags(.sync))
+struct V4PlaceToElementMapperTests {
+    @Test func mapsV4PlaceRecordIntoElementAndMetadata() {
         let record = V4PlaceRecord(
             id: 42,
             lat: 10.0,
@@ -48,22 +50,22 @@ final class V4PlaceToElementMapperTests: XCTestCase {
 
         let element = V4PlaceToElementMapper.placeRecordToElement(record)
 
-        XCTAssertEqual(element.id, "42")
-        XCTAssertEqual(element.osmJSON?.lat, 10.0)
-        XCTAssertEqual(element.osmJSON?.lon, 20.0)
-        XCTAssertEqual(element.osmJSON?.tags?.name, "Cafe Bitcoin")
-        XCTAssertEqual(element.osmJSON?.tags?.openingHours, "24/7")
-        XCTAssertEqual(element.osmJSON?.tags?.amenity, "cafe")
-        XCTAssertEqual(element.osmJSON?.tags?.paymentLightning, "yes")
-        XCTAssertEqual(element.osmJSON?.tags?.brandWikidata, "Q7605233")
-        XCTAssertEqual(element.osmJSON?.tags?.addrCity, "Nashville")
-        XCTAssertEqual(element.v4Metadata?.commentsCount, 3)
-        XCTAssertEqual(element.v4Metadata?.verifiedAt, "2025-01-03T00:00:00Z")
-        XCTAssertEqual(element.v4Metadata?.paymentProvider, "coinos")
-        XCTAssertEqual(element.v4Metadata?.imageURL, "https://cdn.example.com/cafe.jpg")
+        #expect(element.id == "42")
+        #expect(element.osmJSON?.lat == 10.0)
+        #expect(element.osmJSON?.lon == 20.0)
+        #expect(element.osmJSON?.tags?.name == "Cafe Bitcoin")
+        #expect(element.osmJSON?.tags?.openingHours == "24/7")
+        #expect(element.osmJSON?.tags?.amenity == "cafe")
+        #expect(element.osmJSON?.tags?.paymentLightning == "yes")
+        #expect(element.osmJSON?.tags?.brandWikidata == "Q7605233")
+        #expect(element.osmJSON?.tags?.addrCity == "Nashville")
+        #expect(element.v4Metadata?.commentsCount == 3)
+        #expect(element.v4Metadata?.verifiedAt == "2025-01-03T00:00:00Z")
+        #expect(element.v4Metadata?.paymentProvider == "coinos")
+        #expect(element.v4Metadata?.imageURL == "https://cdn.example.com/cafe.jpg")
     }
 
-    func testMapsIconToShopCategoryWhenNeeded() {
+    @Test func mapsIconToShopCategoryWhenNeeded() {
         let record = V4PlaceRecord(
             id: 43,
             lat: 10.0,
@@ -109,11 +111,11 @@ final class V4PlaceToElementMapperTests: XCTestCase {
 
         let element = V4PlaceToElementMapper.placeRecordToElement(record)
 
-        XCTAssertEqual(element.osmJSON?.tags?.shop, "computer")
-        XCTAssertNil(element.osmJSON?.tags?.amenity)
+        #expect(element.osmJSON?.tags?.shop == "computer")
+        #expect(element.osmJSON?.tags?.amenity == nil)
     }
 
-    func testSymbolResolutionUsesMaterialV4IconAliasWhenTagsMissing() {
+    @Test func symbolResolutionUsesMaterialV4IconAliasWhenTagsMissing() {
         let element = Element(
             id: "1",
             osmJSON: nil,
@@ -151,10 +153,10 @@ final class V4PlaceToElementMapperTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(ElementCategorySymbols.symbolName(for: element), "fork.knife.circle.fill")
+        #expect(ElementCategorySymbols.symbolName(for: element) == "fork.knife.circle.fill")
     }
 
-    func testTagsCodingPreservesLegacyIconPayloadKey() throws {
+    @Test func tagsCodingPreservesLegacyIconPayloadKey() throws {
         let iconPayloadKey = "icon:" + String(decoding: [97, 110, 100, 114, 111, 105, 100], as: UTF8.self)
         let jsonData = try JSONSerialization.data(
             withJSONObject: [iconPayloadKey: "local_cafe", "payment:provider": "coinos"]
@@ -162,76 +164,75 @@ final class V4PlaceToElementMapperTests: XCTestCase {
 
         let decoded = try JSONDecoder().decode(Tags.self, from: jsonData)
 
-        XCTAssertEqual(decoded.iconPlatform, "local_cafe")
-        XCTAssertEqual(decoded.paymentProvider, "coinos")
+        #expect(decoded.iconPlatform == "local_cafe")
+        #expect(decoded.paymentProvider == "coinos")
 
         let encodedData = try JSONEncoder().encode(decoded)
-        let encodedObject = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: encodedData) as? [String: String]
-        )
+        let encodedObject = try #require(JSONSerialization.jsonObject(with: encodedData) as? [String: String])
 
-        XCTAssertEqual(encodedObject[iconPayloadKey], "local_cafe")
-        XCTAssertEqual(encodedObject["payment:provider"], "coinos")
+        #expect(encodedObject[iconPayloadKey] == "local_cafe")
+        #expect(encodedObject["payment:provider"] == "coinos")
     }
 }
 
-final class OSMOpeningHoursParserTests: XCTestCase {
-    func testParsesWeekdayAndWeekendRanges() {
+@Suite(.tags(.sync))
+struct OSMOpeningHoursParserTests {
+    @Test func parsesWeekdayAndWeekendRanges() {
         let raw = "Mo-Fr 06:30-15:00; Sa 07:00-14:00; Su 08:00-13:00"
 
         let schedule = OSMOpeningHoursParser.parseWeekSchedule(raw)
 
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .monday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .monday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 390, endMinutes: 900)
         ])
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .saturday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .saturday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 420, endMinutes: 840)
         ])
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .sunday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .sunday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 480, endMinutes: 780)
         ])
     }
 
-    func testParsesMixedDayLists() {
+    @Test func parsesMixedDayLists() {
         let raw = "Tu 10:00-18:00; We, Fr, Sa 09:00-17:00; Th 11:00-19:00; Su 11:00-17:00"
 
         let schedule = OSMOpeningHoursParser.parseWeekSchedule(raw)
 
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .monday })?.ranges, [])
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .tuesday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .monday })?.ranges == [])
+        #expect(schedule?.days.first(where: { $0.weekday == .tuesday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 600, endMinutes: 1080)
         ])
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .wednesday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .wednesday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 540, endMinutes: 1020)
         ])
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .friday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .friday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 540, endMinutes: 1020)
         ])
     }
 
-    func testParsesTwentyFourSeven() {
+    @Test func parsesTwentyFourSeven() {
         let schedule = OSMOpeningHoursParser.parseWeekSchedule("24/7")
 
-        XCTAssertEqual(schedule?.days.count, 7)
-        XCTAssertEqual(schedule?.isTwentyFourSeven, true)
+        #expect(schedule?.days.count == 7)
+        #expect(schedule?.isTwentyFourSeven == true)
     }
 
-    func testParsesSingleRangeAcrossMostOfWeek() {
+    @Test func parsesSingleRangeAcrossMostOfWeek() {
         let raw = "Mo-Sa 08:00-14:00"
         let schedule = OSMOpeningHoursParser.parseWeekSchedule(raw)
 
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .monday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .monday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 480, endMinutes: 840)
         ])
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .saturday })?.ranges, [
+        #expect(schedule?.days.first(where: { $0.weekday == .saturday })?.ranges == [
             OSMOpeningHoursTimeRange(startMinutes: 480, endMinutes: 840)
         ])
-        XCTAssertEqual(schedule?.days.first(where: { $0.weekday == .sunday })?.ranges, [])
+        #expect(schedule?.days.first(where: { $0.weekday == .sunday })?.ranges == [])
     }
 
-    func testReturnsNilForUnsupportedOrMalformedInput() {
-        XCTAssertNil(OSMOpeningHoursParser.parseWeekSchedule("Mo-Fr 9am-5pm"))
-        XCTAssertNil(OSMOpeningHoursParser.parseWeekSchedule("PH off"))
-        XCTAssertNil(OSMOpeningHoursParser.parseWeekSchedule("Mo-Fr 09:00-17:00 || \"by appointment\""))
+    @Test func returnsNilForUnsupportedOrMalformedInput() {
+        #expect(OSMOpeningHoursParser.parseWeekSchedule("Mo-Fr 9am-5pm") == nil)
+        #expect(OSMOpeningHoursParser.parseWeekSchedule("PH off") == nil)
+        #expect(OSMOpeningHoursParser.parseWeekSchedule("Mo-Fr 09:00-17:00 || \"by appointment\"") == nil)
     }
 }

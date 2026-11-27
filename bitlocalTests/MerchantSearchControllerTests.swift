@@ -1,29 +1,29 @@
-import XCTest
+import Foundation
+import Testing
 import CoreLocation
 import MapKit
 @testable import bitlocal
 
 /// Exercises `MerchantSearchController` on its own, without a `ContentViewModel`.
 @MainActor
-final class MerchantSearchControllerTests: XCTestCase {
-    private var previousHybridFlag: Any?
+@Suite(.serialized, .tags(.search))
+final class MerchantSearchControllerTests {
+    private let previousHybridFlag: Bool?
 
-    override func setUp() {
-        super.setUp()
-        previousHybridFlag = UserDefaults.standard.object(forKey: "search_v2_hybrid")
+    init() {
+        previousHybridFlag = UserDefaults.standard.object(forKey: "search_v2_hybrid") as? Bool
         UserDefaults.standard.set(true, forKey: "search_v2_hybrid")
     }
 
-    override func tearDown() {
+    deinit {
         if let previousHybridFlag {
             UserDefaults.standard.set(previousHybridFlag, forKey: "search_v2_hybrid")
         } else {
             UserDefaults.standard.removeObject(forKey: "search_v2_hybrid")
         }
-        super.tearDown()
     }
 
-    func testLocalSearchFiltersHostVisibleElements() async {
+    @Test func localSearchFiltersHostVisibleElements() async {
         let service = MockSearchService()
         let host = FakeSearchHost()
         host.visibleElements = [
@@ -36,13 +36,13 @@ final class MerchantSearchControllerTests: XCTestCase {
         controller.performUnifiedSearch()
         await waitUntil { controller.merchantSearchPrimaryResults.count == 1 }
 
-        XCTAssertEqual(controller.merchantSearchPrimaryResults.map(\.id), ["1"])
-        XCTAssertFalse(controller.merchantSearchIsWaitingForLocalDebounce)
-        XCTAssertEqual(service.searchPlaceQueries.count, 0)
-        XCTAssertFalse(host.hydratedPlaceholderBatches.isEmpty)
+        #expect(controller.merchantSearchPrimaryResults.map(\.id) == ["1"])
+        #expect(controller.merchantSearchIsWaitingForLocalDebounce == false)
+        #expect(service.searchPlaceQueries.count == 0)
+        #expect(host.hydratedPlaceholderBatches.isEmpty == false)
     }
 
-    func testShortQueryClearsResultsWithoutSearching() {
+    @Test func shortQueryClearsResultsWithoutSearching() {
         let service = MockSearchService()
         let host = FakeSearchHost()
         host.visibleElements = [
@@ -53,12 +53,12 @@ final class MerchantSearchControllerTests: XCTestCase {
         controller.unifiedSearchText = "c"
         controller.performUnifiedSearch()
 
-        XCTAssertTrue(controller.merchantSearchPrimaryResults.isEmpty)
-        XCTAssertFalse(controller.merchantSearchIsWaitingForLocalDebounce)
-        XCTAssertEqual(host.pruneForceCalls, [true])
+        #expect(controller.merchantSearchPrimaryResults.isEmpty)
+        #expect(controller.merchantSearchIsWaitingForLocalDebounce == false)
+        #expect(host.pruneForceCalls == [true])
     }
 
-    func testLegacyWorldwideSearchQueriesRemoteAndPublishesFreshResults() async {
+    @Test func legacyWorldwideSearchQueriesRemoteAndPublishesFreshResults() async {
         UserDefaults.standard.set(false, forKey: "search_v2_hybrid")
         let remote = Self.placeRecord(id: 7, name: "Coffee Abroad", icon: "local_cafe")
         let service = MockSearchService()
@@ -72,13 +72,13 @@ final class MerchantSearchControllerTests: XCTestCase {
         controller.performUnifiedSearch()
         await waitUntil { controller.merchantSearchFreshResults.count == 1 }
 
-        XCTAssertFalse(service.searchPlaceQueries.isEmpty)
-        XCTAssertEqual(controller.merchantSearchFreshResults.map(\.idString), ["7"])
-        XCTAssertFalse(controller.merchantSearchIsLoading)
-        XCTAssertNil(controller.merchantSearchError)
+        #expect(service.searchPlaceQueries.isEmpty == false)
+        #expect(controller.merchantSearchFreshResults.map(\.idString) == ["7"])
+        #expect(controller.merchantSearchIsLoading == false)
+        #expect(controller.merchantSearchError == nil)
     }
 
-    func testLegacyWorldwideSearchFailureFallsBackOffline() async {
+    @Test func legacyWorldwideSearchFailureFallsBackOffline() async {
         UserDefaults.standard.set(false, forKey: "search_v2_hybrid")
         let service = MockSearchService()
         service.searchPlacesHandler = { _, completion in
@@ -91,12 +91,12 @@ final class MerchantSearchControllerTests: XCTestCase {
         controller.performUnifiedSearch()
         await waitUntil { controller.merchantSearchIsOfflineFallback }
 
-        XCTAssertTrue(controller.merchantSearchIsOfflineFallback)
-        XCTAssertNotNil(controller.merchantSearchError)
-        XCTAssertFalse(controller.merchantSearchIsLoading)
+        #expect(controller.merchantSearchIsOfflineFallback)
+        #expect(controller.merchantSearchError != nil)
+        #expect(controller.merchantSearchIsLoading == false)
     }
 
-    func testResetForMerchantAlertDigestClearsSearchState() async {
+    @Test func resetForMerchantAlertDigestClearsSearchState() async {
         let host = FakeSearchHost()
         host.visibleElements = [
             V4PlaceToElementMapper.placeRecordToElement(Self.placeRecord(id: 1, name: "Coffee House", icon: "local_cafe"))
@@ -110,14 +110,14 @@ final class MerchantSearchControllerTests: XCTestCase {
 
         controller.resetForMerchantAlertDigest()
 
-        XCTAssertEqual(controller.unifiedSearchText, "")
-        XCTAssertFalse(controller.isSearchActive)
-        XCTAssertTrue(controller.merchantSearchPrimaryResults.isEmpty)
-        XCTAssertTrue(controller.merchantSearchMapResults.isEmpty)
-        XCTAssertTrue(controller.localFilteredMerchants.isEmpty)
+        #expect(controller.unifiedSearchText == "")
+        #expect(controller.isSearchActive == false)
+        #expect(controller.merchantSearchPrimaryResults.isEmpty)
+        #expect(controller.merchantSearchMapResults.isEmpty)
+        #expect(controller.localFilteredMerchants.isEmpty)
     }
 
-    func testPreviewHydrationUpdatesResultsAndUpsertsIntoHost() async {
+    @Test func previewHydrationUpdatesResultsAndUpsertsIntoHost() async {
         UserDefaults.standard.set(false, forKey: "search_v2_hybrid")
         let partial = Self.placeRecord(id: 9, name: "Coffee Abroad", icon: "local_cafe")
         let service = MockSearchService()
@@ -130,12 +130,12 @@ final class MerchantSearchControllerTests: XCTestCase {
         controller.performUnifiedSearch()
         await waitUntil { controller.merchantSearchFreshResults.count == 1 }
 
-        XCTAssertTrue(controller.shouldHydrateSearchResult(partial))
+        #expect(controller.shouldHydrateSearchResult(partial))
         controller.hydrateMerchantSearchPreviewIfNeeded(partial)
         await waitUntil { !host.upsertedElements.isEmpty }
 
-        XCTAssertEqual(service.fetchPlaceIDs, ["9"])
-        XCTAssertEqual(host.upsertedElements.map(\.id), ["9"])
+        #expect(service.fetchPlaceIDs == ["9"])
+        #expect(host.upsertedElements.map(\.id) == ["9"])
     }
 
     private func makeController(service: MockSearchService, host: FakeSearchHost) -> MerchantSearchController {

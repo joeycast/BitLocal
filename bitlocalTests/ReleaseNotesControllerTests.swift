@@ -1,67 +1,67 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
 @MainActor
-final class ReleaseNotesControllerTests: XCTestCase {
-    private let suiteName = "ReleaseNotesControllerTests"
+@Suite(.tags(.persistence))
+final class ReleaseNotesControllerTests {
+    private let suiteName = "ReleaseNotesControllerTests-\(UUID().uuidString)"
 
-    override func setUp() {
-        super.setUp()
+    init() {
         UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
     }
 
-    override func tearDown() {
+    deinit {
         UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
-        super.tearDown()
     }
 
-    func testShowsReleaseNotesForUnseenMeaningfulVersion() {
+    @Test func showsReleaseNotesForUnseenMeaningfulVersion() {
         let defaults = testDefaults()
         defaults.set("2.9", forKey: "lastSeenReleaseNotesVersion")
         let controller = makeController(currentVersion: "3.0", defaults: defaults)
 
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
-        XCTAssertEqual(controller.activeReleaseNotes?.version, "3.0")
+        #expect(controller.activeReleaseNotes?.version == "3.0")
     }
 
-    func testSkipsReleaseNotesOnFirstLaunchAndMarksVersionSeen() {
+    @Test func skipsReleaseNotesOnFirstLaunchAndMarksVersionSeen() {
         let defaults = testDefaults()
         let controller = makeController(currentVersion: "3.0", defaults: defaults)
 
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
-        XCTAssertNil(controller.activeReleaseNotes)
-        XCTAssertEqual(defaults.string(forKey: "lastSeenReleaseNotesVersion"), "3.0")
+        #expect(controller.activeReleaseNotes == nil)
+        #expect(defaults.string(forKey: "lastSeenReleaseNotesVersion") == "3.0")
     }
 
-    func testSkipsReleaseNotesWhenVersionWasAlreadySeen() {
+    @Test func skipsReleaseNotesWhenVersionWasAlreadySeen() {
         let defaults = testDefaults()
         defaults.set("3.0", forKey: "lastSeenReleaseNotesVersion")
         let controller = makeController(currentVersion: "3.0", defaults: defaults)
 
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
-        XCTAssertNil(controller.activeReleaseNotes)
+        #expect(controller.activeReleaseNotes == nil)
     }
 
-    func testSkipsReleaseNotesForVersionsWithoutAnEntry() {
+    @Test func skipsReleaseNotesForVersionsWithoutAnEntry() {
         let controller = makeController(currentVersion: "3.0.1")
 
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
 
-        XCTAssertNil(controller.activeReleaseNotes)
+        #expect(controller.activeReleaseNotes == nil)
     }
 
-    func testDismissMarksVersionAsSeen() {
+    @Test func dismissMarksVersionAsSeen() {
         let defaults = testDefaults()
         let controller = makeController(currentVersion: "3.0", defaults: defaults)
 
         controller.evaluatePresentation(didCompleteOnboarding: true, isReadyForMainUI: true)
         controller.dismiss()
 
-        XCTAssertEqual(defaults.string(forKey: "lastSeenReleaseNotesVersion"), "3.0")
-        XCTAssertNil(controller.activeReleaseNotes)
+        #expect(defaults.string(forKey: "lastSeenReleaseNotesVersion") == "3.0")
+        #expect(controller.activeReleaseNotes == nil)
     }
 
     private func makeController(

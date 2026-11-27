@@ -1,8 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class MerchantSearchEngineTests: XCTestCase {
-    func testMatchScoresExactNameHigherThanCategory() {
+@Suite(.tags(.search))
+struct MerchantSearchEngineTests {
+    @Test func matchScoresExactNameHigherThanCategory() {
         let cafe = makeElement(id: "1", name: "Da Vinci Coffee", icon: "local_cafe")
         let other = makeElement(id: "2", name: "Random Shop", icon: "local_cafe")
         let query = SearchTextNormalizer.normalize("Da Vinci Coffee")
@@ -16,12 +18,12 @@ final class MerchantSearchEngineTests: XCTestCase {
             normalizedQuery: SearchTextNormalizer.normalize("coffee"),
             resolvedGroup: .coffee
         )
-        XCTAssertNotNil(cafeMatch)
-        XCTAssertNotNil(otherMatch)
-        XCTAssertGreaterThan(cafeMatch!.score, otherMatch!.score)
+        #expect(cafeMatch != nil)
+        #expect(otherMatch != nil)
+        #expect(cafeMatch!.score > otherMatch!.score)
     }
 
-    func testFilterElementsReturnsScores() {
+    @Test func filterElementsReturnsScores() {
         let elements = [
             makeElement(id: "1", name: "Cafe Bitcoin", icon: "local_cafe"),
             makeElement(id: "2", name: "Hardware Store", icon: "hardware")
@@ -31,8 +33,8 @@ final class MerchantSearchEngineTests: XCTestCase {
             normalizedQuery: SearchTextNormalizer.normalize("cafe"),
             documentProvider: MerchantSearchEngine.document(for:)
         )
-        XCTAssertEqual(result.elements.map(\.id), ["1"])
-        XCTAssertNotNil(result.scoresByID["1"])
+        #expect(result.elements.map(\.id) == ["1"])
+        #expect(result.scoresByID["1"] != nil)
     }
 
     private func makeElement(id: String, name: String, icon: String) -> Element {

@@ -1,23 +1,23 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class BTCMapV4SyncTests: XCTestCase {
+@Suite(.serialized, .tags(.sync))
+final class BTCMapV4SyncTests {
     private let elementsFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         .appendingPathComponent("btcmap_elements_v4.json")
     private let syncStateFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         .appendingPathComponent("btcmap_v4_sync_state.json")
 
-    override func setUpWithError() throws {
-        try super.setUpWithError()
+    init() throws {
         try removeV4CacheFiles()
     }
 
-    override func tearDownWithError() throws {
-        try removeV4CacheFiles()
-        try super.tearDownWithError()
+    deinit {
+        try? removeV4CacheFiles()
     }
 
-    func testBootstrapUsesSnapshotLastModifiedAsInitialIncrementalAnchor() {
+    @Test func bootstrapUsesSnapshotLastModifiedAsInitialIncrementalAnchor() async {
         let client = MockBTCMapV4Client()
         client.snapshotResult = .success((
             records: [
@@ -37,18 +37,16 @@ final class BTCMapV4SyncTests: XCTestCase {
         client.fetchPlacesResult = .success([])
 
         let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
-        let expectation = expectation(description: "refresh completes")
-
-        repository.refreshElements { _ in
-            expectation.fulfill()
+        await withCheckedContinuation { continuation in
+            repository.refreshElements { _ in
+                continuation.resume()
+            }
         }
 
-        wait(for: [expectation], timeout: 2)
-
-        XCTAssertEqual(client.fetchPlacesUpdatedSinceValues, ["2025-06-11T00:00:00Z"])
+        #expect(client.fetchPlacesUpdatedSinceValues == ["2025-06-11T00:00:00Z"])
     }
 
-    func testIncrementalSyncFallsBackToSnapshotLastModifiedWhenAnchorMissing() throws {
+    @Test func incrementalSyncFallsBackToSnapshotLastModifiedWhenAnchorMissing() async throws {
         let element = V4PlaceToElementMapper.placeRecordToElement(
             V4PlaceRecord(
                 id: 7,
@@ -109,15 +107,13 @@ final class BTCMapV4SyncTests: XCTestCase {
         client.fetchPlacesResult = .success([])
 
         let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
-        let expectation = expectation(description: "refresh completes")
-
-        repository.refreshElements { _ in
-            expectation.fulfill()
+        await withCheckedContinuation { continuation in
+            repository.refreshElements { _ in
+                continuation.resume()
+            }
         }
 
-        wait(for: [expectation], timeout: 2)
-
-        XCTAssertEqual(client.fetchPlacesUpdatedSinceValues, ["2025-06-11T00:00:00Z"])
+        #expect(client.fetchPlacesUpdatedSinceValues == ["2025-06-11T00:00:00Z"])
     }
 
     private func removeV4CacheFiles() throws {
@@ -138,7 +134,7 @@ final class BTCMapV4SyncTests: XCTestCase {
     }
 }
 
-private final class MockBTCMapV4Client: BTCMapV4ClientProtocol {
+private final class MockBTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
     var snapshotResult: Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error> = .success((records: [], lastModified: nil))
     var fetchPlacesResult: Result<[V4PlaceRecord], Error> = .success([])
     var fetchPlacesUpdatedSinceValues: [String] = []

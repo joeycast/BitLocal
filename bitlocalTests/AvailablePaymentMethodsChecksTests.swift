@@ -1,8 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class AvailablePaymentMethodsChecksTests: XCTestCase {
-    func testInfersLightningForKnownBrandWhenPaymentTagsMissing() {
+@Suite(.tags(.formatting))
+struct AvailablePaymentMethodsChecksTests {
+    @Test func infersLightningForKnownBrandWhenPaymentTagsMissing() {
         let element = makeElement(
             paymentBitcoin: nil,
             currencyXBT: nil,
@@ -12,13 +14,13 @@ final class AvailablePaymentMethodsChecksTests: XCTestCase {
             brandWikidata: "Q7605233"
         )
 
-        XCTAssertTrue(acceptsLightning(element: element))
-        XCTAssertFalse(acceptsBitcoin(element: element))
-        XCTAssertFalse(acceptsBitcoinOnChain(element: element))
-        XCTAssertFalse(acceptsContactlessLightning(element: element))
+        #expect(acceptsLightning(element: element))
+        #expect(acceptsBitcoin(element: element) == false)
+        #expect(acceptsBitcoinOnChain(element: element) == false)
+        #expect(acceptsContactlessLightning(element: element) == false)
     }
 
-    func testDoesNotInferLightningWhenExplicitPaymentTagsExist() {
+    @Test func doesNotInferLightningWhenExplicitPaymentTagsExist() {
         let element = makeElement(
             paymentBitcoin: nil,
             currencyXBT: nil,
@@ -28,11 +30,11 @@ final class AvailablePaymentMethodsChecksTests: XCTestCase {
             brandWikidata: "Q7605233"
         )
 
-        XCTAssertFalse(acceptsLightning(element: element))
-        XCTAssertTrue(acceptsBitcoinOnChain(element: element))
+        #expect(acceptsLightning(element: element) == false)
+        #expect(acceptsBitcoinOnChain(element: element))
     }
 
-    func testInfersLightningForKnownBrandNameWhenWikidataMissing() {
+    @Test func infersLightningForKnownBrandNameWhenWikidataMissing() {
         let element = makeElement(
             paymentBitcoin: nil,
             currencyXBT: nil,
@@ -42,10 +44,10 @@ final class AvailablePaymentMethodsChecksTests: XCTestCase {
             brandWikidata: nil
         )
 
-        XCTAssertTrue(acceptsLightning(element: element))
-        XCTAssertFalse(acceptsBitcoin(element: element))
-        XCTAssertFalse(acceptsBitcoinOnChain(element: element))
-        XCTAssertFalse(acceptsContactlessLightning(element: element))
+        #expect(acceptsLightning(element: element))
+        #expect(acceptsBitcoin(element: element) == false)
+        #expect(acceptsBitcoinOnChain(element: element) == false)
+        #expect(acceptsContactlessLightning(element: element) == false)
     }
 
     private func makeElement(

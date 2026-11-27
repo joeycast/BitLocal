@@ -1,40 +1,42 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class MerchantElementStoreTests: XCTestCase {
-    func testReplaceAllIndexesByID() {
+@Suite(.tags(.sync))
+struct MerchantElementStoreTests {
+    @Test func replaceAllIndexesByID() {
         let store = MerchantElementStore()
         store.replaceAll([
             makeElement(id: "1", name: "A"),
             makeElement(id: "2", name: "B")
         ])
-        XCTAssertEqual(store.count, 2)
-        XCTAssertEqual(store.element(id: "1")?.osmJSON?.tags?.name, "A")
-        XCTAssertEqual(store.revision, 1)
+        #expect(store.count == 2)
+        #expect(store.element(id: "1")?.osmJSON?.tags?.name == "A")
+        #expect(store.revision == 1)
     }
 
-    func testUpsertDoesNotRebuildFromScratchForOtherIDs() {
+    @Test func upsertDoesNotRebuildFromScratchForOtherIDs() {
         let store = MerchantElementStore()
         store.replaceAll([makeElement(id: "1", name: "A"), makeElement(id: "2", name: "B")])
         let revisionAfterLoad = store.revision
         store.upsert(makeElement(id: "1", name: "A2"))
-        XCTAssertEqual(store.element(id: "1")?.osmJSON?.tags?.name, "A2")
-        XCTAssertEqual(store.element(id: "2")?.osmJSON?.tags?.name, "B")
-        XCTAssertEqual(store.revision, revisionAfterLoad + 1)
+        #expect(store.element(id: "1")?.osmJSON?.tags?.name == "A2")
+        #expect(store.element(id: "2")?.osmJSON?.tags?.name == "B")
+        #expect(store.revision == revisionAfterLoad + 1)
     }
 
-    func testUpsertManyAndElementsByIDs() {
+    @Test func upsertManyAndElementsByIDs() {
         let store = MerchantElementStore()
         store.replaceAll([makeElement(id: "1", name: "A")])
         store.upsertMany([
             makeElement(id: "2", name: "B"),
             makeElement(id: "3", name: "C")
         ])
-        XCTAssertEqual(store.count, 3)
-        XCTAssertEqual(store.elements(ids: ["3", "1", "missing"]).map(\.id), ["3", "1"])
+        #expect(store.count == 3)
+        #expect(store.elements(ids: ["3", "1", "missing"]).map(\.id) == ["3", "1"])
     }
 
-    func testSnapshotPreservesFirstSeenOrderWithoutSorting() {
+    @Test func snapshotPreservesFirstSeenOrderWithoutSorting() {
         let store = MerchantElementStore()
         store.replaceAll([
             makeElement(id: "b", name: "B"),
@@ -42,10 +44,10 @@ final class MerchantElementStoreTests: XCTestCase {
             makeElement(id: "c", name: "C")
         ])
         // Stable first-seen order — sorting ~25k ids on every upsert is too expensive.
-        XCTAssertEqual(store.snapshot().map(\.id), ["b", "a", "c"])
+        #expect(store.snapshot().map(\.id) == ["b", "a", "c"])
     }
 
-    func testUpsertKeepsExistingPositionAndAppendsNewIDs() {
+    @Test func upsertKeepsExistingPositionAndAppendsNewIDs() {
         let store = MerchantElementStore()
         store.replaceAll([
             makeElement(id: "b", name: "B"),
@@ -53,20 +55,20 @@ final class MerchantElementStoreTests: XCTestCase {
         ])
         store.upsert(makeElement(id: "b", name: "B2"))
         store.upsert(makeElement(id: "z", name: "Z"))
-        XCTAssertEqual(store.snapshot().map(\.id), ["b", "a", "z"])
-        XCTAssertEqual(store.element(id: "b")?.osmJSON?.tags?.name, "B2")
+        #expect(store.snapshot().map(\.id) == ["b", "a", "z"])
+        #expect(store.element(id: "b")?.osmJSON?.tags?.name == "B2")
     }
 
-    func testDuplicateIDsInReplaceKeepLastAtFirstPosition() {
+    @Test func duplicateIDsInReplaceKeepLastAtFirstPosition() {
         let store = MerchantElementStore()
         store.replaceAll([
             makeElement(id: "1", name: "first"),
             makeElement(id: "2", name: "two"),
             makeElement(id: "1", name: "second")
         ])
-        XCTAssertEqual(store.count, 2)
-        XCTAssertEqual(store.element(id: "1")?.osmJSON?.tags?.name, "second")
-        XCTAssertEqual(store.snapshot().map(\.id), ["1", "2"])
+        #expect(store.count == 2)
+        #expect(store.element(id: "1")?.osmJSON?.tags?.name == "second")
+        #expect(store.snapshot().map(\.id) == ["1", "2"])
     }
 
     private func makeElement(id: String, name: String) -> Element {

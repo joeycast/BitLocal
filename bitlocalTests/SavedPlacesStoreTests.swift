@@ -1,67 +1,65 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
 @MainActor
-final class SavedPlacesStoreTests: XCTestCase {
-    private var suiteName: String!
-    private var defaults: UserDefaults!
+@Suite(.tags(.persistence))
+final class SavedPlacesStoreTests {
+    private let suiteName: String
+    private let defaults: UserDefaults
 
-    override func setUp() {
-        super.setUp()
+    init() {
         suiteName = "SavedPlacesStoreTests-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
     }
 
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
-        defaults = nil
-        suiteName = nil
-        super.tearDown()
+    deinit {
+        UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
     }
 
-    func testToggleSavedPersistsAcrossInstances() {
+    @Test func toggleSavedPersistsAcrossInstances() {
         let store = SavedPlacesStore(userDefaults: defaults, enableCloudKitSync: false)
-        XCTAssertFalse(store.isSaved("place-1"))
+        #expect(store.isSaved("place-1") == false)
 
         store.toggleSaved("place-1")
-        XCTAssertTrue(store.isSaved("place-1"))
-        XCTAssertEqual(store.savedIDs, ["place-1"])
-        XCTAssertEqual(store.pendingAdditionIDs, ["place-1"])
-        XCTAssertTrue(store.pendingRemovalIDs.isEmpty)
+        #expect(store.isSaved("place-1"))
+        #expect(store.savedIDs == ["place-1"])
+        #expect(store.pendingAdditionIDs == ["place-1"])
+        #expect(store.pendingRemovalIDs.isEmpty)
 
         // Fresh store instance reading the same defaults should restore saved IDs and pending queues.
         let reloaded = SavedPlacesStore(userDefaults: defaults, enableCloudKitSync: false)
-        XCTAssertTrue(reloaded.isSaved("place-1"))
-        XCTAssertEqual(reloaded.pendingAdditionIDs, ["place-1"])
+        #expect(reloaded.isSaved("place-1"))
+        #expect(reloaded.pendingAdditionIDs == ["place-1"])
     }
 
-    func testToggleUnsaveMovesPlaceFromPendingAdditionsToPendingRemovals() {
+    @Test func toggleUnsaveMovesPlaceFromPendingAdditionsToPendingRemovals() {
         let store = SavedPlacesStore(userDefaults: defaults, enableCloudKitSync: false)
         store.toggleSaved("place-42")
-        XCTAssertEqual(store.pendingAdditionIDs, ["place-42"])
+        #expect(store.pendingAdditionIDs == ["place-42"])
 
         store.toggleSaved("place-42")
-        XCTAssertFalse(store.isSaved("place-42"))
-        XCTAssertTrue(store.pendingAdditionIDs.isEmpty)
-        XCTAssertEqual(store.pendingRemovalIDs, ["place-42"])
+        #expect(store.isSaved("place-42") == false)
+        #expect(store.pendingAdditionIDs.isEmpty)
+        #expect(store.pendingRemovalIDs == ["place-42"])
 
         // Re-saving removes from pendingRemovals and re-queues in pendingAdditions.
         store.toggleSaved("place-42")
-        XCTAssertTrue(store.isSaved("place-42"))
-        XCTAssertEqual(store.pendingAdditionIDs, ["place-42"])
-        XCTAssertTrue(store.pendingRemovalIDs.isEmpty)
+        #expect(store.isSaved("place-42"))
+        #expect(store.pendingAdditionIDs == ["place-42"])
+        #expect(store.pendingRemovalIDs.isEmpty)
     }
 
-    func testToggleIgnoresEmptyPlaceID() {
+    @Test func toggleIgnoresEmptyPlaceID() {
         let store = SavedPlacesStore(userDefaults: defaults, enableCloudKitSync: false)
         store.toggleSaved("")
-        XCTAssertTrue(store.savedIDs.isEmpty)
-        XCTAssertTrue(store.pendingAdditionIDs.isEmpty)
-        XCTAssertTrue(store.pendingRemovalIDs.isEmpty)
+        #expect(store.savedIDs.isEmpty)
+        #expect(store.pendingAdditionIDs.isEmpty)
+        #expect(store.pendingRemovalIDs.isEmpty)
     }
 
-    func testApplyCloudMergeAddsRemoteIDsWithoutResurrectingPendingRemovals() {
+    @Test func applyCloudMergeAddsRemoteIDsWithoutResurrectingPendingRemovals() {
         let store = SavedPlacesStore(userDefaults: defaults, enableCloudKitSync: false)
         store.toggleSaved("local-only")
         store.toggleSaved("deleted-locally")
@@ -69,11 +67,11 @@ final class SavedPlacesStoreTests: XCTestCase {
 
         store.applyCloudMerge(remoteIDs: ["remote-new", "deleted-locally", "local-only"])
 
-        XCTAssertEqual(store.savedIDs, ["local-only", "remote-new"])
-        XCTAssertFalse(store.isSaved("deleted-locally"))
+        #expect(store.savedIDs == ["local-only", "remote-new"])
+        #expect(store.isSaved("deleted-locally") == false)
 
         // Verify merged set was persisted.
         let reloaded = SavedPlacesStore(userDefaults: defaults, enableCloudKitSync: false)
-        XCTAssertEqual(reloaded.savedIDs, ["local-only", "remote-new"])
+        #expect(reloaded.savedIDs == ["local-only", "remote-new"])
     }
 }

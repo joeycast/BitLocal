@@ -1,15 +1,16 @@
 import Network
-import XCTest
+import Testing
 @testable import bitlocal
 
 @MainActor
-final class NetworkReachabilityMonitorTests: XCTestCase {
-    func testInitialStateIsOnline() {
+@Suite(.tags(.sync))
+struct NetworkReachabilityMonitorTests {
+    @Test func initialStateIsOnline() {
         let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.05, startSystemMonitor: false)
-        XCTAssertFalse(monitor.isOffline)
+        #expect(monitor.isOffline == false)
     }
 
-    func testBriefUnsatisfiedBlipIsSuppressedByDebounce() async throws {
+    @Test func briefUnsatisfiedBlipIsSuppressedByDebounce() async throws {
         let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.12, startSystemMonitor: false)
 
         monitor.handleStatusForTesting(.unsatisfied)
@@ -17,19 +18,19 @@ final class NetworkReachabilityMonitorTests: XCTestCase {
         monitor.handleStatusForTesting(.satisfied)
         try await Task.sleep(for: .milliseconds(160))
 
-        XCTAssertFalse(monitor.isOffline)
+        #expect(monitor.isOffline == false)
     }
 
-    func testSustainedUnsatisfiedFlipsOfflineAndSatisfiedRecoversImmediately() async throws {
+    @Test func sustainedUnsatisfiedFlipsOfflineAndSatisfiedRecoversImmediately() async throws {
         let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.05, startSystemMonitor: false)
 
         monitor.handleStatusForTesting(.unsatisfied)
         let becameOffline = await waitUntil(timeout: .seconds(1)) { monitor.isOffline }
-        XCTAssertTrue(becameOffline)
+        #expect(becameOffline)
 
         monitor.handleStatusForTesting(.satisfied)
-        let becameOnline = await waitUntil(timeout: .seconds(1)) { !monitor.isOffline }
-        XCTAssertTrue(becameOnline)
+        let becameOnline = await waitUntil(timeout: .seconds(1)) { monitor.isOffline == false }
+        #expect(becameOnline)
     }
 
     private func waitUntil(timeout: Duration, condition: @escaping @MainActor () -> Bool) async -> Bool {

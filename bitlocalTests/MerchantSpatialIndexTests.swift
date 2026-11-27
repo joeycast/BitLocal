@@ -1,8 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class MerchantSpatialIndexTests: XCTestCase {
-    func testCandidatesRespectBoundingBox() {
+@Suite(.tags(.search))
+struct MerchantSpatialIndexTests {
+    @Test func candidatesRespectBoundingBox() {
         let elements = [
             makeElement(id: "in", lat: 36.16, lon: -86.78),
             makeElement(id: "out", lat: 40.0, lon: -74.0)
@@ -16,26 +18,26 @@ final class MerchantSpatialIndexTests: XCTestCase {
             minLongitude: -87.0,
             maxLongitude: -86.5
         )
-        XCTAssertEqual(hits.map(\.id), ["in"])
+        #expect(hits.map(\.id) == ["in"])
     }
 
-    func testRebuildReplacesPreviousEntries() {
+    @Test func rebuildReplacesPreviousEntries() {
         var index = MerchantSpatialIndex(cellSizeDegrees: 0.1)
         index.rebuild(from: [makeElement(id: "a", lat: 1, lon: 1)], sourceSignature: 1)
-        XCTAssertEqual(index.entryCount, 1)
+        #expect(index.entryCount == 1)
 
         index.rebuild(from: [
             makeElement(id: "b", lat: 2, lon: 2),
             makeElement(id: "c", lat: 3, lon: 3)
         ], sourceSignature: 2)
-        XCTAssertEqual(index.entryCount, 2)
-        XCTAssertEqual(index.sourceSignature, 2)
+        #expect(index.entryCount == 2)
+        #expect(index.sourceSignature == 2)
 
         let hits = index.candidates(minLatitude: 1.5, maxLatitude: 2.5, minLongitude: 1.5, maxLongitude: 2.5)
-        XCTAssertEqual(hits.map(\.id), ["b"])
+        #expect(hits.map(\.id) == ["b"])
     }
 
-    func testPolygonBoundingBoxFromOuterRing() {
+    @Test func polygonBoundingBoxFromOuterRing() {
         let polygon: [[[[Double]]]] = [[
             [
                 [-87.0, 36.0],
@@ -46,13 +48,13 @@ final class MerchantSpatialIndexTests: XCTestCase {
             ]
         ]]
         let box = MerchantPolygonGeometry.boundingBox(for: polygon)
-        XCTAssertEqual(box?.minLat, 36.0)
-        XCTAssertEqual(box?.maxLat, 37.0)
-        XCTAssertEqual(box?.minLon, -87.0)
-        XCTAssertEqual(box?.maxLon, -86.0)
+        #expect(box?.minLat == 36.0)
+        #expect(box?.maxLat == 37.0)
+        #expect(box?.minLon == -87.0)
+        #expect(box?.maxLon == -86.0)
     }
 
-    func testCandidatesAcrossAntimeridianUseShortArc() {
+    @Test func candidatesAcrossAntimeridianUseShortArc() {
         // Points near ±180; naive min/max lon span is huge and would cover the wrong ocean.
         let elements = [
             makeElement(id: "pacific-west", lat: 0, lon: 179.9),
@@ -69,9 +71,9 @@ final class MerchantSpatialIndexTests: XCTestCase {
             maxLongitude: 179.8
         )
         let ids = Set(hits.map(\.id))
-        XCTAssertTrue(ids.contains("pacific-west"))
-        XCTAssertTrue(ids.contains("pacific-east"))
-        XCTAssertFalse(ids.contains("atlantic"))
+        #expect(ids.contains("pacific-west"))
+        #expect(ids.contains("pacific-east"))
+        #expect(ids.contains("atlantic") == false)
     }
 
     private func makeElement(id: String, lat: Double, lon: Double) -> Element {

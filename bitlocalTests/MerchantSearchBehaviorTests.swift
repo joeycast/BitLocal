@@ -1,16 +1,17 @@
-import XCTest
+import Foundation
+import Testing
 import CoreLocation
 import MapKit
 @testable import bitlocal
 
 @MainActor
-final class MerchantSearchBehaviorTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
+@Suite(.serialized, .tags(.search))
+struct MerchantSearchBehaviorTests {
+    init() {
         UserDefaults.standard.set(true, forKey: "search_v2_hybrid")
     }
 
-    func testTwoCharacterQueryUsesLocalOnlyAndSkipsRemote() async {
+    @Test func twoCharacterQueryUsesLocalOnlyAndSkipsRemote() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -22,12 +23,12 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(1, on: viewModel)
 
-        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["1"])
-        XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
+        #expect(repo.searchPlaceQueries.count == 0)
+        #expect(viewModel.merchantSearchPrimaryResults.map(\.id) == ["1"])
+        #expect(viewModel.merchantSearchFreshResults.isEmpty)
     }
 
-    func testNearbySearchUsesLocalOnlyAndSkipsRemoteTopUp() async {
+    @Test func nearbySearchUsesLocalOnlyAndSkipsRemoteTopUp() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -41,11 +42,11 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(8, on: viewModel)
 
-        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.count, 8)
+        #expect(repo.searchPlaceQueries.count == 0)
+        #expect(viewModel.merchantSearchPrimaryResults.count == 8)
     }
 
-    func testNearbySearchWaitsForDebounceBeforeUpdatingPrimaryResults() async {
+    @Test func nearbySearchWaitsForDebounceBeforeUpdatingPrimaryResults() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo, unifiedSearchDebounceNanoseconds: 200_000_000)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -56,16 +57,16 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.unifiedSearchText = "free"
         viewModel.performUnifiedSearch()
 
-        XCTAssertTrue(viewModel.merchantSearchPrimaryResults.isEmpty)
-        XCTAssertTrue(viewModel.merchantSearchIsWaitingForLocalDebounce)
+        #expect(viewModel.merchantSearchPrimaryResults.isEmpty)
+        #expect(viewModel.merchantSearchIsWaitingForLocalDebounce)
 
         await waitForPrimaryResultCount(1, on: viewModel)
 
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["1"])
-        XCTAssertFalse(viewModel.merchantSearchIsWaitingForLocalDebounce)
+        #expect(viewModel.merchantSearchPrimaryResults.map(\.id) == ["1"])
+        #expect(viewModel.merchantSearchIsWaitingForLocalDebounce == false)
     }
 
-    func testCoffeeQueryMatchesNearbyCategoryLocallyWithoutRemote() async {
+    @Test func coffeeQueryMatchesNearbyCategoryLocallyWithoutRemote() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -78,12 +79,12 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(2, on: viewModel)
 
-        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
-        XCTAssertEqual(Set(viewModel.merchantSearchPrimaryResults.map(\.id)), ["10", "11"])
-        XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
+        #expect(repo.searchPlaceQueries.count == 0)
+        #expect(Set(viewModel.merchantSearchPrimaryResults.map(\.id)) == ["10", "11"])
+        #expect(viewModel.merchantSearchFreshResults.isEmpty)
     }
 
-    func testDessertQueryMatchesIceCreamLocallyWithoutRemote() async {
+    @Test func dessertQueryMatchesIceCreamLocallyWithoutRemote() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -95,11 +96,11 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(1, on: viewModel)
 
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.first?.id, "21")
-        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
+        #expect(viewModel.merchantSearchPrimaryResults.first?.id == "21")
+        #expect(repo.searchPlaceQueries.count == 0)
     }
 
-    func testNearbySearchRemoteFailureStateIsNotUsed() async {
+    @Test func nearbySearchRemoteFailureStateIsNotUsed() async {
         let repo = MockBTCMapRepository()
         repo.searchPlacesHandler = { _, completion in
             completion(.failure(MockError.network))
@@ -115,14 +116,14 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(1, on: viewModel)
 
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.map(\.id), ["20"])
-        XCTAssertTrue(viewModel.merchantSearchFreshResults.isEmpty)
-        XCTAssertFalse(viewModel.merchantSearchIsOfflineFallback)
-        XCTAssertNil(viewModel.merchantSearchError)
-        XCTAssertEqual(repo.searchPlaceQueries.count, 0)
+        #expect(viewModel.merchantSearchPrimaryResults.map(\.id) == ["20"])
+        #expect(viewModel.merchantSearchFreshResults.isEmpty)
+        #expect(viewModel.merchantSearchIsOfflineFallback == false)
+        #expect(viewModel.merchantSearchError == nil)
+        #expect(repo.searchPlaceQueries.count == 0)
     }
 
-    func testMapElementsFollowDisplayedSearchResultsWhenSearching() {
+    @Test func mapElementsFollowDisplayedSearchResultsWhenSearching() {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         let cafe = Self.element(id: "1", icon: "local_cafe")
@@ -133,10 +134,10 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.setAllElementsForTesting([cafe, diner])
         viewModel.setMerchantSearchMapResults([cafe])
 
-        XCTAssertEqual(viewModel.mapElementsForCurrentDisplay.map(\.id), ["1"])
+        #expect(viewModel.mapElementsForCurrentDisplay.map(\.id) == ["1"])
     }
 
-    func testMapElementsShowAllMerchantsWhenSearchIsTooShort() {
+    @Test func mapElementsShowAllMerchantsWhenSearchIsTooShort() {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         let cafe = Self.element(id: "1", icon: "local_cafe")
@@ -147,10 +148,10 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.setAllElementsForTesting([cafe, diner])
         viewModel.setMerchantSearchMapResults([cafe])
 
-        XCTAssertEqual(viewModel.mapElementsForCurrentDisplay.map(\.id), ["1", "2"])
+        #expect(viewModel.mapElementsForCurrentDisplay.map(\.id) == ["1", "2"])
     }
 
-    func testClearingMapAnnotationsResetsCoordinatorCachesForSameResultReentry() {
+    @Test func clearingMapAnnotationsResetsCoordinatorCachesForSameResultReentry() {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         let coordinator = MapView.Coordinator(viewModel: viewModel, topPadding: 0, bottomPadding: 0)
@@ -161,15 +162,15 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         coordinator.lastElementsHash = [cafe].hashValue
         coordinator.lastVisibleElementIDs = [cafe.id]
 
-        XCTAssertEqual(mapView.annotations.compactMap { ($0 as? Annotation)?.element?.id }, ["1"])
+        #expect(mapView.annotations.compactMap { ($0 as? Annotation)?.element?.id } == ["1"])
 
-        XCTAssertTrue(coordinator.clearMerchantAnnotations(on: mapView))
-        XCTAssertNil(coordinator.lastElementsHash)
-        XCTAssertEqual(coordinator.lastVisibleElementIDs, [])
-        XCTAssertTrue(mapView.annotations.compactMap { $0 as? Annotation }.isEmpty)
+        #expect(coordinator.clearMerchantAnnotations(on: mapView))
+        #expect(coordinator.lastElementsHash == nil)
+        #expect(coordinator.lastVisibleElementIDs == [])
+        #expect(mapView.annotations.compactMap { $0 as? Annotation }.isEmpty)
     }
 
-    func testPunctuationInsensitiveLocalMatchFindsSteakNShake() async {
+    @Test func punctuationInsensitiveLocalMatchFindsSteakNShake() async {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.selectedMerchantSearchScope = .onMap
@@ -181,25 +182,25 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         viewModel.performUnifiedSearch()
         await waitForPrimaryResultCount(1, on: viewModel)
 
-        XCTAssertEqual(viewModel.merchantSearchPrimaryResults.first?.id, "25770")
+        #expect(viewModel.merchantSearchPrimaryResults.first?.id == "25770")
     }
 
-    func testCategoryGroupResolutionCoversExistingAndExpandedIcons() {
-        XCTAssertEqual(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_cafe"), [.coffee])
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_grocery_store").contains(.groceries))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_atm").contains(.finance))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "content_cut").contains(.beauty))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_gas_station").contains(.auto))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "colorize").contains(.beauty))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "diamond").contains(.shopping))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "build").contains(.services))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "attach_money").contains(.finance))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "dentistry").contains(.health))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "cooking").contains(.food))
-        XCTAssertTrue(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "tapas").contains(.food))
+    @Test func categoryGroupResolutionCoversExistingAndExpandedIcons() {
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_cafe") == [.coffee])
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_grocery_store").contains(.groceries))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_atm").contains(.finance))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "content_cut").contains(.beauty))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "local_gas_station").contains(.auto))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "colorize").contains(.beauty))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "diamond").contains(.shopping))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "build").contains(.services))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "attach_money").contains(.finance))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "dentistry").contains(.health))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "cooking").contains(.food))
+        #expect(ElementCategorySymbols.merchantCategoryGroups(forCategoryIcon: "tapas").contains(.food))
     }
 
-    func testCategoryGroupResolutionFallsBackToIconPlatformTag() {
+    @Test func categoryGroupResolutionFallsBackToIconPlatformTag() {
         let element = Self.element(id: "fallback", icon: "restaurant")
         let elementWithTaggedIcon = Element(
             id: element.id,
@@ -223,10 +224,10 @@ final class MerchantSearchBehaviorTests: XCTestCase {
 
         let groups = ElementCategorySymbols.merchantCategoryGroups(for: elementWithTaggedIcon)
 
-        XCTAssertTrue(groups.contains(.coffee))
+        #expect(groups.contains(.coffee))
     }
 
-    func testDynamicCategoryChipsAreSortedByVisibleCountAndCapped() {
+    @Test func dynamicCategoryChipsAreSortedByVisibleCountAndCapped() {
         let elements = [
             Self.element(id: "1", icon: "local_cafe"),
             Self.element(id: "2", icon: "local_cafe"),
@@ -241,13 +242,13 @@ final class MerchantSearchBehaviorTests: XCTestCase {
 
         let chips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
 
-        XCTAssertEqual(chips.count, 6)
-        XCTAssertEqual(chips.first?.group, .coffee)
-        XCTAssertTrue(chips.contains(where: { $0.group == .food }))
-        XCTAssertFalse(chips.contains(where: { $0.group == .recreation && $0.count == 1 && chips.count > 6 }))
+        #expect(chips.count == 6)
+        #expect(chips.first?.group == .coffee)
+        #expect(chips.contains(where: { $0.group == .food }))
+        #expect(chips.contains(where: { $0.group == .recreation && $0.count == 1 && chips.count > 6 }) == false)
     }
 
-    func testBrowseOrderingShowsBoostedVisibleMerchantsFirstThenDistance() {
+    @Test func browseOrderingShowsBoostedVisibleMerchantsFirstThenDistance() {
         let repo = MockBTCMapRepository()
         let viewModel = makeViewModel(repo: repo)
         viewModel.userLocation = CLLocation(latitude: 36.17, longitude: -86.78)
@@ -268,7 +269,7 @@ final class MerchantSearchBehaviorTests: XCTestCase {
         let ordered = [nonBoostedNear, boostedFarther, boostedNearest, nonBoostedFar]
             .sorted(by: viewModel.merchantBrowseSortOrder)
 
-        XCTAssertEqual(ordered.map(\.id), ["102", "101", "100", "103"])
+        #expect(ordered.map(\.id) == ["102", "101", "100", "103"])
     }
 
     private func makeViewModel(
