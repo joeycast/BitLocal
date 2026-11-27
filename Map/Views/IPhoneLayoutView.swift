@@ -46,6 +46,7 @@ private struct IPhoneLayoutContent: View {
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
     @Environment(AppearanceManager.self) private var appearanceManager
+    @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @Environment(ReleaseNotesController.self) private var releaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -361,7 +362,7 @@ private struct IPhoneLayoutContent: View {
                 currentDetent: $settingsSheetDetent
             )
             .environment(viewModel)
-            .environment(MerchantAlertsManager.shared)
+            .environment(merchantAlertsManager)
         }
         .preferredColorScheme(effectiveColorScheme)
         .settingsSheetBackground()

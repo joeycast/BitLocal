@@ -248,22 +248,6 @@ extension BusinessesListView {
         viewModel.toggleCategoryFilter(chip.group)
     }
 
-    func handlePendingIntentAction() {
-        guard let action = intentRouter.pendingAction else { return }
-        if case .openMerchants(let filter, let query) = action {
-            _ = intentRouter.consumePendingAction()
-            if viewModel.mapDisplayMode != .merchants {
-                viewModel.setMapDisplayMode(.merchants)
-            }
-            if let filter {
-                viewModel.activeQuickFilters = [filter]
-            }
-            if let query {
-                viewModel.unifiedSearchText = query
-            }
-        }
-    }
-
     func refreshDiscoveryCache() {
         let filteredBrowse = viewModel.applyMerchantChipFilters(
             to: browseSourceElements,

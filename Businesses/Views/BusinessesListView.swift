@@ -35,7 +35,6 @@ struct BusinessesListView: View {
 
     let savedPlacesStore = SavedPlacesStore.shared
     private let reachabilityMonitor = NetworkReachabilityMonitor.shared
-    let intentRouter = BitLocalAppIntentRouter.shared
 
     init(
         elements: [Element],
@@ -121,9 +120,6 @@ struct BusinessesListView: View {
                 syncDisplayedSearchResultsToMap()
                 refreshEmptyStateVisibility()
             }
-            .onChange(of: intentRouter.pendingAction) { _, _ in
-                handlePendingIntentAction()
-            }
             .onChange(of: viewModel.region.center.latitude) { _, _ in
                 viewModel.handleMerchantSearchMapRegionChange()
             }
@@ -143,7 +139,6 @@ struct BusinessesListView: View {
                     viewModel.ensureEventsLoaded()
                 }
                 viewModel.ensureAreasLoaded() // Keep community/area data warming in background during merchant browsing.
-                handlePendingIntentAction()
                 refreshDiscoveryCache()
                 syncDisplayedSearchResultsToMap()
                 refreshEmptyStateVisibility()

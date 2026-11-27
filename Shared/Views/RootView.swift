@@ -12,6 +12,8 @@ struct RootView: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
     @Environment(ContentViewModel.self) var contentViewModel
     @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.bitLocalWindowSceneID) private var windowSceneID
     @State private var featureHintsController = FeatureHintsController()
     @State private var releaseNotesController = ReleaseNotesController()
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
@@ -49,6 +51,7 @@ struct RootView: View {
             triggerInitialFetchIfNeeded(source: "RootView.onAppear")
             evaluateReleaseNotesPresentation()
             evaluateFeatureHintsPresentation()
+            claimPendingMerchantDigestIfNeeded()
         }
         .onChange(of: didCompleteOnboarding) { _, completed in
             Debug.log("onboarding completion changed to: \(completed)")
@@ -109,9 +112,13 @@ struct RootView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .onChange(of: merchantAlertsManager.activeDigest?.id) { _, _ in
-            guard let digest = merchantAlertsManager.activeDigest else { return }
-            contentViewModel.activateMerchantAlertDigest(digest)
+        .onChange(of: merchantAlertsManager.pendingDigestRequest?.id) { _, _ in
+            claimPendingMerchantDigestIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                claimPendingMerchantDigestIfNeeded()
+            }
         }
         .animation(
             BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
@@ -121,6 +128,16 @@ struct RootView: View {
             deferredInitialFetchTask?.cancel()
             deferredInitialFetchTask = nil
         }
+    }
+
+    private func claimPendingMerchantDigestIfNeeded() {
+        guard let digest = merchantAlertsManager.claimPendingDigest(
+            forSceneID: windowSceneID,
+            isSceneActive: scenePhase == .active
+        ) else {
+            return
+        }
+        contentViewModel.activateMerchantAlertDigest(digest)
     }
 
     private func triggerInitialFetchIfNeeded(source: String) {

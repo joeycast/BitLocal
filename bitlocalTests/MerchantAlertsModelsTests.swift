@@ -127,4 +127,33 @@ struct MerchantAlertsModelsTests {
         #expect(!digest.summaryLine.contains("^["))
         #expect(!digest.summaryLine.contains("inflect:"))
     }
+
+    @Test func pendingDigestRequestRespectsTargetedAndActiveSceneRules() {
+        let sceneA = UUID()
+        let sceneB = UUID()
+        let digest = CityDigest(
+            id: "digest-scene-test",
+            locationID: "austin|texas|united states",
+            cityKey: "austin|texas|united states",
+            cityDisplayName: "Austin, Texas, United States",
+            digestWindowStart: nil,
+            digestWindowEnd: nil,
+            merchantCount: 2,
+            merchantIDs: ["1", "2"],
+            topMerchantNames: ["Cafe Satoshi", "Lightning Books"],
+            timeZoneID: "America/Chicago",
+            deliveryLocalDate: "2026-11-27"
+        )
+
+        // Targeted request (e.g. from Settings in sceneA) only matches sceneA.
+        let targeted = PendingMerchantDigestRequest(digest: digest, targetSceneID: sceneA)
+        #expect(targeted.canBeClaimed(bySceneID: sceneA, isSceneActive: true))
+        #expect(targeted.canBeClaimed(bySceneID: sceneA, isSceneActive: false))
+        #expect(!targeted.canBeClaimed(bySceneID: sceneB, isSceneActive: true))
+
+        // Untargeted request (e.g. push notification) only matches an active foreground scene.
+        let untargeted = PendingMerchantDigestRequest(digest: digest, targetSceneID: nil)
+        #expect(!untargeted.canBeClaimed(bySceneID: sceneA, isSceneActive: false))
+        #expect(untargeted.canBeClaimed(bySceneID: sceneB, isSceneActive: true))
+    }
 }

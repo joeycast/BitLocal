@@ -74,23 +74,45 @@ enum BitLocalIntentAction: Equatable, Sendable {
     case openCommunities
 }
 
+struct PendingIntentRequest: Equatable, Sendable {
+    let id: UUID
+    let action: BitLocalIntentAction
+
+    init(id: UUID = UUID(), action: BitLocalIntentAction) {
+        self.id = id
+        self.action = action
+    }
+}
+
 @MainActor
 @Observable
 final class BitLocalAppIntentRouter {
     static let shared = BitLocalAppIntentRouter()
 
-    var pendingAction: BitLocalIntentAction?
+    private(set) var pendingRequest: PendingIntentRequest?
+
+    var pendingAction: BitLocalIntentAction? {
+        pendingRequest?.action
+    }
 
     init() {}
 
     func post(_ action: BitLocalIntentAction) {
-        pendingAction = action
+        pendingRequest = PendingIntentRequest(action: action)
     }
 
     func consumePendingAction() -> BitLocalIntentAction? {
-        let action = pendingAction
-        pendingAction = nil
+        let action = pendingRequest?.action
+        pendingRequest = nil
         return action
+    }
+
+    /// Claims the queued App Intent action only for an active foreground scene,
+    /// preventing background or secondary multi-window scenes from consuming it.
+    func claimPendingAction(isSceneActive: Bool) -> BitLocalIntentAction? {
+        guard isSceneActive, let request = pendingRequest else { return nil }
+        pendingRequest = nil
+        return request.action
     }
 }
 

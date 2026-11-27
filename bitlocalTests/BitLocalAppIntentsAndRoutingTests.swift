@@ -18,6 +18,22 @@ struct BitLocalAppIntentsAndRoutingTests {
         #expect(router.consumePendingAction() == nil)
     }
 
+    @Test func appIntentRouterOnlyAllowsActiveSceneToClaimPendingAction() {
+        let router = BitLocalAppIntentRouter()
+        router.post(.openCommunities)
+        let firstRequestID = router.pendingRequest?.id
+        #expect(firstRequestID != nil)
+
+        // Inactive/background scene must not consume the queued intent.
+        #expect(router.claimPendingAction(isSceneActive: false) == nil)
+        #expect(router.pendingRequest?.id == firstRequestID)
+
+        // Foreground active scene claims it once; a second active scene gets nil.
+        #expect(router.claimPendingAction(isSceneActive: true) == .openCommunities)
+        #expect(router.claimPendingAction(isSceneActive: true) == nil)
+        #expect(router.pendingRequest == nil)
+    }
+
     @Test(arguments: MerchantQuickFilter.allCases)
     func merchantQuickFilterMetadataIsComplete(filter: MerchantQuickFilter) {
         #expect(filter.id.isEmpty == false)

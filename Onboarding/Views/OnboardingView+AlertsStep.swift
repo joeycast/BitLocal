@@ -8,7 +8,7 @@ extension OnboardingView {
         maxContentWidth: CGFloat
     ) -> some View {
         VStack(spacing: 14) {
-            if let errorMessage = merchantAlertsManager.errorMessage {
+            if let errorMessage = alertsErrorMessage {
                 Text(errorMessage)
                     .font(.footnote)
                     .foregroundStyle(.red)
@@ -437,9 +437,10 @@ extension OnboardingView {
         guard !isEnablingAlerts else { return }
 
         isEnablingAlerts = true
+        alertsErrorMessage = nil
         defer { isEnablingAlerts = false }
 
-        await merchantAlertsManager.enableNotifications(for: selectedAlertCity)
+        alertsErrorMessage = await merchantAlertsManager.enableNotifications(for: selectedAlertCity)
 
         if merchantAlertsManager.currentSubscription?.locationID == selectedAlertCity.locationID {
             proceedToNextPage()
