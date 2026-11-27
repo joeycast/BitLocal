@@ -124,19 +124,16 @@ struct LRUCacheTests {
         )
 
         // First request starts immediately and holds the pump on `gate` so we can queue the rest deterministically.
-        geocoder.reverseGeocode(location: CLLocation(latitude: 1, longitude: 0), requestKey: "k1", priority: .normal) { (_: ReverseGeocodeResponse) in }
+        _ = await geocoder.enqueueSync(location: CLLocation(latitude: 1, longitude: 0), requestKey: "k1", priority: .normal) { (_: ReverseGeocodeResponse) in }
         await recorder.waitUntilCount(1)
 
-        geocoder.reverseGeocode(location: CLLocation(latitude: 2, longitude: 0), requestKey: "k2", priority: .low) { (_: ReverseGeocodeResponse) in }
-        let canceledToken = geocoder.reverseGeocode(location: CLLocation(latitude: 3, longitude: 0), requestKey: "k3", priority: .normal) { (_: ReverseGeocodeResponse) in }
-        geocoder.reverseGeocode(location: CLLocation(latitude: 4, longitude: 0), requestKey: "k4", priority: .normal) { (_: ReverseGeocodeResponse) in }
-        try? await Task.sleep(for: .milliseconds(15))
-        geocoder.reverseGeocode(location: CLLocation(latitude: 5, longitude: 0), requestKey: "k5", priority: .normal) { (_: ReverseGeocodeResponse) in }
-        geocoder.reverseGeocode(location: CLLocation(latitude: 6, longitude: 0), requestKey: "k6", priority: .high) { (_: ReverseGeocodeResponse) in }
-        geocoder.cancel(canceledToken)
+        _ = await geocoder.enqueueSync(location: CLLocation(latitude: 2, longitude: 0), requestKey: "k2", priority: .low) { (_: ReverseGeocodeResponse) in }
+        let canceledToken = await geocoder.enqueueSync(location: CLLocation(latitude: 3, longitude: 0), requestKey: "k3", priority: .normal) { (_: ReverseGeocodeResponse) in }
+        _ = await geocoder.enqueueSync(location: CLLocation(latitude: 4, longitude: 0), requestKey: "k4", priority: .normal) { (_: ReverseGeocodeResponse) in }
+        _ = await geocoder.enqueueSync(location: CLLocation(latitude: 5, longitude: 0), requestKey: "k5", priority: .normal) { (_: ReverseGeocodeResponse) in }
+        _ = await geocoder.enqueueSync(location: CLLocation(latitude: 6, longitude: 0), requestKey: "k6", priority: .high) { (_: ReverseGeocodeResponse) in }
+        await geocoder.cancelSync(canceledToken)
 
-        // Allow enqueue & cancel tasks to enter the actor before opening the gate.
-        try? await Task.sleep(for: .milliseconds(30))
         await gate.open()
         await recorder.waitUntilCount(5)
 
@@ -180,7 +177,7 @@ private actor GeocodeOrderRecorder {
     }
 
     func waitUntilCount(_ expected: Int) async {
-        for _ in 0..<200 {
+        for _ in 0..<500 {
             if items.count >= expected { return }
             try? await Task.sleep(for: .milliseconds(10))
         }

@@ -395,6 +395,28 @@ final class Geocoder: @unchecked Sendable {
             await pump.cancel(token)
         }
     }
+
+    /// Awaits actor insertion directly so unit tests can assert queue order deterministically.
+    func enqueueSync(
+        location: CLLocation,
+        requestKey: String? = nil,
+        priority: GeocodePriority = .normal,
+        completion: @escaping @MainActor @Sendable (ReverseGeocodeResponse) -> Void
+    ) async -> GeocodeRequestToken {
+        let key = requestKey ?? ReverseGeocodingSpatialKey.key(for: location.coordinate)
+        let token = GeocodeRequestToken(id: UUID(), key: key)
+        await pump.enqueue(
+            token: token,
+            location: location,
+            priority: priority,
+            completion: completion
+        )
+        return token
+    }
+
+    func cancelSync(_ token: GeocodeRequestToken) async {
+        await pump.cancel(token)
+    }
 }
 
 private actor GeocoderPump {
@@ -603,8 +625,9 @@ private actor GeocoderPump {
                         retryAfter: nil,
                         wasCanceled: true
                     )
-                    await MainActor.run {
-                        waiters.forEach { $0.handler(offlineResponse) }
+                    let handlers = waiters.map(\.handler)
+                    Task { @MainActor in
+                        handlers.forEach { $0(offlineResponse) }
                     }
                 }
                 continue
@@ -627,8 +650,9 @@ private actor GeocoderPump {
 
             let waiters = waitersByKey.removeValue(forKey: request.key) ?? []
             if !waiters.isEmpty {
-                await MainActor.run {
-                    waiters.forEach { $0.handler(response) }
+                let handlers = waiters.map(\.handler)
+                Task { @MainActor in
+                    handlers.forEach { $0(response) }
                 }
             }
         }

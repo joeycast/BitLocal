@@ -9,6 +9,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     private let v3Client = BTCMapV3AreasClient()
     private let v4Client: BTCMapV4ClientProtocol
     private let userDefaults: UserDefaults
+    private let cacheDirectory: URL
     private let modeKey = "btcmap_data_source_mode"
     private let lastAppVersionKey = "btcmap_last_app_version"
     private let cacheIOQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-io", qos: .utility)
@@ -16,9 +17,14 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     private var isV4RefreshInFlight = false
     private var pendingV4RefreshCompletions: [@Sendable ([Element]?) -> Void] = []
 
-    init(v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(), userDefaults: UserDefaults = .standard) {
+    init(
+        v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(),
+        userDefaults: UserDefaults = .standard,
+        cacheDirectory: URL = .cachesDirectory
+    ) {
         self.v4Client = v4Client
         self.userDefaults = userDefaults
+        self.cacheDirectory = cacheDirectory
         // Ensure v2 version-change side effects still run (APIManager.init).
         _ = APIManager.shared
         clearV4CacheIfAppVersionChanged()
@@ -46,11 +52,11 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     }
 
     private var v4ElementsFileURL: URL {
-        URL.cachesDirectory.appending(path: "btcmap_elements_v4.json")
+        cacheDirectory.appending(path: "btcmap_elements_v4.json")
     }
 
     private var v4SyncStateFileURL: URL {
-        URL.cachesDirectory.appending(path: "btcmap_v4_sync_state.json")
+        cacheDirectory.appending(path: "btcmap_v4_sync_state.json")
     }
 
     func loadCachedElements() -> [Element]? {

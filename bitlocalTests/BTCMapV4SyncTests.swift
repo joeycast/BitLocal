@@ -4,17 +4,20 @@ import Testing
 
 @Suite(.serialized, .tags(.sync))
 final class BTCMapV4SyncTests {
-    private let elementsFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        .appendingPathComponent("btcmap_elements_v4.json")
-    private let syncStateFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        .appendingPathComponent("btcmap_v4_sync_state.json")
+    private let cacheDirectory: URL
+    private let elementsFileURL: URL
+    private let syncStateFileURL: URL
 
     init() throws {
-        try removeV4CacheFiles()
+        cacheDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BTCMapV4SyncTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        elementsFileURL = cacheDirectory.appendingPathComponent("btcmap_elements_v4.json")
+        syncStateFileURL = cacheDirectory.appendingPathComponent("btcmap_v4_sync_state.json")
     }
 
     deinit {
-        try? removeV4CacheFiles()
+        try? FileManager.default.removeItem(at: cacheDirectory)
     }
 
     @Test func bootstrapUsesSnapshotLastModifiedAsInitialIncrementalAnchor() async {
@@ -36,7 +39,11 @@ final class BTCMapV4SyncTests {
         ))
         client.fetchPlacesResult = .success([])
 
-        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
+        let repository = BTCMapRepository(
+            v4Client: client,
+            userDefaults: testUserDefaults(),
+            cacheDirectory: cacheDirectory
+        )
         await withCheckedContinuation { continuation in
             repository.refreshElements { _ in
                 continuation.resume()
@@ -106,7 +113,11 @@ final class BTCMapV4SyncTests {
         let client = MockBTCMapV4Client()
         client.fetchPlacesResult = .success([])
 
-        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
+        let repository = BTCMapRepository(
+            v4Client: client,
+            userDefaults: testUserDefaults(),
+            cacheDirectory: cacheDirectory
+        )
         await withCheckedContinuation { continuation in
             repository.refreshElements { _ in
                 continuation.resume()
@@ -114,14 +125,6 @@ final class BTCMapV4SyncTests {
         }
 
         #expect(client.fetchPlacesUpdatedSinceValues == ["2025-06-11T00:00:00Z"])
-    }
-
-    private func removeV4CacheFiles() throws {
-        for url in [elementsFileURL, syncStateFileURL] {
-            if FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.removeItem(at: url)
-            }
-        }
     }
 
     private func testUserDefaults() -> UserDefaults {
