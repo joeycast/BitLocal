@@ -254,9 +254,9 @@ final class MerchantAlertsManager: NSObject {
     private let keychainService = "app.bitlocal.bitlocal.merchant-alerts"
     private let keychainSubscriptionsAccount = "merchant_alert_subscriptions_v1"
     private let digestRecordType = "CityDigest"
-    private let localNotificationKindKey = "merchant_alert_kind"
-    private let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
-    private let localNotificationKindDigest = "city_digest"
+    private static let localNotificationKindKey = "merchant_alert_kind"
+    private static let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
+    private static let localNotificationKindDigest = "city_digest"
     private let digestCatchUpLimit = 1
     private var hasRegisteredForRemoteNotifications = false
     private var isRegisteringForRemoteNotifications = false
@@ -441,8 +441,13 @@ final class MerchantAlertsManager: NSObject {
     }
 
     func handleNotificationResponse(userInfo: [AnyHashable: Any]) async {
+        guard let recordName = Self.digestRecordName(from: userInfo) else { return }
+        await handleNotificationResponse(digestRecordName: recordName)
+    }
+
+    func handleNotificationResponse(digestRecordName: String) async {
         do {
-            guard let digest = try await digest(from: userInfo) else { return }
+            let digest = try await fetchDigest(recordID: CKRecord.ID(recordName: digestRecordName))
             lastDigest = digest
             persistLastDigest()
             activeDigest = digest
@@ -450,6 +455,21 @@ final class MerchantAlertsManager: NSObject {
             errorMessage = error.localizedDescription
             Debug.log("Merchant alerts: failed handling notification response: \(error.localizedDescription)")
         }
+    }
+
+    nonisolated static func digestRecordName(from userInfo: [AnyHashable: Any]) -> String? {
+        if let kind = userInfo[localNotificationKindKey] as? String,
+           kind == localNotificationKindDigest,
+           let recordName = userInfo[localNotificationDigestRecordNameKey] as? String {
+            return recordName
+        }
+
+        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
+              let queryNotification = notification as? CKQueryNotification,
+              let recordID = queryNotification.recordID else {
+            return nil
+        }
+        return recordID.recordName
     }
 
     private func loadPersistedState() {
@@ -544,19 +564,10 @@ final class MerchantAlertsManager: NSObject {
     }
 
     private func digest(from userInfo: [AnyHashable: Any]) async throws -> CityDigest? {
-        if let kind = userInfo[localNotificationKindKey] as? String,
-           kind == localNotificationKindDigest,
-           let recordName = userInfo[localNotificationDigestRecordNameKey] as? String {
-            return try await fetchDigest(recordID: CKRecord.ID(recordName: recordName))
-        }
-
-        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
-              let queryNotification = notification as? CKQueryNotification,
-              let recordID = queryNotification.recordID else {
+        guard let recordName = Self.digestRecordName(from: userInfo) else {
             return nil
         }
-
-        return try await fetchDigest(recordID: recordID)
+        return try await fetchDigest(recordID: CKRecord.ID(recordName: recordName))
     }
 
     private func scheduleLocalNotification(for digest: CityDigest) async throws {
@@ -565,8 +576,8 @@ final class MerchantAlertsManager: NSObject {
         content.body = notificationBody(for: digest)
         content.sound = .default
         content.userInfo = [
-            localNotificationKindKey: localNotificationKindDigest,
-            localNotificationDigestRecordNameKey: digest.id
+            Self.localNotificationKindKey: Self.localNotificationKindDigest,
+            Self.localNotificationDigestRecordNameKey: digest.id
         ]
 
         let identifier = "merchant-alert-\(digest.id)"
@@ -860,19 +871,22 @@ final class BitLocalAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         }
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        await MerchantAlertsManager.shared.handleNotificationResponse(
-            userInfo: response.notification.request.content.userInfo
-        )
+        guard let recordName = MerchantAlertsManager.digestRecordName(
+            from: response.notification.request.content.userInfo
+        ) else {
+            return
+        }
+        await MerchantAlertsManager.shared.handleNotificationResponse(digestRecordName: recordName)
     }
 }

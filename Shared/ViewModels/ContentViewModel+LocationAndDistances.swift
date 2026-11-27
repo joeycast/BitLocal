@@ -23,16 +23,17 @@ extension ContentViewModel {
     }
     
     // Get latest location
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let latestLocation = locations.first else {
             Debug.log("No location in didUpdateLocations")
             return
         }
 
         Debug.log("Location updated: \(latestLocation.coordinate)")
+        manager.stopUpdatingLocation()
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
 
             // Only center the map on the user's location if this is the first update (initial launch)
             if !self.initialRegionSet {
@@ -56,31 +57,30 @@ extension ContentViewModel {
             self.userLocationSubject.send(latestLocation)
             self.isUpdatingLocation = false
         }
-        manager.stopUpdatingLocation()
     }
     
     // locationManager failure scenario (could not get user location)
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Debug.log("LocationManager error: \(error.localizedDescription)")
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             self?.isUpdatingLocation = false
             self?.cancelPendingPostOnboardingMapPresentation()
         }
     }
     
     // Handle authorization changes
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         Debug.log("Location authorization changed to: \(status.rawValue)")
         
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             
             switch status {
             case .authorizedWhenInUse, .authorizedAlways:
                 if self.userLocation == nil {
                     self.isUpdatingLocation = true
-                    manager.startUpdatingLocation()
+                    self.locationManager.startUpdatingLocation()
                 }
             case .denied, .restricted:
                 self.isUpdatingLocation = false

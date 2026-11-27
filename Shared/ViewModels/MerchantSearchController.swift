@@ -10,6 +10,7 @@ import Observation
 
 /// Map/catalog state the search controller reads from its owner. `ContentViewModel`
 /// conforms directly; tests can supply a lightweight fake.
+@MainActor
 protocol MerchantSearchHost: AnyObject {
     var region: MKCoordinateRegion { get }
     var userLocation: CLLocation? { get }
@@ -25,6 +26,7 @@ protocol MerchantSearchHost: AnyObject {
 
 /// Owns merchant search state and orchestration (hybrid local search, legacy remote
 /// search, result caches). Extracted from `ContentViewModel`, which forwards to it.
+@MainActor
 @Observable
 final class MerchantSearchController {
     var unifiedSearchText = ""
