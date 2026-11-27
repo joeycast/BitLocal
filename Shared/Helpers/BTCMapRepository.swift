@@ -21,16 +21,6 @@ private actor BTCMapRefreshCoordinator {
     }
 }
 
-extension BTCMapRepositoryProtocol {
-    func refreshElements() async -> [Element]? {
-        await withCheckedContinuation { continuation in
-            refreshElements { elements in
-                continuation.resume(returning: elements)
-            }
-        }
-    }
-}
-
 final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     static let shared = BTCMapRepository()
     static let epochISO8601 = "1970-01-01T00:00:00Z"
