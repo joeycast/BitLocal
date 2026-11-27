@@ -1,12 +1,13 @@
 import CoreLocation
+import Observation
 import SwiftUI
 
 struct MerchantAlertCityPickerView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var contentViewModel: ContentViewModel
-    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @Environment(ContentViewModel.self) private var contentViewModel
+    @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @Binding var currentDetent: PresentationDetent
-    @StateObject private var model = MerchantAlertCityPickerModel()
+    @State private var model = MerchantAlertCityPickerModel()
 
     let onSelection: (MerchantAlertCityChoice) -> Void
 
@@ -53,7 +54,7 @@ struct MerchantAlertCityPickerView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-                .font(.system(size: 15))
+                .font(.subheadline)
 
             TextField("Search cities worldwide", text: $model.searchText)
                 .textFieldStyle(.plain)
@@ -63,18 +64,21 @@ struct MerchantAlertCityPickerView: View {
                 .submitLabel(.search)
 
             if !model.searchText.isEmpty {
-                Button {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
                     model.searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 15))
                 }
+                .labelStyle(.iconOnly)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(.rect)
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .frame(minHeight: 44)
+        .padding(.leading, 12)
+        .padding(.trailing, model.searchText.isEmpty ? 12 : 4)
+        .padding(.vertical, 2)
         .cityPickerSearchBackground(glassy: shouldUseGlassyBackground)
     }
 
@@ -207,12 +211,38 @@ struct MerchantAlertCityPickerView: View {
                     .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
+                    if let badge {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(title)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+
+                                Spacer(minLength: 8)
+
+                                badgePill(badge, accent: accent)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(title)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+
+                                badgePill(badge, accent: accent)
+                            }
+                        }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.trailing, badge == nil ? 0 : 132)
+                    } else {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
                     Text(subtitle)
                         .font(.subheadline)
@@ -227,17 +257,6 @@ struct MerchantAlertCityPickerView: View {
                     }
                     .foregroundStyle(accent)
                 }
-                .overlay(alignment: .topTrailing) {
-                    if let badge {
-                        Text(badge)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(accent.opacity(0.12), in: Capsule())
-                            .fixedSize()
-                    }
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
@@ -247,6 +266,16 @@ struct MerchantAlertCityPickerView: View {
         .padding(.horizontal, 16)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(subtitle)")
+    }
+
+    private func badgePill(_ text: String, accent: Color) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(accent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(accent.opacity(0.12), in: Capsule())
+            .lineLimit(1)
     }
 
     private func loadingState(_ title: String) -> some View {
@@ -285,23 +314,24 @@ struct MerchantAlertCityPickerView: View {
 }
 
 @MainActor
-final class MerchantAlertCityPickerModel: ObservableObject {
-    @Published var searchText = "" {
+@Observable
+final class MerchantAlertCityPickerModel {
+    var searchText = "" {
         didSet {
             scheduleSearch(for: searchText)
         }
     }
-    @Published private(set) var results: [CitySearchResult] = []
-    @Published private(set) var isLoading = false
-    @Published private(set) var currentLocationCity: CityPickerContextCity?
-    @Published private(set) var activeAlertCity: MerchantAlertCityChoice?
-    @Published private(set) var recommendedCities: [CitySearchResult] = []
-    @Published private(set) var isLoadingBrowseContent = false
+    private(set) var results: [CitySearchResult] = []
+    private(set) var isLoading = false
+    private(set) var currentLocationCity: CityPickerContextCity?
+    private(set) var activeAlertCity: MerchantAlertCityChoice?
+    private(set) var recommendedCities: [CitySearchResult] = []
+    private(set) var isLoadingBrowseContent = false
 
-    private var searchTask: Task<Void, Never>?
-    private var locationTask: Task<Void, Never>?
-    private let store = CityIndexStore.shared
-    private var latestLocationKey: String?
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var locationTask: Task<Void, Never>?
+    @ObservationIgnored private let store = CityIndexStore.shared
+    @ObservationIgnored private var latestLocationKey: String?
 
     var isShowingSearchResults: Bool {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2
@@ -455,7 +485,7 @@ final class MerchantAlertCityPickerModel: ObservableObject {
 
     private func reverseGeocode(_ location: CLLocation, requestKey: String) async -> CLPlacemark? {
         await withCheckedContinuation { continuation in
-            Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey) { placemark in
+            Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey, priority: .high) { placemark in
                 continuation.resume(returning: placemark)
             }
         }

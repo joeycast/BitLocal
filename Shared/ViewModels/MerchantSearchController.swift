@@ -4,16 +4,18 @@
 //
 
 import SwiftUI
-import Combine
 import CoreLocation
 import MapKit
+import Observation
 
 /// Map/catalog state the search controller reads from its owner. `ContentViewModel`
 /// conforms directly; tests can supply a lightweight fake.
+@MainActor
 protocol MerchantSearchHost: AnyObject {
     var region: MKCoordinateRegion { get }
     var userLocation: CLLocation? { get }
     var visibleElements: [Element] { get }
+    var searchViewportElements: [Element] { get }
     var mapDisplayMode: MapDisplayMode { get }
     var hasLoadedInitialData: Bool { get }
     var allElements: [Element] { get }
@@ -23,46 +25,51 @@ protocol MerchantSearchHost: AnyObject {
     func upsertElementIntoStore(_ element: Element)
 }
 
+extension MerchantSearchHost {
+    var searchViewportElements: [Element] { visibleElements }
+}
+
 /// Owns merchant search state and orchestration (hybrid local search, legacy remote
 /// search, result caches). Extracted from `ContentViewModel`, which forwards to it.
-final class MerchantSearchController: ObservableObject {
-    @Published var unifiedSearchText = ""
-    @Published var isSearchActive = false
-    @Published private(set) var localFilteredMerchants: [Element] = []
-    @Published var selectedMerchantSearchScope: MerchantSearchScope = .onMap
-    @Published private(set) var merchantSearchPrimaryResults: [Element] = []
-    @Published private(set) var merchantSearchMapResults: [Element] = []
-    @Published private(set) var merchantSearchFreshResults: [V4PlaceRecord] = []
-    @Published private(set) var merchantSearchNormalizedQuery = ""
-    @Published var searchMatchingAreas: [V3AreaRecord] = []
+@MainActor
+@Observable
+final class MerchantSearchController {
+    var unifiedSearchText = ""
+    var isSearchActive = false
+    private(set) var localFilteredMerchants: [Element] = []
+    var selectedMerchantSearchScope: MerchantSearchScope = .onMap
+    private(set) var merchantSearchPrimaryResults: [Element] = []
+    private(set) var merchantSearchMapResults: [Element] = []
+    private(set) var merchantSearchFreshResults: [V4PlaceRecord] = []
+    private(set) var merchantSearchNormalizedQuery = ""
+    var searchMatchingAreas: [V3AreaRecord] = []
     // Remote merchant search
-    @Published var merchantSearchResults: [V4PlaceRecord] = []
-    @Published var merchantSearchIsLoading = false
-    @Published private(set) var merchantSearchIsWaitingForLocalDebounce = false
-    @Published var merchantSearchError: String?
-    @Published var merchantSearchIsOfflineFallback = false
-    @Published var merchantSearchRadiusKM: Double = 20
-    @Published var merchantSearchProviderFilter = ""
+    var merchantSearchResults: [V4PlaceRecord] = []
+    var merchantSearchIsLoading = false
+    private(set) var merchantSearchIsWaitingForLocalDebounce = false
+    var merchantSearchError: String?
+    var merchantSearchIsOfflineFallback = false
+    var merchantSearchRadiusKM: Double = 20
+    var merchantSearchProviderFilter = ""
 
-    weak var host: MerchantSearchHost?
+    @ObservationIgnored weak var host: MerchantSearchHost?
 
     private let btcMapRepository: BTCMapSearchServiceProtocol
-    private var unifiedSearchDebounceTask: Task<Void, Never>?
-    private var localMerchantSearchTask: Task<Void, Never>?
-    private let unifiedSearchDebounceNanoseconds: UInt64
-    private let unifiedSearchWorldwideDebounceNanoseconds: UInt64
-    private let localSearchWorldwideDebounceNanoseconds: UInt64
-    private var latestMerchantSearchRequestID = UUID()
-    private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
-    private var merchantSearchAnchorQuery = ""
+    @ObservationIgnored private var unifiedSearchDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private var localMerchantSearchTask: Task<Void, Never>?
+    private let unifiedSearchDebounceDuration: Duration
+    private let unifiedSearchWorldwideDebounceDuration: Duration
+    private let localSearchWorldwideDebounceDuration: Duration
+    @ObservationIgnored private var latestMerchantSearchRequestID = UUID()
+    @ObservationIgnored private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
+    @ObservationIgnored private var merchantSearchAnchorQuery = ""
     private let merchantSearchRequeryDistanceMeters: CLLocationDistance = 5_000
-    private var didRestorePersistedMerchantCategory = false
-    private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
-    private var merchantSearchDocumentSignatureByID: [String: String] = [:]
-    private var merchantSearchLocalMatchScoreByID: [String: Int] = [:]
-    private var merchantSearchStrongLocalHitCount = 0
-    private var merchantSearchPreviewHydrationInFlight = Set<String>()
-    private var merchantSearchLoadingTimeoutTask: Task<Void, Never>?
+    @ObservationIgnored private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
+    @ObservationIgnored private var merchantSearchDocumentSignatureByID: [String: String] = [:]
+    @ObservationIgnored private var merchantSearchLocalMatchScoreByID: [String: Int] = [:]
+    @ObservationIgnored private var merchantSearchStrongLocalHitCount = 0
+    @ObservationIgnored private var merchantSearchPreviewHydrationInFlight = Set<String>()
+    @ObservationIgnored private var merchantSearchLoadingTimeoutTask: Task<Void, Never>?
     private let merchantSearchV2HybridFlagKey = "search_v2_hybrid"
     let merchantSearchDocumentCacheLimit = 1_200
 
@@ -73,16 +80,16 @@ final class MerchantSearchController: ObservableObject {
         localSearchWorldwideDebounceNanoseconds: UInt64 = 250_000_000
     ) {
         self.btcMapRepository = btcMapRepository
-        self.unifiedSearchDebounceNanoseconds = unifiedSearchDebounceNanoseconds
-        self.unifiedSearchWorldwideDebounceNanoseconds = unifiedSearchWorldwideDebounceNanoseconds
-        self.localSearchWorldwideDebounceNanoseconds = localSearchWorldwideDebounceNanoseconds
+        self.unifiedSearchDebounceDuration = .nanoseconds(Int64(clamping: unifiedSearchDebounceNanoseconds))
+        self.unifiedSearchWorldwideDebounceDuration = .nanoseconds(Int64(clamping: unifiedSearchWorldwideDebounceNanoseconds))
+        self.localSearchWorldwideDebounceDuration = .nanoseconds(Int64(clamping: localSearchWorldwideDebounceNanoseconds))
     }
 
     // MARK: - Host state
 
     private var region: MKCoordinateRegion { host?.region ?? MKCoordinateRegion() }
     private var userLocation: CLLocation? { host?.userLocation }
-    private var visibleElements: [Element] { host?.visibleElements ?? [] }
+    private var searchViewportElements: [Element] { host?.searchViewportElements ?? [] }
     private var mapDisplayMode: MapDisplayMode { host?.mapDisplayMode ?? .merchants }
     private var hasLoadedInitialData: Bool { host?.hasLoadedInitialData ?? false }
     private var allElements: [Element] { host?.allElements ?? [] }
@@ -138,14 +145,6 @@ final class MerchantSearchController: ObservableObject {
 
     func performUnifiedSearch() {
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty {
-            MerchantSearchPersistence.clear()
-        } else if let group = ElementCategorySymbols.resolvedCategoryGroup(
-            forNormalizedQuery: SearchTextNormalizer.normalize(query)
-        ), group.localizedLabel.compare(query, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
-            // Only persist exact category chip labels — never free-text.
-            MerchantSearchPersistence.saveCategoryGroup(group)
-        }
         if merchantSearchV2HybridEnabled {
             performUnifiedSearchHybrid(query: query)
         } else {
@@ -153,19 +152,9 @@ final class MerchantSearchController: ObservableObject {
         }
     }
 
-    /// Applies a category chip and persists the selection for return visits.
-    func applyMerchantCategoryChip(_ chip: MerchantCategoryChip) {
-        isSearchActive = true
-        MerchantSearchPersistence.saveCategoryGroup(chip.group)
-        unifiedSearchText = chip.localizedLabel
-        performUnifiedSearch()
-    }
-
-    /// Clears search text and forgets any persisted category chip.
+    /// Clears search text without disturbing active category/attribute filter chips.
     func clearMerchantSearch(userInitiated: Bool = true) {
-        if userInitiated {
-            MerchantSearchPersistence.clear()
-        }
+        _ = userInitiated
         // Setting isSearchActive = false re-enters this method via the
         // bottom sheet's onChange; skip the redundant second search pass.
         let wasCleared = unifiedSearchText.isEmpty && !isSearchActive
@@ -175,46 +164,6 @@ final class MerchantSearchController: ObservableObject {
         performUnifiedSearch()
     }
 
-    /// Restores the last category chip once after initial merchant data is ready.
-    /// Free-text is intentionally not restored (avoids surprise worldwide queries).
-    ///
-    /// When the current viewport has no matches, keep trying on later map/list
-    /// updates (do not set `didRestore…`) so cold-start over empty ocean can
-    /// still restore after the user pans into a populated area.
-    func restorePersistedMerchantCategoryIfNeeded() {
-        guard !didRestorePersistedMerchantCategory else { return }
-        guard mapDisplayMode == .merchants else { return }
-        guard hasLoadedInitialData, !allElements.isEmpty else { return }
-        // Local search filters the viewport (visibleElements); restoring before
-        // any pins are on screen guarantees an empty "no results" takeover on
-        // cold launch. Wait until the map has settled somewhere with merchants.
-        guard !visibleElements.isEmpty else { return }
-        guard unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            // User already typed or selected something — never auto-restore over it.
-            didRestorePersistedMerchantCategory = true
-            return
-        }
-        guard let group = MerchantSearchPersistence.loadCategoryGroup() else {
-            // Nothing to restore (missing/expired) — stop rechecking.
-            didRestorePersistedMerchantCategory = true
-            return
-        }
-        // Only take over the sheet when the category actually has matches in
-        // the current viewport. Leave the flag false so a later pan/zoom can retry.
-        let hasVisibleMatch = visibleElements.contains {
-            ElementCategorySymbols.merchantCategoryGroups(for: $0).contains(group)
-        }
-        guard hasVisibleMatch else {
-            Debug.logAPI("Deferred category chip restore (\(group.rawValue)): no visible matches in viewport")
-            return
-        }
-        didRestorePersistedMerchantCategory = true
-        isSearchActive = true
-        unifiedSearchText = group.localizedLabel
-        performUnifiedSearch()
-        Debug.logAPI("Restored persisted merchant category chip: \(group.rawValue)")
-    }
-
     func refreshMerchantSearchFromVisibleElementsIfNeeded() {
         guard mapDisplayMode == .merchants else { return }
         guard merchantSearchV2HybridEnabled else { return }
@@ -222,7 +171,7 @@ final class MerchantSearchController: ObservableObject {
         guard query.count >= 2 else { return }
         let normalizedQuery = SearchTextNormalizer.normalize(query)
         localFilteredMerchants = filteredMerchantElements(
-            in: visibleElements,
+            in: searchViewportElements,
             normalizedQuery: normalizedQuery
         )
         merchantSearchPrimaryResults = localFilteredMerchants
@@ -291,13 +240,13 @@ final class MerchantSearchController: ObservableObject {
     }
 
     private func scheduleLocalMerchantSearch(query: String, normalizedQuery: String) {
-        let source = visibleElements
+        let source = searchViewportElements
         merchantSearchIsWaitingForLocalDebounce = true
 
         localMerchantSearchTask = Task { [weak self] in
-            let debounceNanoseconds = self?.effectiveLocalMerchantSearchDebounceNanoseconds() ?? 0
-            if debounceNanoseconds > 0 {
-                try? await Task.sleep(nanoseconds: debounceNanoseconds)
+            let debounceDuration = self?.effectiveLocalMerchantSearchDebounceDuration() ?? .zero
+            if debounceDuration > .zero {
+                try? await Task.sleep(for: debounceDuration)
             }
             guard !Task.isCancelled else { return }
             await MainActor.run {
@@ -355,12 +304,16 @@ final class MerchantSearchController: ObservableObject {
 
         Debug.logAPI("Merchant search queued (legacy): query='\(query)', center=(\(region.center.latitude), \(region.center.longitude)), radiusKM=\(merchantSearchRadiusKM)")
 
-        unifiedSearchDebounceTask = Task {
-            try? await Task.sleep(nanoseconds: unifiedSearchDebounceNanoseconds)
+        unifiedSearchDebounceTask = Task { [weak self] in
+            guard let debounceDuration = self?.unifiedSearchDebounceDuration else { return }
+            if debounceDuration > .zero {
+                try? await Task.sleep(for: debounceDuration)
+            }
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                merchantSearchText = query
-                performRemoteMerchantSearch()
+                guard let self else { return }
+                self.merchantSearchText = query
+                self.performRemoteMerchantSearch()
             }
         }
     }
@@ -368,7 +321,7 @@ final class MerchantSearchController: ObservableObject {
     private func localMerchantSearchSource(for scope: MerchantSearchScope) -> [Element] {
         switch scope {
         case .onMap:
-            return visibleElements
+            return searchViewportElements
         case .worldwide:
             return []
         }
@@ -482,41 +435,42 @@ final class MerchantSearchController: ObservableObject {
             "Merchant remote search START: scope=\(selectedMerchantSearchScope.rawValue), query='\(trimmedName)', plans=\(plans.map(\.source).joined(separator: ","))"
         )
 
-        let group = DispatchGroup()
-        let aggregationQueue = DispatchQueue(label: "bitlocal.merchant-search.remote-aggregation")
-        var mergedByID: [String: V4PlaceRecord] = [:]
-        var errors: [String] = []
-        var hadSuccess = false
+        let repository = btcMapRepository
+        let sourceLabel = plans.map(\.source).joined(separator: "+")
 
-        for plan in plans {
-            group.enter()
-            btcMapRepository.searchPlaces(query: plan.query) { [weak self] result in
-                guard let self else {
-                    group.leave()
-                    return
+        Task { @MainActor [weak self] in
+            var mergedByID: [String: V4PlaceRecord] = [:]
+            var errors: [String] = []
+            var hadSuccess = false
+
+            await withTaskGroup(of: Result<[V4PlaceRecord], Error>.self) { group in
+                for plan in plans {
+                    let query = plan.query
+                    group.addTask {
+                        let result: Result<[V4PlaceRecord], Error> = await withCheckedContinuation { continuation in
+                            repository.searchPlaces(query: query) { result in
+                                continuation.resume(returning: result)
+                            }
+                        }
+                        return result.map { records in
+                            MerchantSearchEngine.filterRecords(records, normalizedQuery: normalizedQuery).map(\.record)
+                        }
+                    }
                 }
 
-                switch result {
-                case .success(let records):
-                    let filtered = self.filterRemoteSearchRecords(records, normalizedQuery: normalizedQuery)
-                    aggregationQueue.async {
+                for await outcome in group {
+                    switch outcome {
+                    case .success(let records):
                         hadSuccess = true
-                        for record in filtered {
+                        for record in records {
                             mergedByID[record.idString] = mergedByID[record.idString] ?? record
                         }
-                        group.leave()
-                    }
-
-                case .failure(let error):
-                    aggregationQueue.async {
+                    case .failure(let error):
                         errors.append(error.localizedDescription)
-                        group.leave()
                     }
                 }
             }
-        }
 
-        group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard self.latestMerchantSearchRequestID == requestID else { return }
 
@@ -528,12 +482,15 @@ final class MerchantSearchController: ObservableObject {
                 self.applyRemoteEnrichment(
                     records: rankedRecords,
                     requestID: requestID,
-                    source: plans.map(\.source).joined(separator: "+")
+                    source: sourceLabel
                 )
             } else {
                 self.merchantSearchResults = []
                 self.merchantSearchFreshResults = []
-                self.merchantSearchError = errors.first ?? NSLocalizedString("Search unavailable", comment: "Fallback error when remote merchant search fails")
+                self.merchantSearchError = errors.first ?? String(
+                    localized: "Search unavailable",
+                    comment: "Fallback error when remote merchant search fails"
+                )
                 self.merchantSearchLoadingTimeoutTask?.cancel()
                 self.merchantSearchIsLoading = false
                 self.merchantSearchIsOfflineFallback = true
@@ -642,14 +599,18 @@ final class MerchantSearchController: ObservableObject {
 
     private func scheduleMerchantSearchLoadingTimeout(for requestID: UUID) {
         merchantSearchLoadingTimeoutTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self else { return }
                 guard self.latestMerchantSearchRequestID == requestID else { return }
                 guard self.merchantSearchIsLoading else { return }
 
                 self.merchantSearchIsLoading = false
-                self.merchantSearchError = self.merchantSearchError ?? NSLocalizedString("Search timed out", comment: "Error shown when merchant search takes too long")
+                self.merchantSearchError = self.merchantSearchError ?? String(
+                    localized: "Search timed out",
+                    comment: "Error shown when merchant search takes too long"
+                )
                 self.merchantSearchIsOfflineFallback = true
                 Debug.logAPI("Merchant search timeout: requestID=\(requestID)")
             }
@@ -665,21 +626,21 @@ final class MerchantSearchController: ObservableObject {
         }
     }
 
-    private func effectiveMerchantSearchDebounceNanoseconds() -> UInt64 {
+    private func effectiveMerchantSearchDebounceDuration() -> Duration {
         switch selectedMerchantSearchScope {
         case .onMap:
-            return unifiedSearchDebounceNanoseconds
+            return unifiedSearchDebounceDuration
         case .worldwide:
-            return unifiedSearchWorldwideDebounceNanoseconds
+            return unifiedSearchWorldwideDebounceDuration
         }
     }
 
-    private func effectiveLocalMerchantSearchDebounceNanoseconds() -> UInt64 {
+    private func effectiveLocalMerchantSearchDebounceDuration() -> Duration {
         switch selectedMerchantSearchScope {
         case .onMap:
-            return unifiedSearchDebounceNanoseconds
+            return unifiedSearchDebounceDuration
         case .worldwide:
-            return localSearchWorldwideDebounceNanoseconds
+            return localSearchWorldwideDebounceDuration
         }
     }
 

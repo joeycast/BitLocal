@@ -2,22 +2,23 @@ import SwiftUI
 
 struct AddBusinessInfoView: View {
     @Environment(\.dismiss) var dismiss
+    @ScaledMetric(relativeTo: .largeTitle) private var headerIconSize: CGFloat = 60
 
-    private let btcMapAddLocationURL = URL(string: "https://btcmap.org/add-location")!
+    private static let btcMapAddURL = URL(string: "https://btcmap.org/add-location")
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Header section
                     VStack(spacing: 16) {
                         Image(systemName: "storefront.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.accentColor)
+                            .font(.system(size: headerIconSize))
+                            .foregroundStyle(.accent)
 
                         Text("add_business_info_title")
                             .font(.title2)
-                            .fontWeight(.bold)
+                            .bold()
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -45,22 +46,24 @@ struct AddBusinessInfoView: View {
                     }
 
                     // CTA Button
-                    Link(destination: btcMapAddLocationURL) {
-                        HStack {
-                            Text("add_business_info_cta_button")
-                                .fontWeight(.semibold)
-                            Image(systemName: "arrow.up.right")
+                    if let btcMapAddURL = Self.btcMapAddURL {
+                        Link(destination: btcMapAddURL) {
+                            HStack {
+                                Text("add_business_info_cta_button")
+                                    .fontWeight(.semibold)
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.accentColor)
+                            .foregroundStyle(.white)
+                            .clipShape(.rect(cornerRadius: 12))
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.accentColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
                     }
 
                     Text("add_business_info_leaving_app")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                 }
@@ -89,27 +92,25 @@ private struct InfoCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundColor(.accentColor)
+                .font(.title2)
+                .foregroundStyle(.accent)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
                 Text(description)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground))
-        .cornerRadius(12)
+        .clipShape(.rect(cornerRadius: 12))
     }
 }
 
-struct AddBusinessInfoView_Previews: PreviewProvider {
-    static var previews: some View {
-        AddBusinessInfoView()
-    }
+#Preview {
+    AddBusinessInfoView()
 }

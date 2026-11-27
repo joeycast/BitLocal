@@ -3,9 +3,10 @@ import SwiftUI
 // MARK: - All Events List (pushed onto NavigationStack)
 
 struct AllEventsListView: View {
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var viewModel
 
     var body: some View {
+        @Bindable var viewModel = viewModel
         List {
             if viewModel.eventsIsLoading {
                 Section {
@@ -24,8 +25,7 @@ struct AllEventsListView: View {
 
             if viewModel.eventsResults.isEmpty && !viewModel.eventsIsLoading {
                 Section {
-                    Text("No events found")
-                        .foregroundStyle(.secondary)
+                    ContentUnavailableView("No Events Found", systemImage: "calendar")
                 }
             } else {
                 Section {
@@ -45,24 +45,15 @@ struct AllEventsListView: View {
         .navigationTitle("Events")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    Toggle(isOn: $viewModel.eventsIncludePast) {
-                        Text("Past")
-                    }
-                    .toggleStyle(.button)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .onChange(of: viewModel.eventsIncludePast) { _, _ in
-                        viewModel.loadBTCMapEvents()
-                    }
-                    Button {
-                        viewModel.loadBTCMapEvents()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .accessibilityLabel("Refresh events")
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Toggle(isOn: $viewModel.eventsIncludePast) {
+                    Label("Past", systemImage: "clock.arrow.circlepath")
                 }
+                .onChange(of: viewModel.eventsIncludePast) { _, _ in
+                    viewModel.loadBTCMapEvents()
+                }
+
+                Button("Refresh events", systemImage: "arrow.clockwise", action: viewModel.loadBTCMapEvents)
             }
         }
         .onAppear {

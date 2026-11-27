@@ -1,0 +1,15 @@
+appId: app.bitlocal.bitlocal
+tags:
+  - discovery
+  - filters
+---
+- launchApp
+- assertVisible: "Search merchants…"
+- tapOn: "Lightning"
+- tapOn: "Open Now"
+- tapOn: "Lightning"
+- tapOn: "Open Now"
+- tapOn: "Search merchants…"
+- inputText: "Coffee"
+- tapOn: "Clear search"
+- tapOn: "Cancel"

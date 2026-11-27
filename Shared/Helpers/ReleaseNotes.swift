@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import SwiftUI
 
 struct ReleaseNotesHighlight: Identifiable, Equatable {
@@ -74,15 +75,16 @@ enum ReleaseNotesCatalog {
 }
 
 @MainActor
-final class ReleaseNotesController: ObservableObject {
+@Observable
+final class ReleaseNotesController {
     private enum StorageKey {
         static let lastSeenReleaseNotesVersion = "lastSeenReleaseNotesVersion"
     }
 
-    @Published var activeReleaseNotes: ReleaseNotesEntry?
+    var activeReleaseNotes: ReleaseNotesEntry?
 
-    private let userDefaults: UserDefaults
-    private let currentVersion: String
+    @ObservationIgnored private let userDefaults: UserDefaults
+    @ObservationIgnored private let currentVersion: String
 
     init(
         userDefaults: UserDefaults = .standard,

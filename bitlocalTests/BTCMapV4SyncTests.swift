@@ -1,23 +1,26 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class BTCMapV4SyncTests: XCTestCase {
-    private let elementsFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        .appendingPathComponent("btcmap_elements_v4.json")
-    private let syncStateFileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        .appendingPathComponent("btcmap_v4_sync_state.json")
+@Suite(.serialized, .tags(.sync))
+final class BTCMapV4SyncTests {
+    private let cacheDirectory: URL
+    private let elementsFileURL: URL
+    private let syncStateFileURL: URL
 
-    override func setUpWithError() throws {
-        try super.setUpWithError()
-        try removeV4CacheFiles()
+    init() throws {
+        cacheDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BTCMapV4SyncTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        elementsFileURL = cacheDirectory.appendingPathComponent("btcmap_elements_v4.json")
+        syncStateFileURL = cacheDirectory.appendingPathComponent("btcmap_v4_sync_state.json")
     }
 
-    override func tearDownWithError() throws {
-        try removeV4CacheFiles()
-        try super.tearDownWithError()
+    deinit {
+        try? FileManager.default.removeItem(at: cacheDirectory)
     }
 
-    func testBootstrapUsesSnapshotLastModifiedAsInitialIncrementalAnchor() {
+    @Test func bootstrapUsesSnapshotLastModifiedAsInitialIncrementalAnchor() async {
         let client = MockBTCMapV4Client()
         client.snapshotResult = .success((
             records: [
@@ -36,19 +39,21 @@ final class BTCMapV4SyncTests: XCTestCase {
         ))
         client.fetchPlacesResult = .success([])
 
-        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
-        let expectation = expectation(description: "refresh completes")
-
-        repository.refreshElements { _ in
-            expectation.fulfill()
+        let repository = BTCMapRepository(
+            v4Client: client,
+            userDefaults: testUserDefaults(),
+            cacheDirectory: cacheDirectory
+        )
+        await withCheckedContinuation { continuation in
+            repository.refreshElements { _ in
+                continuation.resume()
+            }
         }
 
-        wait(for: [expectation], timeout: 2)
-
-        XCTAssertEqual(client.fetchPlacesUpdatedSinceValues, ["2025-06-11T00:00:00Z"])
+        #expect(client.fetchPlacesUpdatedSinceValues == ["2025-06-11T00:00:00Z"])
     }
 
-    func testIncrementalSyncFallsBackToSnapshotLastModifiedWhenAnchorMissing() throws {
+    @Test func incrementalSyncFallsBackToSnapshotLastModifiedWhenAnchorMissing() async throws {
         let element = V4PlaceToElementMapper.placeRecordToElement(
             V4PlaceRecord(
                 id: 7,
@@ -108,61 +113,57 @@ final class BTCMapV4SyncTests: XCTestCase {
         let client = MockBTCMapV4Client()
         client.fetchPlacesResult = .success([])
 
-        let repository = BTCMapRepository(v4Client: client, userDefaults: testUserDefaults())
-        let expectation = expectation(description: "refresh completes")
-
-        repository.refreshElements { _ in
-            expectation.fulfill()
-        }
-
-        wait(for: [expectation], timeout: 2)
-
-        XCTAssertEqual(client.fetchPlacesUpdatedSinceValues, ["2025-06-11T00:00:00Z"])
-    }
-
-    private func removeV4CacheFiles() throws {
-        for url in [elementsFileURL, syncStateFileURL] {
-            if FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.removeItem(at: url)
+        let repository = BTCMapRepository(
+            v4Client: client,
+            userDefaults: testUserDefaults(),
+            cacheDirectory: cacheDirectory
+        )
+        await withCheckedContinuation { continuation in
+            repository.refreshElements { _ in
+                continuation.resume()
             }
         }
+
+        #expect(client.fetchPlacesUpdatedSinceValues == ["2025-06-11T00:00:00Z"])
     }
 
     private func testUserDefaults() -> UserDefaults {
         let suiteName = "BTCMapV4SyncTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        defaults.set(currentVersion, forKey: "btcmap_last_app_version")
         return defaults
     }
 }
 
-private final class MockBTCMapV4Client: BTCMapV4ClientProtocol {
+private final class MockBTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
     var snapshotResult: Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error> = .success((records: [], lastModified: nil))
     var fetchPlacesResult: Result<[V4PlaceRecord], Error> = .success([])
     var fetchPlacesUpdatedSinceValues: [String] = []
 
-    func fetchSnapshot(completion: @escaping (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
+    func fetchSnapshot(completion: @escaping @Sendable (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
         completion(snapshotResult)
     }
 
-    func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         fetchPlacesUpdatedSinceValues.append(updatedSince)
         completion(fetchPlacesResult)
     }
 
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         completion(.success([]))
     }
 
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         completion(.failure(MockError.unimplemented))
     }
 
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         completion(.success([]))
     }
 
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         completion(.success([]))
     }
 

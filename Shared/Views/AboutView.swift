@@ -1,320 +1,218 @@
 import SwiftUI
 
 struct AboutView: View {
-    
-    // For dismissing the SettingsView sheet
-    @Environment(\.dismiss) var dismiss
-    @EnvironmentObject private var viewModel: ContentViewModel
-    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
-    var onDone: (() -> Void)? = nil
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
+    @Environment(ReleaseNotesController.self) private var releaseNotesController
+    @Binding var currentDetent: PresentationDetent
+    var onDismissSheet: (() -> Void)? = nil
 
-    @State private var showingLogs = false
-    @State private var showingAddBusinessForm = false
-    @State private var isRefreshingMerchants = false
-    
-    // App name
-    let appName = "BitLocal"
-    
-    // Contribute section links
-    let suggestABusinessEmail = URL(string:"mailto:support@bitlocal.app")!
-    
-    // Support BitLocal links
-     let supportBitLocalURL = URL(string: "https://strike.me/joeycast/")!
-    
-    // Contact section links
-    let generalSupportInquiriesEmail = URL(string:"mailto:support@bitlocal.app")!
-    let reportABugEmail = URL(string:"mailto:support@bitlocal.app")!
-    let suggestAFeatureEmail = URL(string:"mailto:support@bitlocal.app")!
-    
-    // Socials section links
-    let twitterURL = URL(string:"https://twitter.com/bitlocal_app")!
-    //    let nostrURL = URL(string:"")!
-    
-    // More from Brink 13 Labs links
-    let bitcoinLivePriceChartURL = URL(string: "https://brink13labs.com")!
-    let movematesMoveTogetherURL = URL(string: "https://apps.apple.com/us/app/movemates-move-together/id6748308903")!
-    let dandelionURL = URL(string: "https://apps.apple.com/app/id6757363901")!
-    
-    // Other section links
-    let brink13LabsWebsite = URL(string: "https://brink13labs.com")!
-    let bitlocalWebsite = URL(string: "https://www.bitlocal.app")!
-    let privacyPolicyURL = URL(string: "https://www.bitlocal.app/privacy")!
-    let btcMapURL = URL(string: "https://btcmap.org/")!
-    let openStreetMapURL = URL(string: "https://openstreetmap.org/copyright")!
-    let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
-    
-    let iconSize: CGFloat = 20
-    private var usesPopoverStyling: Bool { onDone != nil }
-    
-    // Settings Page
-    var body: some View {
-        
-        NavigationStack {
-            Form {
-                // Header section
-                Section {
-                    Text("about_description")
-                }
-                // Contribute section
-                Section(header: Text("contribute_section")) {
-                    Button {
-                        showingAddBusinessForm = true
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "storefront.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("add_business_to_map")
-                            Spacer()
-                        }
-                    }
-                }
-                if Locale.current.region?.identifier == "US" {
-                    Section(header: Text("support_bitlocal_section"),
-                            footer: Text("support_bitlocal_footer")) {
-                        Link(destination: supportBitLocalURL) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "heart.fill")
-                                    .aboutIconStyle(size: iconSize)
-                                Text("support_bitlocal_button_label")
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-                // Contact section
-                Section(header: Text("contact_section")) {
-                    Link(destination: generalSupportInquiriesEmail) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "paperplane.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("general_support_inquiries")
-                            Spacer()
-                        }
-                    }
-                    Link(destination: reportABugEmail) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "ladybug.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("report_a_bug")
-                            Spacer()
-                        }
-                    }
-                    Link(destination: suggestAFeatureEmail) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "lightbulb.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("suggest_a_feature")
-                            Spacer()
-                        }
-                    }
-                }
-                // Socials section
-                Section(header: Text("socials_section")) {
-                    Link(destination: twitterURL) {
-                        HStack(spacing: 10) {
-                            Image("x-logo-fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("x_twitter_label")
-                            Spacer()
-                        }
-                    }
-                }
-                // More from Birnk 13 Labs section
-                Section(header: Text("more_from_brink_13_Labs_section")) {
-                    Link(destination: bitcoinLivePriceChartURL) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "chart.line.uptrend.xyaxis")
-                                .aboutIconStyle(size: iconSize)
-                            Text("bitcoin_live_price_chart_button_label")
-                            Spacer()
-                        }
-                    }
-                    if Locale.current.region?.identifier == "US" {
-                        Link(destination: movematesMoveTogetherURL) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "figure.run")
-                                    .aboutIconStyle(size: iconSize)
-                                Text("Movemates: Move Together")
-                                Spacer()
-                            }
-                        }
-                    }
-                    Link(destination: dandelionURL) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "camera.macro")
-                                .aboutIconStyle(size: iconSize)
-                            Text("Dandelion: Write and Let Go")
-                            Spacer()
-                        }
-                    }
-                }
-                // Other section
-                Section(header: Text("other_section")) {
-                    Link(destination: bitlocalWebsite) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "safari.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("bitlocal_website")
-                            Spacer()
-                        }
-                    }
-                    Link(destination: brink13LabsWebsite) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "safari.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("brink_13_labs_website")
-                            Spacer()
-                        }
-                    }
-                    Link(destination: privacyPolicyURL) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "hand.raised.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("privacy_policy")
-                            Spacer()
-                        }
-                    }
-                    Link(destination: btcMapURL) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .aboutIconStyle(size: iconSize)
-                            Text("btc_map")
-                            Spacer()
-                        }
-                    }
-                    Link(destination: openStreetMapURL) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "globe")
-                                .aboutIconStyle(size: iconSize)
-                            Text("open_street_map")
-                            Spacer()
-                        }
-                    }
-                    Link(destination: bitcoinResourcesURL) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "bitcoinsign.circle.fill")
-                                .aboutIconStyle(size: iconSize)
-                            Text("bitcoin_resources")
-                            Spacer()
-                        }
-                    }
-                }
-                Section {
-                    Button {
-                        UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")
-                        handleDone()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "rectangle.stack")
-                                .aboutIconStyle(size: iconSize)
-                            Text("show_onboarding_button")
-                            Spacer()
-                        }
-                    }
-                    Button {
-                        releaseNotesController.presentCurrentReleaseNotes()
-                        handleDone()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "sparkles")
-                                .aboutIconStyle(size: iconSize)
-                            Text("show_whats_new_button")
-                            Spacer()
-                        }
-                    }
-                    Button {
-                        refreshMerchantsFromAbout()
-                    } label: {
-                        HStack(spacing: 10) {
-                            if isRefreshingMerchants || viewModel.isLoading {
-                                ProgressView()
-                                    .frame(width: iconSize, height: iconSize)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .aboutIconStyle(size: iconSize)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(NSLocalizedString("Refresh Merchants", comment: "About action to refresh BTC Map merchant catalog"))
-                                Text(merchantRefreshSubtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                    }
-                    .disabled(isRefreshingMerchants || viewModel.isLoading)
-                }
-            }
-            .scrollContentBackground(usesPopoverStyling ? .hidden : .automatic)
-            .background(usesPopoverStyling ? Color.clear : nil)
-            // About page title
-            // TODO: Figure out how to use the appName constant here
-            .navigationTitle(Text("about_title"))
-            
-            // Dismiss sheet when tapping Done.
-            .navigationBarItems(trailing:
-                Button(action: { handleDone() }) {
-                    Text("done_button")
-                        .bold() // or .fontWeight(.bold)
-                }
-            )
-        }
-        .modifier(AboutNavigationBackgroundModifier(enabled: usesPopoverStyling))
-        .sheet(isPresented: $showingAddBusinessForm) {
-            AddBusinessInfoView()
+    // Contact links with prefilled subjects
+    private let generalSupportInquiriesEmail = URL(string: "mailto:support@bitlocal.app?subject=BitLocal%20Support")!
+    private let reportABugEmail = URL(string: "mailto:support@bitlocal.app?subject=BitLocal%20Bug%20Report")!
+    private let suggestAFeatureEmail = URL(string: "mailto:support@bitlocal.app?subject=BitLocal%20Feature%20Request")!
+
+    // Socials
+    private let twitterURL = URL(string: "https://twitter.com/bitlocal_app")!
+
+    // More from Brink 13 Labs
+    private let bitcoinLivePriceChartURL = URL(string: "https://brink13labs.com")!
+    private let movematesMoveTogetherURL = URL(string: "https://apps.apple.com/us/app/movemates-move-together/id6748308903")!
+    private let dandelionURL = URL(string: "https://apps.apple.com/app/id6757363901")!
+
+    // Links & Credits
+    private let brink13LabsWebsite = URL(string: "https://brink13labs.com")!
+    private let bitlocalWebsite = URL(string: "https://www.bitlocal.app")!
+    private let privacyPolicyURL = URL(string: "https://www.bitlocal.app/privacy")!
+    private let btcMapURL = URL(string: "https://btcmap.org/")!
+    private let openStreetMapURL = URL(string: "https://openstreetmap.org/copyright")!
+    private let bitcoinResourcesURL = URL(string: "https://www.lopp.net/bitcoin-information.html")!
+
+    init(
+        currentDetent: Binding<PresentationDetent> = .constant(.large),
+        onDismissSheet: (() -> Void)? = nil
+    ) {
+        self._currentDetent = currentDetent
+        self.onDismissSheet = onDismissSheet
+    }
+
+    private var versionBuildLabel: String? {
+        let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        switch (shortVersion, build) {
+        case let (v?, b?) where !v.isEmpty && !b.isEmpty:
+            return "Version \(v) (\(b))"
+        case let (v?, _) where !v.isEmpty:
+            return "Version \(v)"
+        default:
+            return nil
         }
     }
 
-    private func handleDone() {
-        if let onDone {
-            onDone()
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("bitlocal")
+                            .font(.custom("Fredoka-Medium", size: 26, relativeTo: .title2))
+                            .foregroundStyle(.accent)
+
+                        if let versionBuildLabel {
+                            Text(versionBuildLabel)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text("about_description")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 4)
+            }
+
+            Section(header: Text("contact_section")) {
+                externalLinkRow(
+                    destination: generalSupportInquiriesEmail,
+                    titleKey: "general_support_inquiries",
+                    systemImage: "paperplane"
+                )
+                externalLinkRow(
+                    destination: reportABugEmail,
+                    titleKey: "report_a_bug",
+                    systemImage: "ladybug"
+                )
+                externalLinkRow(
+                    destination: suggestAFeatureEmail,
+                    titleKey: "suggest_a_feature",
+                    systemImage: "lightbulb"
+                )
+                Link(destination: twitterURL) {
+                    HStack {
+                        Label {
+                            Text("x_twitter_label")
+                                .foregroundStyle(.primary)
+                        } icon: {
+                            Image(.xLogoFill)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 18, height: 18)
+                                .foregroundStyle(.accent)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "arrow.up.forward")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
+
+            Section(header: Text("other_section")) {
+                externalLinkRow(destination: bitlocalWebsite, titleKey: "bitlocal_website", systemImage: "safari")
+                externalLinkRow(destination: brink13LabsWebsite, titleKey: "brink_13_labs_website", systemImage: "safari")
+                externalLinkRow(destination: privacyPolicyURL, titleKey: "privacy_policy", systemImage: "hand.raised")
+                externalLinkRow(destination: btcMapURL, titleKey: "btc_map", systemImage: "mappin.and.ellipse")
+                externalLinkRow(destination: openStreetMapURL, titleKey: "open_street_map", systemImage: "globe")
+                externalLinkRow(destination: bitcoinResourcesURL, titleKey: "bitcoin_resources", systemImage: "bitcoinsign.circle")
+            }
+
+            Section(header: Text("more_from_brink_13_Labs_section")) {
+                externalLinkRow(
+                    destination: bitcoinLivePriceChartURL,
+                    titleKey: "bitcoin_live_price_chart_button_label",
+                    systemImage: "chart.line.uptrend.xyaxis"
+                )
+                if locale.region?.identifier == "US" {
+                    externalLinkRow(
+                        destination: movematesMoveTogetherURL,
+                        titleKey: "Movemates: Move Together",
+                        systemImage: "figure.run"
+                    )
+                }
+                externalLinkRow(
+                    destination: dandelionURL,
+                    titleKey: "Dandelion: Write and Let Go",
+                    systemImage: "camera.macro"
+                )
+            }
+
+            Section {
+                Button {
+                    BitLocalHaptics.selection()
+                    releaseNotesController.presentCurrentReleaseNotes()
+                    dismissSheet()
+                } label: {
+                    Label {
+                        Text("show_whats_new_button")
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.accent)
+                    }
+                }
+
+                Button {
+                    BitLocalHaptics.selection()
+                    UserDefaults.standard.set(false, forKey: "didCompleteOnboarding")
+                    dismissSheet()
+                } label: {
+                    Label {
+                        Text("show_onboarding_button")
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "rectangle.stack")
+                            .foregroundStyle(.accent)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(Text("about_title"))
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            currentDetent = .large
+        }
+    }
+
+    private func externalLinkRow(
+        destination: URL,
+        titleKey: LocalizedStringKey,
+        systemImage: String
+    ) -> some View {
+        Link(destination: destination) {
+            HStack {
+                Label {
+                    Text(titleKey)
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: systemImage)
+                        .foregroundStyle(.accent)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "arrow.up.forward")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func dismissSheet() {
+        if let onDismissSheet {
+            onDismissSheet()
         } else {
             dismiss()
         }
     }
-
-    private var merchantRefreshSubtitle: String {
-        if isRefreshingMerchants || viewModel.isLoading {
-            return NSLocalizedString("Updating…", comment: "Status while merchant catalog refresh is in progress")
-        }
-        if let relative = viewModel.lastSuccessfulSyncRelativeDescription {
-            return String(
-                format: NSLocalizedString("Updated %@", comment: "Relative last-synced label, e.g. Updated 5 minutes ago"),
-                relative
-            )
-        }
-        return NSLocalizedString(
-            "Fetch new and changed merchants since the last sync.",
-            comment: "About subtitle explaining incremental merchant refresh"
-        )
-    }
-
-    private func refreshMerchantsFromAbout() {
-        guard !isRefreshingMerchants else { return }
-        isRefreshingMerchants = true
-        viewModel.refreshMerchantData(userInitiated: true) {
-            isRefreshingMerchants = false
-        }
-    }
 }
 
-private struct AboutNavigationBackgroundModifier: ViewModifier {
-    let enabled: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if enabled {
-            content.clearNavigationContainerBackgroundIfAvailable()
-        } else {
-            content
-        }
-    }
-}
-
-// View preview
-struct AboutView_Previews: PreviewProvider {
-    static var previews: some View {
+#Preview {
+    NavigationStack {
         AboutView()
-            .environmentObject(ReleaseNotesController())
+            .environment(ReleaseNotesController())
     }
 }

@@ -1,3 +1,4 @@
 build/
 .asc/artifacts/
 tmp/
+.impeccable/

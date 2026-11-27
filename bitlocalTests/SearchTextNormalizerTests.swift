@@ -1,26 +1,25 @@
-import XCTest
+import Testing
 @testable import bitlocal
 
-final class SearchTextNormalizerTests: XCTestCase {
-    func testNormalizesPunctuationAndCase() {
-        let normalized = SearchTextNormalizer.normalize("Steak 'n Shake")
-        XCTAssertEqual(normalized, "steak n shake")
+@Suite(.tags(.search))
+struct SearchTextNormalizerTests {
+    @Test(arguments: [
+        ("Steak 'n Shake", "steak n shake"),
+        ("Café Crème", "cafe creme")
+    ])
+    func normalizesPunctuationCaseAndDiacritics(raw: String, expected: String) {
+        #expect(SearchTextNormalizer.normalize(raw) == expected)
     }
 
-    func testNormalizesDiacritics() {
-        let normalized = SearchTextNormalizer.normalize("Café Crème")
-        XCTAssertEqual(normalized, "cafe creme")
-    }
-
-    func testMatchesWithTokenPrefixes() {
+    @Test func matchesWithTokenPrefixes() {
         let query = SearchTextNormalizer.normalize("ste n sh")
         let candidate = SearchTextNormalizer.normalize("Steak 'n Shake")
-        XCTAssertTrue(SearchTextNormalizer.matches(normalizedQuery: query, normalizedCandidate: candidate))
+        #expect(SearchTextNormalizer.matches(normalizedQuery: query, normalizedCandidate: candidate))
     }
 
-    func testDoesNotMatchDifferentTokens() {
+    @Test func doesNotMatchDifferentTokens() {
         let query = SearchTextNormalizer.normalize("pizza")
         let candidate = SearchTextNormalizer.normalize("Steak 'n Shake")
-        XCTAssertFalse(SearchTextNormalizer.matches(normalizedQuery: query, normalizedCandidate: candidate))
+        #expect(SearchTextNormalizer.matches(normalizedQuery: query, normalizedCandidate: candidate) == false)
     }
 }

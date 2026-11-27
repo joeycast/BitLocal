@@ -1,60 +1,62 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class ElementMapVisibilityTests: XCTestCase {
-    func testBrandOnlyMerchantHasMapRenderableIdentity() {
+@Suite(.tags(.sync))
+struct ElementMapVisibilityTests {
+    @Test func brandOnlyMerchantHasMapRenderableIdentity() {
         let element = makeElement(name: nil, brand: "Steak 'n Shake", operatorName: nil)
-        XCTAssertEqual(element.displayName, "Steak 'n Shake")
-        XCTAssertTrue(element.hasMapRenderableIdentity)
+        #expect(element.displayName == "Steak 'n Shake")
+        #expect(element.hasMapRenderableIdentity)
     }
 
-    func testOperatorOnlyMerchantHasMapRenderableIdentity() {
+    @Test func operatorOnlyMerchantHasMapRenderableIdentity() {
         let element = makeElement(name: nil, brand: nil, operatorName: "Acme Ops LLC")
-        XCTAssertEqual(element.displayName, "Acme Ops LLC")
-        XCTAssertTrue(element.hasMapRenderableIdentity)
+        #expect(element.displayName == "Acme Ops LLC")
+        #expect(element.hasMapRenderableIdentity)
     }
 
-    func testNamedMerchantHasMapRenderableIdentity() {
+    @Test func namedMerchantHasMapRenderableIdentity() {
         let element = makeElement(name: "Cafe Bitcoin", brand: nil, operatorName: nil)
-        XCTAssertTrue(element.hasMapRenderableIdentity)
+        #expect(element.hasMapRenderableIdentity)
     }
 
-    func testPlaceholderNameStillHasMapRenderableIdentity() {
+    @Test func placeholderNameStillHasMapRenderableIdentity() {
         let element = makeElement(name: "BTC Map Place #42", brand: nil, operatorName: nil)
-        XCTAssertNil(element.displayName)
-        XCTAssertTrue(element.hasMapRenderableIdentity)
+        #expect(element.displayName == nil)
+        #expect(element.hasMapRenderableIdentity)
     }
 
-    func testEmptyIdentityIsNotMapRenderable() {
+    @Test func emptyIdentityIsNotMapRenderable() {
         let element = makeElement(name: nil, brand: nil, operatorName: nil)
-        XCTAssertNil(element.displayName)
-        XCTAssertFalse(element.hasMapRenderableIdentity)
+        #expect(element.displayName == nil)
+        #expect(element.hasMapRenderableIdentity == false)
     }
 
-    func testUnnamedWithoutFallbackIsNotMapRenderable() {
+    @Test func unnamedWithoutFallbackIsNotMapRenderable() {
         let element = makeElement(name: "unnamed", brand: nil, operatorName: nil)
-        XCTAssertNil(element.displayName)
-        XCTAssertFalse(element.hasMapRenderableIdentity)
+        #expect(element.displayName == nil)
+        #expect(element.hasMapRenderableIdentity == false)
     }
 
-    func testAmenityATMIsDetected() {
+    @Test func amenityATMIsDetected() {
         let element = makeElement(name: "BTC ATM", brand: nil, operatorName: nil, amenity: "atm")
-        XCTAssertTrue(element.isATM)
+        #expect(element.isATM)
     }
 
-    func testLocalATMIconIsDetected() {
+    @Test func localATMIconIsDetected() {
         let element = makeElement(name: "Cash Point", brand: nil, operatorName: nil, icon: "local_atm")
-        XCTAssertTrue(element.isATM)
+        #expect(element.isATM)
     }
 
-    func testCafeIsNotATM() {
+    @Test func cafeIsNotATM() {
         let element = makeElement(name: "Cafe", brand: nil, operatorName: nil, amenity: "cafe", icon: "local_cafe")
-        XCTAssertFalse(element.isATM)
+        #expect(element.isATM == false)
     }
 
-    func testBankIsNotATM() {
+    @Test func bankIsNotATM() {
         let element = makeElement(name: "Bank", brand: nil, operatorName: nil, amenity: "bank")
-        XCTAssertFalse(element.isATM)
+        #expect(element.isATM == false)
     }
 
     private func makeElement(

@@ -13,7 +13,7 @@ import Foundation // for Debug logging
 
 struct MapView: UIViewRepresentable {
     var elements: [Element]?
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
     
     // Properties for Dynamic Padding
     var topPadding: CGFloat
@@ -176,7 +176,7 @@ struct MapView: UIViewRepresentable {
         if canSkipAnnotationHash {
             let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
             if needsUpdate {
-                Debug.logMap("⏱ updateUIView: padding/mapType-only in \(String(format: "%.1f", elapsed))ms")
+                Debug.logMap("⏱ updateUIView: padding/mapType-only in \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
             }
             return
         }
@@ -221,26 +221,45 @@ struct MapView: UIViewRepresentable {
         }
         
         // Handle community/merchant display mode overlay sync
-        let currentAreaDataHash = viewModel.communityMapAreas.isEmpty
-            ? viewModel.areaBrowserAreas.hashValue
-            : viewModel.communityMapAreas.hashValue
         if modeChanged || currentMode == .communities {
             context.coordinator.lastDisplayMode = currentMode
 
             if currentMode == .communities {
-                context.coordinator.lastCommunityAreasHash = currentAreaDataHash
-                // On iPad we reuse the same MKMapView instance, so community overlays
-                // need to be reconciled on every update while this mode is active.
-                let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
-                let desiredOverlays = Set(viewModel.communityOverlays)
-                let toRemove = existingOverlays.subtracting(desiredOverlays)
-                let toAdd = desiredOverlays.subtracting(existingOverlays)
-                if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
-                if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
+                var areaHasher = Hasher()
+                if viewModel.communityMapAreas.isEmpty {
+                    areaHasher.combine(viewModel.areaBrowserAreas.count)
+                    for area in viewModel.areaBrowserAreas {
+                        areaHasher.combine(area.id)
+                        areaHasher.combine(area.geoJSON?.features.count ?? 0)
+                    }
+                } else {
+                    areaHasher.combine(viewModel.communityMapAreas.count)
+                    for area in viewModel.communityMapAreas {
+                        areaHasher.combine(area.id)
+                        areaHasher.combine(area.geoJSON?.features.count ?? 0)
+                    }
+                }
+                let currentAreaDataHash = areaHasher.finalize()
+                let desiredOverlays = viewModel.communityOverlays
+                let overlaysChanged =
+                    modeChanged ||
+                    context.coordinator.lastCommunityAreasHash != currentAreaDataHash ||
+                    mapView.overlays.count != desiredOverlays.count
+                if overlaysChanged {
+                    context.coordinator.lastCommunityAreasHash = currentAreaDataHash
+                    // On iPad we reuse the same MKMapView instance, so community overlays
+                    // need to be reconciled whenever mode, area data, or overlay count changes.
+                    let existingOverlays = Set(mapView.overlays.compactMap { $0 as? MKPolygon })
+                    let desiredOverlaySet = Set(desiredOverlays)
+                    let toRemove = existingOverlays.subtracting(desiredOverlaySet)
+                    let toAdd = desiredOverlaySet.subtracting(existingOverlays)
+                    if !toRemove.isEmpty { mapView.removeOverlays(Array(toRemove)) }
+                    if !toAdd.isEmpty { mapView.addOverlays(Array(toAdd)) }
+                }
 
                 // Only show pins for selected community members.
                 if viewModel.isShowingCommunityMembersOnMap {
-                if let elements = elements {
+                    if let elements = elements {
                         shouldRefreshAnnotations = true
                         refreshElementsHash = context.coordinator.lastElementsHash ?? elements.hashValue
                         refreshForce = true
@@ -252,7 +271,7 @@ struct MapView: UIViewRepresentable {
                     }
                 }
             } else {
-                context.coordinator.lastCommunityAreasHash = currentAreaDataHash
+                context.coordinator.lastCommunityAreasHash = nil
                 // Remove all overlays
                 if !mapView.overlays.isEmpty {
                     mapView.removeOverlays(mapView.overlays)
@@ -280,9 +299,9 @@ struct MapView: UIViewRepresentable {
 
         let elapsed = (CFAbsoluteTimeGetCurrent() - updateStart) * 1000
         if needsUpdate {
-            Debug.logMap("⏱ updateUIView: COMPLETED with changes in \(String(format: "%.1f", elapsed))ms")
+            Debug.logMap("⏱ updateUIView: COMPLETED with changes in \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
         } else if elapsed > 1.0 {
-            Debug.logMap("⏱ updateUIView: no-op but took \(String(format: "%.1f", elapsed))ms")
+            Debug.logMap("⏱ updateUIView: no-op but took \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
         }
     }
     
@@ -293,6 +312,7 @@ struct MapView: UIViewRepresentable {
     }
     
     // Coordinator class to handle MKMapViewDelegate methods and annotations management
+    @MainActor
     class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         private struct AnnotationPassKey: Equatable {
             let elementsHash: Int
@@ -313,8 +333,22 @@ struct MapView: UIViewRepresentable {
         // Keep track of previously displayed elements to manage annotations efficiently
         var previousElements: Set<Element> = []
         var currentAnnotations: [String: Annotation] = [:] // Keep track of current annotations
-        private var cancellable: AnyCancellable?
         private var debounceTimer: AnyCancellable?
+        private struct SpatialCellKey: Hashable {
+            let x: Int
+            let y: Int
+        }
+
+        private struct SpatialEntry {
+            let element: Element
+            let latitude: Double
+            let longitude: Double
+            let mapPoint: MKMapPoint
+        }
+
+        private static let spatialCellDegrees: Double = 0.5
+        private static let markerTintColor: UIColor? = UIColor(named: "MarkerColor")
+
         var lastElementsHash: Int?
         var lastAnnotationInputSignature: Int?
         var lastDisplayMode: MapDisplayMode = .merchants
@@ -323,6 +357,11 @@ struct MapView: UIViewRepresentable {
         private var hasLoggedInitialAnnotationPass = false
         var lastVisibleElementIDs: [String] = []
         weak var overlayTapRecognizer: UITapGestureRecognizer?
+        private var spatialIndexHash: Int?
+        private var spatialIndexCount: Int = 0
+        private var spatialCells: [SpatialCellKey: [SpatialEntry]] = [:]
+        private var spatialAllRenderable: [SpatialEntry] = []
+        private var glyphImageCache: [String: UIImage] = [:]
 
         init(viewModel: ContentViewModel, topPadding: CGFloat, bottomPadding: CGFloat) {
             self.viewModel = viewModel
@@ -393,13 +432,25 @@ struct MapView: UIViewRepresentable {
             let zoomOutScale: Double = 1.3
             rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1), dy: -rect.size.height * (zoomOutScale - 1))
             
-            // Edge padding for header and bottom sheet
-            let edgePadding = UIEdgeInsets(
-                top: viewModel.topPadding + 10,
-                left: 20,
-                bottom: viewModel.bottomPadding + 100,
-                right: 20
-            )
+            // Edge padding for header and sheet in compact-sheet mode
+            let edgePadding: UIEdgeInsets
+            if viewModel.layoutMode == .splitSidebar {
+                edgePadding = UIEdgeInsets(top: 10, left: 20, bottom: 20, right: 20)
+            } else if viewModel.leadingSheetInset > 1 {
+                edgePadding = UIEdgeInsets(
+                    top: viewModel.topPadding + 10,
+                    left: viewModel.leadingSheetInset + 20,
+                    bottom: 20,
+                    right: 20
+                )
+            } else {
+                edgePadding = UIEdgeInsets(
+                    top: viewModel.topPadding + 10,
+                    left: 20,
+                    bottom: viewModel.bottomPadding + 100,
+                    right: 20
+                )
+            }
             
             // Smoothly animate to the expanded cluster region
             DispatchQueue.main.async {
@@ -433,9 +484,85 @@ struct MapView: UIViewRepresentable {
             })
         }
         
-        // Ensure to cancel the subscription when the Coordinator is deinitialized
-        deinit {
-            cancellable?.cancel()
+        private func ensureSpatialIndex(for elements: [Element], elementsHash: Int) {
+            guard spatialIndexHash != elementsHash || spatialIndexCount != elements.count else {
+                return
+            }
+            spatialIndexHash = elementsHash
+            spatialIndexCount = elements.count
+            spatialCells.removeAll(keepingCapacity: true)
+            spatialAllRenderable.removeAll(keepingCapacity: true)
+            spatialAllRenderable.reserveCapacity(elements.count)
+
+            let invCell = 1.0 / Self.spatialCellDegrees
+            for element in elements {
+                guard (element.deletedAt == nil || element.deletedAt == ""),
+                      element.hasMapRenderableIdentity,
+                      let coordinate = element.mapCoordinate else { continue }
+                let entry = SpatialEntry(
+                    element: element,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude,
+                    mapPoint: MKMapPoint(coordinate)
+                )
+                spatialAllRenderable.append(entry)
+                let key = SpatialCellKey(
+                    x: Int(floor(coordinate.longitude * invCell)),
+                    y: Int(floor(coordinate.latitude * invCell))
+                )
+                spatialCells[key, default: []].append(entry)
+            }
+        }
+
+        private func querySpatialCandidates(
+            centerLat: Double,
+            centerLon: Double,
+            cosLat: Double
+        ) -> [SpatialEntry] {
+            // Near the poles, fall back to the pre-filtered renderable list.
+            guard abs(centerLat) < 85.0, cosLat > 0.05 else {
+                return spatialAllRenderable
+            }
+
+            // 25 miles ≈ 40.23 km ≈ 0.362° latitude; use 0.38° for safe margin.
+            let latDelta = 0.38
+            let lonDelta = min(180.0, latDelta / cosLat)
+            let minLat = max(-90.0, centerLat - latDelta)
+            let maxLat = min(90.0, centerLat + latDelta)
+            let rawMinLon = centerLon - lonDelta
+            let rawMaxLon = centerLon + lonDelta
+
+            let invCell = 1.0 / Self.spatialCellDegrees
+            let minY = Int(floor(minLat * invCell))
+            let maxY = Int(floor(maxLat * invCell))
+
+            var results: [SpatialEntry] = []
+            results.reserveCapacity(128)
+
+            func collect(lonStart: Double, lonEnd: Double) {
+                let minX = Int(floor(lonStart * invCell))
+                let maxX = Int(floor(lonEnd * invCell))
+                guard minX <= maxX, minY <= maxY else { return }
+                for x in minX...maxX {
+                    for y in minY...maxY {
+                        if let bucket = spatialCells[SpatialCellKey(x: x, y: y)] {
+                            results.append(contentsOf: bucket)
+                        }
+                    }
+                }
+            }
+
+            if rawMinLon < -180.0 {
+                collect(lonStart: rawMinLon + 360.0, lonEnd: 180.0)
+                collect(lonStart: -180.0, lonEnd: rawMaxLon)
+            } else if rawMaxLon > 180.0 {
+                collect(lonStart: rawMinLon, lonEnd: 180.0)
+                collect(lonStart: -180.0, lonEnd: rawMaxLon - 360.0)
+            } else {
+                collect(lonStart: rawMinLon, lonEnd: rawMaxLon)
+            }
+
+            return results
         }
         
         // Efficiently update annotations by only adding/removing what's changed
@@ -448,14 +575,13 @@ struct MapView: UIViewRepresentable {
                 Debug.logTiming("map", "initial annotation pass started (elements=\(elements.count), force=\(force))")
             }
 
-            let sourceElements: [Element]
+            let allowedCommunityIDs: Set<String>?
             if viewModel.mapDisplayMode == .communities,
                viewModel.selectedCommunityArea != nil,
                !viewModel.communityMemberElementIDs.isEmpty {
-                let allowedIDs = viewModel.communityMemberElementIDs
-                sourceElements = elements.filter { allowedIDs.contains($0.id) }
+                allowedCommunityIDs = viewModel.communityMemberElementIDs
             } else {
-                sourceElements = elements
+                allowedCommunityIDs = nil
             }
 
             let viewportRect = effectiveViewportRect(for: mapView)
@@ -482,23 +608,38 @@ struct MapView: UIViewRepresentable {
             }
             lastAnnotationPassKey = currentKey
 
-            let visibleElements = sourceElements.filter { element in
-                // 1. Cheapest checks first — pure string comparisons
-                guard (element.deletedAt == nil || element.deletedAt == ""),
-                      element.hasMapRenderableIdentity,
-                      let coordinate = element.mapCoordinate else { return false }
+            ensureSpatialIndex(for: elements, elementsHash: elementsHash)
 
-                // 2. Rect containment — cheap math, eliminates most elements
-                let mapPoint = MKMapPoint(coordinate)
-                guard visibleRect.contains(mapPoint) else { return false }
+            let degToRad = Double.pi / 180.0
+            let cosLat = cos(centerLat * degToRad)
+            let maxDistanceRatio = maxDistanceMeters / 6_371_000.0
+            let maxDistanceSq = maxDistanceRatio * maxDistanceRatio
+            let candidates = querySpatialCandidates(centerLat: centerLat, centerLon: centerLon, cosLat: cosLat)
 
-                // 3. Distance check — only for the few elements still in the rect.
-                //    Use Equirectangular approximation instead of CLLocation (avoids object allocation).
-                let dLat = (coordinate.latitude - centerLat) * .pi / 180.0
-                let dLon = (coordinate.longitude - centerLon) * .pi / 180.0
-                let cosLat = cos(centerLat * .pi / 180.0)
-                let approxDistance = 6_371_000.0 * sqrt(dLat * dLat + (dLon * cosLat) * (dLon * cosLat))
-                return approxDistance <= maxDistanceMeters
+            var visibleElements: [Element] = []
+            visibleElements.reserveCapacity(min(candidates.count, 128))
+            var newByID: [String: Element] = [:]
+            newByID.reserveCapacity(min(candidates.count, 128))
+
+            for entry in candidates {
+                if let allowedCommunityIDs, !allowedCommunityIDs.contains(entry.element.id) {
+                    continue
+                }
+                guard visibleRect.contains(entry.mapPoint) else { continue }
+
+                let dLat = (entry.latitude - centerLat) * degToRad
+                var rawDLon = entry.longitude - centerLon
+                if rawDLon > 180.0 { rawDLon -= 360.0 }
+                else if rawDLon < -180.0 { rawDLon += 360.0 }
+                let dLon = rawDLon * degToRad * cosLat
+                guard (dLat * dLat + dLon * dLon) <= maxDistanceSq else { continue }
+
+                let id = entry.element.id
+                if newByID[id] == nil {
+                    visibleElements.append(entry.element)
+                }
+                // Keep latest record for duplicate IDs (last-wins, matching IdentifiableIndex.byID).
+                newByID[id] = entry.element
             }
 
             let existingAnnotations = mapView.annotations.compactMap { $0 as? Annotation }
@@ -510,11 +651,7 @@ struct MapView: UIViewRepresentable {
                 }
             }
 
-            var newByID: [String: Element] = [:]
-            newByID.reserveCapacity(visibleElements.count)
-            for element in visibleElements where newByID[element.id] == nil {
-                newByID[element.id] = element
-            }
+            let referenceDate = Date.now
 
             // Drop pins that left the viewport, and pins whose map-facing content changed
             // (name, boost, icon) so marker tint/title stay current.
@@ -522,7 +659,8 @@ struct MapView: UIViewRepresentable {
                 guard let latest = newByID[id] else { return annotation }
                 let existingSignature = annotation.element?.mapAnnotationContentSignature
                 let latestSignature = latest.mapAnnotationContentSignature
-                let boostChanged = (annotation.element?.isCurrentlyBoosted() ?? false) != latest.isCurrentlyBoosted()
+                let boostChanged = (annotation.element?.isCurrentlyBoosted(referenceDate: referenceDate) ?? false)
+                    != latest.isCurrentlyBoosted(referenceDate: referenceDate)
                 if existingSignature != latestSignature || boostChanged {
                     return annotation
                 }
@@ -536,25 +674,27 @@ struct MapView: UIViewRepresentable {
                 return nil
             }
 
-            mapView.removeAnnotations(annotationsToRemove)
-
-            let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
-            mapView.addAnnotations(newAnnotations)
-
-            let latestByID = IdentifiableIndex.byID(sourceElements)
-            let visibleIDs = visibleElements.map(\.id)
-            let refreshedVisibleElements = visibleIDs.compactMap { id in
-                latestByID[id] ?? newByID[id]
+            if !annotationsToRemove.isEmpty {
+                mapView.removeAnnotations(annotationsToRemove)
             }
-            if visibleIDs != lastVisibleElementIDs {
+            if !elementsToAdd.isEmpty {
+                let newAnnotations = elementsToAdd.map { Annotation(element: $0) }
+                mapView.addAnnotations(newAnnotations)
+            }
+
+            let visibleIDs = visibleElements.map(\.id)
+            let annotationsContentUpdated = !annotationsToRemove.isEmpty || !elementsToAdd.isEmpty
+            if visibleIDs != lastVisibleElementIDs || annotationsContentUpdated {
                 lastVisibleElementIDs = visibleIDs
+                let refreshedVisibleElements = visibleIDs.compactMap { newByID[$0] }
                 Debug.logTiming(
                     "map",
                     "publishing visible elements -> count=\(refreshedVisibleElements.count), annotations=\(mapView.annotations.compactMap { $0 as? Annotation }.count)"
                 )
                 self.viewModel.visibleElementsSubject.send(refreshedVisibleElements)
             }
-            Debug.logMap("⏱ updateAnnotations: \(sourceElements.count) source → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - annStart) * 1000))ms")
+            let elapsed = (CFAbsoluteTimeGetCurrent() - annStart) * 1000
+            Debug.logMap("⏱ updateAnnotations: \(elements.count) source (\(candidates.count) candidates) → \(visibleElements.count) visible, removed \(annotationsToRemove.count), added \(elementsToAdd.count) in \(elapsed.formatted(.number.precision(.fractionLength(1))))ms")
         }
 
         @discardableResult
@@ -569,16 +709,33 @@ struct MapView: UIViewRepresentable {
                 mapView.removeAnnotations(currentAnnotations)
             }
 
+            let hadVisibleElements = !lastVisibleElementIDs.isEmpty
+
             // Reset annotation caches so the same search result IDs can be re-added
             // after transient empty states during search refinement.
             lastElementsHash = nil
             lastVisibleElementIDs = []
             lastAnnotationPassKey = nil
+
+            if hadVisibleElements && viewModel.mapDisplayMode == .merchants {
+                viewModel.visibleElementsSubject.send([])
+            }
             return true
         }
 
         // MARK: - MKMapViewDelegate Methods
         
+        private func cachedGlyphImage(for symbolName: String) -> UIImage? {
+            if let cached = glyphImageCache[symbolName] {
+                return cached
+            }
+            guard let rendered = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal) else {
+                return nil
+            }
+            glyphImageCache[symbolName] = rendered
+            return rendered
+        }
+
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             let reuseIdentifier = "AnnotationView"
             var view: MKMarkerAnnotationView?
@@ -587,16 +744,14 @@ struct MapView: UIViewRepresentable {
                 // Handle cluster annotations
                 view = mapView.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: cluster, reuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
                 view?.clusteringIdentifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
-                view?.markerTintColor = UIColor(named: "MarkerColor")
-                view?.glyphText = "\(cluster.memberAnnotations.count)"
+                view?.markerTintColor = Self.markerTintColor
                 let count = cluster.memberAnnotations.count
-                // localizedStringWithFormat resolves the catalog's plural variations.
-                view?.accessibilityLabel = String.localizedStringWithFormat(
-                    NSLocalizedString(
-                        "%d Bitcoin merchants",
+                view?.glyphText = "\(count)"
+                view?.accessibilityLabel = String(
+                    AttributedString(
+                        localized: "^[\(count) Bitcoin merchant](inflect: true)",
                         comment: "VoiceOver label for a map cluster of merchants"
-                    ),
-                    count
+                    ).characters
                 )
                 view?.accessibilityTraits = .button
                 view?.accessibilityHint = NSLocalizedString(
@@ -614,11 +769,12 @@ struct MapView: UIViewRepresentable {
                 view?.canShowCallout = true
                 view?.glyphText = nil
                 view?.glyphTintColor = .white
-                view?.markerTintColor = element.isCurrentlyBoosted() ? .systemOrange : UIColor(named: "MarkerColor")
+                let isBoosted = element.isCurrentlyBoosted()
+                view?.markerTintColor = isBoosted ? .systemOrange : Self.markerTintColor
                 let symbolName = ElementCategorySymbols.symbolName(for: element)
                 Debug.logMap("Rendering annotation for \(element.osmJSON?.tags?.name ?? "unknown") amenity=\(element.osmTagsDict?["amenity"] ?? "none"), symbol=\(symbolName)")
-                view?.glyphImage = UIImage(systemName: symbolName)?.withTintColor(.white, renderingMode: .alwaysOriginal)
-                view?.accessibilityLabel = Self.accessibilityLabel(for: element)
+                view?.glyphImage = cachedGlyphImage(for: symbolName)
+                view?.accessibilityLabel = Self.accessibilityLabel(for: element, isBoosted: isBoosted)
                 view?.accessibilityTraits = .button
                 view?.accessibilityHint = NSLocalizedString(
                     "Double tap to open merchant details",
@@ -629,12 +785,12 @@ struct MapView: UIViewRepresentable {
             return view
         }
 
-        private static func accessibilityLabel(for element: Element) -> String {
+        private static func accessibilityLabel(for element: Element, isBoosted: Bool) -> String {
             let name = element.displayNameForUI
                 ?? element.displayName
                 ?? NSLocalizedString("Bitcoin merchant", comment: "Fallback VoiceOver name for unnamed merchant pin")
             var parts = [name]
-            if element.isCurrentlyBoosted() {
+            if isBoosted {
                 parts.append(NSLocalizedString("Featured", comment: "VoiceOver flag for boosted merchants"))
             }
             var methods: [String] = []
@@ -648,7 +804,7 @@ struct MapView: UIViewRepresentable {
                 methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
             }
             if !methods.isEmpty {
-                parts.append(methods.joined(separator: ", "))
+                parts.append(methods.formatted())
             }
             return parts.joined(separator: ". ")
         }
@@ -674,14 +830,25 @@ struct MapView: UIViewRepresentable {
                 rect = rect.insetBy(dx: -rect.size.width * (zoomOutScale - 1),
                                     dy: -rect.size.height * (zoomOutScale - 1))
                 
-                // Edge padding to respect header and bottom sheet
-                let topInset: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 10 : viewModel.topPadding + 10
-                let edgePadding = UIEdgeInsets(
-                    top: topInset,
-                    left: 20,
-                    bottom: viewModel.bottomPadding + 100,
-                    right: 20
-                )
+                // Edge padding to respect header and sheet in compact-sheet mode
+                let edgePadding: UIEdgeInsets
+                if viewModel.layoutMode == .splitSidebar {
+                    edgePadding = UIEdgeInsets(top: 10, left: 20, bottom: 20, right: 20)
+                } else if viewModel.leadingSheetInset > 1 {
+                    edgePadding = UIEdgeInsets(
+                        top: viewModel.topPadding + 10,
+                        left: viewModel.leadingSheetInset + 20,
+                        bottom: 20,
+                        right: 20
+                    )
+                } else {
+                    edgePadding = UIEdgeInsets(
+                        top: viewModel.topPadding + 10,
+                        left: 20,
+                        bottom: viewModel.bottomPadding + 100,
+                        right: 20
+                    )
+                }
                 
                 // Set the visible map rect with padding and zoom adjustments
                 mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: true)
@@ -696,7 +863,7 @@ struct MapView: UIViewRepresentable {
                 // Restore the logic to display BusinessDetailView
                 DispatchQueue.main.async {
                     self.viewModel.setSelectionSource(.mapAnnotation)
-                    self.viewModel.path = [element] // Update path for NavigationStack
+                    self.viewModel.path = [.place(element)] // Update path for NavigationStack
                     self.viewModel.selectedElement = element // Update the selected element
                     
                     Debug.logMap("Annotation tapped: \(element)")

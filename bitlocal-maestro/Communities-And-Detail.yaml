@@ -1,0 +1,12 @@
+appId: app.bitlocal.bitlocal
+tags:
+  - communities
+---
+- launchApp
+- tapOn: "Show communities"
+- assertVisible: "Search communities…"
+- tapOn: "Search communities…"
+- inputText: "Bitcoin"
+- tapOn: "Clear search"
+- tapOn: "Show merchants"
+- assertVisible: "Search merchants…"

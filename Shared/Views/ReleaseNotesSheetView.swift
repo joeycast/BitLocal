@@ -3,6 +3,7 @@ import SwiftUI
 struct ReleaseNotesSheetView: View {
     let entry: ReleaseNotesEntry
     let dismissAction: () -> Void
+    @ScaledMetric(relativeTo: .headline) private var iconColumnSize: CGFloat = 24
 
     var body: some View {
         NavigationStack {
@@ -26,9 +27,9 @@ struct ReleaseNotesSheetView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
                     .padding(.bottom, 16)
-                    .background(Color(uiColor: .systemBackground))
+                    .background(.background)
             }
-            .background(Color(uiColor: .systemBackground))
+            .background(.background)
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -37,8 +38,6 @@ struct ReleaseNotesSheetView: View {
         Text("release_notes_sheet_title")
             .font(.title3.bold())
             .foregroundStyle(.primary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -46,9 +45,10 @@ struct ReleaseNotesSheetView: View {
     private func highlightRow(_ highlight: ReleaseNotesHighlight) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: highlight.iconName)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(.orange)
-                .frame(width: 24, height: 24)
+                .frame(width: iconColumnSize, height: iconColumnSize)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(highlight.title)

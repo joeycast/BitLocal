@@ -1,51 +1,60 @@
-import XCTest
+import Foundation
+import Synchronization
+import Testing
 @testable import bitlocal
 
-final class CommunityAreasLoaderTests: XCTestCase {
+@Suite(.tags(.sync))
+struct CommunityAreasLoaderTests {
     /// Regression test: the loader is created as a local by its caller, so it
     /// must stay alive through async completions. A weak self capture in
     /// `step` deallocated it before the first page returned and onPage never
     /// fired. The stub completes asynchronously to reproduce that timing.
-    func testLoaderSurvivesCallingScopeWithAsyncRepository() async {
+    @Test func loaderSurvivesCallingScopeWithAsyncRepository() async {
         let repository = AsyncStubRepository()
         repository.pages = [[makeArea(id: "a")]]
-        let onPageFired = expectation(description: "onPage fires")
 
-        func kickOff() {
-            let loader = CommunityAreasLoader(repository: repository)
-            loader.loadAll { areas, isComplete, error in
-                XCTAssertEqual(areas.map(\.id), ["a"])
-                XCTAssertTrue(isComplete)
-                XCTAssertNil(error)
-                onPageFired.fulfill()
+        let result: (ids: [String], isComplete: Bool, hasError: Bool) = await withCheckedContinuation { continuation in
+            func kickOff() {
+                let loader = CommunityAreasLoader(repository: repository)
+                loader.loadAll { areas, isComplete, error in
+                    continuation.resume(returning: (areas.map(\.id), isComplete, error != nil))
+                }
             }
+            kickOff() // loader local goes out of scope before the fetch completes
         }
-        kickOff() // loader local goes out of scope before the fetch completes
 
-        await fulfillment(of: [onPageFired], timeout: 2)
+        #expect(result.ids == ["a"])
+        #expect(result.isComplete)
+        #expect(result.hasError == false)
     }
 
-    func testPaginatesUntilShortPage() async {
+    @Test func paginatesUntilShortPage() async {
         let repository = AsyncStubRepository()
         repository.pages = [
             [makeArea(id: "a", updatedAt: "2024-01-01T00:00:00Z"), makeArea(id: "b", updatedAt: "2024-01-02T00:00:00Z")],
             [makeArea(id: "c", updatedAt: "2024-01-03T00:00:00Z")]
         ]
-        let completed = expectation(description: "final page")
-        var pageCallCount = 0
 
-        let loader = CommunityAreasLoader(repository: repository, pageLimit: 2)
-        loader.loadAll { areas, isComplete, error in
-            pageCallCount += 1
-            XCTAssertNil(error)
-            if isComplete {
-                XCTAssertEqual(Set(areas.map(\.id)), ["a", "b", "c"])
-                XCTAssertEqual(pageCallCount, 2)
-                completed.fulfill()
+        let result: (ids: Set<String>, pageCallCount: Int, hasError: Bool) = await withCheckedContinuation { continuation in
+            let state = Mutex<(pageCallCount: Int, sawError: Bool)>((0, false))
+            let loader = CommunityAreasLoader(repository: repository, pageLimit: 2)
+            loader.loadAll { areas, isComplete, error in
+                let snapshot = state.withLock { current -> (Int, Bool) in
+                    current.pageCallCount += 1
+                    if error != nil {
+                        current.sawError = true
+                    }
+                    return (current.pageCallCount, current.sawError)
+                }
+                if isComplete {
+                    continuation.resume(returning: (Set(areas.map(\.id)), snapshot.0, snapshot.1))
+                }
             }
         }
 
-        await fulfillment(of: [completed], timeout: 2)
+        #expect(result.hasError == false)
+        #expect(result.ids == ["a", "b", "c"])
+        #expect(result.pageCallCount == 2)
     }
 
     private func makeArea(id: String, updatedAt: String = "2024-01-01T00:00:00Z") -> V2AreaRecord {
@@ -62,41 +71,42 @@ final class CommunityAreasLoaderTests: XCTestCase {
 
 /// Completes every call asynchronously off the calling thread, matching real
 /// network timing so lifetime bugs in callers surface.
-private final class AsyncStubRepository: BTCMapRepositoryProtocol {
+private final class AsyncStubRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     var pages: [[V2AreaRecord]] = []
     private var nextPageIndex = 0
 
-    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) {
+    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V2AreaRecord], Error>) -> Void) {
         let page = nextPageIndex < pages.count ? pages[nextPageIndex] : []
         nextPageIndex += 1
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+        Task {
+            try? await Task.sleep(for: .milliseconds(50))
             completion(.success(page))
         }
     }
 
     func loadCachedElements() -> [Element]? { nil }
     func hasCachedData() -> Bool { false }
-    func refreshElements(completion: @escaping ([Element]?) -> Void) { completion(nil) }
+    func refreshElements(completion: @escaping @Sendable ([Element]?) -> Void) { completion(nil) }
     func lastSuccessfulSyncAtISO8601() -> String? { nil }
-    func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
+    func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) {
+    func fetchV3Area(id: Int, completion: @escaping @Sendable (Result<V3AreaRecord, Error>) -> Void) {
         completion(.failure(NSError(domain: "test", code: 1)))
     }
-    func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void) {
+    func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaElementRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         completion(.failure(NSError(domain: "test", code: 1)))
     }
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         completion(.success([]))
     }
 }

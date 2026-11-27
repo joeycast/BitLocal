@@ -1,12 +1,15 @@
-import SwiftUI
 import MessageUI
+import Observation
+import SwiftUI
 
-class BusinessSubmissionViewModel: ObservableObject {
-    @Published var submission = BusinessSubmission()
-    @Published var showingValidationErrors = false
-    @Published var showingMailComposer = false
-    @Published var mailComposeResult: Result<MFMailComposeResult, Error>?
-    @Published var isSubmitting = false
+@MainActor
+@Observable
+final class BusinessSubmissionViewModel {
+    var submission = BusinessSubmission()
+    var showingValidationErrors = false
+    var showingMailComposer = false
+    var mailComposeResult: Result<MFMailComposeResult, Error>?
+    var isSubmitting = false
 
     func validateAndSubmit() {
         let errors = submission.validationErrors()
@@ -31,15 +34,9 @@ class BusinessSubmissionViewModel: ObservableObject {
     func emailSubject() -> String {
         let name = submission.businessName.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty {
-            return NSLocalizedString("New BitLocal Business Submission", comment: "Email subject for a new business submission without a business name")
+            return String(localized: "New BitLocal Business Submission", comment: "Email subject for a new business submission without a business name")
         }
-        return String(
-            format: NSLocalizedString(
-                "New BitLocal Business Submission: %@",
-                comment: "Email subject for a new business submission with the business name"
-            ),
-            name
-        )
+        return String(localized: "New BitLocal Business Submission: \(name)", comment: "Email subject for a new business submission with the business name")
     }
 
     func emailBody() -> String {

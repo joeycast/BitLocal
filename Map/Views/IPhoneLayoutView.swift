@@ -12,10 +12,31 @@ import Foundation // for Debug logging
 import UIKit
 
 struct IPhoneLayoutView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     var elements: [Element]?
     var visibleElements: [Element]
-    @Binding var showingAbout: Bool
+    @Binding var showingSettings: Bool
+    @Binding var headerHeight: CGFloat
+    var selectedMapTypeBinding: Binding<MKMapType>
+
+    var body: some View {
+        NavigationStack {
+            IPhoneLayoutContent(
+                viewModel: viewModel,
+                elements: elements,
+                visibleElements: visibleElements,
+                showingSettings: $showingSettings,
+                headerHeight: $headerHeight,
+                selectedMapTypeBinding: selectedMapTypeBinding
+            )
+        }
+    }
+}
+
+private struct IPhoneLayoutContent: View {
+    var viewModel: ContentViewModel
+    var elements: [Element]?
+    var visibleElements: [Element]
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -24,27 +45,57 @@ struct IPhoneLayoutView: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
-    @EnvironmentObject var appearanceManager: AppearanceManager
-    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
+    @Environment(AppearanceManager.self) private var appearanceManager
+    @Environment(ReleaseNotesController.self) private var releaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
-    
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
+
     private var appearance: Appearance { appearanceManager.appearance }
-    @State private var bottomSheetDetent: PresentationDetent = .fraction(0.3)
-    @State private var settingsSheetDetent: PresentationDetent = .medium
+    @State private var recenterController = MapLocationRecenterController()
+    @State private var activeSheet: IPhoneActiveSheet?
+    @State private var bottomSheetDetent: PresentationDetent = .fraction(0.37)
+    @State private var settingsSheetDetent: PresentationDetent = .large
     @State private var hasLiveSheetMeasurement = false
     @State private var hasAcceptedDefaultLiveMeasurement = false
     @State private var pendingLaunchOutlier: CGFloat?
     private let collapsedSheetDetent: PresentationDetent = BottomSheetDetents.collapsed
-    private let defaultSheetDetent: PresentationDetent = .fraction(0.3)
+    private let defaultSheetDetent: PresentationDetent = .fraction(0.37)
     private var shouldPresentBottomSheet: Bool {
         didCompleteOnboarding &&
         viewModel.isReadyForPostOnboardingPresentation &&
         !releaseNotesController.isPresenting
     }
 
+    private var usesNativeHorizontalBar: Bool {
+        if #available(iOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+
+    private var usesToolbarMapControls: Bool {
+        AppLayoutMode.usesToolbarMapControls(
+            horizontalSizeClass: horizontalSizeClass,
+            isVerticalToolbarActive: isVerticalToolbarActive,
+            usesNativeHorizontalBar: usesNativeHorizontalBar
+        )
+    }
+
+    private var showsLegacyHeader: Bool {
+        !isVerticalToolbarActive && !usesNativeHorizontalBar
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let elements = self.elements
+            let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+            let leadingSheetWidth = geometry.leadingCollapsibleSheetWidth(
+                horizontalSizeClass: horizontalSizeClass,
+                layoutDirection: layoutDirection
+            )
+            let isLeadingSheet = leadingSheetWidth != nil
 
             ZStack {
                 if let elements = elements {
@@ -60,121 +111,164 @@ struct IPhoneLayoutView: View {
                     }
                     // Attribution observes settled padding only (via this layout's
                     // onChange of bottomPadding / detent), not live drag height.
-                    .overlay(
+                    .overlay(alignment: .bottomLeading) {
                         OpenStreetMapAttributionView()
-                            .padding(.bottom, attributionBottomInset(for: geometry.size.height) + 1)
-                            .padding(.leading, 16),
-                        alignment: .bottomLeading
-                    )
+                            .padding(
+                                .bottom,
+                                isLeadingSheet
+                                    ? max(geometry.safeAreaInsets.bottom, 8)
+                                    : attributionBottomInset(for: fullHeight) + 6
+                            )
+                            .padding(
+                                .leading,
+                                isLeadingSheet
+                                    ? (leadingSheetWidth ?? 0) + 28
+                                    : geometry.safeAreaInsets.leading + 16
+                            )
+                    }
                 }
-                VStack {
-                    IPhoneHeaderView(
-                        screenWidth: geometry.size.width,
-                        viewModel: viewModel,
-                        showingAbout: $showingAbout,
-                        showingSettings: $showingSettings,
-                        selectedMapTypeBinding: selectedMapTypeBinding
-                        // Removed appearance and systemColorScheme parameters
-                    )
-                    Spacer()
+                if showsLegacyHeader {
+                    VStack {
+                        IPhoneHeaderView(
+                            screenWidth: geometry.size.width,
+                            viewModel: viewModel,
+                            showingSettings: $showingSettings
+                        )
+                        Spacer()
+                    }
                 }
             }
             // Map buttons live in a child that observes `sheetGeometry` only, so
             // continuous drag height does not rebuild MapView / this ZStack.
+            // On iPhone Duo poses (outer display, unfolded landscape, and unfolded
+            // portrait on iOS 26+), they stay consistently in the native `.toolbar`.
             .overlay(alignment: shouldPresentBottomSheet ? .bottomTrailing : .topTrailing) {
-                IPhoneMapButtonsChrome(
-                    viewModel: viewModel,
-                    sheetGeometry: viewModel.sheetGeometry,
-                    selectedMapTypeBinding: selectedMapTypeBinding,
-                    mapHeight: geometry.size.height,
-                    safeTopInset: geometry.safeAreaInsets.top,
-                    safeBottomInset: geometry.safeAreaInsets.bottom,
-                    headerHeight: headerHeight,
-                    shouldPresentBottomSheet: shouldPresentBottomSheet,
-                    showingSettings: showingSettings
-                )
+                if !usesToolbarMapControls {
+                    IPhoneMapButtonsChrome(
+                        viewModel: viewModel,
+                        sheetGeometry: viewModel.sheetGeometry,
+                        selectedMapTypeBinding: selectedMapTypeBinding,
+                        mapHeight: geometry.size.height,
+                        safeTopInset: geometry.safeAreaInsets.top,
+                        safeBottomInset: geometry.safeAreaInsets.bottom,
+                        headerHeight: headerHeight,
+                        shouldPresentBottomSheet: shouldPresentBottomSheet,
+                        showingSettings: showingSettings,
+                        useMonochromeIcons: horizontalSizeClass == .regular || usesNativeHorizontalBar
+                    )
+                }
             }
-//            // Only show bottom sheet after onboarding is complete
-//            .bottomSheet(
-//                presentationDetents: [.fraction(0.3), .medium, .large],
-//                isPresented: .constant(didCompleteOnboarding), // Changed this line
-//                dragIndicator: .visible,
-//                sheetCornerRadius: 20,
-//                largestUndimmedIdentifier: .medium,
-//                interactiveDisabled: true,
-//                forcedColorScheme: nil, // Let the content handle its own color scheme
-//                content: {
-//                    BottomSheetContentView(visibleElements: visibleElements)
-//                        .id("\(appearance.rawValue)-\(systemColorScheme)")
-//                        .environmentObject(viewModel)
-//                        .background(Color(UIColor.systemBackground))
-//                        .preferredColorScheme(effectiveColorScheme)
-//                        .environment(\.colorScheme, effectiveColorScheme ?? systemColorScheme)
-//                        .sheet(isPresented: $showingAbout) {
-//                            AboutView()
-//                        }
-//                },
-//                onDismiss: {
-//                    Debug.log("Bottom sheet dismissed")
-//                }
-//            )
-            .sheet(isPresented: .constant(shouldPresentBottomSheet), onDismiss: {
-                Debug.log("Bottom sheet dismissed")
-            }) {
-                BottomSheetContentView(
-                    visibleElements: visibleElements,
-                    currentDetent: $bottomSheetDetent
-                )
-                    .id("\(appearance.rawValue)-\(systemColorScheme)")
-                    .environmentObject(viewModel)
+            .toolbar {
+                if usesToolbarMapControls {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("settings_label_accessibility", systemImage: "gearshape.fill")
+                                .foregroundStyle(.primary)
+                                .id("settings-\(effectiveColorScheme == .dark)")
+                        }
+                        .tint(.primary)
+                    }
+
+                    MapControlToolbarContent(
+                        viewModel: viewModel,
+                        selectedMapTypeBinding: selectedMapTypeBinding,
+                        recenterController: recenterController,
+                        placement: .topBarTrailing,
+                        colorScheme: effectiveColorScheme
+                    )
+                } else if usesNativeHorizontalBar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("settings_label_accessibility", systemImage: "gearshape.fill")
+                                .foregroundStyle(.primary)
+                                .id("settings-h-\(effectiveColorScheme == .dark)")
+                        }
+                        .tint(.primary)
+                    }
+                }
+            }
+            .toolbarVisibility(showsLegacyHeader ? .hidden : .visible, for: .navigationBar)
+            .locationRecenterAlerts(controller: recenterController)
+            .toolbarColorScheme(effectiveColorScheme, for: .navigationBar)
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("")
+            .sheet(item: $activeSheet, onDismiss: handleActiveSheetDismiss) { sheet in
+                switch sheet {
+                case .browse:
+                    let topDetent: PresentationDetent = isLeadingSheet
+                        ? BottomSheetDetents.expandedLeading
+                        : .large
+                    BottomSheetContentView(
+                        visibleElements: visibleElements,
+                        currentDetent: $bottomSheetDetent,
+                        preferredLeadingWidth: leadingSheetWidth
+                    )
+                    .environment(viewModel)
                     .preferredColorScheme(effectiveColorScheme)  // To respect appearance
-//                    .presentationBackground(Color(UIColor.systemBackground))  // Keeps background opaque, resolves based on the preferred scheme
                     .presentationDetents([
                         collapsedSheetDetent,
                         defaultSheetDetent,
                         .medium,
-                        .large
+                        topDetent
                     ], selection: $bottomSheetDetent)
+                    .presentationSizing(
+                        AdaptiveLeadingSheetSizing(
+                            maxWidth: leadingSheetWidth,
+                            maxHeight: fullHeight
+                        )
+                    )
+                    .adaptiveSheetPlacement(leading: isLeadingSheet)
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(true)
                     .presentationBackgroundInteraction(.enabled)
-                    .sheet(isPresented: $showingAbout) {
-                        AboutView()
-                            .environmentObject(viewModel)
-                    }
-                    .sheet(isPresented: $showingSettings) {
-                        NavigationStack {
-                            SettingsView(
-                                selectedMapType: selectedMapTypeBinding,
-                                currentDetent: $settingsSheetDetent
-                            )
-                            .environmentObject(viewModel)
-                            .environmentObject(MerchantAlertsManager.shared)
-                        }
-                        .id("settings-sheet-\(appearance.rawValue)-\(systemColorScheme)")
-                        .preferredColorScheme(effectiveColorScheme)
-                        .presentationDetents([.medium, .large], selection: $settingsSheetDetent)
-                        .settingsSheetBackground()
-                    }
+                case .settings:
+                    settingsSheetContent
+                }
             }
             .onAppear {
+                syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
+                viewModel.leadingSheetInset = leadingSheetWidth ?? 0
                 hasLiveSheetMeasurement = false
                 hasAcceptedDefaultLiveMeasurement = false
                 pendingLaunchOutlier = nil
+                syncActiveSheet()
                 if shouldPresentBottomSheet {
-                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
                 }
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = attributionBottomInset(for: fullHeight)
                 Debug.logMap(
                     "Attribution launch: detent=\(bottomSheetDetent), " +
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
-                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
+                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(fullHeight), inset=\(inset)"
                 )
             }
+            .onDisappear {
+                viewModel.leadingSheetInset = 0
+            }
+            .onChange(of: leadingSheetWidth) { _, newWidth in
+                viewModel.leadingSheetInset = newWidth ?? 0
+                if newWidth != nil, bottomSheetDetent == .large {
+                    bottomSheetDetent = BottomSheetDetents.expandedLeading
+                } else if newWidth == nil, bottomSheetDetent == BottomSheetDetents.expandedLeading {
+                    bottomSheetDetent = .large
+                }
+            }
+            .onChange(of: isVerticalToolbarActive) { _, _ in
+                syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
+            }
+            .onChange(of: geometry.safeAreaInsets.top) { _, newTop in
+                syncTopPadding(safeTopInset: newTop)
+            }
             .onChange(of: shouldPresentBottomSheet) { _, isPresented in
+                syncActiveSheet()
                 if isPresented {
-                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
                 }
                 Debug.logTiming(
@@ -191,9 +285,9 @@ struct IPhoneLayoutView: View {
             }
             .onChange(of: viewModel.bottomPadding) { _, newValue in
                 if newValue > 1 {
-                    let expected = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                    let expected = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     let isDefaultDetent = isDefaultLikeDetent(bottomSheetDetent)
-                    let isPlausibleAtDefault = abs(newValue - expected) <= 8
+                    let isPlausibleAtDefault = abs(newValue - expected) <= 24
 
                     if isDefaultDetent && !hasAcceptedDefaultLiveMeasurement {
                         if isPlausibleAtDefault {
@@ -206,7 +300,7 @@ struct IPhoneLayoutView: View {
                             pendingLaunchOutlier = nil
                         } else {
                             pendingLaunchOutlier = newValue
-                            let inset = attributionBottomInset(for: geometry.size.height)
+                            let inset = attributionBottomInset(for: fullHeight)
                             Debug.logMap(
                                 "Attribution bottomPadding ignored (launch outlier): detent=\(bottomSheetDetent), " +
                                 "bottomPadding=\(newValue), expected=\(expected), inset=\(inset)"
@@ -216,11 +310,11 @@ struct IPhoneLayoutView: View {
                     }
                     hasLiveSheetMeasurement = true
                 }
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = attributionBottomInset(for: fullHeight)
                 Debug.logMap(
                     "Attribution bottomPadding changed: detent=\(bottomSheetDetent), " +
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
-                    "bottomPadding=\(newValue), mapHeight=\(geometry.size.height), inset=\(inset)"
+                    "bottomPadding=\(newValue), mapHeight=\(fullHeight), inset=\(inset)"
                 )
             }
             .onChange(of: bottomSheetDetent) { _, newDetent in
@@ -230,23 +324,89 @@ struct IPhoneLayoutView: View {
                 }
                 // The selection changes at the start of UIKit's snap animation.
                 // Defer map padding publication until the measured card stops moving.
-                let settledHeight = estimatedBottomInsetForDetent(mapHeight: geometry.size.height)
+                let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                 viewModel.prepareForSheetDetentTransition(estimatedHeight: settledHeight)
-                let inset = attributionBottomInset(for: geometry.size.height)
+                let inset = attributionBottomInset(for: fullHeight)
                 Debug.logMap(
                     "Attribution detent changed: detent=\(newDetent), " +
                     "hasLiveSheetMeasurement=\(hasLiveSheetMeasurement), " +
-                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(geometry.size.height), inset=\(inset)"
+                    "bottomPadding=\(viewModel.bottomPadding), mapHeight=\(fullHeight), inset=\(inset)"
                 )
+            }
+            .onChange(of: geometry.size) { _, _ in
+                guard shouldPresentBottomSheet, fullHeight > 1 else { return }
+                hasLiveSheetMeasurement = false
+                hasAcceptedDefaultLiveMeasurement = false
+                pendingLaunchOutlier = nil
+                let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
+                viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
             }
             .onChange(of: showingSettings) { _, isShowing in
                 if isShowing {
-                    settingsSheetDetent = .medium
+                    settingsSheetDetent = .large
                 }
+                syncActiveSheet()
             }
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.25), value: appearance)
             .animation(.easeInOut(duration: 0.25), value: systemColorScheme)
+        }
+    }
+
+    @ViewBuilder
+    private var settingsSheetContent: some View {
+        let baseSettings = NavigationStack {
+            SettingsView(
+                selectedMapType: selectedMapTypeBinding,
+                currentDetent: $settingsSheetDetent
+            )
+            .environment(viewModel)
+            .environment(MerchantAlertsManager.shared)
+        }
+        .preferredColorScheme(effectiveColorScheme)
+        .settingsSheetBackground()
+
+        if horizontalSizeClass == .regular {
+            baseSettings
+                .presentationSizing(.form)
+        } else {
+            baseSettings
+                .presentationDetents([.medium, .large], selection: $settingsSheetDetent)
+        }
+    }
+
+    private func syncActiveSheet() {
+        let target = IPhoneSheetPresentationResolver.targetSheet(
+            shouldPresentBottomSheet: shouldPresentBottomSheet,
+            showingSettings: showingSettings
+        )
+        if activeSheet != target {
+            activeSheet = target
+        }
+    }
+
+    private func handleActiveSheetDismiss() {
+        let resolution = IPhoneSheetPresentationResolver.stateAfterDismiss(
+            currentActiveSheet: activeSheet,
+            shouldPresentBottomSheet: shouldPresentBottomSheet,
+            showingSettings: showingSettings
+        )
+        if showingSettings != resolution.nextShowingSettings {
+            showingSettings = resolution.nextShowingSettings
+        }
+        if activeSheet != resolution.nextSheet {
+            activeSheet = resolution.nextSheet
+        }
+    }
+
+    private func syncTopPadding(safeTopInset: CGFloat) {
+        guard !showsLegacyHeader else { return }
+        let resolvedTop = isVerticalToolbarActive ? 0 : safeTopInset
+        if headerHeight != resolvedTop {
+            headerHeight = resolvedTop
+        }
+        if viewModel.topPadding != resolvedTop {
+            viewModel.topPadding = resolvedTop
         }
     }
 
@@ -258,15 +418,6 @@ struct IPhoneLayoutView: View {
             return .light
         case .dark:
             return .dark
-        }
-    }
-
-    private func mapOverlayTopOffset(for safeTopInset: CGFloat) -> CGFloat {
-        let isNotch = safeTopInset >= 40
-        if isNotch {
-            return headerHeight - 28   // tune notch devices
-        } else {
-            return headerHeight - 5   // tune legacy/home-button devices
         }
     }
 
@@ -287,13 +438,13 @@ struct IPhoneLayoutView: View {
             return BottomSheetDetents.collapsedHeight
         }
         if isDefaultLikeDetent(bottomSheetDetent) {
-            return mapHeight * 0.30
+            return mapHeight * 0.37
         }
         if isMediumDetent(bottomSheetDetent) {
             return mapHeight * 0.50
         }
         // Keep large detent aligned with default viewport behavior.
-        return mapHeight * 0.30
+        return mapHeight * 0.37
     }
 
     private func detentIdentifier(_ detent: PresentationDetent) -> String {
@@ -305,8 +456,11 @@ struct IPhoneLayoutView: View {
     }
 
     private func isDefaultLikeDetent(_ detent: PresentationDetent) -> Bool {
+        if detent == defaultSheetDetent || detent == BottomSheetDetents.expandedLeading {
+            return true
+        }
         let id = detentIdentifier(detent)
-        return id.contains("fraction 0.3") || id.contains("large")
+        return id.contains("fraction 0.3") || id.contains("large") || id.contains("fraction 0.92")
     }
 
     private func isMediumDetent(_ detent: PresentationDetent) -> Bool {
@@ -317,7 +471,7 @@ struct IPhoneLayoutView: View {
 /// Map control chrome that stays at a fixed SwiftUI anchor. Continuous sheet
 /// motion is applied directly to its UIKit host view below.
 private struct IPhoneMapButtonsChrome: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     /// Not observed — continuous height arrives via Combine subject.
     var sheetGeometry: SheetGeometryModel
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -327,6 +481,7 @@ private struct IPhoneMapButtonsChrome: View {
     var headerHeight: CGFloat
     var shouldPresentBottomSheet: Bool
     var showingSettings: Bool
+    var useMonochromeIcons: Bool = false
 
     private let mapButtonsPillHeight: CGFloat = 132
     /// Gap between the top of the sheet card and the bottom of the control pill.
@@ -341,7 +496,8 @@ private struct IPhoneMapButtonsChrome: View {
             safeBottomInset: safeBottomInset,
             maximumBottomOffset: maxMapButtonsBottomInset,
             sheetClearance: sheetClearance,
-            tracksSheet: shouldPresentBottomSheet
+            tracksSheet: shouldPresentBottomSheet,
+            useMonochromeIcons: useMonochromeIcons
         )
         .fixedSize()
         .padding(.trailing, 18)
@@ -363,9 +519,9 @@ private struct IPhoneMapButtonsChrome: View {
     private var mapOverlayTopOffset: CGFloat {
         let isNotch = safeTopInset >= 40
         if isNotch {
-            return headerHeight - 28
+            return max(headerHeight - 28, 8)
         } else {
-            return headerHeight - 5
+            return max(headerHeight - 5, 8)
         }
     }
 }
@@ -381,6 +537,7 @@ private struct IPhoneMapButtonsUIKitHost: UIViewControllerRepresentable {
     var maximumBottomOffset: CGFloat
     var sheetClearance: CGFloat
     var tracksSheet: Bool
+    var useMonochromeIcons: Bool = false
 
     func makeUIViewController(context: Context) -> SheetTrackingMapButtonsController {
         let controller = SheetTrackingMapButtonsController(rootView: hostedContent)
@@ -435,8 +592,7 @@ private struct IPhoneMapButtonsUIKitHost: UIViewControllerRepresentable {
         MapButtonsView(
             viewModel: viewModel,
             selectedMapTypeBinding: selectedMapTypeBinding,
-            userLocation: viewModel.userLocation,
-            isIPad: false
+            useMonochromeIcons: useMonochromeIcons
         )
     }
 }

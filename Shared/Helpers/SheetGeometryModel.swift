@@ -1,29 +1,31 @@
 import Combine
+import Observation
 import SwiftUI
 import UIKit
 
 /// Isolated sheet-height state so detent dragging does not invalidate the entire
 /// `ContentViewModel` observation graph on every geometry tick.
 @MainActor
-final class SheetGeometryModel: ObservableObject {
-    /// Continuous height (screen bottom → sheet top). Not `@Published`.
+@Observable
+final class SheetGeometryModel {
+    /// Continuous height (screen bottom → sheet top). Not observed by SwiftUI.
     /// Map chrome should subscribe via `continuousHeightPublisher` so list bodies
     /// are not re-evaluated every frame.
-    private(set) var continuousHeight: CGFloat = 0
+    @ObservationIgnored private(set) var continuousHeight: CGFloat = 0
 
     /// Sparse SwiftUI-facing height for collapsed-content reveal only.
-    /// Publishes only near the collapsed band, not on every drag frame.
-    @Published private(set) var liveHeight: CGFloat = 0
+    /// Observed only near the collapsed band, not on every drag frame.
+    private(set) var liveHeight: CGFloat = 0
 
-    /// Height captured when a detent selection settles. Not observable: callers
+    /// Height captured when a detent selection settles. Not observed: callers
     /// read it synchronously so drag-time measurements never fan out through SwiftUI.
-    private(set) var settledHeight: CGFloat = 0
+    @ObservationIgnored private(set) var settledHeight: CGFloat = 0
 
-    /// High-frequency continuous height for UIKit chrome (not objectWillChange).
-    let continuousHeightPublisher = PassthroughSubject<CGFloat, Never>()
+    /// High-frequency continuous height for UIKit chrome (not observed by SwiftUI).
+    @ObservationIgnored let continuousHeightPublisher = PassthroughSubject<CGFloat, Never>()
 
-    private var lastLivePublished: CGFloat = -1
-    private var lastContinuousSent: CGFloat = -1
+    @ObservationIgnored private var lastLivePublished: CGFloat = -1
+    @ObservationIgnored private var lastContinuousSent: CGFloat = -1
 
     /// Only publish `liveHeight` for SwiftUI when near collapsed reveal.
     private static let revealPublishCeiling: CGFloat = 200
@@ -78,11 +80,13 @@ final class SheetGeometryModel: ObservableObject {
 /// UIKit layout passes. More reliable than SwiftUI content-height during interactive
 /// detent changes, and matches what map chrome should clear.
 struct SheetEdgeHeightReader: UIViewRepresentable {
+    var preferredLeadingWidth: CGFloat? = nil
     var onHeightChange: (CGFloat) -> Void
     var onMotionSettled: (CGFloat) -> Void
 
     func makeUIView(context: Context) -> SheetEdgeHeightReaderView {
         let view = SheetEdgeHeightReaderView()
+        view.preferredLeadingWidth = preferredLeadingWidth
         view.onHeightChange = onHeightChange
         view.onMotionSettled = onMotionSettled
         view.isUserInteractionEnabled = false
@@ -91,23 +95,48 @@ struct SheetEdgeHeightReader: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: SheetEdgeHeightReaderView, context: Context) {
+        let widthChanged = uiView.preferredLeadingWidth != preferredLeadingWidth
+        uiView.preferredLeadingWidth = preferredLeadingWidth
         uiView.onHeightChange = onHeightChange
         uiView.onMotionSettled = onMotionSettled
+        if widthChanged {
+            uiView.applyPreferredSheetWidthIfNeeded()
+        }
+    }
+}
+
+private final class DisplayLinkHandle: @unchecked Sendable {
+    let link: CADisplayLink
+
+    init(_ link: CADisplayLink) {
+        self.link = link
+    }
+
+    deinit {
+        link.invalidate()
     }
 }
 
 final class SheetEdgeHeightReaderView: UIView {
+    var preferredLeadingWidth: CGFloat?
     var onHeightChange: ((CGFloat) -> Void)?
     var onMotionSettled: ((CGFloat) -> Void)?
     private var lastReported: CGFloat = -1
-    private var displayLink: CADisplayLink?
+    private var lastWindowBoundsSize: CGSize = .zero
+    private var lastAppliedLeadingWidth: CGFloat? = -1
+    private var displayLinkHandle: DisplayLinkHandle?
     private var stableFrameCount = 0
     private weak var cachedPresentedView: UIView?
     private static let stableFramesBeforePause = 8
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        // Layout changes mean the sheet may be moving again.
+        // Layout changes mean the sheet or window may be moving/resizing again.
+        if let windowBoundsSize = window?.bounds.size, windowBoundsSize != lastWindowBoundsSize {
+            lastWindowBoundsSize = windowBoundsSize
+            lastReported = -1
+            applyPreferredSheetWidthIfNeeded(force: true)
+        }
         stableFrameCount = 0
         startDisplayLinkIfNeeded()
     }
@@ -115,8 +144,12 @@ final class SheetEdgeHeightReaderView: UIView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         cachedPresentedView = nil
-        if window != nil {
+        lastAppliedLeadingWidth = -1
+        if let window {
+            lastWindowBoundsSize = window.bounds.size
+            lastReported = -1
             stableFrameCount = 0
+            applyPreferredSheetWidthIfNeeded(force: true)
             startDisplayLinkIfNeeded()
             report()
         } else {
@@ -124,22 +157,63 @@ final class SheetEdgeHeightReaderView: UIView {
         }
     }
 
-    deinit {
-        displayLink?.invalidate()
+    /// Directly configures UIKit's `UISheetPresentationController` so edge-attached
+    /// detent sheets on wide displays (iPhone Duo unfolded landscape) honor a custom
+    /// ~1/3 width instead of falling back to UIKit's default ~620 pt page-sheet width.
+    func applyPreferredSheetWidthIfNeeded(force: Bool = false) {
+        guard let window,
+              let presentedVC = presentedSheetViewController(),
+              let sheet = presentedVC.sheetPresentationController else {
+            return
+        }
+
+        if !force, lastAppliedLeadingWidth == preferredLeadingWidth {
+            return
+        }
+        lastAppliedLeadingWidth = preferredLeadingWidth
+
+        if let targetWidth = preferredLeadingWidth, targetWidth > 1 {
+            let finiteHeight = max(window.bounds.height, 400)
+            let desiredSize = CGSize(width: targetWidth, height: finiteHeight)
+            let needsChange =
+                sheet.prefersPageSizing ||
+                !sheet.widthFollowsPreferredContentSizeWhenEdgeAttached ||
+                abs(presentedVC.preferredContentSize.width - targetWidth) > 0.5
+
+            if needsChange {
+                sheet.animateChanges {
+                    sheet.prefersPageSizing = false
+                    sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = true
+                    presentedVC.preferredContentSize = desiredSize
+                }
+            }
+        } else {
+            let needsReset =
+                !sheet.prefersPageSizing ||
+                sheet.widthFollowsPreferredContentSizeWhenEdgeAttached ||
+                presentedVC.preferredContentSize.width > 0.5
+
+            if needsReset {
+                sheet.animateChanges {
+                    sheet.prefersPageSizing = true
+                    sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = false
+                    presentedVC.preferredContentSize = .zero
+                }
+            }
+        }
     }
 
     private func startDisplayLinkIfNeeded() {
-        guard displayLink == nil else { return }
+        guard displayLinkHandle == nil else { return }
         // Sample while the card moves. Pause after stable frames to avoid
         // burning main-thread time while the sheet is idle.
         let link = CADisplayLink(target: self, selector: #selector(handleDisplayLink))
         link.add(to: .main, forMode: .common)
-        displayLink = link
+        displayLinkHandle = DisplayLinkHandle(link)
     }
 
     private func stopDisplayLink() {
-        displayLink?.invalidate()
-        displayLink = nil
+        displayLinkHandle = nil
     }
 
     @objc private func handleDisplayLink() {
@@ -147,7 +221,14 @@ final class SheetEdgeHeightReaderView: UIView {
     }
 
     private func report() {
-        guard window != nil else { return }
+        guard let window else { return }
+
+        if window.bounds.size != lastWindowBoundsSize {
+            lastWindowBoundsSize = window.bounds.size
+            lastReported = -1
+            stableFrameCount = 0
+            applyPreferredSheetWidthIfNeeded(force: true)
+        }
 
         let sheetFrame: CGRect
         if let presented = presentedSheetView() {
@@ -158,8 +239,8 @@ final class SheetEdgeHeightReaderView: UIView {
         }
 
         guard sheetFrame.height > 1 || sheetFrame.minY > 0 else { return }
-        let screenHeight = window?.screen.bounds.height ?? UIScreen.main.bounds.height
-        let heightFromBottom = max(0, screenHeight - sheetFrame.minY)
+        let containerHeight = window.bounds.height
+        let heightFromBottom = max(0, containerHeight - sheetFrame.minY)
         guard heightFromBottom > 1 else { return }
 
         if abs(heightFromBottom - lastReported) < 0.25 {
@@ -200,9 +281,22 @@ final class SheetEdgeHeightReaderView: UIView {
         if let cachedPresentedView, cachedPresentedView.window != nil {
             return cachedPresentedView
         }
-        guard let viewController = nearestViewController() else { return nil }
+        guard let viewController = presentedSheetViewController() ?? nearestViewController() else {
+            return nil
+        }
         cachedPresentedView = viewController.view
         return viewController.view
+    }
+
+    private func presentedSheetViewController() -> UIViewController? {
+        var current = nearestViewController()
+        while let vc = current {
+            if vc.sheetPresentationController != nil {
+                return vc
+            }
+            current = vc.parent
+        }
+        return nil
     }
 
     private func nearestViewController() -> UIViewController? {
@@ -220,15 +314,17 @@ final class SheetEdgeHeightReaderView: UIView {
 // MARK: - Collapsed content reveal
 
 /// Applies opacity/offset for collapsed-sheet content reveal.
-/// Only attached when the sheet is collapsed-like, so expanded lists do not
-/// observe live height during normal drag.
+/// Guards `isActive` before reading `geometry.liveHeight` so expanded lists skip
+/// `@Observable` tracking automatically while preserving structural view identity.
 struct SheetCollapsedRevealModifier: ViewModifier {
-    @ObservedObject var geometry: SheetGeometryModel
+    var geometry: SheetGeometryModel
+    var isActive: Bool
 
     private let revealHeight: CGFloat = 140
     private let revealRange: CGFloat = 36
 
     private var progress: CGFloat {
+        guard isActive else { return 1 }
         guard geometry.liveHeight > 1 else { return 0 }
         let raw = (geometry.liveHeight - revealHeight) / revealRange
         return min(max(raw, 0), 1)
@@ -245,17 +341,16 @@ struct SheetCollapsedRevealModifier: ViewModifier {
 }
 
 extension View {
-    @ViewBuilder
     func sheetCollapsedReveal(
         geometry: SheetGeometryModel,
         isCollapsedLike: Bool,
         forceRevealed: Bool = false
     ) -> some View {
-        // Skip observation entirely when fully revealed — critical for device drag FPS.
-        if forceRevealed || !isCollapsedLike {
-            self
-        } else {
-            modifier(SheetCollapsedRevealModifier(geometry: geometry))
-        }
+        modifier(
+            SheetCollapsedRevealModifier(
+                geometry: geometry,
+                isActive: !forceRevealed && isCollapsedLike
+            )
+        )
     }
 }

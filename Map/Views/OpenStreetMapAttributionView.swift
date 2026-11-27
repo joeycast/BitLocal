@@ -10,46 +10,46 @@ import SwiftUI
 
 struct OpenStreetMapAttributionView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
     @State private var isFaded = false
+    @State private var fadeTrigger = 0
+
+    private static let osmCopyrightURL = URL(string: "https://www.openstreetmap.org/copyright")!
 
     var body: some View {
-        Button(action: {
-            if let url = URL(string: "https://www.openstreetmap.org/copyright") {
-                UIApplication.shared.open(url)
-            }
-        }) {
-            HStack(spacing: 0) {
-                Text("osm_attribution_prefix")
-                    .font(.system(size: 10))
-                    .foregroundColor(colorScheme == .light ? .black : .white)
-                Text("osm_openstreetmap")
-                    .font(.system(size: 10))
-                    .underline()
-                    .foregroundColor(colorScheme == .light ? .black : .white)
-            }
+        Button {
+            openURL(Self.osmCopyrightURL)
+        } label: {
+            Text("\(Text("osm_attribution_prefix"))\(Text("osm_openstreetmap").underline())")
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .padding(.vertical, 2)
+                .padding(.horizontal, 6)
+                .background(.regularMaterial, in: .rect(cornerRadius: 3))
+                .frame(minWidth: 44, minHeight: 44, alignment: .bottomLeading)
+                .contentShape(.rect)
         }
-        .padding(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
-        .background(Color(colorScheme == .light ? UIColor.white : UIColor.black).opacity(colorScheme == .light ? 0.6 : 0.4))
-        .cornerRadius(3)
+        .buttonStyle(.tactilePress(scale: 0.96))
         .opacity(isFaded ? 0 : 1)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
-                withAnimation(.easeInOut(duration: 3)) {
-                    isFaded = true
-                }
+        .allowsHitTesting(!isFaded)
+        .task(id: fadeTrigger) {
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled else { return }
+            withAnimation(
+                BitLocalMotion.animation(.easeOut(duration: 0.6), reduceMotion: reduceMotion)
+            ) {
+                isFaded = true
             }
         }
         .onChange(of: scenePhase) { _, newScenePhase in
             if newScenePhase == .active {
-                withAnimation(.easeInOut(duration: 0)) {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
                     isFaded = false
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
-                    withAnimation(.easeInOut(duration: 3)) {
-                        isFaded = true
-                    }
-                }
+                fadeTrigger += 1
             }
         }
     }

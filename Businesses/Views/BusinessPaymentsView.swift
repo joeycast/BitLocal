@@ -6,52 +6,31 @@ struct BusinessPaymentsView: View {
     var body: some View {
         Form {
                 Section {
-                    HStack {
-                        Text("payment_onchain_label")
-                            .font(.body)
-
-                        Spacer()
-
-                        Picker(selection: $submission.acceptsOnChain) {
+                    LabeledContent("payment_onchain_label") {
+                        Picker("payment_onchain_label", selection: $submission.acceptsOnChain) {
                             Text("payment_not_accepted").tag(false)
                             Text("payment_accepted").tag(true)
-                        } label: {
-                            EmptyView()
                         }
+                        .labelsHidden()
                         .pickerStyle(.segmented)
-                        .fixedSize()
                     }
 
-                    HStack {
-                        Text("payment_lightning_label")
-                            .font(.body)
-
-                        Spacer()
-
-                        Picker(selection: $submission.acceptsLightning) {
+                    LabeledContent("payment_lightning_label") {
+                        Picker("payment_lightning_label", selection: $submission.acceptsLightning) {
                             Text("payment_not_accepted").tag(false)
                             Text("payment_accepted").tag(true)
-                        } label: {
-                            EmptyView()
                         }
+                        .labelsHidden()
                         .pickerStyle(.segmented)
-                        .fixedSize()
                     }
 
-                    HStack {
-                        Text("payment_lightning_contactless_label")
-                            .font(.body)
-
-                        Spacer()
-
-                        Picker(selection: $submission.acceptsContactlessLightning) {
+                    LabeledContent("payment_lightning_contactless_label") {
+                        Picker("payment_lightning_contactless_label", selection: $submission.acceptsContactlessLightning) {
                             Text("payment_not_accepted").tag(false)
                             Text("payment_accepted").tag(true)
-                        } label: {
-                            EmptyView()
                         }
+                        .labelsHidden()
                         .pickerStyle(.segmented)
-                        .fixedSize()
                     }
                 } header: {
                     Text("step_payments_header")
@@ -61,9 +40,5 @@ struct BusinessPaymentsView: View {
                     }
                 }
             }
-    }
-
-    private var canContinue: Bool {
-        submission.hasAtLeastOneBitcoinPayment
     }
 }

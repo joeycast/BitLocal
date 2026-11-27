@@ -3,29 +3,24 @@
 
 import SwiftUI
 import MapKit
-import CoreLocationUI
 import Combine
 import Foundation
-import Foundation // for Debug logging
 
 struct ContentView: View {
-    @EnvironmentObject private var viewModel: ContentViewModel
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
-    @Environment(\.colorScheme) private var systemColorScheme
+    @Environment(ContentViewModel.self) private var viewModel
+    @Environment(FeatureHintsController.self) private var featureHintsController
+    private let intentRouter = BitLocalAppIntentRouter.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @StateObject private var appearanceManager = AppearanceManager()
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
+    @State private var appearanceManager = AppearanceManager()
 
-    @State public var showingAbout = false
-    @State private var userLocation: CLLocation?
-    @State private var cancellable: Cancellable?
     @State private var mapStoppedMovingCancellable: Cancellable?
-    @State private var cancellableUserLocation: Cancellable?
-    @State private var firstLocationUpdate: Bool = true
     @State private var headerHeight: CGFloat = 0
     @State private var showingSettings = false
+    @State private var containerSize: CGSize = .zero
 
     @AppStorage("selectedMapType") private var storedMapType: Int = 0
-    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     var selectedMapTypeBinding: Binding<MKMapType> {
         Binding<MKMapType>(
@@ -35,53 +30,70 @@ struct ContentView: View {
     }
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
 
-    /// Prefer idiom + size class over hard-coded pixel thresholds so iPad
-    /// multitasking and large phones don't flip the wrong layout shell.
-    private var usesIPadLayout: Bool {
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return horizontalSizeClass != .compact
-        }
-        return false
+    /// Size-class + container-geometry shell selection (never `userInterfaceIdiom`):
+    /// iPhone Duo keeps the collapsible sheet shell across all poses (pinning the
+    /// sheet to the leading side in unfolded landscape), while iPad uses split view.
+    private var layoutMode: AppLayoutMode {
+        AppLayoutMode.resolve(
+            horizontalSizeClass: horizontalSizeClass,
+            verticalSizeClass: verticalSizeClass,
+            containerSize: containerSize,
+            isVerticalToolbarActive: isVerticalToolbarActive
+        )
     }
 
     var body: some View {
-        Group {
-            if usesIPadLayout {
+        ZStack {
+            if layoutMode == .splitSidebar {
                 IPadLayoutView(
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.listElementsForCurrentDisplay,
-                    showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding
                 )
-                .environmentObject(appearanceManager)
+                .environment(appearanceManager)
             } else {
                 IPhoneLayoutView(
                     viewModel: viewModel,
                     elements: viewModel.mapElementsForCurrentDisplay,
                     visibleElements: viewModel.listElementsForCurrentDisplay,
-                    showingAbout: $showingAbout,
                     showingSettings: $showingSettings,
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding
                 )
-                .environmentObject(appearanceManager)
+                .environment(appearanceManager)
+            }
+        }
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { newSize in
+            if newSize != containerSize {
+                containerSize = newSize
             }
         }
         .onPreferenceChange(HeaderHeightKey.self) { value in
+            guard layoutMode == .compactSheet else { return }
             self.headerHeight = value
             viewModel.topPadding = value
             Debug.log("Header Height reported: \(value)")
         }
         .onAppear {
             Debug.log("ContentView.onAppear called")
-
-            cancellableUserLocation = viewModel.userLocationSubject.sink { updatedUserLocation in
-                userLocation = updatedUserLocation
+            if containerSize == .zero, let windowSize = ActiveWindowScene.keyWindow?.bounds.size {
+                containerSize = windowSize
             }
+            syncLayoutMode(layoutMode)
+            routePendingAppIntent()
+
             mapStoppedMovingCancellable = viewModel.mapStoppedMovingSubject.sink(receiveValue: {})
+        }
+        .onChange(of: layoutMode) { _, newMode in
+            syncLayoutMode(newMode)
+        }
+        .onChange(of: intentRouter.pendingAction) { _, _ in
+            routePendingAppIntent()
         }
         .onChange(of: featureHintsController.activeTarget) { _, target in
             if target == .merchantAlerts {
@@ -94,6 +106,33 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(colorSchemeFor(appearanceManager.appearance))
+    }
+
+    private func routePendingAppIntent() {
+        guard let action = intentRouter.pendingAction else { return }
+        switch action {
+        case .openCommunities:
+            _ = intentRouter.consumePendingAction()
+            showingSettings = false
+            viewModel.path = []
+            viewModel.setMapDisplayMode(.communities)
+        case .openMerchants:
+            // Switch to merchants mode if needed so BusinessesListView mounts and consumes the filter/query.
+            showingSettings = false
+            if !viewModel.path.isEmpty {
+                viewModel.path = []
+            }
+            if viewModel.mapDisplayMode != .merchants {
+                viewModel.setMapDisplayMode(.merchants)
+            }
+        }
+    }
+
+    private func syncLayoutMode(_ newMode: AppLayoutMode) {
+        viewModel.updateLayoutMode(newMode)
+        if newMode == .splitSidebar, headerHeight != 0 {
+            headerHeight = 0
+        }
     }
 
     // Helper function to map Appearance -> ColorScheme?

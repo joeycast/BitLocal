@@ -14,13 +14,13 @@ struct bitlocalApp: App {
 
     // Add the environment property to track the app's scene phase
     @Environment(\.scenePhase) var scenePhase
-    @StateObject private var contentViewModel = ContentViewModel()
-    @StateObject private var merchantAlertsManager = MerchantAlertsManager.shared
+    @State private var contentViewModel = ContentViewModel()
+    private let merchantAlertsManager = MerchantAlertsManager.shared
     
     // Track scene phase timing to avoid false triggers
-    @State private var lastActiveTime: Date = Date()
+    @State private var lastActiveTime: Date = .now
     @State private var lastBackgroundTime: Date?
-    @State private var scenePhaseChangeTimer: Timer?
+    @State private var scenePhaseTask: Task<Void, Never>?
     
     init() {
         MyFont.registerFonts()
@@ -29,17 +29,17 @@ struct bitlocalApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(contentViewModel)
-                .environmentObject(merchantAlertsManager)
+                .environment(contentViewModel)
+                .environment(merchantAlertsManager)
                 .task {
                     await merchantAlertsManager.refreshStatus()
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     Debug.log("scenePhase changed from \(oldPhase) to: \(newPhase)")
                     
-                    // Cancel any pending timer
-                    scenePhaseChangeTimer?.invalidate()
-                    scenePhaseChangeTimer = nil
+                    // Cancel any pending task
+                    scenePhaseTask?.cancel()
+                    scenePhaseTask = nil
                     
                     // Batch state changes to minimize UI updates
                     handleScenePhaseChange(from: oldPhase, to: newPhase)
@@ -58,16 +58,18 @@ struct bitlocalApp: App {
         case .inactive:
             Debug.log("Scene became inactive")
             // Don't immediately update - batch with potential background state
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            scenePhaseTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { return }
                 // Only update if we're still inactive (haven't moved to background)
-                if self.scenePhase == .inactive {
-                    self.contentViewModel.handleAppBecameInactive()
+                if scenePhase == .inactive {
+                    contentViewModel.handleAppBecameInactive()
                 }
             }
             
         case .background:
             Debug.log("Scene entered background")
-            lastBackgroundTime = Date()
+            lastBackgroundTime = .now
             // Update state immediately since we know we're backgrounded
             contentViewModel.handleAppEnteredBackground()
             
@@ -77,7 +79,7 @@ struct bitlocalApp: App {
     }
     
     private func handleActiveState(from oldPhase: ScenePhase) {
-        let now = Date()
+        let now = Date.now
         
         // Calculate time since last background (if any)
         let timeSinceBackground = lastBackgroundTime?.timeIntervalSince(now) ?? 0
@@ -112,12 +114,12 @@ struct bitlocalApp: App {
             Debug.log("Scheduling additional fetchElements() - meaningful app return")
             
             // Small delay to let UI settle, especially after true app return
-            scenePhaseChangeTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
-                DispatchQueue.main.async {
-                    // Only fetch if still active
-                    if self.contentViewModel.appState == .active {
-                        self.contentViewModel.fetchElements()
-                    }
+            scenePhaseTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                // Only fetch if still active
+                if contentViewModel.appState == .active {
+                    contentViewModel.fetchElements()
                 }
             }
         } else {

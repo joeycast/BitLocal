@@ -73,6 +73,6 @@ extension Address {
         guard !city.isEmpty, !state.isEmpty else { return text }
         let needle = "\(city) \(state)"
         let replacement = "\(city), \(state)"
-        return text.replacingOccurrences(of: needle, with: replacement)
+        return text.replacing(needle, with: replacement)
     }
 }

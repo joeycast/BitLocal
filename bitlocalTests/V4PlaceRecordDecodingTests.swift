@@ -1,36 +1,38 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class V4PlaceRecordDecodingTests: XCTestCase {
-    func testDecodesSnapshotRecordMinimalPayload() throws {
+@Suite(.tags(.sync))
+struct V4PlaceRecordDecodingTests {
+    @Test func decodesSnapshotRecordMinimalPayload() throws {
         let data = Data("""
         [{"id":123,"lat":1.23,"lon":4.56,"icon":"cafe","comments":2,"boosted_until":"2026-01-01T00:00:00Z"}]
         """.utf8)
 
         let records = try JSONDecoder().decode([V4PlaceSnapshotRecord].self, from: data)
-        XCTAssertEqual(records.count, 1)
-        XCTAssertEqual(records.first?.id, 123)
-        XCTAssertEqual(records.first?.icon, "cafe")
-        XCTAssertEqual(records.first?.comments, 2)
-        XCTAssertNil(records.first?.preferredName)
+        #expect(records.count == 1)
+        #expect(records.first?.id == 123)
+        #expect(records.first?.icon == "cafe")
+        #expect(records.first?.comments == 2)
+        #expect(records.first?.preferredName == nil)
     }
 
-    func testDecodesSnapshotRecordWithOptionalNameFields() throws {
+    @Test func decodesSnapshotRecordWithOptionalNameFields() throws {
         let data = Data("""
         [{"id":5,"lat":1.0,"lon":2.0,"icon":"hotel","name":"  Sea Lodge  ","display_name":"Sea Lodge Display"}]
         """.utf8)
 
         let record = try JSONDecoder().decode([V4PlaceSnapshotRecord].self, from: data).first
-        XCTAssertEqual(record?.preferredName, "Sea Lodge")
+        #expect(record?.preferredName == "Sea Lodge")
         let element = V4PlaceToElementMapper.snapshotRecordToElement(
-            try XCTUnwrap(record),
+            try #require(record),
             fallbackTimestamp: "2026-01-01T00:00:00Z"
         )
-        XCTAssertEqual(element.displayName, "Sea Lodge")
-        XCTAssertFalse(Element.isPlaceholderName(element.osmJSON?.tags?.name ?? ""))
+        #expect(element.displayName == "Sea Lodge")
+        #expect(Element.isPlaceholderName(element.osmJSON?.tags?.name ?? "") == false)
     }
 
-    func testSnapshotWithoutNameUsesCategoryDisplayNameWhileKeepingPlaceholderTag() {
+    @Test func snapshotWithoutNameUsesCategoryDisplayNameWhileKeepingPlaceholderTag() {
         let record = V4PlaceSnapshotRecord(
             id: 9,
             lat: 1,
@@ -45,13 +47,13 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
             record,
             fallbackTimestamp: "2026-01-01T00:00:00Z"
         )
-        XCTAssertTrue(Element.isPlaceholderName(element.osmJSON?.tags?.name ?? ""))
+        #expect(Element.isPlaceholderName(element.osmJSON?.tags?.name ?? ""))
         // Category labels are UI-only — must not pollute displayName/search scoring.
-        XCTAssertNil(element.displayName)
-        XCTAssertEqual(element.displayNameForUI, MerchantCategoryGroup.coffee.localizedLabel)
+        #expect(element.displayName == nil)
+        #expect(element.displayNameForUI == MerchantCategoryGroup.coffee.localizedLabel)
     }
 
-    func testDecodesFullPlaceRecordWithOptionalFields() throws {
+    @Test func decodesFullPlaceRecordWithOptionalFields() throws {
         let data = Data("""
         [{
           "id": 999,
@@ -92,17 +94,17 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
         """.utf8)
 
         let records = try JSONDecoder().decode([V4PlaceRecord].self, from: data)
-        let record = try XCTUnwrap(records.first)
-        XCTAssertEqual(record.id, 999)
-        XCTAssertEqual(record.displayName, "Test Merchant")
-        XCTAssertEqual(record.paymentProvider, "coinos")
-        XCTAssertEqual(record.osmPaymentBitcoin, "yes")
-        XCTAssertEqual(record.osmPaymentLightning, "yes")
-        XCTAssertEqual(record.osmAddrCity, "New York")
-        XCTAssertEqual(record.osmBrandWikidata, "Q7605233")
+        let record = try #require(records.first)
+        #expect(record.id == 999)
+        #expect(record.displayName == "Test Merchant")
+        #expect(record.paymentProvider == "coinos")
+        #expect(record.osmPaymentBitcoin == "yes")
+        #expect(record.osmPaymentLightning == "yes")
+        #expect(record.osmAddrCity == "New York")
+        #expect(record.osmBrandWikidata == "Q7605233")
     }
 
-    func testBoostHelpersUseFuturePastAndInvalidDatesCorrectly() {
+    @Test func boostHelpersUseFuturePastAndInvalidDatesCorrectly() {
         let referenceDate = Date(timeIntervalSince1970: 1_735_689_600) // 2025-01-01T00:00:00Z
 
         let boostedRecord = Self.makePlaceRecord(id: 1, boostedUntil: "2025-02-01T00:00:00Z")
@@ -110,19 +112,19 @@ final class V4PlaceRecordDecodingTests: XCTestCase {
         let invalidRecord = Self.makePlaceRecord(id: 3, boostedUntil: "not-a-date")
         let noBoostRecord = Self.makePlaceRecord(id: 4, boostedUntil: nil)
 
-        XCTAssertTrue(boostedRecord.isCurrentlyBoosted(referenceDate: referenceDate))
-        XCTAssertFalse(expiredRecord.isCurrentlyBoosted(referenceDate: referenceDate))
-        XCTAssertFalse(invalidRecord.isCurrentlyBoosted(referenceDate: referenceDate))
-        XCTAssertFalse(noBoostRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        #expect(boostedRecord.isCurrentlyBoosted(referenceDate: referenceDate))
+        #expect(expiredRecord.isCurrentlyBoosted(referenceDate: referenceDate) == false)
+        #expect(invalidRecord.isCurrentlyBoosted(referenceDate: referenceDate) == false)
+        #expect(noBoostRecord.isCurrentlyBoosted(referenceDate: referenceDate) == false)
     }
 
-    func testElementAndPlaceRecordAgreeOnBoostState() {
+    @Test func elementAndPlaceRecordAgreeOnBoostState() {
         let referenceDate = Date(timeIntervalSince1970: 1_735_689_600) // 2025-01-01T00:00:00Z
         let record = Self.makePlaceRecord(id: 5, boostedUntil: "2025-03-01T12:00:00Z")
         let element = V4PlaceToElementMapper.placeRecordToElement(record)
 
-        XCTAssertEqual(record.isCurrentlyBoosted(referenceDate: referenceDate), element.isCurrentlyBoosted(referenceDate: referenceDate))
-        XCTAssertEqual(record.boostExpirationDate, element.boostExpirationDate)
+        #expect(record.isCurrentlyBoosted(referenceDate: referenceDate) == element.isCurrentlyBoosted(referenceDate: referenceDate))
+        #expect(record.boostExpirationDate == element.boostExpirationDate)
     }
     private static func makePlaceRecord(id: Int, boostedUntil: String?) -> V4PlaceRecord {
         V4PlaceRecord(

@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - All Regions List (pushed onto NavigationStack)
 
 struct AllRegionsListView: View {
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
     @State private var filterText = ""
 
@@ -27,8 +27,11 @@ struct AllRegionsListView: View {
             let areas = filteredAreas
             if areas.isEmpty && !viewModel.areaBrowserIsLoading {
                 Section {
-                    Text("No regions found")
-                        .foregroundStyle(.secondary)
+                    if !filterText.isEmpty {
+                        ContentUnavailableView.search(text: filterText)
+                    } else {
+                        ContentUnavailableView("No Regions Found", systemImage: "globe")
+                    }
                 }
             } else {
                 Section {
@@ -50,12 +53,7 @@ struct AllRegionsListView: View {
         .searchable(text: $filterText, prompt: "Filter regions…")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    viewModel.loadAreaBrowserAreas()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .accessibilityLabel("Refresh regions")
+                Button("Refresh regions", systemImage: "arrow.clockwise", action: viewModel.loadAreaBrowserAreas)
             }
         }
         .onAppear {

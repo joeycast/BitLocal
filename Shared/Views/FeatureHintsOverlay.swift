@@ -2,32 +2,48 @@ import SwiftUI
 import UIKit
 
 struct FeatureHintsOverlay: View {
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @Environment(FeatureHintsController.self) private var featureHintsController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
             if let step = featureHintsController.activeStep {
                 let targetFrame = featureHintsController.frame(for: step.target)
+                let safeFrame = proxy.frame(in: .global)
+                let safeInsets = proxy.safeAreaInsets
+                let fullSize = CGSize(
+                    width: proxy.size.width + safeInsets.leading + safeInsets.trailing,
+                    height: proxy.size.height + safeInsets.top + safeInsets.bottom
+                )
 
                 ZStack {
                     if let targetFrame {
                         highlightedOverlay(
                             step: step,
                             highlightFrame: targetFrame,
-                            containerSize: proxy.size
+                            fullContainerSize: fullSize,
+                            safeContainerSize: proxy.size,
+                            safeOrigin: safeFrame.origin
                         )
                     } else {
                         // Dim + card without highlight (e.g. while settings sheet is opening)
                         Color.black.opacity(0.42)
+                            .ignoresSafeArea()
                         centeredCard(step: step, containerSize: proxy.size)
                     }
                 }
+                .frame(width: proxy.size.width, height: proxy.size.height)
                 .transition(.opacity)
-                .animation(.easeInOut(duration: 0.18), value: step.id)
-                .animation(.easeInOut(duration: 0.25), value: targetFrame != nil)
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion),
+                    value: step.id
+                )
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.strongEaseOut, reduceMotion: reduceMotion),
+                    value: targetFrame != nil
+                )
             }
         }
-        .ignoresSafeArea()
         .allowsHitTesting(featureHintsController.isPresenting)
     }
 
@@ -37,12 +53,15 @@ struct FeatureHintsOverlay: View {
     private func highlightedOverlay(
         step: FeatureHintStep,
         highlightFrame: CGRect,
-        containerSize: CGSize
+        fullContainerSize: CGSize,
+        safeContainerSize: CGSize,
+        safeOrigin: CGPoint
     ) -> some View {
-        let insetFrame = paddedHighlightFrame(highlightFrame, for: step.target, in: containerSize)
+        let insetFrame = paddedHighlightFrame(highlightFrame, for: step.target, in: fullContainerSize)
+        let localInsetFrame = insetFrame.offsetBy(dx: -safeOrigin.x, dy: -safeOrigin.y)
         let cornerRadius = highlightCornerRadius(for: step.target)
 
-        // Dim with cutout
+        // Dim with cutout (decorative scrim only ignores safe area)
         Canvas { context, size in
             context.fill(
                 Path(CGRect(origin: .zero, size: size)),
@@ -57,16 +76,17 @@ struct FeatureHintsOverlay: View {
             )
         }
         .compositingGroup()
+        .ignoresSafeArea()
 
         // Highlight border
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .strokeBorder(Color.accentColor, lineWidth: 3)
-            .frame(width: insetFrame.width, height: insetFrame.height)
-            .position(x: insetFrame.midX, y: insetFrame.midY)
+            .frame(width: localInsetFrame.width, height: localInsetFrame.height)
+            .position(x: localInsetFrame.midX, y: localInsetFrame.midY)
             .shadow(color: Color.accentColor.opacity(0.16), radius: 8)
 
         // Tooltip card
-        card(step: step, targetFrame: insetFrame, containerSize: containerSize)
+        card(step: step, targetFrame: localInsetFrame, containerSize: safeContainerSize)
     }
 
     // MARK: - Highlight frame
@@ -109,12 +129,12 @@ struct FeatureHintsOverlay: View {
 
     // MARK: - Tooltip cards
 
-    /// Card positioned relative to a highlighted target frame.
+    /// Card positioned relative to a highlighted target frame within safe area bounds.
     private func card(step: FeatureHintStep, targetFrame: CGRect, containerSize: CGSize) -> some View {
         let horizontalPadding: CGFloat = 18
-        let bubbleWidth = min(containerSize.width - horizontalPadding * 2, 300)
+        let availableWidth = max(containerSize.width - horizontalPadding * 2, 200)
+        let bubbleWidth = min(availableWidth, 300)
         let bubbleHeight = estimatedBubbleHeight(for: step, width: bubbleWidth)
-        let safeInsets = screenSafeAreaInsets
         let gap: CGFloat = 20
 
         let bubbleY = bubbleYPosition(
@@ -122,24 +142,24 @@ struct FeatureHintsOverlay: View {
             targetFrame: targetFrame,
             bubbleHeight: bubbleHeight,
             containerHeight: containerSize.height,
-            safeTop: safeInsets.top + 8,
-            safeBottom: safeInsets.bottom + 8,
+            safeTop: 8,
+            safeBottom: 8,
             gap: gap
         )
 
-        let bubbleX = min(
-            max(targetFrame.midX, bubbleWidth / 2 + horizontalPadding),
-            containerSize.width - bubbleWidth / 2 - horizontalPadding
-        )
+        let minCenterX = horizontalPadding + bubbleWidth / 2
+        let maxCenterX = max(minCenterX, containerSize.width - horizontalPadding - bubbleWidth / 2)
+        let bubbleX = min(max(targetFrame.midX, minCenterX), maxCenterX)
 
         return cardContent(step: step, width: bubbleWidth)
             .position(x: bubbleX, y: bubbleY)
     }
 
-    /// Card centered on screen (used when target frame is not yet available).
+    /// Card centered within the safe horizontal area (used when target frame is not yet available).
     private func centeredCard(step: FeatureHintStep, containerSize: CGSize) -> some View {
         let horizontalPadding: CGFloat = 18
-        let bubbleWidth = min(containerSize.width - horizontalPadding * 2, 300)
+        let availableWidth = max(containerSize.width - horizontalPadding * 2, 200)
+        let bubbleWidth = min(availableWidth, 300)
 
         return cardContent(step: step, width: bubbleWidth)
             .position(x: containerSize.width / 2, y: containerSize.height / 2)
@@ -161,32 +181,31 @@ struct FeatureHintsOverlay: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 12) {
-                Button("Skip all") {
-                    featureHintsController.skip()
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                Button("Skip all", action: featureHintsController.skip)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(minHeight: 44)
+                    .contentShape(.rect)
 
                 Spacer(minLength: 0)
 
-                Button(featureHintsController.primaryButtonTitle) {
-                    featureHintsController.advance()
-                }
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 9)
-                .background(Color.accentColor, in: Capsule())
-                .foregroundStyle(.white)
+                Button(featureHintsController.primaryButtonTitle, action: featureHintsController.advance)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .frame(minHeight: 44)
+                    .background(Color.accentColor, in: Capsule())
+                    .foregroundStyle(.white)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 15)
         .frame(width: width)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(
+        .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(.white.opacity(0.05))
-        )
+        }
         .shadow(color: .black.opacity(0.16), radius: 12, x: 0, y: 8)
     }
 
@@ -218,12 +237,6 @@ struct FeatureHintsOverlay: View {
         }
 
         return min(max(preferredY, minY), maxY)
-    }
-
-    private var screenSafeAreaInsets: UIEdgeInsets {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.keyWindow?.safeAreaInsets ?? UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
     }
 
     private func estimatedBubbleHeight(for step: FeatureHintStep, width: CGFloat) -> CGFloat {

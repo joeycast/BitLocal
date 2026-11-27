@@ -28,6 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Verify Design & Convention Guardrails
+        run: ./scripts/verify_design_conventions.sh
+
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.3.app
 

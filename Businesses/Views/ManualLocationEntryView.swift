@@ -2,14 +2,22 @@ import SwiftUI
 import CoreLocation
 
 struct ManualLocationEntryView: View {
+    @Environment(\.locale) private var locale
     @Binding var submission: BusinessSubmission
     let onSave: (CLLocationCoordinate2D) -> Void
     let onCancel: () -> Void
 
     @State private var isGeocoding = false
+    @State private var geocodingErrorMessage: String?
+    @State private var showingGeocodingError = false
+    @State private var geocodingTask: Task<Void, Never>?
+
+    private var localizedCountries: [String] {
+        CountryList.localizedCountries(for: locale)
+    }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     TextField(text: $submission.businessName) {
@@ -42,7 +50,7 @@ struct ManualLocationEntryView: View {
 
                     Picker(selection: $submission.country) {
                         Text("Select Country").tag("")
-                        ForEach(CountryList.allCountries, id: \.self) { country in
+                        ForEach(localizedCountries, id: \.self) { country in
                             Text(country).tag(country)
                         }
                     } label: {
@@ -61,20 +69,27 @@ struct ManualLocationEntryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("cancel_button") {
-                        onCancel()
-                    }
+                    Button("cancel_button", action: onCancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isGeocoding {
                         ProgressView()
                     } else {
-                        Button("save_button") {
-                            geocodeAddress()
-                        }
-                        .disabled(!isValid)
+                        Button("save_button", action: geocodeAddress)
+                            .disabled(!isValid)
                     }
                 }
+            }
+            .alert("Unable to Locate Address", isPresented: $showingGeocodingError) {
+                Button("Try Again", action: geocodeAddress)
+                Button("cancel_button", role: .cancel) { }
+            } message: {
+                if let geocodingErrorMessage {
+                    Text(geocodingErrorMessage)
+                }
+            }
+            .onDisappear {
+                geocodingTask?.cancel()
             }
         }
     }
@@ -89,7 +104,9 @@ struct ManualLocationEntryView: View {
     }
 
     private func geocodeAddress() {
+        geocodingTask?.cancel()
         isGeocoding = true
+        geocodingErrorMessage = nil
 
         // Construct full address string
         let addressComponents = [
@@ -103,60 +120,47 @@ struct ManualLocationEntryView: View {
 
         let addressString = addressComponents.joined(separator: ", ")
 
-        let geocoder = CLGeocoder()
-        geocoder.geocodeAddressString(addressString) { placemarks, error in
-            isGeocoding = false
+        geocodingTask = Task {
+            defer { isGeocoding = false }
+            let geocoder = CLGeocoder()
+            do {
+                let placemarks = try await geocoder.geocodeAddressString(addressString)
+                guard !Task.isCancelled else { return }
 
-            if let error = error {
-                print("Geocoding error: \(error.localizedDescription)")
-                // Still save even if geocoding fails, coordinates will be nil
-                onSave(CLLocationCoordinate2D(latitude: 0, longitude: 0))
-                return
-            }
-
-            if let coordinate = placemarks?.first?.location?.coordinate {
-                onSave(coordinate)
-            } else {
-                // No coordinates found, but still save
-                onSave(CLLocationCoordinate2D(latitude: 0, longitude: 0))
+                if let coordinate = placemarks.first?.location?.coordinate {
+                    onSave(coordinate)
+                } else {
+                    geocodingErrorMessage = String(
+                        localized: "We couldn’t find coordinates for this address. Please double-check the address and try again."
+                    )
+                    showingGeocodingError = true
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                geocodingErrorMessage = error.localizedDescription
+                showingGeocodingError = true
             }
         }
     }
 }
 
-struct CountryList {
-    static let allCountries = [
-        "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
-        "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain",
-        "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan",
-        "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria",
-        "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
-        "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros",
-        "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic",
-        "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica",
-        "Dominican Republic", "East Timor", "Ecuador", "Egypt", "El Salvador",
-        "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji",
-        "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece",
-        "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras",
-        "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel",
-        "Italy", "Ivory Coast", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya",
-        "Kiribati", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon",
-        "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
-        "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands",
-        "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia",
-        "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal",
-        "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea",
-        "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama",
-        "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
-        "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia",
-        "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe",
-        "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore",
-        "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea",
-        "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland",
-        "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga",
-        "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda",
-        "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay",
-        "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia",
-        "Zimbabwe"
-    ]
+enum CountryList {
+    static var allCountries: [String] {
+        localizedCountries(for: .current)
+    }
+
+    static func localizedCountries(for locale: Locale) -> [String] {
+        let names = Locale.Region.isoRegions.compactMap { region -> String? in
+            let code = region.identifier
+            guard code.count == 2,
+                  code.allSatisfy(\.isLetter),
+                  region.subRegions.isEmpty else {
+                return nil
+            }
+            return locale.localizedString(forRegionCode: code)
+        }
+        return Array(Set(names)).sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }
+    }
 }

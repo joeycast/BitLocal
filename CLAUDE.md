@@ -113,14 +113,21 @@ Default repository mode is **auto**: prefer v4, fall back to v2 when needed.
 
 ## Important Conventions
 
-- iPhone: portrait-oriented product UX, bottom sheet with multiple detents
-- iPad: split layout when regular size class; compact multitasking uses phone shell
+- Follow **`DESIGN.md`** for visual design tokens, typography (`Fredoka-Medium` display wordmark + SF Pro Dynamic Type), translucent material hierarchy, `BitLocalMotion`, and accessibility floors (`≥ 44×44pt` tap targets, Reduce Motion, VoiceOver labels).
+- Follow **`docs/VERIFICATION.md`** for feature verification: run `./scripts/verify_design_conventions.sh` (also enforced in CI), maintain `bitlocalTests/` unit tests for new logic, and keep `bitlocal-maestro/` flows in sync with core user journeys.
+- Adaptive layout (`AppLayoutMode`): shell switches by size class + container geometry + vertical toolbar environment (never `UIDevice.current.userInterfaceIdiom` or `UIScreen.main`)
+  - Standard iPhone, Split View / Slide Over, and all iPhone Duo poses: unified collapsible sheet shell (full-width bottom sheet on compact/portrait, leading-side collapsible sheet in iPhone Duo unfolded landscape, with native vertical side-rail toolbar controls when active)
+  - Wide regular canvas without vertical toolbar (iPad regular width): `NavigationSplitView` sidebar + map
+- Value-based navigation: all `NavigationStack` pushes route through `BitLocalNavigationRoute` (`.place`, `.placeComments`, `.allEvents`); community detail uses `.navigationDestination(item: $viewModel.presentedCommunityArea)`.
+- Saved places & offline mode: `SavedPlacesStore` persists bookmarks locally with offline CloudKit retry queues (`pendingAdditions`/`pendingRemovals`); `NetworkReachabilityMonitor` drives debounced Offline Travel Mode UI; `BitLocalAppIntents` exposes Siri/Shortcuts actions via `BitLocalAppIntentRouter`.
 - Map uses Bitcoin-orange markers (`MarkerColor`); boosted merchants use system orange tint
 - ~25-mile radius visible pin range from map center
 - Location permission: “When In Use” only (privacy-first)
 
 ## External References
 
+- **DESIGN.md** — visual design system, tokens, components, and do's/don'ts
+- **docs/VERIFICATION.md** — feature verification matrix, test commands, and iPhone Duo/a11y release checklist
 - **SPEC.md** — product specification (features, OSM tags, categories)
 - **BTC Map API** — https://api.btcmap.org (v2/v3/v4; read-only, no auth)
 - **Data attribution** — BTC Map + OpenStreetMap (credited in-app)

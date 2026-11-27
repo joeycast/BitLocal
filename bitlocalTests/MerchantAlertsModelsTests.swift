@@ -1,8 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class MerchantAlertsModelsTests: XCTestCase {
-    func testCityKeyNormalizesCaseWhitespaceAndDiacritics() {
+@Suite(.tags(.alerts))
+struct MerchantAlertsModelsTests {
+    @Test func cityKeyNormalizesCaseWhitespaceAndDiacritics() {
         let lhs = MerchantAlertsCityNormalizer.cityKey(
             city: "  São Paulo ",
             region: " SP ",
@@ -14,10 +16,10 @@ final class MerchantAlertsModelsTests: XCTestCase {
             country: "brazil"
         )
 
-        XCTAssertEqual(lhs, rhs)
+        #expect(lhs == rhs)
     }
 
-    func testCityKeyDifferentiatesSameCityAcrossRegions() {
+    @Test func cityKeyDifferentiatesSameCityAcrossRegions() {
         let illinois = MerchantAlertsCityNormalizer.cityKey(
             city: "Springfield",
             region: "Illinois",
@@ -29,10 +31,10 @@ final class MerchantAlertsModelsTests: XCTestCase {
             country: "United States"
         )
 
-        XCTAssertNotEqual(illinois, missouri)
+        #expect(illinois != missouri)
     }
 
-    func testCityKeyCanonicalizesUnitedStatesRegionAbbreviations() {
+    @Test func cityKeyCanonicalizesUnitedStatesRegionAbbreviations() {
         let abbreviation = MerchantAlertsCityNormalizer.cityKey(
             city: "Oceanside",
             region: "CA",
@@ -44,21 +46,21 @@ final class MerchantAlertsModelsTests: XCTestCase {
             country: "United States"
         )
 
-        XCTAssertEqual(abbreviation, fullName)
-        XCTAssertEqual(abbreviation, "oceanside|california|united states")
+        #expect(abbreviation == fullName)
+        #expect(abbreviation == "oceanside|california|united states")
     }
 
-    func testDisplayNameOmitsEmptyRegion() {
+    @Test func displayNameOmitsEmptyRegion() {
         let displayName = MerchantAlertsCityNormalizer.displayName(
             city: "Singapore",
             region: "",
             country: "Singapore"
         )
 
-        XCTAssertEqual(displayName, "Singapore, Singapore")
+        #expect(displayName == "Singapore, Singapore")
     }
 
-    func testCitySubscriptionDecodesLegacyLocationIDFromCityKey() throws {
+    @Test func citySubscriptionDecodesLegacyLocationIDFromCityKey() throws {
         let payload = """
         {
           "id": "11111111-1111-1111-1111-111111111111",
@@ -72,34 +74,57 @@ final class MerchantAlertsModelsTests: XCTestCase {
         """.data(using: .utf8)!
 
         let decoded = try JSONDecoder().decode(CitySubscription.self, from: payload)
-        XCTAssertEqual(decoded.locationID, "astoria|new york|united states")
+        #expect(decoded.locationID == "astoria|new york|united states")
     }
 
-    func testCatchUpPolicyAllowsDigestCreatedAfterSubscriptionEvenWhenWindowEndedEarlier() {
+    @Test func catchUpPolicyAllowsDigestCreatedAfterSubscriptionEvenWhenWindowEndedEarlier() {
         let subscriptionCreatedAt = ISO8601DateFormatter().date(from: "2026-04-26T13:05:00Z")!
         let digestWindowEnd = ISO8601DateFormatter().date(from: "2026-04-26T13:00:00Z")!
         let recordCreationDate = ISO8601DateFormatter().date(from: "2026-04-26T13:17:00Z")!
 
-        XCTAssertTrue(
-            MerchantAlertsCatchUpPolicy.isEligible(
+        #expect(MerchantAlertsCatchUpPolicy.isEligible(
                 recordCreationDate: recordCreationDate,
                 digestWindowEnd: digestWindowEnd,
                 subscriptionCreatedAt: subscriptionCreatedAt
-            )
-        )
+            ))
     }
 
-    func testCatchUpPolicyRejectsDigestCreatedBeforeSubscription() {
+    @Test func catchUpPolicyRejectsDigestCreatedBeforeSubscription() {
         let subscriptionCreatedAt = ISO8601DateFormatter().date(from: "2026-04-26T14:00:00Z")!
         let digestWindowEnd = ISO8601DateFormatter().date(from: "2026-04-26T13:00:00Z")!
         let recordCreationDate = ISO8601DateFormatter().date(from: "2026-04-26T13:17:00Z")!
 
-        XCTAssertFalse(
-            MerchantAlertsCatchUpPolicy.isEligible(
+        #expect(MerchantAlertsCatchUpPolicy.isEligible(
                 recordCreationDate: recordCreationDate,
                 digestWindowEnd: digestWindowEnd,
                 subscriptionCreatedAt: subscriptionCreatedAt
-            )
+            ) == false)
+    }
+
+    @Test(arguments: [
+        (1, "1 new merchant"),
+        (298, "298 new merchants"),
+    ])
+    func cityDigestSummaryLineEvaluatesGrammarInflectionWithoutRawSyntax(
+        count: Int,
+        expected: String
+    ) {
+        let digest = CityDigest(
+            id: "digest-\(count)",
+            locationID: "el zonte|la libertad|el salvador",
+            cityKey: "el zonte|la libertad|el salvador",
+            cityDisplayName: "El Zonte, El Salvador",
+            digestWindowStart: nil,
+            digestWindowEnd: nil,
+            merchantCount: count,
+            merchantIDs: [],
+            topMerchantNames: [],
+            timeZoneID: nil,
+            deliveryLocalDate: nil
         )
+
+        #expect(digest.summaryLine == expected)
+        #expect(!digest.summaryLine.contains("^["))
+        #expect(!digest.summaryLine.contains("inflect:"))
     }
 }

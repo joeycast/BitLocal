@@ -1,10 +1,11 @@
-import SwiftUI
 import MapKit
+import Observation
+import SwiftUI
 
 struct LocationSearchView: View {
     @Binding var submission: BusinessSubmission
 
-    @StateObject private var searchViewModel = LocationSearchViewModel()
+    @State private var searchViewModel = LocationSearchViewModel()
     @State private var showingManualEntry = false
     @State private var mapType: MKMapType = .hybrid
     @State private var selectedLocation: SearchLocation? {
@@ -46,6 +47,15 @@ struct LocationSearchView: View {
                 locationDetailView
             }
         }
+        .onDisappear {
+            searchViewModel.cancelPendingSearch()
+        }
+        .alert("Search Error", isPresented: $searchViewModel.showingSearchError) {
+        } message: {
+            if let errorMessage = searchViewModel.searchErrorMessage {
+                Text(errorMessage)
+            }
+        }
     }
 
     private var searchView: some View {
@@ -54,9 +64,9 @@ struct LocationSearchView: View {
                 Section {
                     HStack {
                         Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                         TextField("Search for location...", text: $searchViewModel.searchText)
-                            .autocapitalization(.words)
+                            .textInputAutocapitalization(.words)
                     }
                 } header: {
                     Text("step_location_header")
@@ -73,18 +83,20 @@ struct LocationSearchView: View {
                 } else if !searchViewModel.searchResults.isEmpty {
                     Section {
                         ForEach(searchViewModel.searchResults) { result in
-                            Button(action: {
-                                searchViewModel.selectLocation(result) { location in
-                                    selectedLocation = location
+                            Button {
+                                Task {
+                                    if let location = await searchViewModel.selectLocation(result) {
+                                        selectedLocation = location
+                                    }
                                 }
-                            }) {
+                            } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(result.title)
                                         .font(.body)
-                                        .foregroundColor(.primary)
+                                        .foregroundStyle(.primary)
                                     Text(result.subtitle)
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(.secondary)
                                 }
                                 .padding(.vertical, 4)
                             }
@@ -95,11 +107,10 @@ struct LocationSearchView: View {
                 }
 
                 Section {
-                    Button(action: { showingManualEntry = true }) {
-                        HStack {
-                            Image(systemName: "keyboard")
-                            Text("manual_entry_button")
-                        }
+                    Button {
+                        showingManualEntry = true
+                    } label: {
+                        Label("manual_entry_button", systemImage: "keyboard")
                     }
                 } footer: {
                     Text("manual_entry_footer")
@@ -134,7 +145,7 @@ struct LocationSearchView: View {
                             .font(.headline)
                         Text(selectedLocation?.subtitle ?? "")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
                 } header: {
@@ -161,20 +172,14 @@ struct LocationSearchView: View {
                     .frame(height: 200)
                     .listRowInsets(EdgeInsets())
                     .overlay(alignment: .bottomTrailing) {
-                        Button(action: {
+                        Button(
+                            mapType == .standard ? "Switch to Hybrid Map" : "Switch to Standard Map",
+                            systemImage: mapType == .standard ? "globe.americas.fill" : "map.fill"
+                        ) {
                             mapType = (mapType == .standard) ? .hybrid : .standard
-                        }) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.accentColor)
-                                    .frame(width: 36, height: 36)
-                                    .shadow(radius: 2)
-                                Image(systemName: mapType == .standard ? "globe.americas.fill" : "map.fill")
-                                    .aboutIconStyle(size: 16, color: .white)
-                            }
                         }
-                        .buttonStyle(.plain)
-                        .contentShape(Circle())
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(MapTypeToggleButtonStyle())
                         .padding(10)
                     }
                 } header: {
@@ -199,17 +204,27 @@ struct LocationSearchView: View {
                 }
 
                 Section {
-                    Button(action: {
+                    Button {
                         selectedLocation = nil
-                    }) {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                            Text("search_different_location")
-                        }
+                    } label: {
+                        Label("search_different_location", systemImage: "magnifyingglass")
                     }
                 }
             }
         }
+    }
+}
+
+private struct MapTypeToggleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(minWidth: 44, minHeight: 44)
+            .background(.accent, in: .circle)
+            .shadow(radius: 2)
+            .contentShape(.circle)
+            .opacity(configuration.isPressed ? 0.85 : 1)
     }
 }
 
@@ -231,13 +246,21 @@ struct SearchResult: Identifiable {
 }
 
 // MARK: - Location Search ViewModel
-class LocationSearchViewModel: NSObject, ObservableObject {
-    @Published var searchText = ""
-    @Published var searchResults: [SearchResult] = []
-    @Published var isSearching = false
+@MainActor
+@Observable
+final class LocationSearchViewModel: NSObject {
+    var searchText = "" {
+        didSet {
+            scheduleSearch(for: searchText)
+        }
+    }
+    var searchResults: [SearchResult] = []
+    var isSearching = false
+    var searchErrorMessage: String?
+    var showingSearchError = false
 
-    private let searchCompleter = MKLocalSearchCompleter()
-    private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private let searchCompleter = MKLocalSearchCompleter()
+    @ObservationIgnored private var searchDebounceTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -250,22 +273,27 @@ class LocationSearchViewModel: NSObject, ObservableObject {
             .stadium, .park, .campground, .fitnessCenter, .nightlife,
             .gasStation, .evCharger, .publicTransport, .parking
         ])
+    }
 
-        // Debounced search
-        Task { @MainActor in
-            for await searchText in $searchText.values {
-                searchTask?.cancel()
-                searchTask = Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
-                    guard !Task.isCancelled else { return }
-                    await performSearch(searchText)
-                }
-            }
+    func cancelPendingSearch() {
+        searchDebounceTask?.cancel()
+    }
+
+    private func scheduleSearch(for query: String) {
+        searchDebounceTask?.cancel()
+        guard !query.isEmpty else {
+            searchResults = []
+            return
+        }
+
+        searchDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self else { return }
+            self.performSearch(query)
         }
     }
 
-    @MainActor
-    private func performSearch(_ query: String) async {
+    private func performSearch(_ query: String) {
         guard !query.isEmpty else {
             searchResults = []
             return
@@ -273,40 +301,45 @@ class LocationSearchViewModel: NSObject, ObservableObject {
         searchCompleter.queryFragment = query
     }
 
-    func selectLocation(_ result: SearchResult, completion: @escaping (SearchLocation) -> Void) {
+    func selectLocation(_ result: SearchResult) async -> SearchLocation? {
         isSearching = true
+        searchErrorMessage = nil
+        defer { isSearching = false }
 
         let searchRequest = MKLocalSearch.Request(completion: result.completion)
         let search = MKLocalSearch(request: searchRequest)
 
-        search.start { [weak self] response, error in
-            guard let self = self else { return }
-
-            DispatchQueue.main.async {
-                self.isSearching = false
-
-                guard let mapItem = response?.mapItems.first else { return }
-
-                let placemark = mapItem.placemark
-                var addressComponents = BusinessSubmission()
-
-                addressComponents.streetNumber = placemark.subThoroughfare ?? ""
-                addressComponents.streetName = placemark.thoroughfare ?? ""
-                addressComponents.city = placemark.locality ?? ""
-                addressComponents.stateProvince = placemark.administrativeArea ?? ""
-                addressComponents.country = placemark.country ?? ""
-                addressComponents.postalCode = placemark.postalCode ?? ""
-                self.applyMapItemDetails(mapItem, to: &addressComponents)
-
-                let location = SearchLocation(
-                    title: mapItem.name ?? result.title,
-                    subtitle: result.subtitle,
-                    coordinate: placemark.coordinate,
-                    addressComponents: addressComponents
-                )
-
-                completion(location)
+        do {
+            let response = try await search.start()
+            guard let mapItem = response.mapItems.first else {
+                searchErrorMessage = String(localized: "Unable to find details for the selected location.")
+                showingSearchError = true
+                return nil
             }
+
+            let placemark = mapItem.placemark
+            var addressComponents = BusinessSubmission()
+
+            addressComponents.streetNumber = placemark.subThoroughfare ?? ""
+            addressComponents.streetName = placemark.thoroughfare ?? ""
+            addressComponents.city = placemark.locality ?? ""
+            addressComponents.stateProvince = placemark.administrativeArea ?? ""
+            addressComponents.country = placemark.country ?? ""
+            addressComponents.postalCode = placemark.postalCode ?? ""
+            applyMapItemDetails(mapItem, to: &addressComponents)
+
+            return SearchLocation(
+                title: mapItem.name ?? result.title,
+                subtitle: result.subtitle,
+                coordinate: placemark.coordinate,
+                addressComponents: addressComponents
+            )
+        } catch {
+            if !Task.isCancelled {
+                searchErrorMessage = error.localizedDescription
+                showingSearchError = true
+            }
+            return nil
         }
     }
 
@@ -314,10 +347,10 @@ class LocationSearchViewModel: NSObject, ObservableObject {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let requestKey = "location-search:\(ReverseGeocodingSpatialKey.key(for: coordinate))"
 
-        Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey) { placemark in
+        Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey, priority: .high) { placemark in
             guard let placemark else { return }
 
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 var addressComponents = BusinessSubmission()
 
                 addressComponents.streetNumber = placemark.subThoroughfare ?? ""
@@ -410,9 +443,10 @@ class LocationSearchViewModel: NSObject, ObservableObject {
 
 // MARK: - MKLocalSearchCompleterDelegate
 extension LocationSearchViewModel: MKLocalSearchCompleterDelegate {
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        DispatchQueue.main.async {
-            self.searchResults = completer.results.map { completion in
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.searchResults = self.searchCompleter.results.map { completion in
                 SearchResult(
                     title: completion.title,
                     subtitle: completion.subtitle,
@@ -422,7 +456,15 @@ extension LocationSearchViewModel: MKLocalSearchCompleterDelegate {
         }
     }
 
-    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        print("Search completer error: \(error.localizedDescription)")
+    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain, nsError.code == NSURLErrorCancelled {
+            return
+        }
+        let message = error.localizedDescription
+        Task { @MainActor [weak self] in
+            self?.searchErrorMessage = message
+            self?.showingSearchError = true
+        }
     }
 }

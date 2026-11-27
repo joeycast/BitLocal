@@ -1,46 +1,45 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class PlaceDeepLinkResolverTests: XCTestCase {
-    func testInvalidIdentifier() {
+@Suite(.tags(.routing))
+struct PlaceDeepLinkResolverTests {
+    @Test func invalidIdentifier() async {
         let resolver = PlaceDeepLinkResolver(repository: StubSearchService())
-        let expectation = expectation(description: "resolve")
-        resolver.resolve(placeID: "not-a-number") { result in
-            XCTAssertEqual(result, .invalidIdentifier)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1)
+        let result = await resolve(resolver, placeID: "not-a-number")
+        #expect(result == .invalidIdentifier)
     }
 
-    func testDeletedPlace() {
+    @Test func deletedPlace() async {
         let service = StubSearchService()
         service.placeResult = .success(
             makeRecord(id: 9, deletedAt: "2026-01-01T00:00:00Z")
         )
         let resolver = PlaceDeepLinkResolver(repository: service)
-        let expectation = expectation(description: "resolve")
-        resolver.resolve(placeID: "9") { result in
-            XCTAssertEqual(result, .deleted)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1)
+        let result = await resolve(resolver, placeID: "9")
+        #expect(result == .deleted)
     }
 
-    func testSuccessMapsElement() {
+    @Test func successMapsElement() async {
         let service = StubSearchService()
         service.placeResult = .success(makeRecord(id: 42, deletedAt: nil, name: "Cafe"))
         let resolver = PlaceDeepLinkResolver(repository: service)
-        let expectation = expectation(description: "resolve")
-        resolver.resolve(placeID: "42") { result in
-            if case .success(let element) = result {
-                XCTAssertEqual(element.id, "42")
-                XCTAssertEqual(element.displayName, "Cafe")
-            } else {
-                XCTFail("expected success, got \(result)")
-            }
-            expectation.fulfill()
+        let result = await resolve(resolver, placeID: "42")
+
+        if case .success(let element) = result {
+            #expect(element.id == "42")
+            #expect(element.displayName == "Cafe")
+        } else {
+            Issue.record("expected success, got \(result)")
         }
-        wait(for: [expectation], timeout: 1)
+    }
+
+    private func resolve(_ resolver: PlaceDeepLinkResolver, placeID: String) async -> PlaceDeepLinkResolution {
+        await withCheckedContinuation { continuation in
+            resolver.resolve(placeID: placeID) { result in
+                continuation.resume(returning: result)
+            }
+        }
     }
 
     private func makeRecord(id: Int, deletedAt: String?, name: String = "Place") -> V4PlaceRecord {
@@ -89,22 +88,22 @@ final class PlaceDeepLinkResolverTests: XCTestCase {
     }
 }
 
-private final class StubSearchService: BTCMapSearchServiceProtocol {
+private final class StubSearchService: BTCMapSearchServiceProtocol, @unchecked Sendable {
     var placeResult: Result<V4PlaceRecord, Error> = .failure(NSError(domain: "test", code: 1))
 
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         completion(.success([]))
     }
 
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         completion(placeResult)
     }
 
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         completion(.success([]))
     }
 
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         completion(.success([]))
     }
 }

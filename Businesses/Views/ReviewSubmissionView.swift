@@ -30,7 +30,7 @@ struct ReviewSubmissionView: View {
             }
             .keyboardType(.emailAddress)
             .textContentType(.emailAddress)
-            .autocapitalization(.none)
+            .textInputAutocapitalization(.never)
 
             Picker(selection: $submission.relationship) {
                 ForEach(BusinessSubmission.SubmitterRelationship.allCases, id: \.self) { relationship in
@@ -134,7 +134,7 @@ struct ReviewSubmissionView: View {
         if submission.acceptsContactlessLightning {
             methods.append(NSLocalizedString("payment_lightning_contactless_label", comment: ""))
         }
-        return methods.joined(separator: ", ")
+        return methods.formatted()
     }
 }
 
@@ -146,7 +146,7 @@ struct ReviewRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(LocalizedStringKey(label))
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Text(value)
                 .font(.body)
         }

@@ -1,4 +1,6 @@
 import SwiftUI
+import Synchronization
+import UIKit
 import Foundation // for Debug logging
 import MapKit
 import CoreLocation
@@ -95,12 +97,12 @@ extension Element {
 extension UserDefaults {
     func setElements(_ elements: [Element], forKey key: String) {
         if let encoded = try? JSONEncoder().encode(elements) {
-            UserDefaults.standard.set(encoded, forKey: key)
+            self.set(encoded, forKey: key)
         }
     }
     
     func getElements(forKey key: String) -> [Element]? {
-        if let data = UserDefaults.standard.data(forKey: key),
+        if let data = self.data(forKey: key),
            let elements = try? JSONDecoder().decode([Element].self, from: data) {
             return elements
         }
@@ -163,7 +165,7 @@ extension Image {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: size, height: size)
-            .foregroundColor(color)
+            .foregroundStyle(color)
     }
 }
 
@@ -176,20 +178,15 @@ extension View {
     @ViewBuilder
     func bitLocalDetailNavigationChrome() -> some View {
         self
-            .toolbar(.visible, for: .navigationBar)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarVisibility(.visible, for: .navigationBar)
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .toolbar(removing: .sidebarToggle)
             .clearNavigationContainerBackgroundIfAvailable()
             .tint(.accentColor)
     }
     
-    @ViewBuilder
     func clearListRowBackground(if condition: Bool) -> some View {
-        if condition {
-            self.listRowBackground(Color.clear)
-        } else {
-            self
-        }
+        self.listRowBackground(condition ? Color.clear : nil)
     }
 
     @ViewBuilder
@@ -207,26 +204,18 @@ extension View {
         self.presentationSizing(.page)
     }
 
-    @ViewBuilder
     func cityPickerResultBackground(glassy: Bool) -> some View {
-        if glassy {
-            self
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        } else {
-            self
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
+        self.background(
+            glassy ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(uiColor: .secondarySystemGroupedBackground)),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
     }
 
-    @ViewBuilder
     func cityPickerSearchBackground(glassy: Bool) -> some View {
-        if glassy {
-            self
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        } else {
-            self
-                .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+        self.background(
+            glassy ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color(uiColor: .tertiarySystemFill)),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
     }
 }
 
@@ -260,8 +249,8 @@ extension String {
         // Remove multiple protocols if they exist
         let duplicatedSecurePrefix = Self.secureProtocolPrefix + Self.insecureProtocolPrefix
         let duplicatedInsecurePrefix = Self.insecureProtocolPrefix + Self.secureProtocolPrefix
-        cleanURL = cleanURL.replacingOccurrences(of: duplicatedSecurePrefix, with: Self.secureProtocolPrefix)
-        cleanURL = cleanURL.replacingOccurrences(of: duplicatedInsecurePrefix, with: Self.secureProtocolPrefix)
+        cleanURL = cleanURL.replacing(duplicatedSecurePrefix, with: Self.secureProtocolPrefix)
+        cleanURL = cleanURL.replacing(duplicatedInsecurePrefix, with: Self.secureProtocolPrefix)
         
         // Try to create URL as-is first
         if let url = URL(string: cleanURL), url.scheme != nil {
@@ -284,21 +273,9 @@ extension String {
     
     func cleanedForDisplay() -> String {
         let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
-        let withoutScheme = trimmed.replacingOccurrences(
-            of: #"^https?://"#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        let withoutWWW = withoutScheme.replacingOccurrences(
-            of: #"^www\."#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        return withoutWWW.replacingOccurrences(
-            of: #"/+$"#,
-            with: "",
-            options: .regularExpression
-        )
+        let withoutScheme = trimmed.replacing(#/^https?:\/\//#.ignoresCase(), with: "")
+        let withoutWWW = withoutScheme.replacing(#/^www\./#.ignoresCase(), with: "")
+        return withoutWWW.replacing(#/\/+$/#, with: "")
     }
 }
 
@@ -308,11 +285,11 @@ extension String {
     func cleanedPhoneNumber() -> (cleaned: String, isValid: Bool) {
         // Just remove whitespace and common separators for tel: links
         let cleaned = self.trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "-", with: "")
-            .replacingOccurrences(of: "(", with: "")
-            .replacingOccurrences(of: ")", with: "")
-            .replacingOccurrences(of: ".", with: "")
+            .replacing(" ", with: "")
+            .replacing("-", with: "")
+            .replacing("(", with: "")
+            .replacing(")", with: "")
+            .replacing(".", with: "")
         
         let isValid = isValidPhoneNumber(cleaned)
         return (cleaned, isValid)
@@ -335,7 +312,7 @@ extension String {
         }
         
         // Must be mostly digits (allow + for country codes)
-        let validChars = phone.filter({ $0.isNumber || $0 == "+" }).count
+        let validChars = phone.count(where: { $0.isNumber || $0 == "+" })
         let totalChars = phone.count
         
         // At least 70% should be digits or +
@@ -344,7 +321,7 @@ extension String {
         }
         
         // Must contain at least 4 digits
-        let digitCount = phone.filter { $0.isNumber }.count
+        let digitCount = phone.count(where: \.isNumber)
         return digitCount >= 4
     }
     
@@ -356,8 +333,8 @@ extension String {
         guard !trimmed.isEmpty else { return self }
         
         // Remove excessive whitespace but preserve intentional formatting
-        let cleaned = trimmed.replacingOccurrences(of: "  +", with: " ")
-                           .replacingOccurrences(of: "+ ", with: "+")
+        let cleaned = trimmed.replacing(#/ {2,}/#, with: " ")
+            .replacing("+ ", with: "+")
         
         return cleaned
     }
@@ -471,3 +448,410 @@ enum BTCMapMerchantURLBuilder {
         return URL(string: "https://btcmap.org/merchant/\(trimmedID)")
     }
 }
+
+// MARK: - Design-Engineering Motion, Tactile Press & Layout Primitives
+
+enum BitLocalMotion {
+    /// Strong ease-out (cubic-bezier(0.23, 1, 0.32, 1)) for responsive UI entrances.
+    static let strongEaseOut = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.22)
+
+    /// Crisp tactile press/release feedback under 160ms.
+    static let press = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.14)
+
+    /// Asymmetric faster exit for dismissals and secondary reveals.
+    static let fastExit = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.16)
+
+    /// Interruptible, zero-bounce spring for disclosures (opening hours, info reveals).
+    static let disclosureSpring = Animation.spring(duration: 0.28, bounce: 0.0)
+
+    /// Subtle spring for micro icon state morphs (copy -> checkmark).
+    static let morphSpring = Animation.spring(duration: 0.26, bounce: 0.12)
+
+    /// Gentle opacity-only fallback when Reduce Motion is enabled.
+    static let reducedFade = Animation.easeOut(duration: 0.16)
+
+    static func animation(_ standard: Animation, reduceMotion: Bool) -> Animation {
+        reduceMotion ? reducedFade : standard
+    }
+}
+
+@MainActor
+enum BitLocalHaptics {
+    static func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+
+    static func lightTap() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+
+    static func success() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.success)
+    }
+}
+
+struct TactilePressButtonStyle: ButtonStyle {
+    var scale: CGFloat = 0.97
+    var pressedOpacity: Double = 0.88
+
+    func makeBody(configuration: Configuration) -> some View {
+        Content(
+            configuration: configuration,
+            scale: scale,
+            pressedOpacity: pressedOpacity
+        )
+    }
+
+    private struct Content: View {
+        let configuration: Configuration
+        let scale: CGFloat
+        let pressedOpacity: Double
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduceMotion ? scale : 1.0)
+                .opacity(configuration.isPressed ? pressedOpacity : 1.0)
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
+                    value: configuration.isPressed
+                )
+        }
+    }
+}
+
+struct TactileRowButtonStyle: ButtonStyle {
+    var scale: CGFloat = 0.985
+    var cornerRadius: CGFloat = 12
+
+    func makeBody(configuration: Configuration) -> some View {
+        Content(
+            configuration: configuration,
+            scale: scale,
+            cornerRadius: cornerRadius
+        )
+    }
+
+    private struct Content: View {
+        let configuration: Configuration
+        let scale: CGFloat
+        let cornerRadius: CGFloat
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color.primary.opacity(configuration.isPressed ? 0.06 : 0))
+                )
+                .scaleEffect(configuration.isPressed && !reduceMotion ? scale : 1.0)
+                .animation(
+                    BitLocalMotion.animation(BitLocalMotion.press, reduceMotion: reduceMotion),
+                    value: configuration.isPressed
+                )
+        }
+    }
+}
+
+extension ButtonStyle where Self == TactilePressButtonStyle {
+    static var tactilePress: TactilePressButtonStyle { TactilePressButtonStyle() }
+
+    static func tactilePress(
+        scale: CGFloat,
+        pressedOpacity: Double = 0.88
+    ) -> TactilePressButtonStyle {
+        TactilePressButtonStyle(scale: scale, pressedOpacity: pressedOpacity)
+    }
+}
+
+extension ButtonStyle where Self == TactileRowButtonStyle {
+    static var tactileRow: TactileRowButtonStyle { TactileRowButtonStyle() }
+
+    static func tactileRow(
+        scale: CGFloat = 0.985,
+        cornerRadius: CGFloat = 12
+    ) -> TactileRowButtonStyle {
+        TactileRowButtonStyle(scale: scale, cornerRadius: cornerRadius)
+    }
+}
+
+/// Wrapping horizontal flow layout for compact badges, payment rails, and social chips.
+struct BitLocalFlowLayout: Layout {
+    var horizontalSpacing: CGFloat = 8
+    var verticalSpacing: CGFloat = 8
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let maxWidth = proposal.width ?? .greatestFiniteMagnitude
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var measuredWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX > 0 && currentX + size.width > maxWidth {
+                currentX = 0
+                currentY += lineHeight + verticalSpacing
+                lineHeight = 0
+            }
+            measuredWidth = max(measuredWidth, currentX + size.width)
+            lineHeight = max(lineHeight, size.height)
+            currentX += size.width + horizontalSpacing
+        }
+
+        let totalHeight = subviews.isEmpty ? 0 : currentY + lineHeight
+        let resolvedWidth = proposal.width ?? measuredWidth
+        return CGSize(width: resolvedWidth, height: totalHeight)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        var currentX = bounds.minX
+        var currentY = bounds.minY
+        var lineHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX > bounds.minX && currentX + size.width > bounds.maxX {
+                currentX = bounds.minX
+                currentY += lineHeight + verticalSpacing
+                lineHeight = 0
+            }
+            subview.place(
+                at: CGPoint(x: currentX, y: currentY),
+                proposal: ProposedViewSize(size)
+            )
+            lineHeight = max(lineHeight, size.height)
+            currentX += size.width + horizontalSpacing
+        }
+    }
+}
+
+enum ElementCategoryBadgeHelper {
+    /// Returns the crisp uncircled SF Symbol matching the map marker glyph 1:1.
+    static func badgeSymbolName(for element: Element) -> String {
+        let raw: String
+        if let group = ElementCategorySymbols.merchantCategoryGroups(for: element).first {
+            raw = ElementCategorySymbols.merchantCategoryDescriptor(for: group).chipSymbolName
+        } else {
+            raw = ElementCategorySymbols.symbolName(for: element)
+        }
+        return uncircledSymbolName(from: raw)
+    }
+
+    static func primaryCategoryLabel(for element: Element) -> String? {
+        if let group = ElementCategorySymbols.merchantCategoryGroups(for: element).first {
+            return group.localizedLabel
+        }
+        return ElementCategorySymbols.friendlyCategoryLabel(
+            forIcon: element.v4Metadata?.icon ?? element.tags?.iconPlatform
+        )
+    }
+
+    private static let uncircledSymbolCache = Mutex<[String: String]>([:])
+
+    static func uncircledSymbolName(from raw: String) -> String {
+        if let cached = uncircledSymbolCache.withLock({ $0[raw] }) {
+            return cached
+        }
+
+        var resolved = raw
+        for suffix in [".circle.fill", ".circle"] where raw.hasSuffix(suffix) {
+            let base = String(raw.dropLast(suffix.count))
+            let filled = "\(base).fill"
+            if UIImage(systemName: filled) != nil {
+                resolved = filled
+                break
+            }
+            if UIImage(systemName: base) != nil {
+                resolved = base
+                break
+            }
+        }
+
+        uncircledSymbolCache.withLock { $0[raw] = resolved }
+        return resolved
+    }
+}
+
+/// Adaptive translucent surface tokens for controls, cards, and search fields inside
+/// floating Liquid Glass / material sheets.
+///
+/// Using primary-tinted translucent fills instead of stacking `.regularMaterial`
+/// avoids white-on-white washout in Light Mode and harsh opaque charcoal cutouts
+/// over translucent glass in Dark Mode, while letting elements follow the sheet's
+/// underlying background seamlessly.
+enum BitLocalSheetSurfaceRole: Sendable {
+    /// Grouped detail cards (`PlaceGroupedSurface`, community icon frame).
+    case card
+    /// Interactive secondary buttons, pills, and unselected filter chips.
+    case control
+    /// Search input capsules that subtly follow the sheet background.
+    case searchField
+}
+
+enum BitLocalSheetSurface {
+    static func fillOpacity(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Double {
+        let isDark = colorScheme == .dark
+        let isIncreased = contrast == .increased
+        switch role {
+        case .card:
+            if isIncreased { return isDark ? 0.16 : 0.10 }
+            return isDark ? 0.08 : 0.06
+        case .control:
+            if isIncreased { return isDark ? 0.18 : 0.13 }
+            return isDark ? 0.11 : 0.08
+        case .searchField:
+            if isIncreased { return isDark ? 0.14 : 0.09 }
+            return isDark ? 0.06 : 0.05
+        }
+    }
+
+    static func borderOpacity(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Double {
+        let isDark = colorScheme == .dark
+        let isIncreased = contrast == .increased
+        switch role {
+        case .card:
+            if isIncreased { return isDark ? 0.30 : 0.28 }
+            return isDark ? 0.14 : 0.11
+        case .control:
+            if isIncreased { return isDark ? 0.32 : 0.30 }
+            return isDark ? 0.16 : 0.12
+        case .searchField:
+            if isIncreased { return isDark ? 0.30 : 0.26 }
+            return isDark ? 0.15 : 0.12
+        }
+    }
+
+    static func fillColor(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Color {
+        Color.primary.opacity(fillOpacity(for: role, colorScheme: colorScheme, contrast: contrast))
+    }
+
+    static func borderColor(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Color {
+        Color.primary.opacity(borderOpacity(for: role, colorScheme: colorScheme, contrast: contrast))
+    }
+}
+
+/// Adaptive translucent grouped container shared by Merchant and Community detail screens.
+struct PlaceGroupedSurface<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+    let padding: EdgeInsets
+    let content: Content
+
+    init(
+        padding: EdgeInsets = EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14),
+        @ViewBuilder content: () -> Content
+    ) {
+        self.padding = padding
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                BitLocalSheetSurface.fillColor(
+                    for: .card,
+                    colorScheme: colorScheme,
+                    contrast: colorSchemeContrast
+                ),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        BitLocalSheetSurface.borderColor(
+                            for: .card,
+                            colorScheme: colorScheme,
+                            contrast: colorSchemeContrast
+                        ),
+                        lineWidth: 0.5
+                    )
+            }
+    }
+}
+
+/// Inline 44x44pt tactile copy button with symbol morph (doc.on.doc -> green checkmark) and success haptic.
+struct TactileCopyButton: View {
+    let value: String
+    let accessibilityLabel: String
+
+    @State private var copied = false
+    @State private var resetTask: Task<Void, Never>?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button {
+            UIPasteboard.general.string = value
+
+            resetTask?.cancel()
+            withAnimation(
+                BitLocalMotion.animation(BitLocalMotion.morphSpring, reduceMotion: reduceMotion)
+            ) {
+                copied = true
+            }
+
+            resetTask = Task {
+                try? await Task.sleep(for: .milliseconds(1600))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    withAnimation(
+                        BitLocalMotion.animation(BitLocalMotion.fastExit, reduceMotion: reduceMotion)
+                    ) {
+                        copied = false
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(copied ? Color.green : Color.secondary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.tactilePress(scale: 0.92))
+        .sensoryFeedback(.success, trigger: copied) { _, isCopied in
+            isCopied
+        }
+        .accessibilityLabel(copied ? Text("Copied") : Text(accessibilityLabel))
+        .onDisappear {
+            resetTask?.cancel()
+        }
+    }
+}
+
+

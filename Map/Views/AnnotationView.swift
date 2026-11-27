@@ -20,7 +20,7 @@ class AnnotationView: MKMarkerAnnotationView {
     }
     
     override var annotation: MKAnnotation? {
-        willSet {
+        didSet {
             updateView()
         }
     }
@@ -28,13 +28,13 @@ class AnnotationView: MKMarkerAnnotationView {
     // UpdateView Function
     private func updateView() {
         guard let annotation = annotation else { return }
-        if let _ = annotation as? Annotation {
+        if annotation is Annotation {
             clusteringIdentifier = "element"
         } else if let cluster = annotation as? MKClusterAnnotation {
             clusteringIdentifier = nil
             displayPriority = .defaultHigh
             let totalCount = cluster.memberAnnotations.count
-            markerTintColor = totalCount < 5 ? UIColor(named: "MarkerColor") : totalCount < 10 ? UIColor(named: "MarkerColor") : UIColor(named: "MarkerColor")
+            markerTintColor = UIColor(named: "MarkerColor")
             glyphText = "\(totalCount)"
         }
         canShowCallout = true

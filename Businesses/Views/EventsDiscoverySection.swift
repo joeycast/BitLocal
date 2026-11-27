@@ -4,7 +4,7 @@ import CoreLocation
 // MARK: - Events Discovery Carousel
 
 struct EventsDiscoverySection: View {
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
 
     var body: some View {
         let events = carouselEvents
@@ -15,10 +15,7 @@ struct EventsDiscoverySection: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    NavigationLink {
-                        AllEventsListView()
-                            .environmentObject(viewModel)
-                    } label: {
+                    NavigationLink(value: BitLocalNavigationRoute.allEvents) {
                         Text("See All")
                             .font(.subheadline)
                     }
@@ -29,10 +26,12 @@ struct EventsDiscoverySection: View {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 12) {
                         ForEach(events) { event in
-                            EventCarouselCard(event: event, userLocation: viewModel.userLocation)
-                                .onTapGesture {
-                                    viewModel.selectEvent(event)
-                                }
+                            Button {
+                                viewModel.selectEvent(event)
+                            } label: {
+                                EventCarouselCard(event: event, userLocation: viewModel.userLocation)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .scrollTargetLayout()
@@ -40,7 +39,7 @@ struct EventsDiscoverySection: View {
                 }
                 .scrollTargetBehavior(.viewAligned)
                 .scrollIndicators(.hidden)
-                .frame(height: 88)
+                .frame(minHeight: 88)
             }
             .padding(.vertical, 8)
         }
@@ -51,10 +50,10 @@ struct EventsDiscoverySection: View {
 
         let futureEvents = withCoords.filter { event in
             guard let startsAt = event.startsAt,
-                  let date = btcMapISO8601WithFractional.date(from: startsAt) ?? btcMapISO8601Basic.date(from: startsAt) else {
+                  let date = parseBTCMapISO8601Date(startsAt) else {
                 return true // include events without a parseable date
             }
-            return date >= Date()
+            return date >= Date.now
         }
 
         let filtered: [V4EventRecord]
@@ -75,6 +74,7 @@ struct EventsDiscoverySection: View {
 // MARK: - Event Carousel Card
 
 private struct EventCarouselCard: View {
+    @Environment(\.locale) private var locale
     let event: V4EventRecord
     let userLocation: CLLocation?
 
@@ -95,27 +95,26 @@ private struct EventCarouselCard: View {
 
             if let distText = distanceText {
                 Text(distText)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.accent)
             }
         }
         .padding(12)
-        .frame(width: 160, alignment: .leading)
-        .frame(maxHeight: .infinity)
+        .frame(minWidth: 160, maxWidth: 180, minHeight: 88, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 12)
                 .fill(.ultraThinMaterial)
-                .overlay(
+                .overlay {
                     RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
-                )
+                }
         }
         .clipShape(.rect(cornerRadius: 12))
     }
 
     private var formattedStartDate: String? {
         guard let raw = event.startsAt, !raw.isEmpty, !raw.hasPrefix("1970-01-01") else { return nil }
-        if let date = btcMapISO8601WithFractional.date(from: raw) ?? btcMapISO8601Basic.date(from: raw) {
+        if let date = parseBTCMapISO8601Date(raw) {
             return date.formatted(date: .abbreviated, time: .shortened)
         }
         return raw
@@ -127,13 +126,18 @@ private struct EventCarouselCard: View {
               let lon = event.lon else { return nil }
         let eventLoc = CLLocation(latitude: lat, longitude: lon)
         let meters = userLocation.distance(from: eventLoc)
-        let useMetric = Locale.current.measurementSystem == .metric
-        if useMetric {
-            let km = meters / 1000
-            return km < 10 ? String(format: "%.1f km away", km) : String(format: "%.0f km away", km)
-        } else {
-            let miles = meters / 1609.34
-            return miles < 10 ? String(format: "%.1f mi away", miles) : String(format: "%.0f mi away", miles)
-        }
+        let useMetric = locale.measurementSystem == .metric
+        let value = useMetric ? (meters / 1000) : (meters / 1609.344)
+        let unit: UnitLength = useMetric ? .kilometers : .miles
+        let fractionDigits = value < 10 ? 1 : 0
+        let formatted = Measurement(value: value, unit: unit).formatted(
+            .measurement(
+                width: .abbreviated,
+                usage: .asProvided,
+                numberFormatStyle: .number.precision(.fractionLength(fractionDigits))
+            )
+            .locale(locale)
+        )
+        return String(localized: "\(formatted) away", comment: "Distance to an upcoming event")
     }
 }

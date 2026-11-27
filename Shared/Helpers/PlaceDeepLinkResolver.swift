@@ -29,14 +29,14 @@ enum PlaceDeepLinkResolution: Equatable {
 
 /// Resolves place share deep links against BTC Map without owning UI state.
 /// ContentViewModel remains responsible for navigation and presentation.
-final class PlaceDeepLinkResolver {
+final class PlaceDeepLinkResolver: Sendable {
     private let repository: BTCMapSearchServiceProtocol
 
     init(repository: BTCMapSearchServiceProtocol) {
         self.repository = repository
     }
 
-    func resolve(placeID: String, completion: @escaping (PlaceDeepLinkResolution) -> Void) {
+    func resolve(placeID: String, completion: @escaping @Sendable (PlaceDeepLinkResolution) -> Void) {
         let trimmed = placeID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard PlaceShareLinkBuilder.isValidPlaceID(trimmed) else {
             completion(.invalidIdentifier)

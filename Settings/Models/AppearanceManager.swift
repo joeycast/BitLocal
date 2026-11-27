@@ -7,15 +7,18 @@
 
 
 // AppearanceManager.swift
+import Observation
 import SwiftUI
 
-class AppearanceManager: ObservableObject {
-    @Published var appearance: Appearance {
+@MainActor
+@Observable
+final class AppearanceManager {
+    var appearance: Appearance {
         didSet {
             UserDefaults.standard.set(appearance.rawValue, forKey: "appearance")
         }
     }
-    
+
     init() {
         let storedValue = UserDefaults.standard.string(forKey: "appearance") ?? "system"
         self.appearance = Appearance(rawValue: storedValue) ?? .system

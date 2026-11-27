@@ -1,43 +1,55 @@
-import XCTest
+import Foundation
+import Testing
 @testable import bitlocal
 
-final class MerchantSearchPersistenceTests: XCTestCase {
-    private var suiteName: String!
-    private var defaults: UserDefaults!
+@Suite(.tags(.persistence, .search))
+final class MerchantSearchPersistenceTests {
+    private let suiteName: String
+    private let defaults: UserDefaults
 
-    override func setUp() {
-        super.setUp()
+    init() {
         suiteName = "MerchantSearchPersistenceTests-\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
+        defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
     }
 
-    override func tearDown() {
-        if let suiteName {
-            defaults?.removePersistentDomain(forName: suiteName)
-        }
-        defaults = nil
-        suiteName = nil
-        super.tearDown()
+    deinit {
+        UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
     }
 
-    func testSaveAndLoadCategoryWithinTTL() {
+    @Test func saveAndLoadCategoryWithinTTL() {
         MerchantSearchPersistence.saveCategoryGroup(.coffee, defaults: defaults)
         let loaded = MerchantSearchPersistence.loadCategoryGroup(defaults: defaults)
-        XCTAssertEqual(loaded, .coffee)
+        #expect(loaded == .coffee)
     }
 
-    func testExpiredCategoryIsCleared() {
+    @Test func expiredCategoryIsCleared() {
         MerchantSearchPersistence.saveCategoryGroup(.food, defaults: defaults)
         defaults.set(
-            Date().timeIntervalSince1970 - MerchantSearchPersistence.categoryTTL - 10,
+            Date.now.timeIntervalSince1970 - MerchantSearchPersistence.categoryTTL - 10,
             forKey: "merchant_search_last_category_saved_at"
         )
-        XCTAssertNil(MerchantSearchPersistence.loadCategoryGroup(defaults: defaults))
+        #expect(MerchantSearchPersistence.loadCategoryGroup(defaults: defaults) == nil)
     }
 
-    func testClearRemovesCategory() {
+    @Test func clearRemovesCategory() {
         MerchantSearchPersistence.saveCategoryGroup(.bars, defaults: defaults)
         MerchantSearchPersistence.clear(defaults: defaults)
-        XCTAssertNil(MerchantSearchPersistence.loadCategoryGroup(defaults: defaults))
+        #expect(MerchantSearchPersistence.loadCategoryGroup(defaults: defaults) == nil)
+        #expect(MerchantSearchPersistence.loadCategoryGroups(defaults: defaults).isEmpty)
+    }
+
+    @Test func saveAndLoadMultipleCategoryGroupsWithinTTL() {
+        MerchantSearchPersistence.saveCategoryGroups([.food, .coffee], defaults: defaults)
+        let loaded = MerchantSearchPersistence.loadCategoryGroups(defaults: defaults)
+        #expect(loaded == [.food, .coffee])
+    }
+
+    @Test func loadsLegacySingleCategoryKeyWhenMultiKeyMissing() {
+        defaults.set("groceries", forKey: "merchant_search_last_category_group")
+        defaults.set(Date.now.timeIntervalSince1970, forKey: "merchant_search_last_category_saved_at")
+
+        let loaded = MerchantSearchPersistence.loadCategoryGroups(defaults: defaults)
+        #expect(loaded == [.groceries])
     }
 }
