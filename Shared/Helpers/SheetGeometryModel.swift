@@ -105,6 +105,18 @@ struct SheetEdgeHeightReader: UIViewRepresentable {
     }
 }
 
+private final class DisplayLinkHandle: @unchecked Sendable {
+    let link: CADisplayLink
+
+    init(_ link: CADisplayLink) {
+        self.link = link
+    }
+
+    deinit {
+        link.invalidate()
+    }
+}
+
 final class SheetEdgeHeightReaderView: UIView {
     var preferredLeadingWidth: CGFloat?
     var onHeightChange: ((CGFloat) -> Void)?
@@ -112,7 +124,7 @@ final class SheetEdgeHeightReaderView: UIView {
     private var lastReported: CGFloat = -1
     private var lastWindowBoundsSize: CGSize = .zero
     private var lastAppliedLeadingWidth: CGFloat? = -1
-    private var displayLink: CADisplayLink?
+    private var displayLinkHandle: DisplayLinkHandle?
     private var stableFrameCount = 0
     private weak var cachedPresentedView: UIView?
     private static let stableFramesBeforePause = 8
@@ -143,10 +155,6 @@ final class SheetEdgeHeightReaderView: UIView {
         } else {
             stopDisplayLink()
         }
-    }
-
-    deinit {
-        displayLink?.invalidate()
     }
 
     /// Directly configures UIKit's `UISheetPresentationController` so edge-attached
@@ -196,17 +204,16 @@ final class SheetEdgeHeightReaderView: UIView {
     }
 
     private func startDisplayLinkIfNeeded() {
-        guard displayLink == nil else { return }
+        guard displayLinkHandle == nil else { return }
         // Sample while the card moves. Pause after stable frames to avoid
         // burning main-thread time while the sheet is idle.
         let link = CADisplayLink(target: self, selector: #selector(handleDisplayLink))
         link.add(to: .main, forMode: .common)
-        displayLink = link
+        displayLinkHandle = DisplayLinkHandle(link)
     }
 
     private func stopDisplayLink() {
-        displayLink?.invalidate()
-        displayLink = nil
+        displayLinkHandle = nil
     }
 
     @objc private func handleDisplayLink() {
