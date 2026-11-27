@@ -12,6 +12,7 @@ struct BusinessesListView: View {
     @Environment(ContentViewModel.self) var viewModel
     @Environment(\.calendar) var calendar
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.colorSchemeContrast) var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
@@ -298,7 +299,14 @@ struct BusinessesListView: View {
         .background(searchFieldSurfaceColor, in: Capsule())
         .overlay {
             Capsule()
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                .strokeBorder(
+                    BitLocalSheetSurface.borderColor(
+                        for: .searchField,
+                        colorScheme: colorScheme,
+                        contrast: colorSchemeContrast
+                    ),
+                    lineWidth: 0.5
+                )
         }
         .padding(.horizontal, 16)
         .animation(
@@ -323,19 +331,34 @@ struct BusinessesListView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: Capsule())
+        .background(
+            BitLocalSheetSurface.fillColor(
+                for: .control,
+                colorScheme: colorScheme,
+                contrast: colorSchemeContrast
+            ),
+            in: Capsule()
+        )
         .overlay {
             Capsule()
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                .strokeBorder(
+                    BitLocalSheetSurface.borderColor(
+                        for: .control,
+                        colorScheme: colorScheme,
+                        contrast: colorSchemeContrast
+                    ),
+                    lineWidth: 0.5
+                )
         }
         .accessibilityElement(children: .combine)
     }
 
     private var searchFieldSurfaceColor: Color {
-        guard shouldUseGlassyRows else {
-            return Color(.tertiarySystemFill)
-        }
-        return Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.58)
+        BitLocalSheetSurface.fillColor(
+            for: .searchField,
+            colorScheme: colorScheme,
+            contrast: colorSchemeContrast
+        )
     }
 
     private var searchBarTopPadding: CGFloat {

@@ -186,3 +186,43 @@ extension View {
         #endif
     }
 }
+
+/// Top-level sheet presented by `IPhoneLayoutView` so `SettingsView` is never
+/// stacked as a nested child detent sheet on top of `BottomSheetContentView`
+/// (which caused UIKit to drag the bottom sheet up and down behind Settings on
+/// unfolded iPhone Duo).
+enum IPhoneActiveSheet: String, Identifiable, Equatable, Sendable {
+    case browse
+    case settings
+
+    var id: String { rawValue }
+}
+
+enum IPhoneSheetPresentationResolver {
+    static func targetSheet(
+        shouldPresentBottomSheet: Bool,
+        showingSettings: Bool
+    ) -> IPhoneActiveSheet? {
+        if showingSettings {
+            return .settings
+        }
+        return shouldPresentBottomSheet ? .browse : nil
+    }
+
+    static func stateAfterDismiss(
+        currentActiveSheet: IPhoneActiveSheet?,
+        shouldPresentBottomSheet: Bool,
+        showingSettings: Bool
+    ) -> (nextSheet: IPhoneActiveSheet?, nextShowingSettings: Bool) {
+        // Ignore intermediate dismiss callbacks when another sheet is already scheduled.
+        guard currentActiveSheet == nil else {
+            return (currentActiveSheet, showingSettings)
+        }
+        let nextShowingSettings = false
+        let nextSheet = targetSheet(
+            shouldPresentBottomSheet: shouldPresentBottomSheet,
+            showingSettings: nextShowingSettings
+        )
+        return (nextSheet, nextShowingSettings)
+    }
+}

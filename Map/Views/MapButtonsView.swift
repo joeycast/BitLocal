@@ -141,9 +141,9 @@ struct MapControlToolbarContent: ToolbarContent {
         #if compiler(>=6.4)
         if #available(iOS 27.0, *) {
             ToolbarItemGroup(placement: placement) {
+                mapModeButton
                 mapTypeButton
                 recenterButton
-                mapModeButton
             }
             .visibilityPriority(.high)
         } else {
@@ -156,9 +156,9 @@ struct MapControlToolbarContent: ToolbarContent {
 
     private var legacyToolbarGroup: some ToolbarContent {
         ToolbarItemGroup(placement: placement) {
+            mapModeButton
             mapTypeButton
             recenterButton
-            mapModeButton
         }
     }
 
@@ -197,12 +197,12 @@ struct MapControlToolbarContent: ToolbarContent {
         } label: {
             Label(
                 isCommunities ? "Show merchants" : "Show communities",
-                systemImage: isCommunities ? "mappin.and.ellipse" : "person.3"
+                systemImage: isCommunities ? "mappin.and.ellipse" : "person.2"
             )
-            .foregroundStyle(isCommunities ? Color.accentColor : .primary)
+            .foregroundStyle(.primary)
             .id("map-mode-\(isCommunities)-\(colorScheme == .dark)")
         }
-        .tint(isCommunities ? .accentColor : .primary)
+        .tint(.primary)
         .accessibilityValue(isCommunities ? "Communities map" : "Merchants map")
         .accessibilityHint("Switches between merchant pins and community areas")
         .featureHintAnchor(.communityToggle)
@@ -232,26 +232,6 @@ struct MapButtonsView: View {
         let controlHeight: CGFloat = isRegularWidth ? 46 : 44
 
         return VStack(spacing: 0) {
-            Button(action: toggleMapType) {
-                mapTypeIcon
-                    .frame(width: controlWidth, height: controlHeight)
-            }
-            .accessibilityLabel(selectedMapType == .standard ? "Show satellite map" : "Show standard map")
-
-            Divider()
-                .padding(.horizontal, 8)
-
-            Button(action: handleRecenterTap) {
-                Image(systemName: useMonochromeIcons ? "location" : "location.fill")
-                    .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
-                    .foregroundStyle(useMonochromeIcons ? Color.primary : Color.accentColor)
-                    .frame(width: controlWidth, height: controlHeight)
-            }
-            .accessibilityLabel("Center map on location")
-
-            Divider()
-                .padding(.horizontal, 8)
-
             Button {
                 BitLocalHaptics.selection()
                 Debug.log("⏱ mapMode button TAPPED")
@@ -273,6 +253,26 @@ struct MapButtonsView: View {
             )
             .accessibilityHint("Switches between merchant pins and community areas")
             .featureHintAnchor(.communityToggle)
+
+            Divider()
+                .padding(.horizontal, 8)
+
+            Button(action: toggleMapType) {
+                mapTypeIcon
+                    .frame(width: controlWidth, height: controlHeight)
+            }
+            .accessibilityLabel(selectedMapType == .standard ? "Show satellite map" : "Show standard map")
+
+            Divider()
+                .padding(.horizontal, 8)
+
+            Button(action: handleRecenterTap) {
+                Image(systemName: useMonochromeIcons ? "location" : "location.fill")
+                    .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: controlWidth, height: controlHeight)
+            }
+            .accessibilityLabel("Center map on location")
         }
         .frame(width: controlWidth)
         .modifier(GlassCapsuleBackground())
@@ -304,15 +304,14 @@ struct MapButtonsView: View {
 
     private var mapModeIcon: some View {
         let isCommunities = viewModel.mapDisplayMode == .communities
-        let iconColor: Color = (useMonochromeIcons && !isCommunities) ? .primary : .accentColor
         return ZStack {
-            Image(systemName: useMonochromeIcons ? "person.3" : "person.3.fill")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(iconColor)
+            Image(systemName: useMonochromeIcons ? "person.2" : "person.2.fill")
+                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+                .foregroundStyle(.primary)
                 .opacity(isCommunities ? 0 : 1)
             Image(systemName: "mappin.and.ellipse")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(iconColor)
+                .font(.subheadline.weight(useMonochromeIcons ? .medium : .semibold))
+                .foregroundStyle(.primary)
                 .opacity(isCommunities ? 1 : 0)
         }
         .animation(.easeOut(duration: 0.16), value: isCommunities)

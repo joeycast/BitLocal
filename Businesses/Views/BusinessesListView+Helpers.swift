@@ -127,7 +127,7 @@ extension BusinessesListView {
                         .overlay {
                             Capsule()
                                 .strokeBorder(
-                                    isSelected ? Color.clear : Color.primary.opacity(0.08),
+                                    isSelected ? Color.clear : chipBorderColor,
                                     lineWidth: 0.5
                                 )
                         }
@@ -181,7 +181,7 @@ extension BusinessesListView {
                         .overlay {
                             Capsule()
                                 .strokeBorder(
-                                    isSelected ? Color.clear : Color.primary.opacity(0.08),
+                                    isSelected ? Color.clear : chipBorderColor,
                                     lineWidth: 0.5
                                 )
                         }
@@ -209,10 +209,19 @@ extension BusinessesListView {
     }
 
     private var chipSurfaceColor: Color {
-        guard shouldUseGlassyRows else {
-            return Color(.secondarySystemFill)
-        }
-        return Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.60)
+        BitLocalSheetSurface.fillColor(
+            for: .control,
+            colorScheme: colorScheme,
+            contrast: colorSchemeContrast
+        )
+    }
+
+    private var chipBorderColor: Color {
+        BitLocalSheetSurface.borderColor(
+            for: .control,
+            colorScheme: colorScheme,
+            contrast: colorSchemeContrast
+        )
     }
 
     private var categoryChipsTopPadding: CGFloat {

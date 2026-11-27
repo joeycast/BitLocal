@@ -6,6 +6,8 @@ import MapKit
 struct CommunityDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.calendar) var calendar
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.openURL) var openURL
     @Environment(ContentViewModel.self) var viewModel
     private let metadataStore = CommunityRowMetadataObservableStore.shared
@@ -239,11 +241,25 @@ struct CommunityDetailView: View {
         if let communityIconURL {
             CommunityIconImage(url: communityIconURL, placeholderSystemName: "person.3.fill", scaleToFill: true)
                 .frame(width: 48, height: 48)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .background(
+                    BitLocalSheetSurface.fillColor(
+                        for: .card,
+                        colorScheme: colorScheme,
+                        contrast: colorSchemeContrast
+                    ),
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                        .strokeBorder(
+                            BitLocalSheetSurface.borderColor(
+                                for: .card,
+                                colorScheme: colorScheme,
+                                contrast: colorSchemeContrast
+                            ),
+                            lineWidth: 0.5
+                        )
                 }
                 .accessibilityHidden(true)
         } else {
@@ -368,13 +384,25 @@ struct CommunityDetailView: View {
                         .fill(Color.accentColor)
                 } else {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(.regularMaterial)
+                        .fill(
+                            BitLocalSheetSurface.fillColor(
+                                for: .control,
+                                colorScheme: colorScheme,
+                                contrast: colorSchemeContrast
+                            )
+                        )
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(
-                        isPrimary ? Color.clear : Color(.separator).opacity(0.35),
+                        isPrimary
+                            ? Color.clear
+                            : BitLocalSheetSurface.borderColor(
+                                for: .control,
+                                colorScheme: colorScheme,
+                                contrast: colorSchemeContrast
+                            ),
                         lineWidth: 0.5
                     )
             }

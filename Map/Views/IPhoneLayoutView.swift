@@ -54,6 +54,7 @@ private struct IPhoneLayoutContent: View {
 
     private var appearance: Appearance { appearanceManager.appearance }
     @State private var recenterController = MapLocationRecenterController()
+    @State private var activeSheet: IPhoneActiveSheet?
     @State private var bottomSheetDetent: PresentationDetent = .fraction(0.37)
     @State private var settingsSheetDetent: PresentationDetent = .large
     @State private var hasLiveSheetMeasurement = false
@@ -144,7 +145,7 @@ private struct IPhoneLayoutContent: View {
                         headerHeight: headerHeight,
                         shouldPresentBottomSheet: shouldPresentBottomSheet,
                         showingSettings: showingSettings,
-                        useMonochromeIcons: horizontalSizeClass == .regular
+                        useMonochromeIcons: horizontalSizeClass == .regular || usesNativeHorizontalBar
                     )
                 }
             }
@@ -187,17 +188,17 @@ private struct IPhoneLayoutContent: View {
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("")
-            .sheet(isPresented: .constant(shouldPresentBottomSheet), onDismiss: {
-                Debug.log("Bottom sheet dismissed")
-            }) {
-                let topDetent: PresentationDetent = isLeadingSheet
-                    ? BottomSheetDetents.expandedLeading
-                    : .large
-                BottomSheetContentView(
-                    visibleElements: visibleElements,
-                    currentDetent: $bottomSheetDetent,
-                    preferredLeadingWidth: leadingSheetWidth
-                )
+            .sheet(item: $activeSheet, onDismiss: handleActiveSheetDismiss) { sheet in
+                switch sheet {
+                case .browse:
+                    let topDetent: PresentationDetent = isLeadingSheet
+                        ? BottomSheetDetents.expandedLeading
+                        : .large
+                    BottomSheetContentView(
+                        visibleElements: visibleElements,
+                        currentDetent: $bottomSheetDetent,
+                        preferredLeadingWidth: leadingSheetWidth
+                    )
                     .environment(viewModel)
                     .preferredColorScheme(effectiveColorScheme)  // To respect appearance
                     .presentationDetents([
@@ -216,19 +217,9 @@ private struct IPhoneLayoutContent: View {
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled(true)
                     .presentationBackgroundInteraction(.enabled)
-                    .sheet(isPresented: $showingSettings) {
-                        NavigationStack {
-                            SettingsView(
-                                selectedMapType: selectedMapTypeBinding,
-                                currentDetent: $settingsSheetDetent
-                            )
-                            .environment(viewModel)
-                            .environment(MerchantAlertsManager.shared)
-                        }
-                        .preferredColorScheme(effectiveColorScheme)
-                        .presentationDetents([.medium, .large], selection: $settingsSheetDetent)
-                        .settingsSheetBackground()
-                    }
+                case .settings:
+                    settingsSheetContent
+                }
             }
             .onAppear {
                 syncTopPadding(safeTopInset: geometry.safeAreaInsets.top)
@@ -236,6 +227,7 @@ private struct IPhoneLayoutContent: View {
                 hasLiveSheetMeasurement = false
                 hasAcceptedDefaultLiveMeasurement = false
                 pendingLaunchOutlier = nil
+                syncActiveSheet()
                 if shouldPresentBottomSheet {
                     let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
@@ -265,6 +257,7 @@ private struct IPhoneLayoutContent: View {
                 syncTopPadding(safeTopInset: newTop)
             }
             .onChange(of: shouldPresentBottomSheet) { _, isPresented in
+                syncActiveSheet()
                 if isPresented {
                     let settledHeight = estimatedBottomInsetForDetent(mapHeight: fullHeight)
                     viewModel.reportSheetDetentSettled(estimatedHeight: settledHeight)
@@ -343,10 +336,57 @@ private struct IPhoneLayoutContent: View {
                 if isShowing {
                     settingsSheetDetent = .large
                 }
+                syncActiveSheet()
             }
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.25), value: appearance)
             .animation(.easeInOut(duration: 0.25), value: systemColorScheme)
+        }
+    }
+
+    @ViewBuilder
+    private var settingsSheetContent: some View {
+        let baseSettings = NavigationStack {
+            SettingsView(
+                selectedMapType: selectedMapTypeBinding,
+                currentDetent: $settingsSheetDetent
+            )
+            .environment(viewModel)
+            .environment(MerchantAlertsManager.shared)
+        }
+        .preferredColorScheme(effectiveColorScheme)
+        .settingsSheetBackground()
+
+        if horizontalSizeClass == .regular {
+            baseSettings
+                .presentationSizing(.form)
+        } else {
+            baseSettings
+                .presentationDetents([.medium, .large], selection: $settingsSheetDetent)
+        }
+    }
+
+    private func syncActiveSheet() {
+        let target = IPhoneSheetPresentationResolver.targetSheet(
+            shouldPresentBottomSheet: shouldPresentBottomSheet,
+            showingSettings: showingSettings
+        )
+        if activeSheet != target {
+            activeSheet = target
+        }
+    }
+
+    private func handleActiveSheetDismiss() {
+        let resolution = IPhoneSheetPresentationResolver.stateAfterDismiss(
+            currentActiveSheet: activeSheet,
+            shouldPresentBottomSheet: shouldPresentBottomSheet,
+            showingSettings: showingSettings
+        )
+        if showingSettings != resolution.nextShowingSettings {
+            showingSettings = resolution.nextShowingSettings
+        }
+        if activeSheet != resolution.nextSheet {
+            activeSheet = resolution.nextSheet
         }
     }
 

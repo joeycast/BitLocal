@@ -189,6 +189,8 @@ enum PlaceVerificationState: Equatable {
 struct BusinessDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.calendar) private var calendar
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
     @State private var showingShareErrorAlert = false
@@ -482,10 +484,24 @@ private extension BusinessDetailView {
                         .foregroundStyle(isSaved ? Color.accentColor : Color.secondary)
                         .contentTransition(.symbolEffect(.replace))
                         .frame(width: 44, height: 44)
-                        .background(.regularMaterial, in: Circle())
+                        .background(
+                            BitLocalSheetSurface.fillColor(
+                                for: .control,
+                                colorScheme: colorScheme,
+                                contrast: colorSchemeContrast
+                            ),
+                            in: Circle()
+                        )
                         .overlay {
                             Circle()
-                                .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                                .strokeBorder(
+                                    BitLocalSheetSurface.borderColor(
+                                        for: .control,
+                                        colorScheme: colorScheme,
+                                        contrast: colorSchemeContrast
+                                    ),
+                                    lineWidth: 0.5
+                                )
                         }
                         .contentShape(Circle())
                 }
@@ -648,13 +664,25 @@ private extension BusinessDetailView {
                         .fill(Color.accentColor)
                 } else {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(.regularMaterial)
+                        .fill(
+                            BitLocalSheetSurface.fillColor(
+                                for: .control,
+                                colorScheme: colorScheme,
+                                contrast: colorSchemeContrast
+                            )
+                        )
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(
-                        isPrimary ? Color.clear : Color(.separator).opacity(0.35),
+                        isPrimary
+                            ? Color.clear
+                            : BitLocalSheetSurface.borderColor(
+                                for: .control,
+                                colorScheme: colorScheme,
+                                contrast: colorSchemeContrast
+                            ),
                         lineWidth: 0.5
                     )
             }

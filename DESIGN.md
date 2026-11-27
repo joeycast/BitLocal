@@ -146,9 +146,9 @@ BitLocal uses one warm brand accent over Apple's semantic system palette so Ligh
 ### Neutral
 - **Primary Label (`Color.primary` / `.primary`)**: Merchant titles, community names, primary detail values, and active toolbar icons.
 - **Secondary & Tertiary Labels (`.secondary`, `.tertiary`)**: Distances, category subtitles, timestamps, trailing chevrons, and muted chrome. Always prefer hierarchical foreground styles over manual `.opacity(...)`.
-- **Translucent Surfaces (`.regularMaterial`, `.ultraThinMaterial`, `.thinMaterial`)**: Floating place cards (`PlaceGroupedSurface`), bottom sheets, and map overlays so map context breathes beneath UI.
+- **Translucent Surfaces (`BitLocalSheetSurface`, `.ultraThinMaterial`, `.thinMaterial`)**: Inside Liquid Glass / translucent bottom sheets, grouped cards (`PlaceGroupedSurface`), secondary action buttons, pills, filter chips, and search bars use `BitLocalSheetSurface` primary-tinted translucent fills (`Color.primary.opacity(...)`) rather than stacked `.regularMaterial`, keeping clear elevation in Light Mode and calm translucency in Dark Mode while letting the search bar follow the sheet background.
 - **Grouped & System Backgrounds (`Color(.systemGroupedBackground)` / native `List(.insetGrouped)` / `.background`)**: Settings, forms, and non-map modal sheets.
-- **Hairline Borders (`.quaternary` / `Color(.separator).opacity(0.35)` at `0.5pt`)**: Crisp structural definition around `PlaceGroupedSurface` cards without drop-shadow clutter.
+- **Hairline Borders (`BitLocalSheetSurface.borderColor` at `0.5pt`)**: Crisp structural definition around `PlaceGroupedSurface` cards, pills, and search capsules (automatically strengthened when `colorSchemeContrast == .increased`) without drop-shadow clutter.
 
 ### Status
 - **Open / Success (`.green`)**: Live "Open" hours indicator and saved/copied confirmation states. Always paired with text or an SF Symbol (never color alone).

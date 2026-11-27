@@ -146,4 +146,88 @@ struct AppLayoutModeTests {
         #expect(abs(ltrWidth - 374) <= 0.5)
         #expect(abs(rtlWidth - (960 * 0.42)) <= 0.5)
     }
+
+    // MARK: - Decoupled Settings vs Browse Sheet Presentation
+
+    @Test func settingsSheetPreemptsBrowseSheetAndRestoresBrowseOnDismiss() {
+        #expect(
+            IPhoneSheetPresentationResolver.targetSheet(
+                shouldPresentBottomSheet: false,
+                showingSettings: false
+            ) == nil
+        )
+        #expect(
+            IPhoneSheetPresentationResolver.targetSheet(
+                shouldPresentBottomSheet: true,
+                showingSettings: false
+            ) == .browse
+        )
+        #expect(
+            IPhoneSheetPresentationResolver.targetSheet(
+                shouldPresentBottomSheet: true,
+                showingSettings: true
+            ) == .settings
+        )
+
+        // Dismissing Settings (activeSheet == nil) clears showingSettings and restores browse.
+        let restored = IPhoneSheetPresentationResolver.stateAfterDismiss(
+            currentActiveSheet: nil,
+            shouldPresentBottomSheet: true,
+            showingSettings: true
+        )
+        #expect(restored.nextShowingSettings == false)
+        #expect(restored.nextSheet == .browse)
+
+        // An intermediate dismiss while transitioning browse -> settings must not clear showingSettings.
+        let midTransition = IPhoneSheetPresentationResolver.stateAfterDismiss(
+            currentActiveSheet: .settings,
+            shouldPresentBottomSheet: true,
+            showingSettings: true
+        )
+        #expect(midTransition.nextShowingSettings == true)
+        #expect(midTransition.nextSheet == .settings)
+
+        // When onboarding/release notes hide the bottom sheet, dismissing Settings stays nil.
+        let hiddenBrowse = IPhoneSheetPresentationResolver.stateAfterDismiss(
+            currentActiveSheet: nil,
+            shouldPresentBottomSheet: false,
+            showingSettings: true
+        )
+        #expect(hiddenBrowse.nextShowingSettings == false)
+        #expect(hiddenBrowse.nextSheet == nil)
+    }
+
+    // MARK: - Sheet Surface Contrast Tokens
+
+    @Test func sheetSurfaceTokensStayBalancedAcrossLightDarkAndIncreasedContrast() {
+        for role in [BitLocalSheetSurfaceRole.card, .control, .searchField] {
+            let lightFill = BitLocalSheetSurface.fillOpacity(for: role, colorScheme: .light, contrast: .standard)
+            let darkFill = BitLocalSheetSurface.fillOpacity(for: role, colorScheme: .dark, contrast: .standard)
+            let lightHighFill = BitLocalSheetSurface.fillOpacity(for: role, colorScheme: .light, contrast: .increased)
+            let darkHighFill = BitLocalSheetSurface.fillOpacity(for: role, colorScheme: .dark, contrast: .increased)
+
+            #expect(lightFill > 0 && lightFill <= 0.12)
+            #expect(darkFill > 0 && darkFill <= 0.14)
+            #expect(lightHighFill > lightFill)
+            #expect(darkHighFill > darkFill)
+
+            let lightBorder = BitLocalSheetSurface.borderOpacity(for: role, colorScheme: .light, contrast: .standard)
+            let darkBorder = BitLocalSheetSurface.borderOpacity(for: role, colorScheme: .dark, contrast: .standard)
+            let lightHighBorder = BitLocalSheetSurface.borderOpacity(for: role, colorScheme: .light, contrast: .increased)
+            let darkHighBorder = BitLocalSheetSurface.borderOpacity(for: role, colorScheme: .dark, contrast: .increased)
+
+            #expect(lightBorder > 0 && lightHighBorder > lightBorder)
+            #expect(darkBorder > 0 && darkHighBorder > darkBorder)
+        }
+
+        // Search field stays subtler than interactive controls so it follows the sheet background.
+        #expect(
+            BitLocalSheetSurface.fillOpacity(for: .searchField, colorScheme: .light, contrast: .standard)
+                < BitLocalSheetSurface.fillOpacity(for: .control, colorScheme: .light, contrast: .standard)
+        )
+        #expect(
+            BitLocalSheetSurface.fillOpacity(for: .searchField, colorScheme: .dark, contrast: .standard)
+                < BitLocalSheetSurface.fillOpacity(for: .control, colorScheme: .dark, contrast: .standard)
+        )
+    }
 }

@@ -688,8 +688,85 @@ enum ElementCategoryBadgeHelper {
     }
 }
 
-/// Native system material grouped container shared by Merchant and Community detail screens.
+/// Adaptive translucent surface tokens for controls, cards, and search fields inside
+/// floating Liquid Glass / material sheets.
+///
+/// Using primary-tinted translucent fills instead of stacking `.regularMaterial`
+/// avoids white-on-white washout in Light Mode and harsh opaque charcoal cutouts
+/// over translucent glass in Dark Mode, while letting elements follow the sheet's
+/// underlying background seamlessly.
+enum BitLocalSheetSurfaceRole: Sendable {
+    /// Grouped detail cards (`PlaceGroupedSurface`, community icon frame).
+    case card
+    /// Interactive secondary buttons, pills, and unselected filter chips.
+    case control
+    /// Search input capsules that subtly follow the sheet background.
+    case searchField
+}
+
+enum BitLocalSheetSurface {
+    static func fillOpacity(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Double {
+        let isDark = colorScheme == .dark
+        let isIncreased = contrast == .increased
+        switch role {
+        case .card:
+            if isIncreased { return isDark ? 0.16 : 0.10 }
+            return isDark ? 0.08 : 0.06
+        case .control:
+            if isIncreased { return isDark ? 0.18 : 0.13 }
+            return isDark ? 0.11 : 0.08
+        case .searchField:
+            if isIncreased { return isDark ? 0.14 : 0.09 }
+            return isDark ? 0.06 : 0.05
+        }
+    }
+
+    static func borderOpacity(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Double {
+        let isDark = colorScheme == .dark
+        let isIncreased = contrast == .increased
+        switch role {
+        case .card:
+            if isIncreased { return isDark ? 0.30 : 0.28 }
+            return isDark ? 0.14 : 0.11
+        case .control:
+            if isIncreased { return isDark ? 0.32 : 0.30 }
+            return isDark ? 0.16 : 0.12
+        case .searchField:
+            if isIncreased { return isDark ? 0.30 : 0.26 }
+            return isDark ? 0.15 : 0.12
+        }
+    }
+
+    static func fillColor(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Color {
+        Color.primary.opacity(fillOpacity(for: role, colorScheme: colorScheme, contrast: contrast))
+    }
+
+    static func borderColor(
+        for role: BitLocalSheetSurfaceRole,
+        colorScheme: ColorScheme,
+        contrast: ColorSchemeContrast
+    ) -> Color {
+        Color.primary.opacity(borderOpacity(for: role, colorScheme: colorScheme, contrast: contrast))
+    }
+}
+
+/// Adaptive translucent grouped container shared by Merchant and Community detail screens.
 struct PlaceGroupedSurface<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     let padding: EdgeInsets
     let content: Content
 
@@ -705,10 +782,24 @@ struct PlaceGroupedSurface<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(
+                BitLocalSheetSurface.fillColor(
+                    for: .card,
+                    colorScheme: colorScheme,
+                    contrast: colorSchemeContrast
+                ),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                    .strokeBorder(
+                        BitLocalSheetSurface.borderColor(
+                            for: .card,
+                            colorScheme: colorScheme,
+                            contrast: colorSchemeContrast
+                        ),
+                        lineWidth: 0.5
+                    )
             }
     }
 }

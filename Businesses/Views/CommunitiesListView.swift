@@ -8,6 +8,7 @@ struct CommunitiesListView: View {
 
     @Environment(ContentViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     private let metadataStore = CommunityRowMetadataObservableStore.shared
     var currentDetent: PresentationDetent? = nil
     @State private var filterText = ""
@@ -93,8 +94,9 @@ struct CommunitiesListView: View {
             )
         }
         .onAppear {
-            // Returning from detail should always restore the visible-community browsing state.
-            if viewModel.selectedCommunityArea != nil {
+            // Returning from detail should always restore the visible-community browsing state,
+            // but re-appearing while a detail route is still presented (e.g. closing Settings) must keep it.
+            if viewModel.selectedCommunityArea != nil, viewModel.presentedCommunityArea == nil {
                 viewModel.clearSelectedCommunity()
             }
             viewModel.ensureCommunityMapAreasLoaded()
@@ -139,16 +141,24 @@ struct CommunitiesListView: View {
         .background(searchFieldSurfaceColor, in: Capsule())
         .overlay {
             Capsule()
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                .strokeBorder(
+                    BitLocalSheetSurface.borderColor(
+                        for: .searchField,
+                        colorScheme: colorScheme,
+                        contrast: colorSchemeContrast
+                    ),
+                    lineWidth: 0.5
+                )
         }
         .padding(.horizontal, 16)
     }
 
     private var searchFieldSurfaceColor: Color {
-        guard shouldUseUnifiedSheetRows else {
-            return Color(.tertiarySystemFill)
-        }
-        return Color(.systemBackground).opacity(colorScheme == .dark ? 0.24 : 0.58)
+        BitLocalSheetSurface.fillColor(
+            for: .searchField,
+            colorScheme: colorScheme,
+            contrast: colorSchemeContrast
+        )
     }
 
     private var searchBarTopPadding: CGFloat {

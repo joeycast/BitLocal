@@ -6,6 +6,8 @@ import Foundation
 struct PlacePaymentRailsStrip: View {
     let element: Element
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     private struct PaymentRail: Identifiable {
         let id: String
@@ -90,10 +92,24 @@ struct PlacePaymentRailsStrip: View {
                             }
                             .padding(.horizontal, 11)
                             .padding(.vertical, 6)
-                            .background(.regularMaterial, in: Capsule())
+                            .background(
+                                BitLocalSheetSurface.fillColor(
+                                    for: .control,
+                                    colorScheme: colorScheme,
+                                    contrast: colorSchemeContrast
+                                ),
+                                in: Capsule()
+                            )
                             .overlay {
                                 Capsule()
-                                    .strokeBorder(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                                    .strokeBorder(
+                                        BitLocalSheetSurface.borderColor(
+                                            for: .control,
+                                            colorScheme: colorScheme,
+                                            contrast: colorSchemeContrast
+                                        ),
+                                        lineWidth: 0.5
+                                    )
                             }
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(rail.accessibilityLabel)
