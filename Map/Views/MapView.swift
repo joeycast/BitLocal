@@ -741,8 +741,10 @@ struct MapView: UIViewRepresentable {
                 let count = cluster.memberAnnotations.count
                 view?.glyphText = "\(count)"
                 view?.accessibilityLabel = String(
-                    localized: "^[\(count) Bitcoin merchant](inflect: true)",
-                    comment: "VoiceOver label for a map cluster of merchants"
+                    AttributedString(
+                        localized: "^[\(count) Bitcoin merchant](inflect: true)",
+                        comment: "VoiceOver label for a map cluster of merchants"
+                    ).characters
                 )
                 view?.accessibilityTraits = .button
                 view?.accessibilityHint = NSLocalizedString(

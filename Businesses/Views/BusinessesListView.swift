@@ -440,63 +440,87 @@ struct BusinessesListView: View {
     }
 
     private var merchantEmptyStateView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: emptyStateSystemImage)
-                .font(.title.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(emptyStateTitle)
-                .font(.title3.weight(.semibold))
-                .multilineTextAlignment(.center)
-            Text(emptyStateMessage)
-                .font(.subheadline)
-                .foregroundStyle(Color.primary.opacity(0.72))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 12) {
+                    Image(systemName: emptyStateSystemImage)
+                        .font(.title.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(emptyStateTitle)
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(emptyStateMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.primary.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 24)
 
-            if shouldShowEmptyStateRetry {
-                Button {
-                    viewModel.refreshMerchantData(userInitiated: true)
-                } label: {
-                    Text(NSLocalizedString("Try Again", comment: "Retry button when merchant sync fails"))
-                        .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.borderedProminent)
-                .padding(.top, 4)
-            } else if !viewModel.allElements.isEmpty {
-                VStack(spacing: 8) {
-                    Button {
-                        viewModel.zoomOutMapToExploreNearby()
-                    } label: {
-                        Label("Zoom Out to Find More", systemImage: "minus.magnifyingglass")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: 240)
+                    if shouldShowEmptyStateRetry {
+                        Button {
+                            viewModel.refreshMerchantData(userInitiated: true)
+                        } label: {
+                            Text(NSLocalizedString("Try Again", comment: "Retry button when merchant sync fails"))
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 4)
+                    } else if !viewModel.allElements.isEmpty {
+                        VStack(spacing: 8) {
+                            Button {
+                                viewModel.zoomOutMapToExploreNearby()
+                            } label: {
+                                Label("Zoom Out to Find More", systemImage: "minus.magnifyingglass")
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: 240)
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button {
+                                showingAddBusinessForm = true
+                            } label: {
+                                Label("Add a Bitcoin Business", systemImage: "plus.circle")
+                                    .font(.subheadline.weight(.medium))
+                                    .frame(maxWidth: 240)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(.top, 4)
                     }
-                    .buttonStyle(.borderedProminent)
 
-                    Button {
-                        showingAddBusinessForm = true
-                    } label: {
-                        Label("Add a Bitcoin Business", systemImage: "plus.circle")
-                            .font(.subheadline.weight(.medium))
-                            .frame(maxWidth: 240)
+                    if let syncLine = lastSyncedFooterLine {
+                        Text(syncLine)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 4)
                     }
-                    .buttonStyle(.bordered)
                 }
-                .padding(.top, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: proxy.size.height, alignment: .center)
             }
-
-            if let syncLine = lastSyncedFooterLine {
-                Text(syncLine)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .padding(.horizontal, 16)
     }
 
     private var quickFilterEmptyStateView: some View {
+        GeometryReader { proxy in
+            ScrollView {
+                quickFilterEmptyStateContent
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: proxy.size.height, alignment: .center)
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var quickFilterEmptyStateContent: some View {
         VStack(spacing: 12) {
             Image(systemName: activeQuickFilters == [.saved] ? "bookmark.slash" : "line.3.horizontal.decrease.circle")
                 .font(.title.weight(.semibold))
@@ -504,10 +528,12 @@ struct BusinessesListView: View {
             Text(quickFilterEmptyStateTitle)
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Text(quickFilterEmptyStateMessage)
                 .font(.subheadline)
                 .foregroundStyle(Color.primary.opacity(0.72))
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 24)
 
             Button {
@@ -520,7 +546,7 @@ struct BusinessesListView: View {
             .buttonStyle(.borderedProminent)
             .padding(.top, 4)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding(.horizontal, 16)
         .padding(.vertical, 24)
     }
@@ -659,7 +685,7 @@ struct BusinessesListView: View {
                         !viewModel.merchantSearchIsWaitingForLocalDebounce &&
                         !viewModel.merchantSearchIsLoading {
                         if !activeQuickFilters.isEmpty {
-                            quickFilterEmptyStateView
+                            quickFilterEmptyStateContent
                                 .listRowSeparator(.hidden)
                                 .clearListRowBackground(if: shouldUseGlassyRows)
                         } else {

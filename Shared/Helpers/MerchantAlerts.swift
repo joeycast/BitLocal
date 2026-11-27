@@ -100,8 +100,10 @@ struct CityDigest: Codable, Hashable, Identifiable {
     var summaryLine: String {
         guard !topMerchantNames.isEmpty else {
             return String(
-                localized: "^[\(merchantCount) new merchant](inflect: true)",
-                comment: "Summary line for a digest with no merchant names"
+                AttributedString(
+                    localized: "^[\(merchantCount) new merchant](inflect: true)",
+                    comment: "Summary line for a digest with no merchant names"
+                ).characters
             )
         }
 
@@ -613,17 +615,27 @@ final class MerchantAlertsManager: NSObject {
     private func notificationTitle(for digest: CityDigest) -> String {
         let city = digest.cityDisplayName.components(separatedBy: ",").first ?? digest.cityDisplayName
         return String(
-            localized: "^[\(digest.merchantCount) new merchant](inflect: true) in \(city)",
-            comment: "Notification title for new merchants in a city"
+            AttributedString(
+                localized: "^[\(digest.merchantCount) new merchant](inflect: true) in \(city)",
+                comment: "Notification title for new merchants in a city"
+            ).characters
         )
     }
 
     private func notificationBody(for digest: CityDigest) -> String {
         let names = Array(digest.topMerchantNames.prefix(2))
         guard !names.isEmpty else {
+            if digest.merchantCount == 1 {
+                return String(
+                    localized: "1 new merchant now accepts bitcoin.",
+                    comment: "Notification body when one new merchant is known"
+                )
+            }
             return String(
-                localized: "^[\(digest.merchantCount) new merchant](inflect: true) now accept bitcoin.",
-                comment: "Notification body when only the merchant count is known"
+                AttributedString(
+                    localized: "^[\(digest.merchantCount) new merchant](inflect: true) now accept bitcoin.",
+                    comment: "Notification body when only the merchant count is known"
+                ).characters
             )
         }
 

@@ -9,16 +9,16 @@ extension CommunityDetailView {
 
     var socialLinks: [CommunitySocialLink] {
         let tags = area.tags ?? [:]
-        let candidates: [(label: String, icon: String, keys: [String], base: String?)] = [
-            ("X", "xmark", ["contact:x", "contact:twitter", "twitter"], "https://x.com/"),
-            ("Facebook", "f.cursive", ["contact:facebook", "facebook"], "https://facebook.com/"),
-            ("Instagram", "camera", ["contact:instagram", "instagram"], "https://instagram.com/"),
-            ("Telegram", "paperplane", ["contact:telegram", "telegram"], "https://t.me/"),
-            ("GitHub", "chevron.left.forwardslash.chevron.right", ["contact:github"], "https://github.com/"),
-            ("LinkedIn", "briefcase", ["contact:linkedin"], "https://linkedin.com/in/"),
-            ("YouTube", "play.rectangle", ["contact:youtube"], "https://youtube.com/"),
-            ("Reddit", "bubble.left.and.bubble.right", ["contact:reddit"], "https://reddit.com/"),
-            ("Nostr", "dot.radiowaves.left.and.right", ["contact:nostr"], nil)
+        let candidates: [(label: String, displayLabel: String?, icon: String?, keys: [String], base: String?)] = [
+            ("X", "𝕏", nil, ["contact:x", "contact:twitter", "twitter"], "https://x.com/"),
+            ("Facebook", nil, "f.cursive", ["contact:facebook", "facebook"], "https://facebook.com/"),
+            ("Instagram", nil, "camera", ["contact:instagram", "instagram"], "https://instagram.com/"),
+            ("Telegram", nil, "paperplane", ["contact:telegram", "telegram"], "https://t.me/"),
+            ("GitHub", nil, "chevron.left.forwardslash.chevron.right", ["contact:github"], "https://github.com/"),
+            ("LinkedIn", nil, "briefcase", ["contact:linkedin"], "https://linkedin.com/in/"),
+            ("YouTube", nil, "play.rectangle", ["contact:youtube"], "https://youtube.com/"),
+            ("Reddit", nil, "bubble.left.and.bubble.right", ["contact:reddit"], "https://reddit.com/"),
+            ("Nostr", nil, "dot.radiowaves.left.and.right", ["contact:nostr"], nil)
         ]
 
         return candidates.compactMap { candidate in
@@ -33,6 +33,7 @@ extension CommunityDetailView {
             }
             return CommunitySocialLink(
                 label: candidate.label,
+                displayLabel: candidate.displayLabel ?? candidate.label,
                 value: rawValue.cleanedForDisplay(),
                 icon: candidate.icon,
                 linkTarget: linkTarget
@@ -405,9 +406,24 @@ extension CommunityDetailView {
 
 struct CommunitySocialLink: Identifiable {
     let label: String
+    let displayLabel: String
     let value: String
-    let icon: String
+    let icon: String?
     let linkTarget: CommunityLinkTarget?
+
+    init(
+        label: String,
+        displayLabel: String? = nil,
+        value: String,
+        icon: String?,
+        linkTarget: CommunityLinkTarget?
+    ) {
+        self.label = label
+        self.displayLabel = displayLabel ?? label
+        self.value = value
+        self.icon = icon
+        self.linkTarget = linkTarget
+    }
 
     var id: String { "\(label)|\(value)" }
     var isInteractive: Bool { linkTarget != nil }

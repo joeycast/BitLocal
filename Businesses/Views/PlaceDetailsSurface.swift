@@ -22,7 +22,8 @@ struct PlaceDetailsSurface: View {
     private struct SocialItem: Identifiable {
         let id: String
         let label: String
-        let icon: String
+        let displayLabel: String
+        let icon: String?
         let value: String
         let url: URL?
     }
@@ -37,23 +38,24 @@ struct PlaceDetailsSurface: View {
 
     private var socialItems: [SocialItem] {
         guard let metadata = element.v4Metadata else { return [] }
-        let candidates: [(String, String, String?, URL?)] = [
-            ("X", "xmark", metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://twitter.com/") }),
-            ("Instagram", "camera", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
-            ("Telegram", "paperplane", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
-            ("Facebook", "f.cursive", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
-            ("LINE", "message", metadata.line, metadata.line.flatMap(URL.init(string:)))
+        let candidates: [(label: String, displayLabel: String?, icon: String?, rawValue: String?, url: URL?)] = [
+            ("X", "𝕏", nil, metadata.twitter, metadata.twitter.flatMap { urlForSocialHandle($0, base: "https://x.com/") }),
+            ("Instagram", nil, "camera", metadata.instagram, metadata.instagram.flatMap { urlForSocialHandle($0, base: "https://instagram.com/") }),
+            ("Telegram", nil, "paperplane", metadata.telegram, metadata.telegram.flatMap { urlForSocialHandle($0, base: "https://t.me/") }),
+            ("Facebook", nil, "f.cursive", metadata.facebook, metadata.facebook.flatMap { urlForSocialHandle($0, base: "https://facebook.com/") }),
+            ("LINE", nil, "message", metadata.line, metadata.line.flatMap(URL.init(string:)))
         ]
         return candidates.compactMap { item in
-            guard let raw = item.2?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            guard let raw = item.rawValue?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
                 return nil
             }
             return SocialItem(
-                id: item.0,
-                label: item.0,
-                icon: item.1,
+                id: item.label,
+                label: item.label,
+                displayLabel: item.displayLabel ?? item.label,
+                icon: item.icon,
                 value: raw.cleanedForDisplay(),
-                url: item.3
+                url: item.url
             )
         }
     }
@@ -333,15 +335,18 @@ struct PlaceDetailsSurface: View {
     @ViewBuilder
     private func socialLink(_ social: SocialItem) -> some View {
         let content = HStack(spacing: 5) {
-            Image(systemName: social.icon)
-                .font(.caption.weight(.semibold))
-            Text(social.label)
+            if let icon = social.icon {
+                Image(systemName: icon)
+                    .font(.caption.weight(.semibold))
+            }
+            Text(social.displayLabel)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
         }
         .foregroundStyle(social.url != nil ? Color.accentColor : Color.primary)
-        .frame(minHeight: 44)
+        .frame(minWidth: social.icon == nil ? 28 : nil, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
+        .accessibilityLabel(social.label)
 
         if let url = social.url {
             Button {

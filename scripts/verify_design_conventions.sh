@@ -143,16 +143,19 @@ value_nav_files = {
     "Businesses/Views/EventsDiscoverySection.swift",
 }
 nav_closure_re = re.compile(r"\bNavigationLink\s*\{")
+string_localized_inflect_re = re.compile(r'\bString\s*\(\s*localized\s*:\s*"[^"\n]*inflect\s*:', re.DOTALL)
 max_swift_file_lines = 1000
 
 for path in iter_app_swift_files():
     rel = path.relative_to(root).as_posix()
     in_block = False
     line_count = 0
+    stripped_lines: list[str] = []
     with path.open("r", encoding="utf-8") as fh:
         for lineno, raw_line in enumerate(fh, start=1):
             line_count = lineno
             code, in_block = strip_comments(raw_line, in_block)
+            stripped_lines.append(code)
             if not code.strip():
                 continue
             for rule_id, pattern, message in rules:
@@ -162,6 +165,12 @@ for path in iter_app_swift_files():
                 errors.append(
                     f"[no-mixed-navigation-link] {rel}:{lineno}: Do not mix NavigationLink {{ ... }} with NavigationStack(path:); use NavigationLink(value: BitLocalNavigationRoute...)."
                 )
+    joined_code = "".join(stripped_lines)
+    for match in string_localized_inflect_re.finditer(joined_code):
+        lineno = joined_code.count("\n", 0, match.start()) + 1
+        errors.append(
+            f"[no-string-localized-inflect] {rel}:{lineno}: String(localized:) does not evaluate ^[...](inflect: true). Use String(AttributedString(localized: ...).characters) or SwiftUI Text(...)."
+        )
     if line_count > max_swift_file_lines:
         errors.append(
             f"[no-giant-files] {rel}: {line_count} lines exceeds {max_swift_file_lines}-line ceiling. Split along natural type/extension seams."

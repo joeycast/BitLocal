@@ -272,7 +272,7 @@ struct CommunityDetailView: View {
 
     private var heroMetadataLine: String? {
         guard let count = resolvedMerchantCount else { return nil }
-        return String(localized: "^[\(count) merchant](inflect: true)")
+        return String(AttributedString(localized: "^[\(count) merchant](inflect: true)").characters)
     }
 
     private var heroVerificationIcon: String {
@@ -444,11 +444,13 @@ struct CommunityDetailView: View {
 
     private func contactRowLabel(_ item: CommunitySocialLink) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: item.icon)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .center)
-                .padding(.top, 2)
+            if let icon = item.icon {
+                Image(systemName: icon)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, alignment: .center)
+                    .padding(.top, 2)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.label)
@@ -500,15 +502,18 @@ struct CommunityDetailView: View {
             social.label
         )
         let content = HStack(spacing: 5) {
-            Image(systemName: social.icon)
-                .font(.caption.weight(.semibold))
-            Text(social.label)
+            if let icon = social.icon {
+                Image(systemName: icon)
+                    .font(.caption.weight(.semibold))
+            }
+            Text(social.displayLabel)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
         }
         .foregroundStyle(social.isInteractive ? Color.accentColor : Color.primary)
-        .frame(minHeight: 44)
+        .frame(minWidth: social.icon == nil ? 28 : nil, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
+        .accessibilityLabel(social.label)
 
         if social.isInteractive {
             Button {

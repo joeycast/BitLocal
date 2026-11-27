@@ -100,4 +100,31 @@ struct MerchantAlertsModelsTests {
                 subscriptionCreatedAt: subscriptionCreatedAt
             ) == false)
     }
+
+    @Test(arguments: [
+        (1, "1 new merchant"),
+        (298, "298 new merchants"),
+    ])
+    func cityDigestSummaryLineEvaluatesGrammarInflectionWithoutRawSyntax(
+        count: Int,
+        expected: String
+    ) {
+        let digest = CityDigest(
+            id: "digest-\(count)",
+            locationID: "el zonte|la libertad|el salvador",
+            cityKey: "el zonte|la libertad|el salvador",
+            cityDisplayName: "El Zonte, El Salvador",
+            digestWindowStart: nil,
+            digestWindowEnd: nil,
+            merchantCount: count,
+            merchantIDs: [],
+            topMerchantNames: [],
+            timeZoneID: nil,
+            deliveryLocalDate: nil
+        )
+
+        #expect(digest.summaryLine == expected)
+        #expect(!digest.summaryLine.contains("^["))
+        #expect(!digest.summaryLine.contains("inflect:"))
+    }
 }
