@@ -510,7 +510,7 @@ extension ContentViewModel {
         return inside
     }
 
-    private func resolveV3AreaID(for area: V2AreaRecord, completion: @escaping (Int?) -> Void) {
+    private func resolveV3AreaID(for area: V2AreaRecord, completion: @escaping @MainActor @Sendable (Int?) -> Void) {
         // If the V2 ID is already numeric, use it directly.
         if let parsed = Int(area.id) {
             completion(parsed)
@@ -524,7 +524,7 @@ extension ContentViewModel {
         }
         // V3 areas not loaded yet — fetch and search for a match.
         btcMapRepository.fetchV3Areas(updatedSince: "1970-01-01T00:00:00Z", limit: 10000) { result in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 switch result {
                 case .success(let areas):
                     let match = areas.first(where: { $0.tags?["url_alias"] == area.id })

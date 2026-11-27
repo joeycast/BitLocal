@@ -489,36 +489,42 @@ final class MerchantSearchController {
             "Merchant remote search START: scope=\(selectedMerchantSearchScope.rawValue), query='\(trimmedName)', plans=\(plans.map(\.source).joined(separator: ","))"
         )
 
-        let group = DispatchGroup()
-        let aggregationQueue = DispatchQueue(label: "bitlocal.merchant-search.remote-aggregation")
-        var mergedByID: [String: V4PlaceRecord] = [:]
-        var errors: [String] = []
-        var hadSuccess = false
+        let repository = btcMapRepository
+        let sourceLabel = plans.map(\.source).joined(separator: "+")
 
-        for plan in plans {
-            group.enter()
-            btcMapRepository.searchPlaces(query: plan.query) { result in
-                switch result {
-                case .success(let records):
-                    let matched = MerchantSearchEngine.filterRecords(records, normalizedQuery: normalizedQuery)
-                    aggregationQueue.async {
-                        hadSuccess = true
-                        for item in matched {
-                            mergedByID[item.record.idString] = mergedByID[item.record.idString] ?? item.record
+        Task { @MainActor [weak self] in
+            var mergedByID: [String: V4PlaceRecord] = [:]
+            var errors: [String] = []
+            var hadSuccess = false
+
+            await withTaskGroup(of: Result<[V4PlaceRecord], Error>.self) { group in
+                for plan in plans {
+                    let query = plan.query
+                    group.addTask {
+                        let result: Result<[V4PlaceRecord], Error> = await withCheckedContinuation { continuation in
+                            repository.searchPlaces(query: query) { result in
+                                continuation.resume(returning: result)
+                            }
                         }
-                        group.leave()
+                        return result.map { records in
+                            MerchantSearchEngine.filterRecords(records, normalizedQuery: normalizedQuery).map(\.record)
+                        }
                     }
+                }
 
-                case .failure(let error):
-                    aggregationQueue.async {
+                for await outcome in group {
+                    switch outcome {
+                    case .success(let records):
+                        hadSuccess = true
+                        for record in records {
+                            mergedByID[record.idString] = mergedByID[record.idString] ?? record
+                        }
+                    case .failure(let error):
                         errors.append(error.localizedDescription)
-                        group.leave()
                     }
                 }
             }
-        }
 
-        group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard self.latestMerchantSearchRequestID == requestID else { return }
 
@@ -530,7 +536,7 @@ final class MerchantSearchController {
                 self.applyRemoteEnrichment(
                     records: rankedRecords,
                     requestID: requestID,
-                    source: plans.map(\.source).joined(separator: "+")
+                    source: sourceLabel
                 )
             } else {
                 self.merchantSearchResults = []

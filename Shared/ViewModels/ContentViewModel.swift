@@ -169,7 +169,7 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     @ObservationIgnored private var hasBeenInactive = false
     
     @ObservationIgnored var lastCenteredCoordinate: CLLocationCoordinate2D?
-    @ObservationIgnored private var geocodingCacheSaveWorkItem: DispatchWorkItem?
+    @ObservationIgnored private var geocodingCacheSaveTask: Task<Void, Never>?
     private let geocodingCacheFileURL = URL.cachesDirectory.appending(path: "geocoding_cache.json")
     
     @ObservationIgnored var cancellables = Set<AnyCancellable>()
@@ -549,32 +549,32 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     private let geocodingCacheIOQueue = DispatchQueue(label: "app.bitlocal.geocodingCacheIO", qos: .utility)
 
     func scheduleGeocodingCacheSave() {
-        geocodingCacheIOQueue.async { [weak self] in
-            guard let self else { return }
-            self.geocodingCacheSaveWorkItem?.cancel()
-            let workItem = DispatchWorkItem { [weak self] in
-                self?.saveGeocodingCache(synchronous: false)
-            }
-            self.geocodingCacheSaveWorkItem = workItem
-            self.geocodingCacheIOQueue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
+        geocodingCacheSaveTask?.cancel()
+        geocodingCacheSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, let self else { return }
+            self.saveGeocodingCache(synchronous: false)
         }
     }
 
     private func loadGeocodingCache() {
         let fileURL = geocodingCacheFileURL
+        let cache = geocodingCache
         geocodingCacheIOQueue.async { [weak self] in
-            guard let self, let data = try? Data(contentsOf: fileURL) else { return }
+            guard let data = try? Data(contentsOf: fileURL) else { return }
             do {
                 let decoded = try JSONDecoder().decode([String: ReverseGeocodingCacheEntry].self, from: data)
-                self.geocodingCache.mergeMissingValues(decoded)
+                cache.mergeMissingValues(decoded)
                 Debug.log("Loaded geocoding cache: \(decoded.count) entries")
             } catch {
                 do {
                     let legacy = try JSONDecoder().decode([String: Address].self, from: data)
                     let migrated = legacy.mapValues { ReverseGeocodingCacheEntry.forAddress($0) }
-                    self.geocodingCache.mergeMissingValues(migrated)
+                    cache.mergeMissingValues(migrated)
                     Debug.log("Migrated geocoding cache: \(migrated.count) entries")
-                    self.scheduleGeocodingCacheSave()
+                    Task { @MainActor [weak self] in
+                        self?.scheduleGeocodingCacheSave()
+                    }
                 } catch {
                     Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
                 }
@@ -586,7 +586,7 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
         let values = geocodingCache.allValues()
         guard !values.isEmpty else { return }
         let fileURL = geocodingCacheFileURL
-        let writeBlock = {
+        let writeBlock: @Sendable () -> Void = {
             do {
                 let data = try JSONEncoder().encode(values)
                 try data.write(to: fileURL, options: [.atomic])

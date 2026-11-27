@@ -57,7 +57,7 @@ extension ContentViewModel {
 
     /// User-initiated merchant refresh (pull-to-refresh / empty-state retry).
     /// Reuses repository in-flight coalescing.
-    func refreshMerchantData(userInitiated: Bool = true, completion: (() -> Void)? = nil) {
+    func refreshMerchantData(userInitiated: Bool = true, completion: (@MainActor @Sendable () -> Void)? = nil) {
         if userInitiated {
             merchantSyncFailed = false
             merchantSyncStatusMessage = nil
@@ -82,13 +82,12 @@ extension ContentViewModel {
     // `warmupOnly` preloads merchant data without triggering onboarding-hostile side effects.
     // `forceNetworkRefresh` always joins a repository network refresh (pull-to-refresh /
     // retry) and never takes the "warm cache only" early return.
-    func fetchElements(warmupOnly: Bool = false, forceNetworkRefresh: Bool = false, completion: (() -> Void)? = nil) {
+    func fetchElements(warmupOnly: Bool = false, forceNetworkRefresh: Bool = false, completion: (@MainActor @Sendable () -> Void)? = nil) {
         Debug.log("fetchElements() called - current state: isLoading=\(isLoading), appState=\(appState), isInitialStartup=\(isInitialStartup), warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh)")
         Debug.logTiming("data", "fetchElements invoked (warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh), allElements=\(allElements.count), isLoading=\(isLoading))")
         
-        // Prevent concurrent calls - use main queue for thread safety
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
 
             // User-initiated pull joins any in-flight repository refresh via coalescing
             // instead of dismissing the spinner immediately.
@@ -96,7 +95,7 @@ extension ContentViewModel {
                 if forceNetworkRefresh {
                     Debug.log("Already loading; joining in-flight repository refresh for user pull")
                     self.btcMapRepository.refreshElements { [weak self] elements in
-                        DispatchQueue.main.async {
+                        Task { @MainActor [weak self] in
                             guard let self else {
                                 completion?()
                                 return
@@ -154,8 +153,9 @@ extension ContentViewModel {
 
                     if self.isInitialStartup {
                         Debug.log("Initial startup - delaying background updates by 5 seconds")
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                            self.checkForUpdatesInBackground()
+                        Task { @MainActor [weak self] in
+                            try? await Task.sleep(for: .seconds(5))
+                            self?.checkForUpdatesInBackground()
                         }
                     } else {
                         self.checkForUpdatesInBackground()
@@ -178,8 +178,8 @@ extension ContentViewModel {
             Debug.logTiming("data", "starting repository refresh (hadCache=\(hadAnyCache), currentEmpty=\(currentElementsEmpty), warmupOnly=\(warmupOnly), forceNetworkRefresh=\(forceNetworkRefresh))")
 
             self.btcMapRepository.refreshElements { [weak self] elements in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
                     self.applyRepositoryRefreshResult(
                         elements: elements,
                         hadAnyCache: hadAnyCache,

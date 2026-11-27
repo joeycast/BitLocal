@@ -20,7 +20,7 @@ final class CommunityAreasLoader: @unchecked Sendable {
     /// Loads all community-capable v2 areas, calling `onPage` on the main actor after each page merge.
     func loadAll(
         initialAnchor: String = "2022-01-01T00:00:00.000Z",
-        onPage: @escaping @Sendable (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
+        onPage: @escaping @MainActor @Sendable (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
     ) {
         let repository = self.repository
         let pageLimit = self.pageLimit

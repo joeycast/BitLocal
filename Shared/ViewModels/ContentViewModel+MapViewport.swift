@@ -262,17 +262,8 @@ extension ContentViewModel {
             on: mapView
         )
         let adjustedRegion = MKCoordinateRegion(center: adjustedCenterCoordinate, span: currentSpan)
-
-        let apply = {
-            self.region = adjustedRegion
-            mapView.setRegion(adjustedRegion, animated: animated)
-        }
-
-        if Thread.isMainThread {
-            apply()
-        } else {
-            DispatchQueue.main.async(execute: apply)
-        }
+        self.region = adjustedRegion
+        mapView.setRegion(adjustedRegion, animated: animated)
     }
 
     func selectAnnotationForListSelection(

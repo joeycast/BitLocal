@@ -69,7 +69,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
         return (data, http)
     }
 
-    private func performDecodedRequest<T: Decodable>(
+    private func performDecodedRequest<T: Decodable & Sendable>(
         url: URL?,
         completion: @escaping @Sendable (Result<T, Error>) -> Void
     ) {
@@ -290,7 +290,7 @@ final class BTCMapV3AreasClient: @unchecked Sendable {
         }
     }
 
-    private func performRequest<T: Decodable>(url: URL?, completion: @escaping @Sendable (Result<[T], Error>) -> Void) {
+    private func performRequest<T: Decodable & Sendable>(url: URL?, completion: @escaping @Sendable (Result<[T], Error>) -> Void) {
         guard let url else {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
@@ -306,7 +306,7 @@ final class BTCMapV3AreasClient: @unchecked Sendable {
         }
     }
 
-    private func performSingleRequest<T: Decodable>(url: URL?, completion: @escaping @Sendable (Result<T, Error>) -> Void) {
+    private func performSingleRequest<T: Decodable & Sendable>(url: URL?, completion: @escaping @Sendable (Result<T, Error>) -> Void) {
         guard let url else {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
