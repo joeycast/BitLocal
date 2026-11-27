@@ -426,10 +426,13 @@ extension OnboardingView {
     }
 
     func syncSelectedAlertCityIfNeeded() {
-        guard !hasManuallySelectedAlertCity else { return }
-        selectedAlertCity = alertCityPickerModel.currentLocationCity?.choice
-            ?? alertCityPickerModel.activeAlertCity
-            ?? alertCityPickerModel.recommendedCities.first?.choice
+        selectedAlertCity = OnboardingStepProgression.preferredAlertCity(
+            hasManuallySelected: hasManuallySelectedAlertCity,
+            currentSelected: selectedAlertCity,
+            currentLocationCity: alertCityPickerModel.currentLocationCity?.choice,
+            activeAlertCity: alertCityPickerModel.activeAlertCity,
+            firstRecommendedCity: alertCityPickerModel.recommendedCities.first?.choice
+        )
     }
 
     private func enableSelectedCityAlerts() async {

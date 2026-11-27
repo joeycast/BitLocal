@@ -9,20 +9,6 @@ import SwiftUI
 import CoreLocation
 import Foundation // for DebugUtils
 
-enum OnboardingPageKind {
-    case info
-    case locationPermission
-    case alertsSetup
-}
-
-struct OnboardingPage {
-    let titleKey: String
-    let subtitleKey: String
-    let symbolName: String
-    let bgColor: Color
-    let kind: OnboardingPageKind
-}
-
 struct OnboardingView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -44,92 +30,18 @@ struct OnboardingView: View {
     @ScaledMetric(relativeTo: .headline) private var iPhoneLargeButtonSize: CGFloat = 19
     @ScaledMetric(relativeTo: .title2) private var iPadLargeButtonSize: CGFloat = 24
 
-    // ──────────────── Adaptive Layout Helpers ────────────────
-    /// Categorize available container space using size classes + dimensions
-    /// (never `userInterfaceIdiom`) so iPhone Duo outer, unfolded portrait,
-    /// unfolded landscape, Split View, and iPad all scale cleanly without clipping.
-    private func screenSizeCategory(width: CGFloat, height: CGFloat) -> ScreenCategory {
-        let isRegularCanvas = horizontalSizeClass == .regular && verticalSizeClass == .regular
-        let minDimension = min(width, height)
+    typealias ScreenCategory = OnboardingScreenCategory
 
-        if isRegularCanvas && height >= 760 {
-            if minDimension >= 1000 { // Large tablet canvas (e.g. 13" iPad)
-                return .iPadLarge
-            } else if minDimension >= 740 { // Medium tablet canvas (e.g. 11" / mini iPad)
-                return .iPadMedium
-            } else { // Compact-regular canvas (e.g. iPhone Duo unfolded portrait)
-                return .iPadSmall
-            }
-        } else if isRegularCanvas {
-            // Wide but shorter regular canvas (e.g. iPhone Duo unfolded landscape ~951×669)
-            return .iPhoneMedium
-        } else {
-            if width <= 375 || height <= 680 { // Compact phone or iPhone Duo outer display
-                return .iPhoneSmall
-            } else if height >= 850 { // Tall phone
-                return .iPhoneLarge
-            } else {
-                return .iPhoneMedium
-            }
-        }
-    }
-    
-    enum ScreenCategory {
-        case iPhoneSmall
-        case iPhoneMedium
-        case iPhoneLarge
-        case iPadSmall
-        case iPadMedium
-        case iPadLarge
-
-        var usesGenerousMargins: Bool {
-            switch self {
-            case .iPadSmall, .iPadMedium, .iPadLarge:
-                return true
-            case .iPhoneSmall, .iPhoneMedium, .iPhoneLarge:
-                return false
-            }
-        }
-    }
-    // ──────────────── End Adaptive Layout Helpers ────────────
-
-    let pages: [OnboardingPage] = [
-        OnboardingPage(
-            titleKey: "onboarding_discover_title",
-            subtitleKey: "onboarding_discover_subtitle",
-            symbolName: "bitcoinsign.circle.fill",
-            bgColor: .accentColor,
-            kind: .info
-        ),
-        OnboardingPage(
-            titleKey: "onboarding_map_title",
-            subtitleKey: "onboarding_map_subtitle",
-            symbolName: "map.fill",
-            bgColor: .green,
-            kind: .info
-        ),
-        OnboardingPage(
-            titleKey: "onboarding_location_title",
-            subtitleKey: "onboarding_location_subtitle",
-            symbolName: "location.fill",
-            bgColor: .blue,
-            kind: .locationPermission
-        ),
-        OnboardingPage(
-            titleKey: "Stay in the loop",
-            subtitleKey: "Get alerts when new local businesses start accepting bitcoin.",
-            symbolName: "bell.badge.fill",
-            bgColor: .orange,
-            kind: .alertsSetup
-        ),
-        OnboardingPage(
-            titleKey: "onboarding_ready_title",
-            subtitleKey: "onboarding_ready_subtitle",
-            symbolName: "binoculars.fill",
-            bgColor: .purple,
-            kind: .info
+    private func screenSizeCategory(width: CGFloat, height: CGFloat) -> OnboardingScreenCategory {
+        OnboardingLayoutResolver.screenCategory(
+            horizontalSizeClass: horizontalSizeClass,
+            verticalSizeClass: verticalSizeClass,
+            width: width,
+            height: height
         )
-    ]
+    }
+
+    let pages: [OnboardingPage] = OnboardingStepProgression.defaultPages
 
     var body: some View {
         GeometryReader { fullGeo in
@@ -145,12 +57,11 @@ struct OnboardingView: View {
             let spacing = getSpacing(for: screenCategory, isLandscape: isLandscape)
             let buttonFont = getButtonFont(for: screenCategory, isLandscape: isLandscape)
             let maxContentWidth = getMaxContentWidth(for: screenCategory, width: fullGeo.size.width)
-            let topAnchorFactor: CGFloat = {
-                if isCompactHeight {
-                    return pages[currentPage].kind == .alertsSetup ? 0.08 : 0.16
-                }
-                return screenCategory.usesGenerousMargins ? 0.30 : 0.25
-            }()
+            let topAnchorFactor = OnboardingLayoutResolver.topAnchorFactor(
+                for: screenCategory,
+                pageKind: pages[currentPage].kind,
+                containerHeight: fullGeo.size.height
+            )
             let topSpacerHeight = max(12, fullGeo.size.height * topAnchorFactor - circleSize / 2)
 
             ZStack {
@@ -224,25 +135,14 @@ struct OnboardingView: View {
     // MARK: - Dynamic Sizing Functions
     
     private func getCircleSize(for category: ScreenCategory, isLandscape: Bool) -> CGFloat {
-        switch category {
-        case .iPhoneSmall:
-            return 110
-        case .iPhoneMedium:
-            return 120
-        case .iPhoneLarge:
-            return 130
-        case .iPadSmall:
-            return 160
-        case .iPadMedium, .iPadLarge:
-            return 180
-        }
+        OnboardingLayoutResolver.circleSize(for: category)
     }
-    
+
     private func getIconSize(for category: ScreenCategory, isLandscape: Bool) -> CGFloat {
         let circleSize = getCircleSize(for: category, isLandscape: isLandscape)
         return circleSize * 0.56
     }
-    
+
     private func getTitleFont(for category: ScreenCategory, isLandscape: Bool, width: CGFloat) -> Font {
         switch category {
         case .iPhoneSmall:
@@ -255,7 +155,7 @@ struct OnboardingView: View {
             return .system(size: iPadLargeTitleSize, weight: .bold)
         }
     }
-    
+
     private func getSubtitleFont(for category: ScreenCategory, isLandscape: Bool) -> Font {
         switch category {
         case .iPhoneSmall:
@@ -270,7 +170,7 @@ struct OnboardingView: View {
             return .system(size: iPadSubtitleSize)
         }
     }
-    
+
     private func getButtonFont(for category: ScreenCategory, isLandscape: Bool) -> Font {
         switch category {
         case .iPhoneSmall, .iPhoneMedium:
@@ -283,20 +183,9 @@ struct OnboardingView: View {
             return .system(size: iPadLargeButtonSize, weight: .semibold)
         }
     }
-    
+
     private func getMaxContentWidth(for category: ScreenCategory, width: CGFloat) -> CGFloat {
-        switch category {
-        case .iPhoneSmall, .iPhoneMedium:
-            return 460
-        case .iPhoneLarge:
-            return 500
-        case .iPadSmall:
-            return min(600, width * 0.8)
-        case .iPadMedium:
-            return min(700, width * 0.75)
-        case .iPadLarge:
-            return min(800, width * 0.7)
-        }
+        OnboardingLayoutResolver.maxContentWidth(for: category, containerWidth: width)
     }
     
     private func getSpacing(for category: ScreenCategory, isLandscape: Bool) -> SpacingValues {
@@ -385,18 +274,7 @@ struct OnboardingView: View {
     }
 
     func getAlertsSupplementHeight(for category: ScreenCategory) -> CGFloat {
-        switch category {
-        case .iPhoneSmall:
-            return 176
-        case .iPhoneMedium:
-            return 194
-        case .iPhoneLarge:
-            return 212
-        case .iPadSmall:
-            return 248
-        case .iPadMedium, .iPadLarge:
-            return 272
-        }
+        OnboardingLayoutResolver.alertsSupplementHeight(for: category)
     }
     
     struct SpacingValues {
@@ -610,9 +488,12 @@ struct OnboardingView: View {
 
     func proceedToNextPage() {
         withAnimation(BitLocalMotion.animation(.spring(response: 0.5, dampingFraction: 0.7), reduceMotion: reduceMotion)) {
-            if currentPage < pages.count - 1 {
-                currentPage += 1
-            } else {
+            let next = OnboardingStepProgression.nextState(
+                currentPage: currentPage,
+                pageCount: pages.count
+            )
+            currentPage = next.nextPage
+            if next.didComplete {
                 didCompleteOnboarding = true
             }
         }
