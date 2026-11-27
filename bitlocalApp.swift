@@ -14,7 +14,7 @@ struct bitlocalApp: App {
 
     // Add the environment property to track the app's scene phase
     @Environment(\.scenePhase) var scenePhase
-    @StateObject private var contentViewModel = ContentViewModel()
+    @State private var contentViewModel = ContentViewModel()
     private let merchantAlertsManager = MerchantAlertsManager.shared
     
     // Track scene phase timing to avoid false triggers
@@ -29,7 +29,7 @@ struct bitlocalApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(contentViewModel)
+                .environment(contentViewModel)
                 .environment(merchantAlertsManager)
                 .task {
                     await merchantAlertsManager.refreshStatus()

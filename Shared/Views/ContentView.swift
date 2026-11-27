@@ -7,7 +7,7 @@ import Combine
 import Foundation
 
 struct ContentView: View {
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var viewModel
     @Environment(FeatureHintsController.self) private var featureHintsController
     private let intentRouter = BitLocalAppIntentRouter.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass

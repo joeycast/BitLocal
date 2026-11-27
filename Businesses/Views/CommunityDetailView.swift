@@ -7,7 +7,7 @@ struct CommunityDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.calendar) var calendar
     @Environment(\.openURL) var openURL
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
     private let metadataStore = CommunityRowMetadataObservableStore.shared
     let area: V2AreaRecord
     @Binding var currentDetent: PresentationDetent?

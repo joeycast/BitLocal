@@ -1,22 +1,24 @@
 import SwiftUI
 import CoreLocation
 import Combine
+import Observation
 
-class ElementCellViewModel: ObservableObject {
+@Observable
+final class ElementCellViewModel {
 
     static let regionCountryCodeDidChange = Notification.Name("regionCountryCodeDidChange")
 
     let element: Element
     let viewModel: ContentViewModel
-    @Published var address: Address?
+    var address: Address?
 
     // OPTIMIZED: Remove the excessive logging from userLocation didSet
-    @Published var userLocation: CLLocation?
+    var userLocation: CLLocation?
 
-    private var userLocationCancellable: AnyCancellable?
-    private var regionCodeCancellable: AnyCancellable?
-    private var lastLocationUpdate: CLLocationCoordinate2D?
-    private var isAddressLookupInFlight = false
+    @ObservationIgnored private var userLocationCancellable: AnyCancellable?
+    @ObservationIgnored private var regionCodeCancellable: AnyCancellable?
+    @ObservationIgnored private var lastLocationUpdate: CLLocationCoordinate2D?
+    @ObservationIgnored private var isAddressLookupInFlight = false
     
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
@@ -24,7 +26,7 @@ class ElementCellViewModel: ObservableObject {
         self.viewModel = viewModel
         
         // OPTIMIZED: Subscribe to location changes but with deduplication
-        self.userLocationCancellable = viewModel.$userLocation
+        self.userLocationCancellable = viewModel.userLocationSubject
             .removeDuplicates { oldLocation, newLocation in
                 // Only update if location changed significantly
                 guard let old = oldLocation, let new = newLocation else {

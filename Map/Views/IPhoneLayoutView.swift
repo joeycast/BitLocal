@@ -12,7 +12,7 @@ import Foundation // for Debug logging
 import UIKit
 
 struct IPhoneLayoutView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     var elements: [Element]?
     var visibleElements: [Element]
     @Binding var showingSettings: Bool
@@ -34,7 +34,7 @@ struct IPhoneLayoutView: View {
 }
 
 private struct IPhoneLayoutContent: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     var elements: [Element]?
     var visibleElements: [Element]
     @Binding var showingSettings: Bool
@@ -203,7 +203,7 @@ private struct IPhoneLayoutContent: View {
                     currentDetent: $bottomSheetDetent,
                     preferredLeadingWidth: leadingSheetWidth
                 )
-                    .environmentObject(viewModel)
+                    .environment(viewModel)
                     .preferredColorScheme(effectiveColorScheme)  // To respect appearance
                     .presentationDetents([
                         collapsedSheetDetent,
@@ -227,7 +227,7 @@ private struct IPhoneLayoutContent: View {
                                 selectedMapType: selectedMapTypeBinding,
                                 currentDetent: $settingsSheetDetent
                             )
-                            .environmentObject(viewModel)
+                            .environment(viewModel)
                             .environment(MerchantAlertsManager.shared)
                         }
                         .preferredColorScheme(effectiveColorScheme)
@@ -427,7 +427,7 @@ private struct IPhoneLayoutContent: View {
 /// Map control chrome that stays at a fixed SwiftUI anchor. Continuous sheet
 /// motion is applied directly to its UIKit host view below.
 private struct IPhoneMapButtonsChrome: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     /// Not observed — continuous height arrives via Combine subject.
     var sheetGeometry: SheetGeometryModel
     var selectedMapTypeBinding: Binding<MKMapType>

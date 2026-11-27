@@ -9,7 +9,7 @@ import SwiftUI
 import MapKit
 
 struct IPadLayoutView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    @Bindable var viewModel: ContentViewModel
     var elements: [Element]?
     var visibleElements: [Element]
     @Binding var showingSettings: Bool
@@ -45,7 +45,7 @@ struct IPadLayoutView: View {
                             userLocation: viewModel.userLocation,
                             contentViewModel: viewModel
                         )
-                        .environmentObject(viewModel)
+                        .environment(viewModel)
                         .clearNavigationContainerBackgroundIfAvailable()
                         .toolbar(removing: .sidebarToggle)
                     case .placeComments(let element):
@@ -54,7 +54,7 @@ struct IPadLayoutView: View {
                             .toolbar(removing: .sidebarToggle)
                     case .allEvents:
                         AllEventsListView()
-                            .environmentObject(viewModel)
+                            .environment(viewModel)
                             .clearNavigationContainerBackgroundIfAvailable()
                             .toolbar(removing: .sidebarToggle)
                     }
@@ -62,7 +62,7 @@ struct IPadLayoutView: View {
                 .navigationDestination(item: $viewModel.presentedCommunityArea) { area in
                     CommunityDetailView(area: area)
                         .id(area.id)
-                        .environmentObject(viewModel)
+                        .environment(viewModel)
                         .clearNavigationContainerBackgroundIfAvailable()
                         .toolbar(removing: .sidebarToggle)
                 }
@@ -86,7 +86,7 @@ struct IPadLayoutView: View {
                                         showingSettings = false
                                     }
                                 )
-                                .environmentObject(viewModel)
+                                .environment(viewModel)
                                 .environment(MerchantAlertsManager.shared)
                             }
                             .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
@@ -133,10 +133,10 @@ struct IPadLayoutView: View {
         // below their search bar (always visible when currentDetent == nil on iPad/Duo).
         if viewModel.mapDisplayMode == .communities {
             CommunitiesListView()
-                .environmentObject(viewModel)
+                .environment(viewModel)
         } else {
             BusinessesListView(elements: visibleElements)
-                .environmentObject(viewModel)
+                .environment(viewModel)
         }
     }
 
@@ -187,7 +187,7 @@ struct IPadLayoutView: View {
 /// from the detail column environment so iPhone Duo unfolded landscape places the
 /// map controls in the system vertical side rail while iPad keeps the floating pill.
 private struct SplitMapDetailView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     var elements: [Element]?
     var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -262,6 +262,6 @@ private struct SplitMapDetailView: View {
         headerHeight: $headerHeight,
         selectedMapTypeBinding: .constant(.standard)
     )
-    .environmentObject(viewModel)
+    .environment(viewModel)
     .environment(AppearanceManager())
 }

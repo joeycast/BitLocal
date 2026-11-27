@@ -13,7 +13,7 @@ struct IPhoneHeaderView: View {
     private let headerHorizontalInset: CGFloat = 18
 
     let screenWidth: CGFloat
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     @Binding var showingSettings: Bool
 
     // Use environment object for instant updates

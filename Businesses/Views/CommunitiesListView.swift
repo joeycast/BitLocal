@@ -6,7 +6,7 @@ import Observation
 struct CommunitiesListView: View {
     private let resultsPageSize = 15
 
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var viewModel
     @Environment(\.colorScheme) private var colorScheme
     private let metadataStore = CommunityRowMetadataObservableStore.shared
     var currentDetent: PresentationDetent? = nil

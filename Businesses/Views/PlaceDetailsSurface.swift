@@ -6,7 +6,7 @@ import UIKit
 
 struct PlaceDetailsSurface: View {
     let element: Element
-    @ObservedObject var elementCellViewModel: ElementCellViewModel
+    var elementCellViewModel: ElementCellViewModel
     let openingHoursRaw: String?
     let parsedOpeningSchedule: OSMOpeningHoursWeekSchedule?
     let websiteInfo: (display: String, url: URL)?

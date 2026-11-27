@@ -27,7 +27,7 @@ struct OnboardingView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
     @Environment(MerchantAlertsManager.self) var merchantAlertsManager
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @State var currentPage = 0

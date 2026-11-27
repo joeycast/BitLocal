@@ -8,7 +8,7 @@ struct SettingsView: View {
     @Binding var currentDetent: PresentationDetent
     var onDone: (() -> Void)? = nil
 
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var viewModel
     @Environment(AppearanceManager.self) private var appearanceManager
     @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto

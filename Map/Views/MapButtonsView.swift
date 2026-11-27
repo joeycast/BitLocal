@@ -55,7 +55,7 @@ final class MapLocationRecenterController {
         viewModel.isUpdatingLocation = true
         viewModel.locationManager.startUpdatingLocation()
 
-        locationCancellable = viewModel.$userLocation
+        locationCancellable = viewModel.userLocationSubject
             .compactMap { $0 }
             .first()
             .receive(on: DispatchQueue.main)
@@ -131,7 +131,7 @@ extension View {
 /// Merchants ↔ Communities switching lives in the labeled sheet mode switcher,
 /// keeping the vertical rail uncluttered with two crisp, balanced map controls.
 struct MapControlToolbarContent: ToolbarContent {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     var selectedMapTypeBinding: Binding<MKMapType>
     var recenterController: MapLocationRecenterController
     var placement: ToolbarItemPlacement = .bottomBar
@@ -191,7 +191,7 @@ struct MapControlToolbarContent: ToolbarContent {
 }
 
 struct MapButtonsView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     var selectedMapTypeBinding: Binding<MKMapType>
     var useMonochromeIcons: Bool = false
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }

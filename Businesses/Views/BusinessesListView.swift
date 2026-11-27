@@ -9,7 +9,7 @@ import UIKit
 
 struct BusinessesListView: View {
 
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
     @Environment(\.calendar) var calendar
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -246,7 +246,8 @@ struct BusinessesListView: View {
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        HStack(spacing: 8) {
+        @Bindable var viewModel = viewModel
+        return HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(Color.primary.opacity(0.65))
                 .font(.subheadline.weight(.medium))
@@ -366,7 +367,7 @@ struct BusinessesListView: View {
             if FeatureFlags.isEventsUIEnabled {
                 Section {
                     EventsDiscoverySection()
-                        .environmentObject(viewModel)
+                        .environment(viewModel)
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .clearListRowBackground(if: shouldUseGlassyRows)

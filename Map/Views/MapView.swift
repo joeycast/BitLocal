@@ -13,7 +13,7 @@ import Foundation // for Debug logging
 
 struct MapView: UIViewRepresentable {
     var elements: [Element]?
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
     
     // Properties for Dynamic Padding
     var topPadding: CGFloat

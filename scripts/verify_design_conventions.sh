@@ -126,6 +126,11 @@ rules = [
         re.compile(r"\.(toolbar|toolbarBackground)\s*\(\s*\.(hidden|visible)\s*,\s*for\s*:"),
         "Use .toolbarVisibility(_:for:) / .toolbarBackgroundVisibility(_:for:) (iOS 18+) instead of soft-deprecated visibility overloads.",
     ),
+    (
+        "no-observable-object",
+        re.compile(r"\bObservableObject\b|@Published\b|@StateObject\b|@ObservedObject\b|@EnvironmentObject\b|\.environmentObject\s*\("),
+        "Use @Observable, @State, @Environment(Type.self), and @Bindable instead of legacy ObservableObject / @Published / @StateObject / @ObservedObject / @EnvironmentObject.",
+    ),
 ]
 
 # Value-based navigation files must not reintroduce destination-closure NavigationLink

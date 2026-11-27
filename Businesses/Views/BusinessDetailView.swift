@@ -198,8 +198,8 @@ struct BusinessDetailView: View {
     @State private var hydratedVerifiedAt: String?
     @State private var isLoadingVerifiedAt = false
     @State private var hasAttemptedVerificationHydration = false
-    @StateObject var elementCellViewModel: ElementCellViewModel
-    @EnvironmentObject var contentViewModel: ContentViewModel
+    @State var elementCellViewModel: ElementCellViewModel
+    @Environment(ContentViewModel.self) var contentViewModel
     private let savedPlacesStore = SavedPlacesStore.shared
 
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
@@ -224,8 +224,8 @@ struct BusinessDetailView: View {
         self.parsedOpeningSchedule = (rawHours?.isEmpty == false)
             ? rawHours.flatMap(OSMOpeningHoursParser.parseWeekSchedule)
             : nil
-        self._elementCellViewModel = StateObject(
-            wrappedValue: ElementCellViewModel(
+        self._elementCellViewModel = State(
+            initialValue: ElementCellViewModel(
                 element: element,
                 userLocation: userLocation,
                 viewModel: contentViewModel

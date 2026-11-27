@@ -10,7 +10,7 @@ import Foundation // for Debug logging
 
 struct RootView: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
-    @EnvironmentObject var contentViewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var contentViewModel
     @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @State private var featureHintsController = FeatureHintsController()
     @State private var releaseNotesController = ReleaseNotesController()
@@ -19,15 +19,16 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
+        @Bindable var contentViewModel = contentViewModel
         ZStack {
             ContentView()
-                .environmentObject(contentViewModel)
+                .environment(contentViewModel)
                 .environment(featureHintsController)
                 .environment(releaseNotesController)
             
             if !didCompleteOnboarding {
                 OnboardingView()
-                    .environmentObject(contentViewModel)
+                    .environment(contentViewModel)
                     .transition(
                         reduceMotion
                             ? .opacity
@@ -99,7 +100,7 @@ struct RootView: View {
         }
         .sheet(item: $contentViewModel.deepLinkUnavailableState) { state in
             DeepLinkUnavailableView(state: state)
-                .environmentObject(contentViewModel)
+                .environment(contentViewModel)
         }
         .sheet(item: $releaseNotesController.activeReleaseNotes) { entry in
             ReleaseNotesSheetView(entry: entry) {
@@ -168,7 +169,7 @@ struct RootView: View {
 
 private struct DeepLinkUnavailableView: View {
     let state: DeepLinkUnavailableState
-    @EnvironmentObject private var contentViewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var contentViewModel
 
     var body: some View {
         NavigationStack {

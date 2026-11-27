@@ -3,9 +3,10 @@ import SwiftUI
 // MARK: - All Events List (pushed onto NavigationStack)
 
 struct AllEventsListView: View {
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var viewModel
 
     var body: some View {
+        @Bindable var viewModel = viewModel
         List {
             if viewModel.eventsIsLoading {
                 Section {

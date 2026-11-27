@@ -14,7 +14,7 @@ import MapKit
 import Observation
 
 struct BottomSheetContentView: View {
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
     @Environment(FeatureHintsController.self) private var featureHintsController
     @Environment(\.colorScheme) private var colorScheme
 
@@ -79,7 +79,8 @@ struct BottomSheetContentView: View {
     }
 
     private var navigationStack: some View {
-        NavigationStack(path: $viewModel.path) {
+        @Bindable var viewModel = viewModel
+        return NavigationStack(path: $viewModel.path) {
             sheetRootContentWithSafeAreaBehavior
                 .modifier(RootSheetNavigationBarModifier())
                 .disableVerticalToolbarIfAvailable()
@@ -93,7 +94,7 @@ struct BottomSheetContentView: View {
                             .disableVerticalToolbarIfAvailable()
                     case .allEvents:
                         AllEventsListView()
-                            .environmentObject(viewModel)
+                            .environment(viewModel)
                             .clearNavigationContainerBackgroundIfAvailable()
                             .disableVerticalToolbarIfAvailable()
                     }
@@ -104,7 +105,7 @@ struct BottomSheetContentView: View {
                         currentDetent: currentDetentBinding
                     )
                     .id(area.id)
-                    .environmentObject(viewModel)
+                    .environment(viewModel)
                     .clearNavigationContainerBackgroundIfAvailable()
                     .disableVerticalToolbarIfAvailable()
                 }
@@ -127,13 +128,13 @@ struct BottomSheetContentView: View {
     private var sheetRootContent: some View {
         if viewModel.mapDisplayMode == .communities {
             CommunitiesListView(currentDetent: currentDetent)
-                .environmentObject(viewModel)
+                .environment(viewModel)
         } else {
             BusinessesListView(
                 elements: visibleElements,
                 currentDetent: currentDetentBinding
             )
-            .environmentObject(viewModel)
+            .environment(viewModel)
         }
     }
 
@@ -180,7 +181,7 @@ private struct RootSheetNavigationBarModifier: ViewModifier {
 /// Clear labeled mode switcher (`Merchants | Communities`) embedded inside the
 /// sheet/sidebar header so users never have to guess what an icon-only button does.
 struct SheetMapModeSwitcher: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
 
     private var selectionBinding: Binding<MapDisplayMode> {
         Binding(

@@ -3,7 +3,7 @@ import CoreLocation
 
 struct ElementCell: View {
 
-    @ObservedObject var viewModel: ElementCellViewModel
+    var viewModel: ElementCellViewModel
     var showsBottomDivider = false
     var isSaved = false
     @State private var appeared = false

@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - All Regions List (pushed onto NavigationStack)
 
 struct AllRegionsListView: View {
-    @EnvironmentObject private var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
     @State private var filterText = ""
 

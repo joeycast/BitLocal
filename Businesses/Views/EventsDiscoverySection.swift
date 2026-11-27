@@ -4,7 +4,7 @@ import CoreLocation
 // MARK: - Events Discovery Carousel
 
 struct EventsDiscoverySection: View {
-    @EnvironmentObject var viewModel: ContentViewModel
+    @Environment(ContentViewModel.self) var viewModel
 
     var body: some View {
         let events = carouselEvents

@@ -4,9 +4,9 @@
 //
 
 import SwiftUI
-import Combine
 import CoreLocation
 import MapKit
+import Observation
 
 /// Map/catalog state the search controller reads from its owner. `ContentViewModel`
 /// conforms directly; tests can supply a lightweight fake.
@@ -25,44 +25,45 @@ protocol MerchantSearchHost: AnyObject {
 
 /// Owns merchant search state and orchestration (hybrid local search, legacy remote
 /// search, result caches). Extracted from `ContentViewModel`, which forwards to it.
-final class MerchantSearchController: ObservableObject {
-    @Published var unifiedSearchText = ""
-    @Published var isSearchActive = false
-    @Published private(set) var localFilteredMerchants: [Element] = []
-    @Published var selectedMerchantSearchScope: MerchantSearchScope = .onMap
-    @Published private(set) var merchantSearchPrimaryResults: [Element] = []
-    @Published private(set) var merchantSearchMapResults: [Element] = []
-    @Published private(set) var merchantSearchFreshResults: [V4PlaceRecord] = []
-    @Published private(set) var merchantSearchNormalizedQuery = ""
-    @Published var searchMatchingAreas: [V3AreaRecord] = []
+@Observable
+final class MerchantSearchController {
+    var unifiedSearchText = ""
+    var isSearchActive = false
+    private(set) var localFilteredMerchants: [Element] = []
+    var selectedMerchantSearchScope: MerchantSearchScope = .onMap
+    private(set) var merchantSearchPrimaryResults: [Element] = []
+    private(set) var merchantSearchMapResults: [Element] = []
+    private(set) var merchantSearchFreshResults: [V4PlaceRecord] = []
+    private(set) var merchantSearchNormalizedQuery = ""
+    var searchMatchingAreas: [V3AreaRecord] = []
     // Remote merchant search
-    @Published var merchantSearchResults: [V4PlaceRecord] = []
-    @Published var merchantSearchIsLoading = false
-    @Published private(set) var merchantSearchIsWaitingForLocalDebounce = false
-    @Published var merchantSearchError: String?
-    @Published var merchantSearchIsOfflineFallback = false
-    @Published var merchantSearchRadiusKM: Double = 20
-    @Published var merchantSearchProviderFilter = ""
+    var merchantSearchResults: [V4PlaceRecord] = []
+    var merchantSearchIsLoading = false
+    private(set) var merchantSearchIsWaitingForLocalDebounce = false
+    var merchantSearchError: String?
+    var merchantSearchIsOfflineFallback = false
+    var merchantSearchRadiusKM: Double = 20
+    var merchantSearchProviderFilter = ""
 
-    weak var host: MerchantSearchHost?
+    @ObservationIgnored weak var host: MerchantSearchHost?
 
     private let btcMapRepository: BTCMapSearchServiceProtocol
-    private var unifiedSearchDebounceTask: Task<Void, Never>?
-    private var localMerchantSearchTask: Task<Void, Never>?
+    @ObservationIgnored private var unifiedSearchDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private var localMerchantSearchTask: Task<Void, Never>?
     private let unifiedSearchDebounceDuration: Duration
     private let unifiedSearchWorldwideDebounceDuration: Duration
     private let localSearchWorldwideDebounceDuration: Duration
-    private var latestMerchantSearchRequestID = UUID()
-    private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
-    private var merchantSearchAnchorQuery = ""
+    @ObservationIgnored private var latestMerchantSearchRequestID = UUID()
+    @ObservationIgnored private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
+    @ObservationIgnored private var merchantSearchAnchorQuery = ""
     private let merchantSearchRequeryDistanceMeters: CLLocationDistance = 5_000
-    private var didRestorePersistedMerchantCategory = false
-    private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
-    private var merchantSearchDocumentSignatureByID: [String: String] = [:]
-    private var merchantSearchLocalMatchScoreByID: [String: Int] = [:]
-    private var merchantSearchStrongLocalHitCount = 0
-    private var merchantSearchPreviewHydrationInFlight = Set<String>()
-    private var merchantSearchLoadingTimeoutTask: Task<Void, Never>?
+    @ObservationIgnored private var didRestorePersistedMerchantCategory = false
+    @ObservationIgnored private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
+    @ObservationIgnored private var merchantSearchDocumentSignatureByID: [String: String] = [:]
+    @ObservationIgnored private var merchantSearchLocalMatchScoreByID: [String: Int] = [:]
+    @ObservationIgnored private var merchantSearchStrongLocalHitCount = 0
+    @ObservationIgnored private var merchantSearchPreviewHydrationInFlight = Set<String>()
+    @ObservationIgnored private var merchantSearchLoadingTimeoutTask: Task<Void, Never>?
     private let merchantSearchV2HybridFlagKey = "search_v2_hybrid"
     let merchantSearchDocumentCacheLimit = 1_200
 

@@ -4,7 +4,7 @@ import SwiftUI
 
 struct MerchantAlertCityPickerView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var contentViewModel: ContentViewModel
+    @Environment(ContentViewModel.self) private var contentViewModel
     @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @Binding var currentDetent: PresentationDetent
     @State private var model = MerchantAlertCityPickerModel()
