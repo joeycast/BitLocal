@@ -162,7 +162,9 @@ struct OpeningHoursAndFormattingTests {
         #expect("https://bitlocal.app".cleanedWebsiteURL()?.absoluteString == "https://bitlocal.app")
         #expect("currency:XBT=yes".cleanedWebsiteURL() == nil)
         #expect("   ".cleanedWebsiteURL() == nil)
-        #expect("+1 (615) 555-0100".cleanedPhoneNumber() == "+16155550100")
+        let phone = "+1 (615) 555-0100".cleanedPhoneNumber()
+        #expect(phone.cleaned == "+16155550100")
+        #expect(phone.isValid)
     }
 
     // MARK: - BusinessSubmission Validation & OSM Email Body (from PR #54)
