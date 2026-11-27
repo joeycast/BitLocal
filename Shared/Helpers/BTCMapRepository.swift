@@ -4,13 +4,11 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     static let shared = BTCMapRepository()
     static let epochISO8601 = "1970-01-01T00:00:00Z"
 
-    private let v2Client = BTCMapV2Client()
     private let v2AreasClient = BTCMapV2AreasClient()
     private let v3Client = BTCMapV3AreasClient()
     private let v4Client: BTCMapV4ClientProtocol
     private let userDefaults: UserDefaults
     private let cacheDirectory: URL
-    private let modeKey = "btcmap_data_source_mode"
     private let lastAppVersionKey = "btcmap_last_app_version"
     private let cacheIOQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-io", qos: .utility)
     private let refreshStateQueue = DispatchQueue(label: "app.bitlocal.btcmap-refresh-state", qos: .userInitiated)
@@ -25,20 +23,16 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         self.v4Client = v4Client
         self.userDefaults = userDefaults
         self.cacheDirectory = cacheDirectory
-        // Ensure v2 version-change side effects still run (APIManager.init).
-        _ = APIManager.shared
         clearV4CacheIfAppVersionChanged()
     }
 
-    /// Clears v4 on-disk cache when the app marketing version changes so
-    /// migrations / mapping changes are not stuck on stale JSON.
+    /// Clears v4 on-disk cache (and any leftover legacy v2 `elements.json`) when the
+    /// app marketing version changes so migrations / mapping changes are not stuck on stale JSON.
     private func clearV4CacheIfAppVersionChanged() {
         let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let storedVersion = userDefaults.string(forKey: lastAppVersionKey)
         guard storedVersion != currentVersion else { return }
 
-        // storedVersion == nil covers both fresh installs (clear is a no-op) and
-        // upgrades from builds that predate version tracking (clear is required).
         if let storedVersion {
             Debug.logCache("App version changed from \(storedVersion) to \(currentVersion); clearing v4 merchant cache")
         } else {
@@ -47,6 +41,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         cacheIOQueue.sync {
             try? FileManager.default.removeItem(at: v4ElementsFileURL)
             try? FileManager.default.removeItem(at: v4SyncStateFileURL)
+            try? FileManager.default.removeItem(at: cacheDirectory.appending(path: "elements.json"))
         }
         userDefaults.set(currentVersion, forKey: lastAppVersionKey)
     }
@@ -60,25 +55,11 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     }
 
     func loadCachedElements() -> [Element]? {
-        switch dataSourceMode {
-        case .v2Legacy:
-            return v2Client.loadCachedElements()
-        case .v4Preferred:
-            return loadV4Elements()
-        case .auto:
-            return loadV4Elements() ?? v2Client.loadCachedElements()
-        }
+        loadV4Elements()
     }
 
     func hasCachedData() -> Bool {
-        switch dataSourceMode {
-        case .v2Legacy:
-            return v2Client.hasCachedData()
-        case .v4Preferred:
-            return hasV4CachedData()
-        case .auto:
-            return hasV4CachedData() || v2Client.hasCachedData()
-        }
+        hasV4CachedData()
     }
 
     func lastSuccessfulSyncAtISO8601() -> String? {
@@ -97,17 +78,8 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     }
 
     func refreshElements(completion: @escaping @Sendable ([Element]?) -> Void) {
-        switch dataSourceMode {
-        case .v2Legacy:
-            Debug.logAPI("BTCMapRepository: using v2 legacy mode")
-            v2Client.refreshElements(completion: completion)
-        case .v4Preferred:
-            Debug.logAPI("BTCMapRepository: using v4 preferred mode")
-            refreshV4(allowV2Fallback: false, completion: completion)
-        case .auto:
-            Debug.logAPI("BTCMapRepository: using auto mode (v4 preferred, v2 fallback)")
-            refreshV4(allowV2Fallback: true, completion: completion)
-        }
+        Debug.logAPI("BTCMapRepository: refreshing v4 merchants")
+        refreshV4(completion: completion)
     }
 
     func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
@@ -142,15 +114,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         v4Client.fetchPlaceComments(placeID: placeID, completion: completion)
     }
 
-    private var dataSourceMode: BTCMapDataSourceMode {
-        guard let raw = userDefaults.string(forKey: modeKey),
-              let mode = BTCMapDataSourceMode(rawValue: raw) else {
-            return .auto
-        }
-        return mode
-    }
-
-    private func refreshV4(allowV2Fallback: Bool, completion: @escaping @Sendable ([Element]?) -> Void) {
+    private func refreshV4(completion: @escaping @Sendable ([Element]?) -> Void) {
         let shouldStartRefresh = refreshStateQueue.sync { () -> Bool in
             pendingV4RefreshCompletions.append(completion)
             guard !isV4RefreshInFlight else {
@@ -188,11 +152,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
                             finishRefresh(nil)
                             return
                         }
-                        if allowV2Fallback && !hadV4Cache {
-                            self.v2Client.refreshElements(completion: finishRefresh)
-                        } else {
-                            finishRefresh(self.loadV4Elements() ?? self.v2Client.loadCachedElements())
-                        }
+                        finishRefresh(self.loadV4Elements())
                     }
                 }
             )
@@ -223,11 +183,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
                     startIncremental(initialIncrementalAnchor, mapped, syncState)
                 case .failure(let error):
                     Debug.logAPI("BTCMap v4 snapshot bootstrap failed: \(error.localizedDescription)")
-                    if allowV2Fallback {
-                        self.v2Client.refreshElements(completion: finishRefresh)
-                    } else {
-                        finishRefresh(nil)
-                    }
+                    finishRefresh(nil)
                 }
             }
             return

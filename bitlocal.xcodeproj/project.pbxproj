@@ -95,7 +95,6 @@
 		F66E0BA32DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */; };
 		F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9E2DE33F1200D68897 /* IPhoneHeaderView.swift */; };
 		F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B942DE33F1200D68897 /* Extensions.swift */; };
-		F66E0BA62DE33F1200D68897 /* BtcMapCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B932DE33F1200D68897 /* BtcMapCall.swift */; };
 		0168D09104D24EC6B50C6E8C /* AddressFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20F5EFF99854866AD9E8045 /* AddressFormatting.swift */; };
 		F66E0BA72DE33F1200D68897 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9B2DE33F1200D68897 /* ContentView.swift */; };
 		F66E0BA82DE33F1200D68897 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B9F2DE33F1200D68897 /* MainView.swift */; };
@@ -242,7 +241,6 @@
 		F66E0B8A2DE33EF800D68897 /* SettingsButtonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsButtonView.swift; sourceTree = "<group>"; };
 		F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailablePaymentMethodsChecks.swift; sourceTree = "<group>"; };
 		D20F5EFF99854866AD9E8045 /* AddressFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressFormatting.swift; sourceTree = "<group>"; };
-		F66E0B932DE33F1200D68897 /* BtcMapCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BtcMapCall.swift; sourceTree = "<group>"; };
 		F66E0B942DE33F1200D68897 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		F66E0B952DE33F1200D68897 /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
 		F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceKeys.swift; sourceTree = "<group>"; };
@@ -475,7 +473,6 @@
 				F64093F42DE66D1700906C3E /* Localizable.xcstrings */,
 				F66E0B922DE33F1200D68897 /* AvailablePaymentMethodsChecks.swift */,
 				D20F5EFF99854866AD9E8045 /* AddressFormatting.swift */,
-				F66E0B932DE33F1200D68897 /* BtcMapCall.swift */,
 				F66E0B942DE33F1200D68897 /* Extensions.swift */,
 				F66E0B952DE33F1200D68897 /* LRUCache.swift */,
 				F7E500013B18000000000002 /* MerchantSpatialIndex.swift */,
@@ -824,7 +821,6 @@
 				F66E0BA42DE33F1200D68897 /* IPhoneHeaderView.swift in Sources */,
 				F66E0BA52DE33F1200D68897 /* Extensions.swift in Sources */,
 				0168D09104D24EC6B50C6E8C /* AddressFormatting.swift in Sources */,
-				F66E0BA62DE33F1200D68897 /* BtcMapCall.swift in Sources */,
 				F66E0BA72DE33F1200D68897 /* ContentView.swift in Sources */,
 				F66E0BA82DE33F1200D68897 /* MainView.swift in Sources */,
 				F66E0BA92DE33F1200D68897 /* AboutView.swift in Sources */,

@@ -1,11 +1,5 @@
 import Foundation
 
-enum BTCMapDataSourceMode: String, Codable {
-    case auto
-    case v2Legacy = "v2_legacy"
-    case v4Preferred = "v4_preferred"
-}
-
 struct ElementV4Metadata: Codable, Hashable {
     let icon: String?
     let commentsCount: Int?

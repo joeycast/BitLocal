@@ -127,6 +127,58 @@ final class BTCMapV4SyncTests {
         #expect(client.fetchPlacesUpdatedSinceValues == ["2025-06-11T00:00:00Z"])
     }
 
+    @Test func snapshotFailureWithoutCacheReturnsNilWithoutLegacyFallback() async {
+        let client = MockBTCMapV4Client()
+        client.snapshotResult = .failure(URLError(.notConnectedToInternet))
+
+        let repository = BTCMapRepository(
+            v4Client: client,
+            userDefaults: testUserDefaults(),
+            cacheDirectory: cacheDirectory
+        )
+        let refreshed: [Element]? = await withCheckedContinuation { continuation in
+            repository.refreshElements { elements in
+                continuation.resume(returning: elements)
+            }
+        }
+
+        #expect(refreshed == nil)
+        #expect(repository.hasCachedData() == false)
+    }
+
+    @Test func incrementalFailureReturnsCachedV4Elements() async throws {
+        let cached = V4PlaceToElementMapper.snapshotRecordToElement(
+            V4PlaceSnapshotRecord(
+                id: 99,
+                lat: 37.77,
+                lon: -122.42,
+                icon: "local_cafe",
+                comments: nil,
+                boostedUntil: nil,
+                name: "Cached Cafe",
+                displayName: nil
+            ),
+            fallbackTimestamp: "2025-06-10T00:00:00Z"
+        )
+        try JSONEncoder().encode([cached]).write(to: elementsFileURL, options: .atomic)
+
+        let client = MockBTCMapV4Client()
+        client.fetchPlacesResult = .failure(URLError(.timedOut))
+
+        let repository = BTCMapRepository(
+            v4Client: client,
+            userDefaults: testUserDefaults(),
+            cacheDirectory: cacheDirectory
+        )
+        let refreshed: [Element]? = await withCheckedContinuation { continuation in
+            repository.refreshElements { elements in
+                continuation.resume(returning: elements)
+            }
+        }
+
+        #expect(refreshed?.map(\.id) == ["99"])
+    }
+
     private func testUserDefaults() -> UserDefaults {
         let suiteName = "BTCMapV4SyncTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
