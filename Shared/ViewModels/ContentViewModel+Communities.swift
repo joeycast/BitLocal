@@ -416,7 +416,7 @@ extension ContentViewModel {
         return members
     }
 
-    private func ensureMerchantSpatialIndex() {
+    func ensureMerchantSpatialIndex() {
         let signature = merchantStoreSignature(for: allElements)
         guard signature != merchantSpatialIndexSignature || merchantSpatialIndex.isEmpty else { return }
         let start = CFAbsoluteTimeGetCurrent()

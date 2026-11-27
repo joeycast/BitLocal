@@ -58,3 +58,97 @@ struct MerchantCategoryChip: Identifiable, Hashable {
     var id: String { group.id }
     var localizedLabel: String { group.localizedLabel }
 }
+
+enum MerchantChipFilterEngine {
+    /// Applies unified multi-select chip filters to a list of merchants:
+    /// - Quick attribute filters (`Open Now`, `Lightning`, `NFC`, `Verified`, `Saved`) combine with **AND**.
+    /// - Category filters (`Food`, `Coffee`, `Bars`, …) combine with **OR**.
+    /// - Attribute filters and category filters combine with **AND**.
+    static func filter(
+        _ elements: [Element],
+        quickFilters: Set<MerchantQuickFilter>,
+        categoryFilters: Set<MerchantCategoryGroup>,
+        savedIDs: Set<String> = [],
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> [Element] {
+        guard !quickFilters.isEmpty || !categoryFilters.isEmpty else { return elements }
+
+        let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: now)
+            ?? now.addingTimeInterval(-365 * 24 * 60 * 60)
+
+        let requiresSaved = quickFilters.contains(.saved)
+        let requiresLightning = quickFilters.contains(.lightning)
+        let requiresNFC = quickFilters.contains(.nfc)
+        let requiresVerified = quickFilters.contains(.verified)
+        let requiresOpenNow = quickFilters.contains(.openNow)
+        let hasCategoryFilters = !categoryFilters.isEmpty
+
+        return elements.filter { element in
+            if requiresSaved && !savedIDs.contains(element.id) {
+                return false
+            }
+            if requiresLightning && !acceptsLightning(element: element) {
+                return false
+            }
+            if requiresNFC && !acceptsContactlessLightning(element: element) {
+                return false
+            }
+            if requiresVerified {
+                guard let verifiedDate = BTCMapDateParser.parse(element.v4Metadata?.verifiedAt),
+                      verifiedDate >= oneYearAgo else {
+                    return false
+                }
+            }
+            if requiresOpenNow {
+                guard OpeningHoursLiveStatus.isOpenNow(
+                    rawOpeningHours: element.osmJSON?.tags?.openingHours,
+                    now: now,
+                    calendar: calendar
+                ) else {
+                    return false
+                }
+            }
+            if hasCategoryFilters {
+                let groups = ElementCategorySymbols.merchantCategoryGroups(for: element)
+                if categoryFilters.isDisjoint(with: groups) {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
+    /// Computes visible category chips for the current viewport while keeping any
+    /// actively selected categories pinned first (even if 0 matches exist in the
+    /// current viewport) so users can always see and clear active filters.
+    static func visibleCategoryChips(
+        for viewportElements: [Element],
+        selectedCategories: Set<MerchantCategoryGroup>,
+        limit: Int = 6
+    ) -> [MerchantCategoryChip] {
+        let baseChips = ElementCategorySymbols.merchantCategoryChips(for: viewportElements, limit: limit)
+        guard !selectedCategories.isEmpty else { return baseChips }
+
+        let baseByGroup = Dictionary(uniqueKeysWithValues: baseChips.map { ($0.group, $0) })
+
+        let selectedOrdered = selectedCategories
+            .sorted {
+                ElementCategorySymbols.merchantCategoryDescriptor(for: $0).priority
+                    < ElementCategorySymbols.merchantCategoryDescriptor(for: $1).priority
+            }
+            .map { group -> MerchantCategoryChip in
+                if let existing = baseByGroup[group] {
+                    return existing
+                }
+                return MerchantCategoryChip(
+                    group: group,
+                    count: 0,
+                    symbolName: ElementCategorySymbols.merchantCategoryDescriptor(for: group).chipSymbolName
+                )
+            }
+
+        let remaining = baseChips.filter { !selectedCategories.contains($0.group) }
+        return selectedOrdered + remaining
+    }
+}

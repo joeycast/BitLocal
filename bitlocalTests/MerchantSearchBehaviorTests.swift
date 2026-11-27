@@ -272,6 +272,95 @@ struct MerchantSearchBehaviorTests {
         #expect(ordered.map(\.id) == ["102", "101", "100", "103"])
     }
 
+    @Test func categoryChipFiltersCombineWithOrWhileQuickFiltersCombineWithAnd() {
+        let cafeLightning = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 1, name: "Cafe Zap", icon: "local_cafe", osmPaymentLightning: "yes")
+        )
+        let dinerLightning = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 2, name: "Diner Zap", icon: "restaurant", osmPaymentLightning: "yes")
+        )
+        let dinerOnchainOnly = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 3, name: "Diner Chain", icon: "restaurant", osmPaymentLightning: "no")
+        )
+        let barLightning = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 4, name: "Bar Zap", icon: "local_bar", osmPaymentLightning: "yes")
+        )
+        let all = [cafeLightning, dinerLightning, dinerOnchainOnly, barLightning]
+
+        // Categories combine with OR: Coffee OR Food
+        let categoryUnion = MerchantChipFilterEngine.filter(
+            all,
+            quickFilters: [],
+            categoryFilters: [.coffee, .food]
+        )
+        #expect(Set(categoryUnion.map(\.id)) == ["1", "2", "3"])
+
+        // Combined across groups with AND: (Coffee OR Food) AND Lightning
+        let combined = MerchantChipFilterEngine.filter(
+            all,
+            quickFilters: [.lightning],
+            categoryFilters: [.coffee, .food]
+        )
+        #expect(Set(combined.map(\.id)) == ["1", "2"])
+    }
+
+    @Test func visibleCategoryChipsKeepSelectedCategoriesPinnedWhenViewportHasZeroMatches() {
+        let viewport = [
+            Self.element(id: "1", icon: "local_cafe"),
+            Self.element(id: "2", icon: "local_bar")
+        ]
+
+        let chips = MerchantChipFilterEngine.visibleCategoryChips(
+            for: viewport,
+            selectedCategories: [.food],
+            limit: 6
+        )
+
+        #expect(chips.first?.group == .food)
+        #expect(chips.first?.count == 0)
+        #expect(chips.contains(where: { $0.group == .coffee }))
+        #expect(chips.contains(where: { $0.group == .bars }))
+    }
+
+    @Test func togglingCategoryAndQuickChipsFiltersMapElementsWithoutModifyingSearchText() {
+        let repo = MockBTCMapRepository()
+        let viewModel = makeViewModel(repo: repo)
+        let cafe = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 1, name: "Cafe Zap", icon: "local_cafe", osmPaymentLightning: "yes")
+        )
+        let diner = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 2, name: "Diner Zap", icon: "restaurant", osmPaymentLightning: "yes")
+        )
+        let bar = V4PlaceToElementMapper.placeRecordToElement(
+            Self.placeRecord(id: 3, name: "Bar Onchain", icon: "local_bar", osmPaymentLightning: "no")
+        )
+
+        viewModel.mapDisplayMode = .merchants
+        viewModel.setAllElementsForTesting([cafe, diner, bar])
+
+        let baselineSignature = viewModel.merchantMapAnnotationInputSignature
+        #expect(viewModel.mapElementsForCurrentDisplay.map(\.id) == ["1", "2", "3"])
+
+        viewModel.toggleCategoryFilter(.food)
+        #expect(viewModel.unifiedSearchText.isEmpty)
+        #expect(viewModel.isSearchActive == false)
+        #expect(viewModel.activeCategoryFilters == [.food])
+        #expect(viewModel.mapElementsForCurrentDisplay.map(\.id) == ["2"])
+        #expect(viewModel.merchantMapAnnotationInputSignature != baselineSignature)
+
+        // Multi-select a second category (OR) + a quick filter (AND)
+        viewModel.toggleCategoryFilter(.coffee)
+        viewModel.toggleQuickFilter(.lightning)
+        #expect(viewModel.activeCategoryFilters == [.food, .coffee])
+        #expect(viewModel.activeQuickFilters == [.lightning])
+        #expect(Set(viewModel.mapElementsForCurrentDisplay.map(\.id)) == ["1", "2"])
+
+        // Clear restores all map pins
+        viewModel.clearMerchantChipFilters()
+        #expect(viewModel.hasActiveChipFilters == false)
+        #expect(viewModel.mapElementsForCurrentDisplay.map(\.id) == ["1", "2", "3"])
+    }
+
     private func makeViewModel(
         repo: MockBTCMapRepository,
         unifiedSearchDebounceNanoseconds: UInt64 = 400_000_000,
@@ -298,7 +387,8 @@ struct MerchantSearchBehaviorTests {
         icon: String? = nil,
         lat: Double = 36.17,
         lon: Double = -86.78,
-        boostedUntil: String? = nil
+        boostedUntil: String? = nil,
+        osmPaymentLightning: String? = nil
     ) -> V4PlaceRecord {
         V4PlaceRecord(
             id: id,
@@ -331,7 +421,7 @@ struct MerchantSearchBehaviorTests {
             osmPaymentBitcoin: nil,
             osmCurrencyXBT: nil,
             osmPaymentOnchain: nil,
-            osmPaymentLightning: nil,
+            osmPaymentLightning: osmPaymentLightning,
             osmPaymentLightningContactless: nil,
             osmAddrHouseNumber: nil,
             osmAddrStreet: nil,

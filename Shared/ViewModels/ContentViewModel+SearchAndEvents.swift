@@ -12,15 +12,145 @@ extension ContentViewModel {
     }
 
     func applyMerchantCategoryChip(_ chip: MerchantCategoryChip) {
-        merchantSearch.applyMerchantCategoryChip(chip)
+        toggleCategoryFilter(chip.group)
     }
 
     func clearMerchantSearch(userInitiated: Bool = true) {
         merchantSearch.clearMerchantSearch(userInitiated: userInitiated)
     }
 
+    // MARK: - Unified Multi-Select Merchant Filter Chips
+
+    var hasActiveChipFilters: Bool {
+        !activeQuickFilters.isEmpty || !activeCategoryFilters.isEmpty
+    }
+
+    func toggleQuickFilter(_ filter: MerchantQuickFilter) {
+        if activeQuickFilters.contains(filter) {
+            activeQuickFilters.remove(filter)
+        } else {
+            activeQuickFilters.insert(filter)
+        }
+    }
+
+    func toggleCategoryFilter(_ group: MerchantCategoryGroup) {
+        didRestorePersistedMerchantCategoryChips = true
+        if activeCategoryFilters.contains(group) {
+            activeCategoryFilters.remove(group)
+        } else {
+            activeCategoryFilters.insert(group)
+        }
+        MerchantSearchPersistence.saveCategoryGroups(activeCategoryFilters)
+    }
+
+    func clearMerchantChipFilters() {
+        didRestorePersistedMerchantCategoryChips = true
+        activeQuickFilters.removeAll()
+        activeCategoryFilters.removeAll()
+        MerchantSearchPersistence.clear()
+    }
+
+    func applyMerchantChipFilters(
+        to elements: [Element],
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> [Element] {
+        MerchantChipFilterEngine.filter(
+            elements,
+            quickFilters: activeQuickFilters,
+            categoryFilters: activeCategoryFilters,
+            savedIDs: SavedPlacesStore.shared.savedIDs,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    /// Returns unfiltered merchant elements in the current map viewport (with ATM preference applied).
+    /// Keeps sibling category chips and local search aware of all nearby merchants even while
+    /// active chip filters narrow the rendered map pins and `visibleElements`.
+    var unfilteredViewportElements: [Element] {
+        guard hasActiveChipFilters else { return visibleElements }
+        guard !allElements.isEmpty else { return [] }
+        let activeRegion = mapView?.region ?? region
+        let halfLat = activeRegion.span.latitudeDelta / 2.0
+        let halfLon = activeRegion.span.longitudeDelta / 2.0
+        let minLat = max(-90.0, activeRegion.center.latitude - halfLat)
+        let maxLat = min(90.0, activeRegion.center.latitude + halfLat)
+
+        let minLon: Double
+        let maxLon: Double
+        if activeRegion.span.longitudeDelta >= 360.0 {
+            minLon = -180.0
+            maxLon = 180.0
+        } else {
+            func wrapLongitude(_ value: Double) -> Double {
+                var lon = value
+                while lon > 180.0 { lon -= 360.0 }
+                while lon < -180.0 { lon += 360.0 }
+                return lon
+            }
+            minLon = wrapLongitude(activeRegion.center.longitude - halfLon)
+            maxLon = wrapLongitude(activeRegion.center.longitude + halfLon)
+        }
+
+        ensureMerchantSpatialIndex()
+        let candidates = merchantSpatialIndex.candidates(
+            minLatitude: minLat,
+            maxLatitude: maxLat,
+            minLongitude: minLon,
+            maxLongitude: maxLon
+        )
+        guard !candidates.isEmpty else { return [] }
+
+        var seen = Set<String>()
+        var result: [Element] = []
+        result.reserveCapacity(candidates.count)
+        for candidate in candidates {
+            guard seen.insert(candidate.id).inserted,
+                  let element = merchantElementStore.element(id: candidate.id) else {
+                continue
+            }
+            if hideATMsFromMapAndList && element.isATM { continue }
+            result.append(element)
+        }
+        return result
+    }
+
+    var searchViewportElements: [Element] {
+        unfilteredViewportElements
+    }
+
+    /// Restores persisted category chips once after initial merchant data is ready,
+    /// without writing into the search bar. Defers if the viewport has no matching
+    /// merchants yet (e.g. cold-start over ocean) so panning into a city can still restore.
     func restorePersistedMerchantCategoryIfNeeded() {
-        merchantSearch.restorePersistedMerchantCategoryIfNeeded()
+        guard !didRestorePersistedMerchantCategoryChips else { return }
+        guard mapDisplayMode == .merchants else { return }
+        guard hasLoadedInitialData, !allElements.isEmpty else { return }
+        guard !visibleElements.isEmpty else { return }
+        guard activeCategoryFilters.isEmpty,
+              unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            didRestorePersistedMerchantCategoryChips = true
+            return
+        }
+
+        let persisted = MerchantSearchPersistence.loadCategoryGroups()
+        guard !persisted.isEmpty else {
+            didRestorePersistedMerchantCategoryChips = true
+            return
+        }
+
+        let hasVisibleMatch = visibleElements.contains { element in
+            !persisted.isDisjoint(with: ElementCategorySymbols.merchantCategoryGroups(for: element))
+        }
+        guard hasVisibleMatch else {
+            Debug.logAPI("Deferred category chip restore (\(persisted.map(\.rawValue).sorted().joined(separator: ","))): no visible matches in viewport")
+            return
+        }
+
+        didRestorePersistedMerchantCategoryChips = true
+        activeCategoryFilters = persisted
+        Debug.logAPI("Restored persisted merchant category chips: \(persisted.map(\.rawValue).sorted().joined(separator: ","))")
     }
 
     func handleMerchantSearchMapRegionChange() {
@@ -114,7 +244,9 @@ extension ContentViewModel {
             if trimmedQuery.count >= 2 {
                 return elementsForDisplay(merchantSearchMapResults)
             }
-            return elementsForDisplay(allElements)
+            let base = elementsForDisplay(allElements)
+            guard hasActiveChipFilters else { return base }
+            return applyMerchantChipFilters(to: base)
         case .communities:
             return selectedCommunityArea == nil ? [] : elementsForDisplay(communityMemberElements)
         }
@@ -127,6 +259,11 @@ extension ContentViewModel {
     var merchantMapAnnotationInputSignature: Int {
         var hasher = Hasher()
         hasher.combine(hideATMsFromMapAndList)
+        hasher.combine(activeQuickFilters)
+        hasher.combine(activeCategoryFilters)
+        if activeQuickFilters.contains(.saved) {
+            hasher.combine(SavedPlacesStore.shared.savedIDs)
+        }
 
         if let digest = activeMerchantAlertDigest {
             hasher.combine(0)
@@ -185,6 +322,8 @@ extension ContentViewModel {
     func activateMerchantAlertDigest(_ digest: CityDigest) {
         activeMerchantAlertDigest = digest
         mapDisplayMode = .merchants
+        activeQuickFilters.removeAll()
+        activeCategoryFilters.removeAll()
         merchantSearch.resetForMerchantAlertDigest()
         selectedCommunityArea = nil
         presentedCommunityArea = nil

@@ -14,14 +14,13 @@ extension BusinessesListView {
     }
 
     var visibleCategoryChips: [MerchantCategoryChip] {
-        guard trimmedSearchQuery.isEmpty else { return [] }
-        return cachedVisibleCategoryChips
+        cachedVisibleCategoryChips
     }
 
     var visibleQuickFilters: [MerchantQuickFilter] {
         MerchantQuickFilter.allCases.filter { filter in
             if filter == .saved {
-                return !savedPlacesStore.savedIDs.isEmpty || activeQuickFilters.contains(.saved)
+                return !savedPlacesStore.savedIDs.isEmpty || viewModel.activeQuickFilters.contains(.saved)
             }
             return true
         }
@@ -59,18 +58,21 @@ extension BusinessesListView {
     }
 
     private var browseSourceElements: [Element] {
-        if activeQuickFilters.contains(.saved) {
+        if viewModel.activeQuickFilters.contains(.saved) {
             return viewModel.elementsForDisplay(viewModel.allElements)
         }
         return elements
     }
 
     private var totalDiscoveryCount: Int {
-        activeQuickFilters.isEmpty ? elements.count : cachedFilteredBrowseCount
+        viewModel.hasActiveChipFilters ? cachedFilteredBrowseCount : elements.count
     }
 
     private var filteredPrimarySearchResults: [Element] {
-        applyQuickFilters(to: viewModel.merchantSearchPrimaryResults)
+        viewModel.applyMerchantChipFilters(
+            to: viewModel.merchantSearchPrimaryResults,
+            calendar: calendar
+        )
     }
 
     var displayedPrimaryResults: [Element] {
@@ -96,19 +98,11 @@ extension BusinessesListView {
         totalDiscoveryCount > topSortedElements.count
     }
 
-    private var activeCategoryChipGroup: MerchantCategoryGroup? {
-        guard isFilteringMerchants else { return nil }
-        let normalized = trimmedSearchQuery.lowercased()
-        return visibleCategoryChips.first {
-            $0.localizedLabel.lowercased() == normalized
-        }?.group
-    }
-
     var categoryChipsView: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
                 ForEach(visibleQuickFilters) { filter in
-                    let isSelected = activeQuickFilters.contains(filter)
+                    let isSelected = viewModel.activeQuickFilters.contains(filter)
                     let title = quickFilterTitle(for: filter)
                     Button {
                         toggleQuickFilter(filter)
@@ -163,9 +157,9 @@ extension BusinessesListView {
                 }
 
                 ForEach(visibleCategoryChips) { chip in
-                    let isSelected = activeCategoryChipGroup == chip.group
+                    let isSelected = viewModel.activeCategoryFilters.contains(chip.group)
                     Button {
-                        applyCategoryChip(chip)
+                        toggleCategoryChip(chip)
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: chip.symbolName)
@@ -237,52 +231,12 @@ extension BusinessesListView {
 
     private func toggleQuickFilter(_ filter: MerchantQuickFilter) {
         BitLocalHaptics.selection()
-        if activeQuickFilters.contains(filter) {
-            activeQuickFilters.remove(filter)
-        } else {
-            activeQuickFilters.insert(filter)
-        }
+        viewModel.toggleQuickFilter(filter)
     }
 
-    private func applyQuickFilters(to source: [Element]) -> [Element] {
-        guard !activeQuickFilters.isEmpty else { return source }
-        let now = Date.now
-        let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: now)
-            ?? now.addingTimeInterval(-365 * 24 * 60 * 60)
-
-        let requiresSaved = activeQuickFilters.contains(.saved)
-        let requiresLightning = activeQuickFilters.contains(.lightning)
-        let requiresNFC = activeQuickFilters.contains(.nfc)
-        let requiresVerified = activeQuickFilters.contains(.verified)
-        let requiresOpenNow = activeQuickFilters.contains(.openNow)
-
-        return source.filter { element in
-            if requiresSaved && !savedPlacesStore.isSaved(element.id) {
-                return false
-            }
-            if requiresLightning && !acceptsLightning(element: element) {
-                return false
-            }
-            if requiresNFC && !acceptsContactlessLightning(element: element) {
-                return false
-            }
-            if requiresVerified {
-                guard let verifiedDate = BTCMapDateParser.parse(element.v4Metadata?.verifiedAt),
-                      verifiedDate >= oneYearAgo else {
-                    return false
-                }
-            }
-            if requiresOpenNow {
-                guard OpeningHoursLiveStatus.isOpenNow(
-                    rawOpeningHours: element.osmJSON?.tags?.openingHours,
-                    now: now,
-                    calendar: calendar
-                ) else {
-                    return false
-                }
-            }
-            return true
-        }
+    private func toggleCategoryChip(_ chip: MerchantCategoryChip) {
+        BitLocalHaptics.selection()
+        viewModel.toggleCategoryFilter(chip.group)
     }
 
     func handlePendingIntentAction() {
@@ -293,7 +247,7 @@ extension BusinessesListView {
                 viewModel.setMapDisplayMode(.merchants)
             }
             if let filter {
-                activeQuickFilters = [filter]
+                viewModel.activeQuickFilters = [filter]
             }
             if let query {
                 viewModel.unifiedSearchText = query
@@ -301,20 +255,18 @@ extension BusinessesListView {
         }
     }
 
-    private func applyCategoryChip(_ chip: MerchantCategoryChip) {
-        BitLocalHaptics.selection()
-        if activeCategoryChipGroup == chip.group {
-            viewModel.clearMerchantSearch(userInitiated: true)
-        } else {
-            viewModel.applyMerchantCategoryChip(chip)
-        }
-    }
-
     func refreshDiscoveryCache() {
-        let filteredBrowse = applyQuickFilters(to: browseSourceElements)
+        let filteredBrowse = viewModel.applyMerchantChipFilters(
+            to: browseSourceElements,
+            calendar: calendar
+        )
         cachedFilteredBrowseCount = filteredBrowse.count
         cachedTopSortedElements = nearestElements(filteredBrowse, limit: discoveryResultsLimit)
-        cachedVisibleCategoryChips = ElementCategorySymbols.merchantCategoryChips(for: elements, limit: 6)
+        cachedVisibleCategoryChips = MerchantChipFilterEngine.visibleCategoryChips(
+            for: viewModel.unfilteredViewportElements,
+            selectedCategories: viewModel.activeCategoryFilters,
+            limit: 6
+        )
     }
 
     private func containsPlaceholderMerchantNames(_ elements: [Element]) -> Bool {
@@ -456,7 +408,7 @@ extension BusinessesListView {
             .font(.footnote)
             .foregroundStyle(Color.primary.opacity(0.65))
 
-            if activeQuickFilters.isEmpty && elements.count <= 3 && viewModel.activeMerchantAlertDigest == nil {
+            if !viewModel.hasActiveChipFilters && elements.count <= 3 && viewModel.activeMerchantAlertDigest == nil {
                 VStack(alignment: .leading, spacing: 8) {
                     Button {
                         viewModel.zoomOutMapToExploreNearby()
@@ -574,7 +526,7 @@ extension BusinessesListView {
         emptyStateDelayTask = nil
 
         let shouldDelayEmptyState = !isFilteringMerchants &&
-            activeQuickFilters.isEmpty &&
+            !viewModel.hasActiveChipFilters &&
             viewModel.activeMerchantAlertDigest == nil &&
             viewModel.hasLoadedInitialData &&
             elements.isEmpty
@@ -589,7 +541,7 @@ extension BusinessesListView {
         emptyStateDelayTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
-            guard elements.isEmpty, activeQuickFilters.isEmpty else { return }
+            guard elements.isEmpty, !viewModel.hasActiveChipFilters else { return }
             guard !viewModel.isLoading else { return }
             canShowEmptyState = true
         }

@@ -26,7 +26,6 @@ struct BusinessesListView: View {
     @State var cachedTopSortedElements: [Element] = []
     @State var cachedFilteredBrowseCount = 0
     @State var cachedVisibleCategoryChips: [MerchantCategoryChip] = []
-    @State var activeQuickFilters: Set<MerchantQuickFilter> = []
     @State var showFocusedSearchCategoryChips = false
     @State var canShowEmptyState = false
     @State var emptyStateDelayTask: Task<Void, Never>?
@@ -70,17 +69,22 @@ struct BusinessesListView: View {
             }
             .onChange(of: viewModel.allElements.count) { _, _ in
                 viewModel.restorePersistedMerchantCategoryIfNeeded()
-                if activeQuickFilters.contains(.saved) {
+                if viewModel.hasActiveChipFilters {
                     refreshDiscoveryCache()
                 }
             }
             .onChange(of: viewModel.hideATMsFromMapAndList) { _, _ in
-                if activeQuickFilters.contains(.saved) {
+                if viewModel.hasActiveChipFilters {
                     refreshDiscoveryCache()
                 }
             }
             .onChange(of: viewModel.visibleElements.count) { _, _ in
                 viewModel.restorePersistedMerchantCategoryIfNeeded()
+            }
+            .onReceive(viewModel.mapStoppedMovingSubject) { _ in
+                if viewModel.hasActiveChipFilters {
+                    refreshDiscoveryCache()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
                 guard isSearchFieldFocused else { return }
@@ -97,7 +101,14 @@ struct BusinessesListView: View {
 
     private var contentWithDiscoveryObservers: some View {
         contentWithSearchObservers
-            .onChange(of: activeQuickFilters) { _, _ in
+            .onChange(of: viewModel.activeQuickFilters) { _, _ in
+                discoveryResultsLimit = maxListResults
+                searchResultsLimit = 20
+                refreshDiscoveryCache()
+                syncDisplayedSearchResultsToMap()
+                refreshEmptyStateVisibility()
+            }
+            .onChange(of: viewModel.activeCategoryFilters) { _, _ in
                 discoveryResultsLimit = maxListResults
                 searchResultsLimit = 20
                 refreshDiscoveryCache()
@@ -215,9 +226,9 @@ struct BusinessesListView: View {
                     digestResultsView
                 } else if shouldShowDiscoveryLoadingState {
                     LoadingScreenView()
-                } else if !activeQuickFilters.isEmpty && cachedFilteredBrowseCount == 0 {
+                } else if viewModel.hasActiveChipFilters && cachedFilteredBrowseCount == 0 {
                     quickFilterEmptyStateView
-                } else if activeQuickFilters.isEmpty && elements.isEmpty {
+                } else if !viewModel.hasActiveChipFilters && elements.isEmpty {
                     if shouldShowEmptyState {
                         merchantEmptyStateView
                     } else {
@@ -520,9 +531,13 @@ struct BusinessesListView: View {
         }
     }
 
+    private var isOnlySavedFilterActive: Bool {
+        viewModel.activeQuickFilters == [.saved] && viewModel.activeCategoryFilters.isEmpty
+    }
+
     private var quickFilterEmptyStateContent: some View {
         VStack(spacing: 12) {
-            Image(systemName: activeQuickFilters == [.saved] ? "bookmark.slash" : "line.3.horizontal.decrease.circle")
+            Image(systemName: isOnlySavedFilterActive ? "bookmark.slash" : "line.3.horizontal.decrease.circle")
                 .font(.title.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text(quickFilterEmptyStateTitle)
@@ -538,7 +553,7 @@ struct BusinessesListView: View {
 
             Button {
                 BitLocalHaptics.selection()
-                activeQuickFilters.removeAll()
+                viewModel.clearMerchantChipFilters()
             } label: {
                 Text(NSLocalizedString("Clear Filters", comment: "Button to clear active merchant quick filters"))
                     .font(.subheadline.weight(.semibold))
@@ -552,14 +567,14 @@ struct BusinessesListView: View {
     }
 
     private var quickFilterEmptyStateTitle: String {
-        if activeQuickFilters == [.saved] {
+        if isOnlySavedFilterActive {
             return NSLocalizedString("No saved places", comment: "Empty state title when Saved filter has no matching places")
         }
         return NSLocalizedString("No matching places", comment: "Empty state title when quick filters yield zero matches")
     }
 
     private var quickFilterEmptyStateMessage: String {
-        if activeQuickFilters == [.saved] {
+        if isOnlySavedFilterActive {
             return NSLocalizedString(
                 "Save places from any merchant detail page to find them quickly here.",
                 comment: "Empty state message when Saved filter has no matching places"
@@ -684,7 +699,7 @@ struct BusinessesListView: View {
                     if displayedPrimaryResults.isEmpty &&
                         !viewModel.merchantSearchIsWaitingForLocalDebounce &&
                         !viewModel.merchantSearchIsLoading {
-                        if !activeQuickFilters.isEmpty {
+                        if viewModel.hasActiveChipFilters {
                             quickFilterEmptyStateContent
                                 .listRowSeparator(.hidden)
                                 .clearListRowBackground(if: shouldUseGlassyRows)

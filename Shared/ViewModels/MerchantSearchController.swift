@@ -15,6 +15,7 @@ protocol MerchantSearchHost: AnyObject {
     var region: MKCoordinateRegion { get }
     var userLocation: CLLocation? { get }
     var visibleElements: [Element] { get }
+    var searchViewportElements: [Element] { get }
     var mapDisplayMode: MapDisplayMode { get }
     var hasLoadedInitialData: Bool { get }
     var allElements: [Element] { get }
@@ -22,6 +23,10 @@ protocol MerchantSearchHost: AnyObject {
     func hydratePlaceholderNamesIfNeeded(in elements: [Element])
     func pruneTransientMerchantCachesIfNeeded(force: Bool)
     func upsertElementIntoStore(_ element: Element)
+}
+
+extension MerchantSearchHost {
+    var searchViewportElements: [Element] { visibleElements }
 }
 
 /// Owns merchant search state and orchestration (hybrid local search, legacy remote
@@ -59,7 +64,6 @@ final class MerchantSearchController {
     @ObservationIgnored private var merchantSearchAnchorCenter: CLLocationCoordinate2D?
     @ObservationIgnored private var merchantSearchAnchorQuery = ""
     private let merchantSearchRequeryDistanceMeters: CLLocationDistance = 5_000
-    @ObservationIgnored private var didRestorePersistedMerchantCategory = false
     @ObservationIgnored private var merchantSearchDocumentByID: [String: MerchantSearchDocument] = [:]
     @ObservationIgnored private var merchantSearchDocumentSignatureByID: [String: String] = [:]
     @ObservationIgnored private var merchantSearchLocalMatchScoreByID: [String: Int] = [:]
@@ -85,7 +89,7 @@ final class MerchantSearchController {
 
     private var region: MKCoordinateRegion { host?.region ?? MKCoordinateRegion() }
     private var userLocation: CLLocation? { host?.userLocation }
-    private var visibleElements: [Element] { host?.visibleElements ?? [] }
+    private var searchViewportElements: [Element] { host?.searchViewportElements ?? [] }
     private var mapDisplayMode: MapDisplayMode { host?.mapDisplayMode ?? .merchants }
     private var hasLoadedInitialData: Bool { host?.hasLoadedInitialData ?? false }
     private var allElements: [Element] { host?.allElements ?? [] }
@@ -141,14 +145,6 @@ final class MerchantSearchController {
 
     func performUnifiedSearch() {
         let query = unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty {
-            MerchantSearchPersistence.clear()
-        } else if let group = ElementCategorySymbols.resolvedCategoryGroup(
-            forNormalizedQuery: SearchTextNormalizer.normalize(query)
-        ), group.localizedLabel.compare(query, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
-            // Only persist exact category chip labels — never free-text.
-            MerchantSearchPersistence.saveCategoryGroup(group)
-        }
         if merchantSearchV2HybridEnabled {
             performUnifiedSearchHybrid(query: query)
         } else {
@@ -156,19 +152,9 @@ final class MerchantSearchController {
         }
     }
 
-    /// Applies a category chip and persists the selection for return visits.
-    func applyMerchantCategoryChip(_ chip: MerchantCategoryChip) {
-        isSearchActive = true
-        MerchantSearchPersistence.saveCategoryGroup(chip.group)
-        unifiedSearchText = chip.localizedLabel
-        performUnifiedSearch()
-    }
-
-    /// Clears search text and forgets any persisted category chip.
+    /// Clears search text without disturbing active category/attribute filter chips.
     func clearMerchantSearch(userInitiated: Bool = true) {
-        if userInitiated {
-            MerchantSearchPersistence.clear()
-        }
+        _ = userInitiated
         // Setting isSearchActive = false re-enters this method via the
         // bottom sheet's onChange; skip the redundant second search pass.
         let wasCleared = unifiedSearchText.isEmpty && !isSearchActive
@@ -178,46 +164,6 @@ final class MerchantSearchController {
         performUnifiedSearch()
     }
 
-    /// Restores the last category chip once after initial merchant data is ready.
-    /// Free-text is intentionally not restored (avoids surprise worldwide queries).
-    ///
-    /// When the current viewport has no matches, keep trying on later map/list
-    /// updates (do not set `didRestore…`) so cold-start over empty ocean can
-    /// still restore after the user pans into a populated area.
-    func restorePersistedMerchantCategoryIfNeeded() {
-        guard !didRestorePersistedMerchantCategory else { return }
-        guard mapDisplayMode == .merchants else { return }
-        guard hasLoadedInitialData, !allElements.isEmpty else { return }
-        // Local search filters the viewport (visibleElements); restoring before
-        // any pins are on screen guarantees an empty "no results" takeover on
-        // cold launch. Wait until the map has settled somewhere with merchants.
-        guard !visibleElements.isEmpty else { return }
-        guard unifiedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            // User already typed or selected something — never auto-restore over it.
-            didRestorePersistedMerchantCategory = true
-            return
-        }
-        guard let group = MerchantSearchPersistence.loadCategoryGroup() else {
-            // Nothing to restore (missing/expired) — stop rechecking.
-            didRestorePersistedMerchantCategory = true
-            return
-        }
-        // Only take over the sheet when the category actually has matches in
-        // the current viewport. Leave the flag false so a later pan/zoom can retry.
-        let hasVisibleMatch = visibleElements.contains {
-            ElementCategorySymbols.merchantCategoryGroups(for: $0).contains(group)
-        }
-        guard hasVisibleMatch else {
-            Debug.logAPI("Deferred category chip restore (\(group.rawValue)): no visible matches in viewport")
-            return
-        }
-        didRestorePersistedMerchantCategory = true
-        isSearchActive = true
-        unifiedSearchText = group.localizedLabel
-        performUnifiedSearch()
-        Debug.logAPI("Restored persisted merchant category chip: \(group.rawValue)")
-    }
-
     func refreshMerchantSearchFromVisibleElementsIfNeeded() {
         guard mapDisplayMode == .merchants else { return }
         guard merchantSearchV2HybridEnabled else { return }
@@ -225,7 +171,7 @@ final class MerchantSearchController {
         guard query.count >= 2 else { return }
         let normalizedQuery = SearchTextNormalizer.normalize(query)
         localFilteredMerchants = filteredMerchantElements(
-            in: visibleElements,
+            in: searchViewportElements,
             normalizedQuery: normalizedQuery
         )
         merchantSearchPrimaryResults = localFilteredMerchants
@@ -294,7 +240,7 @@ final class MerchantSearchController {
     }
 
     private func scheduleLocalMerchantSearch(query: String, normalizedQuery: String) {
-        let source = visibleElements
+        let source = searchViewportElements
         merchantSearchIsWaitingForLocalDebounce = true
 
         localMerchantSearchTask = Task { [weak self] in
@@ -375,7 +321,7 @@ final class MerchantSearchController {
     private func localMerchantSearchSource(for scope: MerchantSearchScope) -> [Element] {
         switch scope {
         case .onMap:
-            return visibleElements
+            return searchViewportElements
         case .worldwide:
             return []
         }

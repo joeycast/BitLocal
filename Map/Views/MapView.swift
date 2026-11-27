@@ -708,11 +708,17 @@ struct MapView: UIViewRepresentable {
                 mapView.removeAnnotations(currentAnnotations)
             }
 
+            let hadVisibleElements = !lastVisibleElementIDs.isEmpty
+
             // Reset annotation caches so the same search result IDs can be re-added
             // after transient empty states during search refinement.
             lastElementsHash = nil
             lastVisibleElementIDs = []
             lastAnnotationPassKey = nil
+
+            if hadVisibleElements && viewModel.mapDisplayMode == .merchants {
+                viewModel.visibleElementsSubject.send([])
+            }
             return true
         }
 

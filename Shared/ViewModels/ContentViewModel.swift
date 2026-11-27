@@ -113,6 +113,10 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     var merchantSearchIsWaitingForLocalDebounce: Bool { merchantSearch.merchantSearchIsWaitingForLocalDebounce }
     var merchantSearchError: String? { merchantSearch.merchantSearchError }
     var merchantSearchIsOfflineFallback: Bool { merchantSearch.merchantSearchIsOfflineFallback }
+    // Unified multi-select merchant filter chips (shared across list + map pins)
+    var activeQuickFilters: Set<MerchantQuickFilter> = []
+    var activeCategoryFilters: Set<MerchantCategoryGroup> = []
+    @ObservationIgnored var didRestorePersistedMerchantCategoryChips = false
     // Events
     var eventsIncludePast = false
     var eventsIsLoading = false

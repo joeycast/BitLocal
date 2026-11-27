@@ -36,5 +36,20 @@ final class MerchantSearchPersistenceTests {
         MerchantSearchPersistence.saveCategoryGroup(.bars, defaults: defaults)
         MerchantSearchPersistence.clear(defaults: defaults)
         #expect(MerchantSearchPersistence.loadCategoryGroup(defaults: defaults) == nil)
+        #expect(MerchantSearchPersistence.loadCategoryGroups(defaults: defaults).isEmpty)
+    }
+
+    @Test func saveAndLoadMultipleCategoryGroupsWithinTTL() {
+        MerchantSearchPersistence.saveCategoryGroups([.food, .coffee], defaults: defaults)
+        let loaded = MerchantSearchPersistence.loadCategoryGroups(defaults: defaults)
+        #expect(loaded == [.food, .coffee])
+    }
+
+    @Test func loadsLegacySingleCategoryKeyWhenMultiKeyMissing() {
+        defaults.set("groceries", forKey: "merchant_search_last_category_group")
+        defaults.set(Date.now.timeIntervalSince1970, forKey: "merchant_search_last_category_saved_at")
+
+        let loaded = MerchantSearchPersistence.loadCategoryGroups(defaults: defaults)
+        #expect(loaded == [.groceries])
     }
 }
