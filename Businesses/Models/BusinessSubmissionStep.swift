@@ -10,15 +10,15 @@ enum BusinessSubmissionStep: Int, CaseIterable {
     var title: String {
         switch self {
         case .location:
-            return NSLocalizedString("step_location_title", comment: "")
+            return String(localized: "step_location_title", comment: "")
         case .details:
-            return NSLocalizedString("step_details_title", comment: "")
+            return String(localized: "step_details_title", comment: "")
         case .payments:
-            return NSLocalizedString("step_payments_title", comment: "")
+            return String(localized: "step_payments_title", comment: "")
         case .hours:
-            return NSLocalizedString("step_hours_title", comment: "")
+            return String(localized: "step_hours_title", comment: "")
         case .review:
-            return NSLocalizedString("step_review_title", comment: "")
+            return String(localized: "step_review_title", comment: "")
         }
     }
 

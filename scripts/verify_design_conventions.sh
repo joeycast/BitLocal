@@ -141,6 +141,11 @@ rules = [
         re.compile(r"\bObservableObject\b|@Published\b|@StateObject\b|@ObservedObject\b|@EnvironmentObject\b|\.environmentObject\s*\("),
         "Use @Observable, @State, @Environment(Type.self), and @Bindable instead of legacy ObservableObject / @Published / @StateObject / @ObservedObject / @EnvironmentObject.",
     ),
+    (
+        "no-ns-localized-string",
+        re.compile(r"\bNSLocalizedString\s*\("),
+        "Use String(localized:) or LocalizedStringResource instead of legacy NSLocalizedString(...).",
+    ),
 ]
 
 # Value-based navigation files must not reintroduce destination-closure NavigationLink

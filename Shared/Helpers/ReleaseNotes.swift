@@ -10,11 +10,11 @@ struct ReleaseNotesHighlight: Identifiable, Equatable {
     var id: String { titleKey }
 
     var title: String {
-        NSLocalizedString(titleKey, comment: "")
+        String(localized: String.LocalizationValue(titleKey))
     }
 
     var detail: String {
-        NSLocalizedString(detailKey, comment: "")
+        String(localized: String.LocalizationValue(detailKey))
     }
 }
 

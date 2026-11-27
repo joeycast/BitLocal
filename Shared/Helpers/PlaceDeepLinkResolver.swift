@@ -62,8 +62,8 @@ final class PlaceDeepLinkResolver: Sendable {
     static func unavailableState(placeID: String) -> DeepLinkUnavailableState {
         DeepLinkUnavailableState(
             placeID: placeID,
-            title: NSLocalizedString("Place unavailable", comment: "Title for unavailable deep-linked place screen"),
-            message: NSLocalizedString(
+            title: String(localized: "Place unavailable", comment: "Title for unavailable deep-linked place screen"),
+            message: String(localized:
                 "We could not open this BitLocal place. It may have been removed or is temporarily unavailable.",
                 comment: "Message for unavailable deep-linked place screen"
             )
@@ -71,10 +71,10 @@ final class PlaceDeepLinkResolver: Sendable {
     }
 
     static func invalidIdentifierReason() -> String {
-        NSLocalizedString("Invalid place identifier.", comment: "Reason shown when a shared place ID is malformed")
+        String(localized: "Invalid place identifier.", comment: "Reason shown when a shared place ID is malformed")
     }
 
     static func deletedPlaceReason() -> String {
-        NSLocalizedString("This place is no longer available.", comment: "Reason shown when a shared place has been removed")
+        String(localized: "This place is no longer available.", comment: "Reason shown when a shared place has been removed")
     }
 }

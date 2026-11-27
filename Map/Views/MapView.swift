@@ -777,7 +777,7 @@ struct MapView: UIViewRepresentable {
                 view.glyphImage = cachedGlyphImage(for: symbolName)
                 view.accessibilityLabel = Self.accessibilityLabel(for: element, isBoosted: isBoosted)
                 view.accessibilityTraits = .button
-                view.accessibilityHint = NSLocalizedString(
+                view.accessibilityHint = String(localized:
                     "Double tap to open merchant details",
                     comment: "VoiceOver hint for individual merchant map pins"
                 )
@@ -796,7 +796,7 @@ struct MapView: UIViewRepresentable {
                 ).characters
             )
             view.accessibilityTraits = .button
-            view.accessibilityHint = NSLocalizedString(
+            view.accessibilityHint = String(localized:
                 "Double tap to zoom into this cluster",
                 comment: "VoiceOver hint for merchant map clusters"
             )
@@ -805,20 +805,20 @@ struct MapView: UIViewRepresentable {
         private static func accessibilityLabel(for element: Element, isBoosted: Bool) -> String {
             let name = element.displayNameForUI
                 ?? element.displayName
-                ?? NSLocalizedString("Bitcoin merchant", comment: "Fallback VoiceOver name for unnamed merchant pin")
+                ?? String(localized: "Bitcoin merchant", comment: "Fallback VoiceOver name for unnamed merchant pin")
             var parts = [name]
             if isBoosted {
-                parts.append(NSLocalizedString("Featured", comment: "VoiceOver flag for boosted merchants"))
+                parts.append(String(localized: "Featured", comment: "VoiceOver flag for boosted merchants"))
             }
             var methods: [String] = []
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
-                methods.append(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
+                methods.append(String(localized: "On-chain Bitcoin", comment: "VoiceOver payment method"))
             }
             if acceptsLightning(element: element) {
-                methods.append(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
+                methods.append(String(localized: "Lightning", comment: "VoiceOver payment method"))
             }
             if acceptsContactlessLightning(element: element) {
-                methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
+                methods.append(String(localized: "Contactless Lightning", comment: "VoiceOver payment method"))
             }
             if !methods.isEmpty {
                 parts.append(methods.formatted())

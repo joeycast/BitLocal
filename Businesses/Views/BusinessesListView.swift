@@ -407,7 +407,7 @@ struct BusinessesListView: View {
                     }
                 } header: {
                     merchantSectionHeader(
-                        title: NSLocalizedString("Featured Nearby", comment: "Section header for boosted nearby merchants"),
+                        title: String(localized: "Featured Nearby", comment: "Section header for boosted nearby merchants"),
                         systemImage: "star.fill",
                         tint: Color(red: 0.71, green: 0.50, blue: 0.12),
                         topPadding: -3,
@@ -438,7 +438,7 @@ struct BusinessesListView: View {
                 } header: {
                     if !featuredTopSortedElements.isEmpty {
                         merchantSectionHeader(
-                            title: NSLocalizedString("More Nearby", comment: "Section header for additional nearby merchants"),
+                            title: String(localized: "More Nearby", comment: "Section header for additional nearby merchants"),
                             systemImage: "location.fill",
                             tint: .secondary,
                             topPadding: 4,
@@ -483,7 +483,7 @@ struct BusinessesListView: View {
                         Button {
                             viewModel.refreshMerchantData(userInitiated: true)
                         } label: {
-                            Text(NSLocalizedString("Try Again", comment: "Retry button when merchant sync fails"))
+                            Text(String(localized: "Try Again", comment: "Retry button when merchant sync fails"))
                                 .font(.subheadline.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
@@ -566,7 +566,7 @@ struct BusinessesListView: View {
                 BitLocalHaptics.selection()
                 viewModel.clearMerchantChipFilters()
             } label: {
-                Text(NSLocalizedString("Clear Filters", comment: "Button to clear active merchant quick filters"))
+                Text(String(localized: "Clear Filters", comment: "Button to clear active merchant quick filters"))
                     .font(.subheadline.weight(.semibold))
             }
             .buttonStyle(.borderedProminent)
@@ -579,19 +579,19 @@ struct BusinessesListView: View {
 
     private var quickFilterEmptyStateTitle: String {
         if isOnlySavedFilterActive {
-            return NSLocalizedString("No saved places", comment: "Empty state title when Saved filter has no matching places")
+            return String(localized: "No saved places", comment: "Empty state title when Saved filter has no matching places")
         }
-        return NSLocalizedString("No matching places", comment: "Empty state title when quick filters yield zero matches")
+        return String(localized: "No matching places", comment: "Empty state title when quick filters yield zero matches")
     }
 
     private var quickFilterEmptyStateMessage: String {
         if isOnlySavedFilterActive {
-            return NSLocalizedString(
+            return String(localized:
                 "Save places from any merchant detail page to find them quickly here.",
                 comment: "Empty state message when Saved filter has no matching places"
             )
         }
-        return NSLocalizedString(
+        return String(localized:
             "No places match your active filters. Try clearing one or more filters to see more merchants.",
             comment: "Empty state message when quick filters yield zero matches"
         )
@@ -609,12 +609,12 @@ struct BusinessesListView: View {
 
     private var emptyStateTitle: String {
         if viewModel.merchantSyncFailed && viewModel.allElements.isEmpty {
-            return NSLocalizedString("Couldn't load merchants", comment: "Title when merchant dataset failed to load")
+            return String(localized: "Couldn't load merchants", comment: "Title when merchant dataset failed to load")
         }
         if viewModel.allElements.isEmpty {
-            return NSLocalizedString("Updating merchants…", comment: "Title while waiting for first merchant sync")
+            return String(localized: "Updating merchants…", comment: "Title while waiting for first merchant sync")
         }
-        return NSLocalizedString("no_locations_found", comment: "Empty state for no locations found")
+        return String(localized: "no_locations_found", comment: "Empty state for no locations found")
     }
 
     private var emptyStateMessage: String {
@@ -622,12 +622,12 @@ struct BusinessesListView: View {
             return message
         }
         if viewModel.allElements.isEmpty {
-            return NSLocalizedString(
+            return String(localized:
                 "BitLocal is downloading the latest Bitcoin merchants. Use Try Again if this takes too long, or refresh merchants in About.",
                 comment: "Message while waiting for first merchant sync"
             )
         }
-        return NSLocalizedString(
+        return String(localized:
             "No Bitcoin merchants in this map area. Pan or zoom to explore nearby places.",
             comment: "Empty state when the viewport has no merchants but the catalog is loaded"
         )
@@ -640,8 +640,8 @@ struct BusinessesListView: View {
     var lastSyncedFooterLine: String? {
         guard let relative = viewModel.lastSuccessfulSyncRelativeDescription else { return nil }
         return String(
-            format: NSLocalizedString("Updated %@", comment: "Relative last-synced label, e.g. Updated 5 minutes ago"),
-            relative
+            localized: "Updated \(relative)",
+            comment: "Relative last-synced label, e.g. Updated 5 minutes ago"
         )
     }
 
@@ -650,7 +650,7 @@ struct BusinessesListView: View {
             if let digest = viewModel.activeMerchantAlertDigest {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(String(format: NSLocalizedString("New merchants in %@", comment: "Digest header showing the city name"), digest.cityDisplayName))
+                        Text(String(localized: "New merchants in \(digest.cityDisplayName)", comment: "Digest header showing the city name"))
                             .font(.headline)
                         Text(digest.summaryLine)
                             .foregroundStyle(.secondary)
@@ -732,7 +732,7 @@ struct BusinessesListView: View {
                                 }
                             } header: {
                                 merchantSectionHeader(
-                                    title: NSLocalizedString("Featured Nearby", comment: "Section header for boosted nearby search results"),
+                                    title: String(localized: "Featured Nearby", comment: "Section header for boosted nearby search results"),
                                     systemImage: "star.fill",
                                     tint: Color(red: 0.71, green: 0.50, blue: 0.12),
                                     topPadding: 3,
@@ -750,7 +750,7 @@ struct BusinessesListView: View {
                             } header: {
                                 if !displayedFeaturedPrimaryResults.isEmpty {
                                     merchantSectionHeader(
-                                        title: NSLocalizedString("More Nearby", comment: "Section header for additional nearby search results"),
+                                        title: String(localized: "More Nearby", comment: "Section header for additional nearby search results"),
                                         systemImage: "location.fill",
                                         tint: .secondary,
                                         topPadding: 4,

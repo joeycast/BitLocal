@@ -56,8 +56,8 @@ struct PlaceTrustAndBoostSection: View {
                             if let dateText = verificationState.formattedDate {
                                 Text(
                                     String(
-                                        format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"),
-                                        dateText
+                                        localized: "Last verified: \(dateText)",
+                                        comment: "Verification status date label"
                                     )
                                 )
                                 .font(.caption)
