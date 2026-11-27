@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import bitlocal
 
@@ -35,16 +36,18 @@ struct CommunityAreasLoaderTests {
         ]
 
         let result: (ids: Set<String>, pageCallCount: Int, hasError: Bool) = await withCheckedContinuation { continuation in
-            var pageCallCount = 0
-            var sawError = false
+            let state = Mutex<(pageCallCount: Int, sawError: Bool)>((0, false))
             let loader = CommunityAreasLoader(repository: repository, pageLimit: 2)
             loader.loadAll { areas, isComplete, error in
-                pageCallCount += 1
-                if error != nil {
-                    sawError = true
+                let snapshot = state.withLock { current -> (Int, Bool) in
+                    current.pageCallCount += 1
+                    if error != nil {
+                        current.sawError = true
+                    }
+                    return (current.pageCallCount, current.sawError)
                 }
                 if isComplete {
-                    continuation.resume(returning: (Set(areas.map(\.id)), pageCallCount, sawError))
+                    continuation.resume(returning: (Set(areas.map(\.id)), snapshot.0, snapshot.1))
                 }
             }
         }
