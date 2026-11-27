@@ -103,7 +103,8 @@ struct PlaceDetailsSurface: View {
                             value: website.display,
                             copyValue: website.display,
                             copyTitle: "Copy Website",
-                            valueLineLimit: 2
+                            valueLineLimit: 2,
+                            truncationMode: .middle
                         ) {
                             BitLocalHaptics.lightTap()
                             openURL(website.url)
@@ -118,7 +119,8 @@ struct PlaceDetailsSurface: View {
                             value: phone.display,
                             copyValue: phone.display,
                             copyTitle: "Copy Phone",
-                            valueLineLimit: 1
+                            valueLineLimit: 1,
+                            truncationMode: .middle
                         ) {
                             BitLocalHaptics.lightTap()
                             openURL(phone.url)
@@ -133,7 +135,8 @@ struct PlaceDetailsSurface: View {
                             value: email.display,
                             copyValue: email.display,
                             copyTitle: "Copy Email",
-                            valueLineLimit: 2
+                            valueLineLimit: 2,
+                            truncationMode: .middle
                         ) {
                             BitLocalHaptics.lightTap()
                             openURL(email.url)
@@ -270,6 +273,7 @@ struct PlaceDetailsSurface: View {
         copyValue: String?,
         copyTitle: String,
         valueLineLimit: Int,
+        truncationMode: Text.TruncationMode = .tail,
         action: @escaping () -> Void
     ) -> some View {
         HStack(alignment: .center, spacing: 4) {
@@ -289,6 +293,7 @@ struct PlaceDetailsSurface: View {
                             .font(.subheadline)
                             .foregroundStyle(.primary)
                             .lineLimit(valueLineLimit)
+                            .truncationMode(truncationMode)
                             .multilineTextAlignment(.leading)
                     }
 

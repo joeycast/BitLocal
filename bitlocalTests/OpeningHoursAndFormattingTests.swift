@@ -142,4 +142,118 @@ struct OpeningHoursAndFormattingTests {
         #expect(english.contains("Germany"))
         #expect(german.contains("Deutschland"))
     }
+
+    // MARK: - Salvaged Opening Hours & String Edge Cases (from PR #54)
+
+    @Test func openingHoursParserHandlesWraparoundRangeAndSplitShifts() throws {
+        let wraparound = try #require(OSMOpeningHoursParser.parseWeekSchedule("Fr-Mo 10:00-18:00"))
+        let openDays = Set(wraparound.days.filter { !$0.ranges.isEmpty }.map(\.weekday))
+        #expect(openDays == [.friday, .saturday, .sunday, .monday])
+
+        let split = try #require(OSMOpeningHoursParser.parseWeekSchedule("Mo 09:00-12:00, 14:00-18:00; Tu off"))
+        let monday = try #require(split.days.first { $0.weekday == .monday })
+        let tuesday = try #require(split.days.first { $0.weekday == .tuesday })
+        #expect(monday.ranges.count == 2)
+        #expect(tuesday.ranges.isEmpty)
+    }
+
+    @Test func cleanedWebsiteURLAndPhoneCleanupHandleEdgeCases() {
+        #expect("example.com/menu".cleanedWebsiteURL()?.absoluteString == "https://example.com/menu")
+        #expect("https://bitlocal.app".cleanedWebsiteURL()?.absoluteString == "https://bitlocal.app")
+        #expect("currency:XBT=yes".cleanedWebsiteURL() == nil)
+        #expect("   ".cleanedWebsiteURL() == nil)
+        #expect("+1 (615) 555-0100".cleanedPhoneNumber() == "+16155550100")
+    }
+
+    // MARK: - BusinessSubmission Validation & OSM Email Body (from PR #54)
+
+    @Test func businessSubmissionValidationReportsMissingRequiredFieldsAndAcceptsCompleteData() {
+        let emptyErrors = BusinessSubmission().validationErrors()
+        #expect(emptyErrors.map(\.id) == [
+            "missing_submitter_name_label",
+            "invalid_email",
+            "missing_business_name_label",
+            "missing_street_number_label",
+            "missing_street_name_label",
+            "missing_city_label",
+            "missing_state_province_label",
+            "missing_country_label",
+            "no_bitcoin_payment"
+        ])
+        #expect(BusinessSubmission().isValid == false)
+
+        var valid = makeValidSubmission()
+        #expect(valid.isValid)
+        #expect(valid.validationErrors().isEmpty)
+
+        valid.website = "currency:XBT=yes"
+        #expect(valid.isWebsiteValidIfProvided == false)
+        #expect(valid.validationErrors().map(\.id) == ["invalid_website"])
+    }
+
+    @Test func businessSubmissionAnySinglePaymentMethodSatisfiesRequirement() {
+        let setters: [(inout BusinessSubmission) -> Void] = [
+            { $0.acceptsOnChain = true },
+            { $0.acceptsLightning = true },
+            { $0.acceptsContactlessLightning = true }
+        ]
+
+        for setter in setters {
+            var submission = makeValidSubmission()
+            submission.acceptsOnChain = false
+            submission.acceptsLightning = false
+            submission.acceptsContactlessLightning = false
+            #expect(submission.isValid == false)
+
+            setter(&submission)
+            #expect(submission.hasAtLeastOneBitcoinPayment)
+            #expect(submission.isValid)
+        }
+    }
+
+    @Test func businessSubmissionEmailBodyEmitsCorePaymentCoordinateAndCategoryTags() throws {
+        var submission = makeValidSubmission()
+        submission.osmFeatureType = .amenityCafe
+        submission.acceptsLightning = true
+        submission.acceptsOnChain = false
+        submission.acceptsContactlessLightning = true
+        submission.latitude = 30.25
+        submission.longitude = -97.75
+        submission.website = "example.com/menu"
+        submission.phoneCountryCode = "+44"
+        submission.phoneNumber = "2071234567"
+
+        let lines = submission.emailBody().components(separatedBy: .newlines)
+        #expect(lines.contains("addr:housenumber=21"))
+        #expect(lines.contains("addr:street=Main Street"))
+        #expect(lines.contains("addr:city=Austin"))
+        #expect(lines.contains("currency:XBT=yes"))
+        #expect(lines.contains("amenity=cafe"))
+        #expect(lines.contains("payment:lightning=yes"))
+        #expect(lines.contains("payment:onchain=no"))
+        #expect(lines.contains("payment:lightning_contactless=yes"))
+        #expect(lines.contains("contact:website=https://example.com/menu"))
+        #expect(lines.contains("contact:phone=+442071234567"))
+        #expect(lines.contains("=== COORDINATES ==="))
+
+        let encoded = try JSONEncoder().encode(submission)
+        let decoded = try JSONDecoder().decode(BusinessSubmission.self, from: encoded)
+        #expect(decoded.emailBody() == submission.emailBody())
+    }
+
+    private func makeValidSubmission() -> BusinessSubmission {
+        var submission = BusinessSubmission()
+        submission.submitterName = "Satoshi"
+        submission.submitterEmail = "satoshi@example.com"
+        submission.relationship = .owner
+        submission.businessName = "Block Cafe"
+        submission.streetNumber = "21"
+        submission.streetName = "Main Street"
+        submission.city = "Austin"
+        submission.stateProvince = "TX"
+        submission.postalCode = "78701"
+        submission.country = "United States"
+        submission.acceptsLightning = true
+        return submission
+    }
 }

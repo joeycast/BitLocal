@@ -320,9 +320,19 @@ struct MapButtonsView: View {
 }
 
 private struct GlassCapsuleBackground: ViewModifier {
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
+        if colorSchemeContrast == .increased {
+            content
+                .background(Color(.systemBackground), in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(Color.primary.opacity(0.35), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
+        } else if #available(iOS 26.0, *) {
             content
                 .glassEffect(.regular.interactive(), in: Capsule())
         } else {

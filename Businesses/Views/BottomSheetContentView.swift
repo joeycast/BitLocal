@@ -17,12 +17,16 @@ struct BottomSheetContentView: View {
     @Environment(ContentViewModel.self) var viewModel
     @Environment(FeatureHintsController.self) private var featureHintsController
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     var visibleElements: [Element]
     @Binding var currentDetent: PresentationDetent
     var preferredLeadingWidth: CGFloat? = nil
 
     private var glassContrastScrimOpacity: Double {
+        if colorSchemeContrast == .increased {
+            return 0.96
+        }
         if currentDetent == .large {
             return 0
         }
