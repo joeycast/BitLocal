@@ -8,4 +8,5 @@ extension Tag {
     @Tag static var formatting: Self
     @Tag static var alerts: Self
     @Tag static var routing: Self
+    @Tag static var map: Self
 }

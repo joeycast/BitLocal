@@ -29,7 +29,7 @@ A 100% native SwiftUI, zero-dependency, privacy-first Apple Maps–grade Bitcoin
 
 - **Deployment target:** iOS 18.0+, universal app supporting iPhone, iPad (Split View / Slide Over / full screen), and folding iPhone Duo (outer + inner displays, fold-aware leading sheet, vertical side-rail toolbar on iOS 27.1+).
 - **Zero third-party dependencies:** Pure Apple frameworks (`SwiftUI`, `MapKit`, `CoreLocation`, `CloudKit`, `Network`, `AppIntents`, `NaturalLanguage`, `UserNotifications`, `MessageUI`).
-- **Core user capabilities:** Interactive clustered map (~25-mile visible pin window), hybrid local + remote merchant search, live utility quick filters (`Saved`, `Open Now`, `Lightning`, `NFC`, `Verified`), merchant & community detail cards, private iCloud saved places with offline retry, Offline Travel Mode, Siri/Shortcuts App Intents, CloudKit city merchant-alert digests, deep links (`bitlocal.app/place/<id>`), and an Add Business submission flow.
+- **Core user capabilities:** Interactive viewport-clustered map (city to global zoom, no 25-mile cap), hybrid local + remote merchant search, live utility quick filters (`Saved`, `Open Now`, `Lightning`, `NFC`, `Verified`), merchant & community detail cards, private iCloud saved places with offline retry, Offline Travel Mode, Siri/Shortcuts App Intents, CloudKit city merchant-alert digests, deep links (`bitlocal.app/place/<id>`), and an Add Business submission flow.
 - **Feature flags:** Events UI is built but gated off via `FeatureFlags.isEventsUIEnabled`.
 
 ## Brand Commitments
@@ -47,7 +47,7 @@ A 100% native SwiftUI, zero-dependency, privacy-first Apple Maps–grade Bitcoin
 - Feature verification matrix & release checklists: [`docs/VERIFICATION.md`](docs/VERIFICATION.md)
 - Privacy policy: [`Privacy_Policy.md`](Privacy_Policy.md)
 - Release history: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)
-- Automated tests: `bitlocalTests/` (26 XCTest suites) and `bitlocal-maestro/` (Maestro UI flows).
+- Automated tests: `bitlocalTests/` (33 Swift Testing suites) and `bitlocal-maestro/` (Maestro UI flows).
 
 ## Product Principles
 
