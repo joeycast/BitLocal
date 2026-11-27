@@ -169,11 +169,6 @@ private struct IPhoneLayoutContent: View {
                         colorScheme: effectiveColorScheme
                     )
                 } else if usesNativeHorizontalBar {
-                    ToolbarItem(placement: .principal) {
-                        Text("bitlocal")
-                            .font(.custom("Fredoka-Medium", size: 28, relativeTo: .title))
-                            .foregroundStyle(.accent)
-                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             showingSettings = true
@@ -189,7 +184,7 @@ private struct IPhoneLayoutContent: View {
             .toolbarVisibility(showsLegacyHeader ? .hidden : .visible, for: .navigationBar)
             .locationRecenterAlerts(controller: recenterController)
             .toolbarColorScheme(effectiveColorScheme, for: .navigationBar)
-            .modifier(LegacyHiddenToolbarBackgroundModifier())
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("")
             .sheet(isPresented: .constant(shouldPresentBottomSheet), onDismiss: {
@@ -664,18 +659,5 @@ private final class SheetTrackingHitContainerView: UIView {
         guard let transformedView else { return false }
         let transformedPoint = transformedView.convert(point, from: self)
         return transformedView.point(inside: transformedPoint, with: event)
-    }
-}
-
-/// Only hides the legacy solid navigation bar background prior to iOS 26;
-/// on iOS 26+, Liquid Glass manages bar chrome and adaptive contrast natively.
-private struct LegacyHiddenToolbarBackgroundModifier: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-        } else {
-            content.toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        }
     }
 }

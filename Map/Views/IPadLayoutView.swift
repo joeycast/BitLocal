@@ -129,8 +129,7 @@ struct IPadLayoutView: View {
 
     @ViewBuilder
     private var sidePanelRootContent: some View {
-        // Both CommunitiesListView and BusinessesListView embed SheetMapModeSwitcher
-        // below their search bar (always visible when currentDetent == nil on iPad/Duo).
+        // Mode switching lives in MapControlToolbarContent on the map detail toolbar.
         if viewModel.mapDisplayMode == .communities {
             CommunitiesListView()
                 .environment(viewModel)

@@ -199,16 +199,6 @@ struct BusinessesListView: View {
                     )
             }
 
-            if !viewModel.isSearchActive && viewModel.activeMerchantAlertDigest == nil {
-                SheetMapModeSwitcher(viewModel: viewModel)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
-                    .sheetCollapsedReveal(
-                        geometry: viewModel.sheetGeometry,
-                        isCollapsedLike: isCollapsedSheet
-                    )
-            }
-
             if shouldShowFilterChips && (!visibleQuickFilters.isEmpty || !visibleCategoryChips.isEmpty) {
                 categoryChipsView
                     .padding(.bottom, categoryChipsBottomPadding)

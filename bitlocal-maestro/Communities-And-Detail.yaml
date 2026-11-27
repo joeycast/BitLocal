@@ -3,10 +3,10 @@ tags:
   - communities
 ---
 - launchApp
-- tapOn: "Communities"
+- tapOn: "Show communities"
 - assertVisible: "Search communities…"
 - tapOn: "Search communities…"
 - inputText: "Bitcoin"
 - tapOn: "Clear search"
-- tapOn: "Merchants"
+- tapOn: "Show merchants"
 - assertVisible: "Search merchants…"

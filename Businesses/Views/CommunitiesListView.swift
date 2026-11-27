@@ -29,16 +29,6 @@ struct CommunitiesListView: View {
                 .padding(.top, searchBarTopPadding)
                 .padding(.bottom, 6)
 
-            if !isSearchFieldFocused && filterText.isEmpty {
-                SheetMapModeSwitcher(viewModel: viewModel)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
-                    .sheetCollapsedReveal(
-                        geometry: viewModel.sheetGeometry,
-                        isCollapsedLike: isCollapsedSheet
-                    )
-            }
-
             List {
                 if viewModel.communityMapAreasIsLoading &&
                     viewModel.communityMapAreas.isEmpty &&

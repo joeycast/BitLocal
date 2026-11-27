@@ -177,30 +177,3 @@ private struct RootSheetNavigationBarModifier: ViewModifier {
         }
     }
 }
-
-/// Clear labeled mode switcher (`Merchants | Communities`) embedded inside the
-/// sheet/sidebar header so users never have to guess what an icon-only button does.
-struct SheetMapModeSwitcher: View {
-    var viewModel: ContentViewModel
-
-    private var selectionBinding: Binding<MapDisplayMode> {
-        Binding(
-            get: { viewModel.mapDisplayMode },
-            set: { newMode in
-                viewModel.setMapDisplayMode(newMode)
-            }
-        )
-    }
-
-    var body: some View {
-        Picker("Map display mode", selection: selectionBinding) {
-            Text(NSLocalizedString("Merchants", comment: "Segmented control option for Bitcoin merchants"))
-                .tag(MapDisplayMode.merchants)
-            Text(NSLocalizedString("Communities", comment: "Segmented control option for Bitcoin communities"))
-                .tag(MapDisplayMode.communities)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .featureHintAnchor(.communityToggle)
-    }
-}

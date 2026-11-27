@@ -126,10 +126,8 @@ extension View {
     }
 }
 
-/// Native SwiftUI toolbar items for map controls so iPhone Duo renders them
-/// directly inside the system vertical side button bar.
-/// Merchants ↔ Communities switching lives in the labeled sheet mode switcher,
-/// keeping the vertical rail uncluttered with two crisp, balanced map controls.
+/// Native SwiftUI toolbar items for map controls so iPhone Duo and iPad render them
+/// directly inside the system toolbar with full Merchants ↔ Communities parity.
 struct MapControlToolbarContent: ToolbarContent {
     var viewModel: ContentViewModel
     var selectedMapTypeBinding: Binding<MKMapType>
@@ -145,6 +143,7 @@ struct MapControlToolbarContent: ToolbarContent {
             ToolbarItemGroup(placement: placement) {
                 mapTypeButton
                 recenterButton
+                mapModeButton
             }
             .visibilityPriority(.high)
         } else {
@@ -159,6 +158,7 @@ struct MapControlToolbarContent: ToolbarContent {
         ToolbarItemGroup(placement: placement) {
             mapTypeButton
             recenterButton
+            mapModeButton
         }
     }
 
@@ -187,6 +187,25 @@ struct MapControlToolbarContent: ToolbarContent {
                 .id("recenter-\(colorScheme == .dark)")
         }
         .tint(.primary)
+    }
+
+    private var mapModeButton: some View {
+        let isCommunities = viewModel.mapDisplayMode == .communities
+        return Button {
+            BitLocalHaptics.selection()
+            viewModel.toggleMapMode()
+        } label: {
+            Label(
+                isCommunities ? "Show merchants" : "Show communities",
+                systemImage: isCommunities ? "mappin.and.ellipse" : "person.3"
+            )
+            .foregroundStyle(isCommunities ? Color.accentColor : .primary)
+            .id("map-mode-\(isCommunities)-\(colorScheme == .dark)")
+        }
+        .tint(isCommunities ? .accentColor : .primary)
+        .accessibilityValue(isCommunities ? "Communities map" : "Merchants map")
+        .accessibilityHint("Switches between merchant pins and community areas")
+        .featureHintAnchor(.communityToggle)
     }
 }
 
@@ -230,30 +249,30 @@ struct MapButtonsView: View {
             }
             .accessibilityLabel("Center map on location")
 
-            if !useMonochromeIcons {
-                Divider()
-                    .padding(.horizontal, 8)
+            Divider()
+                .padding(.horizontal, 8)
 
-                Button {
-                    Debug.log("⏱ mapMode button TAPPED")
-                    viewModel.toggleMapMode()
-                    Debug.log("⏱ mapMode button action DONE")
-                } label: {
-                    mapModeIcon
-                        .frame(width: controlWidth, height: controlHeight)
-                }
-                .accessibilityLabel(
-                    viewModel.mapDisplayMode == .merchants
-                        ? LocalizedStringKey("Show communities")
-                        : LocalizedStringKey("Show merchants")
-                )
-                .accessibilityValue(
-                    viewModel.mapDisplayMode == .merchants
-                        ? LocalizedStringKey("Merchants map")
-                        : LocalizedStringKey("Communities map")
-                )
-                .accessibilityHint("Switches between merchant pins and community areas")
+            Button {
+                BitLocalHaptics.selection()
+                Debug.log("⏱ mapMode button TAPPED")
+                viewModel.toggleMapMode()
+                Debug.log("⏱ mapMode button action DONE")
+            } label: {
+                mapModeIcon
+                    .frame(width: controlWidth, height: controlHeight)
             }
+            .accessibilityLabel(
+                viewModel.mapDisplayMode == .merchants
+                    ? LocalizedStringKey("Show communities")
+                    : LocalizedStringKey("Show merchants")
+            )
+            .accessibilityValue(
+                viewModel.mapDisplayMode == .merchants
+                    ? LocalizedStringKey("Merchants map")
+                    : LocalizedStringKey("Communities map")
+            )
+            .accessibilityHint("Switches between merchant pins and community areas")
+            .featureHintAnchor(.communityToggle)
         }
         .frame(width: controlWidth)
         .modifier(GlassCapsuleBackground())
@@ -284,18 +303,19 @@ struct MapButtonsView: View {
     }
 
     private var mapModeIcon: some View {
-        let iconColor: Color = useMonochromeIcons ? .primary : .accentColor
+        let isCommunities = viewModel.mapDisplayMode == .communities
+        let iconColor: Color = (useMonochromeIcons && !isCommunities) ? .primary : .accentColor
         return ZStack {
-            Image(systemName: "person.3.fill")
+            Image(systemName: useMonochromeIcons ? "person.3" : "person.3.fill")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(iconColor)
-                .opacity(viewModel.mapDisplayMode == .merchants ? 1 : 0)
+                .opacity(isCommunities ? 0 : 1)
             Image(systemName: "mappin.and.ellipse")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(iconColor)
-                .opacity(viewModel.mapDisplayMode == .merchants ? 0 : 1)
+                .opacity(isCommunities ? 1 : 0)
         }
-        .animation(.easeOut(duration: 0.16), value: viewModel.mapDisplayMode == .merchants)
+        .animation(.easeOut(duration: 0.16), value: isCommunities)
     }
 }
 
