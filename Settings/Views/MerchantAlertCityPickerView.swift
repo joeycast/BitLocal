@@ -485,7 +485,7 @@ final class MerchantAlertCityPickerModel {
 
     private func reverseGeocode(_ location: CLLocation, requestKey: String) async -> CLPlacemark? {
         await withCheckedContinuation { continuation in
-            Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey) { placemark in
+            Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey, priority: .high) { placemark in
                 continuation.resume(returning: placemark)
             }
         }

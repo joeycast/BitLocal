@@ -23,7 +23,10 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     var isUpdatingLocation = false
     /// Reverse-geocode results. Intentionally not observed — cache writes
     /// must not invalidate SwiftUI views.
-    let geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 1_000)
+    let geocodingCache = LRUCache<String, ReverseGeocodingCacheEntry>(maxSize: 5_000)
+    /// Completes once the on-disk geocoding cache has been merged into memory so
+    /// cold-launch rows don't re-geocode coordinates that are already cached.
+    @ObservationIgnored var geocodingCacheLoadTask: Task<Void, Never>?
     /// Coarse spatial cache mapping ~11km regions to ISO country codes.
     /// Populated as a side effect of reverse geocoding; used to assign country
     /// codes to merchants that already have complete addresses without needing
@@ -564,23 +567,54 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     private func loadGeocodingCache() {
         let fileURL = geocodingCacheFileURL
         let cache = geocodingCache
-        geocodingCacheIOQueue.async { [weak self] in
+        geocodingCacheLoadTask = Task.detached(priority: .utility) { [weak self] in
             guard let data = try? Data(contentsOf: fileURL) else { return }
+            let entries: [String: ReverseGeocodingCacheEntry]
+            var didMigrateLegacy = false
             do {
-                let decoded = try JSONDecoder().decode([String: ReverseGeocodingCacheEntry].self, from: data)
-                cache.mergeMissingValues(decoded)
-                Debug.log("Loaded geocoding cache: \(decoded.count) entries")
+                entries = try JSONDecoder().decode([String: ReverseGeocodingCacheEntry].self, from: data)
+                Debug.log("Loaded geocoding cache: \(entries.count) entries")
             } catch {
                 do {
                     let legacy = try JSONDecoder().decode([String: Address].self, from: data)
-                    let migrated = legacy.mapValues { ReverseGeocodingCacheEntry.forAddress($0) }
-                    cache.mergeMissingValues(migrated)
-                    Debug.log("Migrated geocoding cache: \(migrated.count) entries")
-                    Task { @MainActor [weak self] in
-                        self?.scheduleGeocodingCacheSave()
-                    }
+                    entries = legacy.mapValues { ReverseGeocodingCacheEntry.forAddress($0) }
+                    didMigrateLegacy = true
+                    Debug.log("Migrated geocoding cache: \(entries.count) entries")
                 } catch {
                     Debug.log("Failed to load geocoding cache: \(error.localizedDescription)")
+                    return
+                }
+            }
+
+            cache.mergeMissingValues(entries)
+
+            // Seed coarse regional ISO country codes from cached addresses so
+            // previously visited regions never fire redundant `region-code:` geocodes.
+            var seededRegionCodes: [String: String] = [:]
+            for (spatialKey, entry) in entries {
+                guard let code = entry.address?.isoCountryCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !code.isEmpty,
+                      let coarseKey = ReverseGeocodingSpatialKey.coarseKey(fromSpatialKey: spatialKey),
+                      seededRegionCodes[coarseKey] == nil else {
+                    continue
+                }
+                seededRegionCodes[coarseKey] = code
+            }
+
+            let finalRegionCodes = seededRegionCodes
+            let shouldScheduleSave = didMigrateLegacy
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                var addedAny = false
+                for (regionKey, code) in finalRegionCodes where self.countryCodeByRegion[regionKey] == nil {
+                    self.countryCodeByRegion[regionKey] = code
+                    addedAny = true
+                }
+                if addedAny {
+                    NotificationCenter.default.post(name: ElementCellViewModel.regionCountryCodeDidChange, object: nil)
+                }
+                if shouldScheduleSave {
+                    self.scheduleGeocodingCacheSave()
                 }
             }
         }

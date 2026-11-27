@@ -20,6 +20,8 @@ final class ElementCellViewModel {
     @ObservationIgnored private var regionCodeCancellable: AnyCancellable?
     @ObservationIgnored private var lastLocationUpdate: CLLocationCoordinate2D?
     @ObservationIgnored private var isAddressLookupInFlight = false
+    @ObservationIgnored private var activeGeocodeToken: GeocodeRequestToken?
+    @ObservationIgnored private var pendingCacheLoadTask: Task<Void, Never>?
     
     init(element: Element, userLocation: CLLocation?, viewModel: ContentViewModel) {
         self.element = element
@@ -87,8 +89,48 @@ final class ElementCellViewModel {
     }
     
     func onCellAppear() {
+        let priority: GeocodePriority = (address?.hasAnyGeocodingFields == true) ? .low : .normal
+        startAddressHydrationIfNeeded(priority: priority)
+    }
+
+    func onDetailAppear() {
+        startAddressHydrationIfNeeded(priority: .high)
+    }
+
+    func onCellDisappear() {
+        pendingCacheLoadTask?.cancel()
+        pendingCacheLoadTask = nil
+        if let token = activeGeocodeToken {
+            activeGeocodeToken = nil
+            isAddressLookupInFlight = false
+            viewModel.geocoder.cancel(token)
+        }
+    }
+
+    private func startAddressHydrationIfNeeded(priority: GeocodePriority) {
+        if let loadTask = viewModel.geocodingCacheLoadTask {
+            pendingCacheLoadTask?.cancel()
+            pendingCacheLoadTask = Task { @MainActor [weak self] in
+                await loadTask.value
+                guard !Task.isCancelled, let self else { return }
+                self.pendingCacheLoadTask = nil
+                self.refreshFromCacheAndGeocodeIfNeeded(priority: priority)
+            }
+        } else {
+            refreshFromCacheAndGeocodeIfNeeded(priority: priority)
+        }
+    }
+
+    private func refreshFromCacheAndGeocodeIfNeeded(priority: GeocodePriority) {
+        if let cachedEntry = getCachedAddressEntry() {
+            let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
+            let enriched = enrichWithRegionCountryCode(merged)
+            setAddressIfChanged(enriched)
+        }
         if shouldAttemptReverseGeocode() {
-            updateAddress()
+            updateAddress(priority: priority)
+        } else {
+            requestRegionCountryCodeIfNeeded()
         }
     }
     
@@ -122,8 +164,8 @@ final class ElementCellViewModel {
         }
     }
 
-    /// Fire exactly one geocode per ~11 km region to discover the country code.
-    /// Does nothing if the region already has a code or a lookup is in flight.
+    /// Fire at most one low-priority geocode per ~111 km region to discover the country code.
+    /// Skips network work when the country code can be inferred locally or is already cached.
     private func requestRegionCountryCodeIfNeeded() {
         guard normalized(address?.isoCountryCode) == nil,
               let key = coarseRegionKey,
@@ -131,17 +173,45 @@ final class ElementCellViewModel {
               !viewModel.pendingRegionCodeLookups.contains(key),
               let coord = element.mapCoordinate else { return }
 
+        if let countryName = normalized(address?.countryName),
+           let inferredCode = Self.isoCountryCode(forCountryName: countryName) {
+            setRegionCountryCode(inferredCode)
+            return
+        }
+
         viewModel.pendingRegionCodeLookups.insert(key)
         let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
         let requestKey = "region-code:\(key)"
 
-        viewModel.geocoder.reverseGeocode(location: location, requestKey: requestKey) { [weak self] response in
+        viewModel.geocoder.reverseGeocode(location: location, requestKey: requestKey, priority: .low) { [weak self] response in
             guard let self else { return }
             self.viewModel.pendingRegionCodeLookups.remove(key)
             if let code = self.normalized(response.placemark?.isoCountryCode) {
                 self.setRegionCountryCode(code)
             }
         }
+    }
+
+    private static let countryNameToISOCode: [String: String] = {
+        var map: [String: String] = [:]
+        let locales = [Locale(identifier: "en_US_POSIX"), Locale.current]
+        for region in Locale.Region.isoRegions {
+            let code = region.identifier
+            guard code.count == 2 else { continue }
+            for locale in locales {
+                if let localizedName = locale.localizedString(forRegionCode: code)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased(),
+                   !localizedName.isEmpty {
+                    map[localizedName] = code
+                }
+            }
+        }
+        return map
+    }()
+
+    private static func isoCountryCode(forCountryName name: String) -> String? {
+        countryNameToISOCode[name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()]
     }
 
     private func getCachedAddressEntry() -> ReverseGeocodingCacheEntry? {
@@ -162,12 +232,15 @@ final class ElementCellViewModel {
     }
 
     /// If the address is missing an `isoCountryCode`, try to fill it in from
-    /// the coarse regional cache (populated by geocoding of nearby merchants).
-    /// This avoids a network geocode just to determine the country.
+    /// the local country-name map or the coarse regional cache (no network).
     private func enrichWithRegionCountryCode(_ address: Address?) -> Address? {
         guard let address else { return nil }
-        guard normalized(address.isoCountryCode) == nil,
-              let code = regionCountryCode() else {
+        guard normalized(address.isoCountryCode) == nil else {
+            return address
+        }
+        let resolvedCode = regionCountryCode()
+            ?? normalized(address.countryName).flatMap(Self.isoCountryCode(forCountryName:))
+        guard let code = resolvedCode else {
             return address
         }
         return Address(
@@ -181,7 +254,7 @@ final class ElementCellViewModel {
         )
     }
 
-    func updateAddress() {
+    func updateAddress(priority: GeocodePriority = .normal) {
         if let cachedEntry = getCachedAddressEntry() {
             let merged = mergedAddress(preferred: element.address, fallback: cachedEntry.address)
             let enriched = enrichWithRegionCountryCode(merged)
@@ -221,10 +294,20 @@ final class ElementCellViewModel {
         isAddressLookupInFlight = true
 
         // Perform geocoding
-        viewModel.geocoder.reverseGeocode(location: location, requestKey: cacheKey) { [weak self] response in
+        activeGeocodeToken = viewModel.geocoder.reverseGeocode(
+            location: location,
+            requestKey: cacheKey,
+            priority: priority
+        ) { [weak self] response in
             guard let self else { return }
 
+            self.activeGeocodeToken = nil
             self.isAddressLookupInFlight = false
+
+            // Do not cache canceled/evicted/offline skips as 24h no-result entries.
+            if response.wasCanceled {
+                return
+            }
 
             if let placemark = response.placemark {
                 let geocodedAddress = Address(

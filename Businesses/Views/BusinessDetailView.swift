@@ -390,7 +390,10 @@ struct BusinessDetailView: View {
         .onAppear {
             Debug.log("BusinessDetailView appeared for element: \(element.id)")
             Debug.log("ElementCellViewModel address: \(elementCellViewModel.address?.streetName ?? "nil")")
-            elementCellViewModel.onCellAppear()
+            elementCellViewModel.onDetailAppear()
+        }
+        .onDisappear {
+            elementCellViewModel.onCellDisappear()
         }
         .task(id: element.id) {
             hydrateVerificationIfNeeded()

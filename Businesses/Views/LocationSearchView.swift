@@ -347,7 +347,7 @@ final class LocationSearchViewModel: NSObject {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let requestKey = "location-search:\(ReverseGeocodingSpatialKey.key(for: coordinate))"
 
-        Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey) { placemark in
+        Geocoder.shared.reverseGeocode(location: location, requestKey: requestKey, priority: .high) { placemark in
             guard let placemark else { return }
 
             Task { @MainActor in

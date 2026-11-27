@@ -6,7 +6,6 @@ struct ElementCell: View {
     var viewModel: ElementCellViewModel
     var showsBottomDivider = false
     var isSaved = false
-    @State private var appeared = false
     @Environment(\.locale) private var locale
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
@@ -122,9 +121,10 @@ struct ElementCell: View {
         }
         .contentShape(Rectangle())
         .onAppear {
-            guard !appeared else { return }
-            appeared = true
             viewModel.onCellAppear()
+        }
+        .onDisappear {
+            viewModel.onCellDisappear()
         }
     }
     
