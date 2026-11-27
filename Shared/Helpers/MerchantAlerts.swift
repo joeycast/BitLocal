@@ -1,6 +1,7 @@
 import CloudKit
 import CryptoKit
 import MapKit
+import Observation
 import Security
 import SwiftUI
 import UIKit
@@ -232,21 +233,22 @@ enum MerchantAlertsCityNormalizer {
 }
 
 @MainActor
-final class MerchantAlertsManager: NSObject, ObservableObject {
+@Observable
+final class MerchantAlertsManager: NSObject {
     static let shared = MerchantAlertsManager()
 
-    @Published private(set) var subscriptions: [CitySubscription] = []
-    @Published private(set) var notificationSettings: UNNotificationSettings?
-    @Published private(set) var cloudKitAccountStatus: CKAccountStatus = .couldNotDetermine
-    @Published private(set) var isRefreshingStatus = false
-    @Published var activeDigest: CityDigest?
-    @Published var lastDigest: CityDigest?
-    @Published var errorMessage: String?
+    private(set) var subscriptions: [CitySubscription] = []
+    private(set) var notificationSettings: UNNotificationSettings?
+    private(set) var cloudKitAccountStatus: CKAccountStatus = .couldNotDetermine
+    private(set) var isRefreshingStatus = false
+    var activeDigest: CityDigest?
+    var lastDigest: CityDigest?
+    var errorMessage: String?
 
-    private let userDefaults: UserDefaults
-    private let notificationCenter: UNUserNotificationCenter
-    private let container: CKContainer
-    private let publicDatabase: CKDatabase
+    @ObservationIgnored private let userDefaults: UserDefaults
+    @ObservationIgnored private let notificationCenter: UNUserNotificationCenter
+    @ObservationIgnored private let container: CKContainer
+    @ObservationIgnored private let publicDatabase: CKDatabase
     private let subscriptionsKey = "merchant_alert_subscriptions_v1"
     private let lastDigestKey = "merchant_alert_last_digest_v1"
     private let keychainService = "app.bitlocal.bitlocal.merchant-alerts"

@@ -5,16 +5,15 @@ import SwiftUI
 import MapKit
 import Combine
 import Foundation
-import UIKit
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ContentViewModel
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
-    @ObservedObject private var intentRouter = BitLocalAppIntentRouter.shared
+    @Environment(FeatureHintsController.self) private var featureHintsController
+    private let intentRouter = BitLocalAppIntentRouter.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
-    @StateObject private var appearanceManager = AppearanceManager()
+    @State private var appearanceManager = AppearanceManager()
 
     @State private var mapStoppedMovingCancellable: Cancellable?
     @State private var headerHeight: CGFloat = 0
@@ -54,7 +53,7 @@ struct ContentView: View {
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding
                 )
-                .environmentObject(appearanceManager)
+                .environment(appearanceManager)
             } else {
                 IPhoneLayoutView(
                     viewModel: viewModel,
@@ -64,7 +63,7 @@ struct ContentView: View {
                     headerHeight: $headerHeight,
                     selectedMapTypeBinding: selectedMapTypeBinding
                 )
-                .environmentObject(appearanceManager)
+                .environment(appearanceManager)
             }
         }
         .onGeometryChange(for: CGSize.self) { proxy in

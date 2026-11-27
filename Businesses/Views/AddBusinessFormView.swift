@@ -3,7 +3,7 @@ import SwiftUI
 struct AddBusinessFormView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var viewModel = BusinessSubmissionViewModel()
+    @State private var viewModel = BusinessSubmissionViewModel()
     @State private var currentStep: BusinessSubmissionStep = .location
     @State private var isSubmitting = false
     private let actionButtonSize: CGFloat = 56

@@ -17,7 +17,7 @@ struct IPhoneHeaderView: View {
     @Binding var showingSettings: Bool
 
     // Use environment object for instant updates
-    @EnvironmentObject var appearanceManager: AppearanceManager
+    @Environment(AppearanceManager.self) private var appearanceManager
     @Environment(\.colorScheme) private var systemColorScheme
 
     private var appearance: Appearance { appearanceManager.appearance }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MerchantAlertsView: View {
-    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @Binding var currentDetent: PresentationDetent
     @State private var showingCityPicker = false
     @ScaledMetric(relativeTo: .largeTitle) private var welcomeIconSize: CGFloat = 40

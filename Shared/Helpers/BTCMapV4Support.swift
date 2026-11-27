@@ -27,11 +27,10 @@ enum BTCMapV4Error: LocalizedError {
     }
 }
 
-final class BTCMapV4Client: BTCMapV4ClientProtocol {
+final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
     private let session: URLSession
     private let baseURL = URL(string: "https://api.btcmap.org/v4")!
     private let snapshotURL = URL(string: "https://cdn.static.btcmap.org/api/v4/places.json")!
-    private let decoder = JSONDecoder()
     private let pageLimit = 5000
 
     // Includes a subset of v4 + explicit OSM tags needed for current UI parity
@@ -58,32 +57,52 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         return request
     }
 
+    private func fetchData(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw BTCMapV4Error.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let message = String(data: data.prefix(500), encoding: .utf8)
+            throw BTCMapV4Error.httpStatus(http.statusCode, message)
+        }
+        return (data, http)
+    }
+
+    private func performDecodedRequest<T: Decodable>(
+        url: URL?,
+        completion: @escaping (Result<T, Error>) -> Void
+    ) {
+        guard let url else {
+            completion(.failure(BTCMapV4Error.invalidURL))
+            return
+        }
+        let request = makeRequest(url: url)
+        Task {
+            do {
+                let (data, _) = try await fetchData(for: request)
+                let decoded = try JSONDecoder().decode(T.self, from: data)
+                completion(.success(decoded))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
     func fetchSnapshot(completion: @escaping (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
         var request = makeRequest(url: snapshotURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 30
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
+        Task {
             do {
-                let records = try self.decoder.decode([V4PlaceSnapshotRecord].self, from: data)
+                let (data, http) = try await fetchData(for: request)
+                let records = try JSONDecoder().decode([V4PlaceSnapshotRecord].self, from: data)
                 let lastModified = http.value(forHTTPHeaderField: "Last-Modified")
                 completion(.success((records, lastModified)))
             } catch {
                 completion(.failure(error))
             }
-        }.resume()
+        }
     }
 
     func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
@@ -97,7 +116,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             URLQueryItem(name: "include_deleted", value: includeDeleted ? "true" : "false"),
             URLQueryItem(name: "limit", value: String(pageLimit))
         ]
-        performRequest(url: components.url, completion: completion)
+        performDecodedRequest(url: components.url, completion: completion)
     }
 
     func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
@@ -112,7 +131,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         var items = query.queryItems()
         items.append(URLQueryItem(name: "fields", value: syncFields.joined(separator: ",")))
         components.queryItems = items
-        performRequest(url: components.url, completion: completion)
+        performDecodedRequest(url: components.url, completion: completion)
     }
 
     func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
@@ -124,32 +143,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
         components.queryItems = [
             URLQueryItem(name: "fields", value: syncFields.joined(separator: ","))
         ]
-        guard let url = components.url else {
-            completion(.failure(BTCMapV4Error.invalidURL))
-            return
-        }
-        let request = makeRequest(url: url)
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            do {
-                let record = try self.decoder.decode(V4PlaceRecord.self, from: data)
-                completion(.success(record))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
+        performDecodedRequest(url: components.url, completion: completion)
     }
 
     func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
@@ -158,7 +152,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             return
         }
         components.queryItems = query.queryItems()
-        performRequest(url: components.url, completion: completion)
+        performDecodedRequest(url: components.url, completion: completion)
     }
 
     func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
@@ -167,154 +161,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol {
             completion(.failure(BTCMapV4Error.invalidURL))
             return
         }
-
-        let request = makeRequest(url: url)
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            do {
-                let records = try self.decoder.decode([V4PlaceCommentRecord].self, from: data)
-                completion(.success(records))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
-    }
-
-    private func performRequest(url: URL?, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
-        guard let url else {
-            completion(.failure(BTCMapV4Error.invalidURL))
-            return
-        }
-        let request = makeRequest(url: url)
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            do {
-                let records = try self.decoder.decode([V4PlaceRecord].self, from: data)
-                completion(.success(records))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
-    }
-
-    private func performRequest(url: URL?, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
-        guard let url else {
-            completion(.failure(BTCMapV4Error.invalidURL))
-            return
-        }
-        let request = makeRequest(url: url)
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            do {
-                let records = try self.decoder.decode([V4EventRecord].self, from: data)
-                completion(.success(records))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
-    }
-
-    private func performJSONRequest<T: Decodable>(path: String, body: [String: Any], completion: @escaping (Result<T, Error>) -> Void) {
-        guard let url = URL(string: "https://api.btcmap.org/v4/\(path)") else {
-            completion(.failure(BTCMapV4Error.invalidURL))
-            return
-        }
-        var request = makeRequest(url: url, method: "POST")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        } catch {
-            completion(.failure(BTCMapV4Error.invalidBody))
-            return
-        }
-
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            do {
-                completion(.success(try self.decoder.decode(T.self, from: data)))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
-    }
-
-    private func performGETJSONRequest<T: Decodable>(path: String, completion: @escaping (Result<T, Error>) -> Void) {
-        guard let url = URL(string: "https://api.btcmap.org/v4/\(path)") else {
-            completion(.failure(BTCMapV4Error.invalidURL))
-            return
-        }
-        var request = makeRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV4Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV4Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            do {
-                completion(.success(try self.decoder.decode(T.self, from: data)))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
+        performDecodedRequest(url: url, completion: completion)
     }
 }
 
@@ -352,10 +199,9 @@ enum BTCMapV3Error: LocalizedError {
     }
 }
 
-final class BTCMapV3AreasClient {
+final class BTCMapV3AreasClient: @unchecked Sendable {
     private let session: URLSession
     private let baseURL = URL(string: "https://api.btcmap.org/v3")!
-    private let decoder = JSONDecoder()
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -365,6 +211,18 @@ final class BTCMapV3AreasClient {
         var request = URLRequest(url: url)
         request.setValue(BTCMapRequestMetadata.appUserAgent, forHTTPHeaderField: "User-Agent")
         return request
+    }
+
+    private func fetchData(for url: URL) async throws -> Data {
+        let (data, response) = try await session.data(for: makeRequest(url: url))
+        guard let http = response as? HTTPURLResponse else {
+            throw BTCMapV3Error.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let message = String(data: data.prefix(500), encoding: .utf8)
+            throw BTCMapV3Error.httpStatus(http.statusCode, message)
+        }
+        return data
     }
 
     func fetchAreas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
@@ -387,42 +245,27 @@ final class BTCMapV3AreasClient {
     func fetchAreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void) {
         let pageLimit = max(1, limit)
         let maxPages = 50
-        var cursor = updatedSince
-        var page = 0
-        var collected: [V3AreaElementRecord] = []
+        Task {
+            var cursor = updatedSince
+            var page = 0
+            var collected: [V3AreaElementRecord] = []
 
-        func step() {
-            guard var components = URLComponents(url: baseURL.appendingPathComponent("area-elements"), resolvingAgainstBaseURL: false) else {
-                completion(.failure(BTCMapV3Error.invalidURL))
-                return
-            }
-            components.queryItems = [
-                URLQueryItem(name: "area_id", value: String(areaID)),
-                URLQueryItem(name: "updated_since", value: cursor),
-                URLQueryItem(name: "limit", value: String(pageLimit))
-            ]
-            guard let url = components.url else {
-                completion(.failure(BTCMapV3Error.invalidURL))
-                return
-            }
+            do {
+                while true {
+                    guard var components = URLComponents(url: baseURL.appendingPathComponent("area-elements"), resolvingAgainstBaseURL: false) else {
+                        throw BTCMapV3Error.invalidURL
+                    }
+                    components.queryItems = [
+                        URLQueryItem(name: "area_id", value: String(areaID)),
+                        URLQueryItem(name: "updated_since", value: cursor),
+                        URLQueryItem(name: "limit", value: String(pageLimit))
+                    ]
+                    guard let url = components.url else {
+                        throw BTCMapV3Error.invalidURL
+                    }
 
-            let request = makeRequest(url: url)
-            session.dataTask(with: request) { data, response, error in
-                if let error {
-                    completion(.failure(error))
-                    return
-                }
-                guard let data, let http = response as? HTTPURLResponse else {
-                    completion(.failure(BTCMapV3Error.invalidResponse))
-                    return
-                }
-                guard (200..<300).contains(http.statusCode) else {
-                    let message = String(data: data.prefix(500), encoding: .utf8)
-                    completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
-                    return
-                }
-                do {
-                    let decoded = try self.decoder.decode([V3AreaElementRecord].self, from: data)
+                    let data = try await fetchData(for: url)
+                    let decoded = try JSONDecoder().decode([V3AreaElementRecord].self, from: data)
                     let filtered = decoded.filter { $0.areaID == areaID }
                     if !filtered.isEmpty {
                         collected.append(contentsOf: filtered)
@@ -440,14 +283,11 @@ final class BTCMapV3AreasClient {
                         return
                     }
                     cursor = nextCursor
-                    step()
-                } catch {
-                    completion(.failure(error))
                 }
-            }.resume()
+            } catch {
+                completion(.failure(error))
+            }
         }
-
-        step()
     }
 
     private func performRequest<T: Decodable>(url: URL?, completion: @escaping (Result<[T], Error>) -> Void) {
@@ -455,28 +295,15 @@ final class BTCMapV3AreasClient {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
         }
-        let request = makeRequest(url: url)
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV3Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
-                return
-            }
+        Task {
             do {
-                let decoded = try self.decoder.decode([T].self, from: data)
+                let data = try await fetchData(for: url)
+                let decoded = try JSONDecoder().decode([T].self, from: data)
                 completion(.success(decoded))
             } catch {
                 completion(.failure(error))
             }
-        }.resume()
+        }
     }
 
     private func performSingleRequest<T: Decodable>(url: URL?, completion: @escaping (Result<T, Error>) -> Void) {
@@ -484,38 +311,29 @@ final class BTCMapV3AreasClient {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
         }
-        let request = makeRequest(url: url)
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
+        Task {
+            do {
+                let data = try await fetchData(for: url)
+                let decoder = JSONDecoder()
+                if let object = try? decoder.decode(T.self, from: data) {
+                    completion(.success(object))
+                    return
+                }
+                if let array = try? decoder.decode([T].self, from: data), let first = array.first {
+                    completion(.success(first))
+                    return
+                }
                 completion(.failure(BTCMapV3Error.invalidResponse))
-                return
+            } catch {
+                completion(.failure(error))
             }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
-                return
-            }
-            if let object = try? self.decoder.decode(T.self, from: data) {
-                completion(.success(object))
-                return
-            }
-            if let array = try? self.decoder.decode([T].self, from: data), let first = array.first {
-                completion(.success(first))
-                return
-            }
-            completion(.failure(BTCMapV3Error.invalidResponse))
-        }.resume()
+        }
     }
 }
 
-final class BTCMapV2AreasClient {
+final class BTCMapV2AreasClient: @unchecked Sendable {
     private let session: URLSession
     private let baseURL = URL(string: "https://api.btcmap.org/v2")!
-    private let decoder = JSONDecoder()
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -536,34 +354,30 @@ final class BTCMapV2AreasClient {
             URLQueryItem(name: "updated_since", value: updatedSince),
             URLQueryItem(name: "limit", value: String(limit))
         ]
-
         guard let url = components.url else {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
         }
 
         let request = makeRequest(url: url)
-        session.dataTask(with: request) { data, response, error in
-            if let error {
-                completion(.failure(error))
-                return
-            }
-            guard let data, let http = response as? HTTPURLResponse else {
-                completion(.failure(BTCMapV3Error.invalidResponse))
-                return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let message = String(data: data.prefix(500), encoding: .utf8)
-                completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
-                return
-            }
+        Task {
             do {
-                let decoded = try self.decoder.decode([V2AreaRecord].self, from: data)
+                let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse else {
+                    completion(.failure(BTCMapV3Error.invalidResponse))
+                    return
+                }
+                guard (200..<300).contains(http.statusCode) else {
+                    let message = String(data: data.prefix(500), encoding: .utf8)
+                    completion(.failure(BTCMapV3Error.httpStatus(http.statusCode, message)))
+                    return
+                }
+                let decoded = try JSONDecoder().decode([V2AreaRecord].self, from: data)
                 completion(.success(decoded))
             } catch {
                 completion(.failure(error))
             }
-        }.resume()
+        }
     }
 }
 
@@ -825,7 +639,7 @@ struct V4PlaceToElementMapper {
     }
 }
 
-final class BTCMapRepository: BTCMapRepositoryProtocol {
+final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     static let shared = BTCMapRepository()
     static let epochISO8601 = "1970-01-01T00:00:00Z"
 
@@ -836,7 +650,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     private let userDefaults: UserDefaults
     private let modeKey = "btcmap_data_source_mode"
     private let lastAppVersionKey = "btcmap_last_app_version"
-    private let cacheWriteQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-writes", qos: .utility)
+    private let cacheIOQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-io", qos: .utility)
     private let refreshStateQueue = DispatchQueue(label: "app.bitlocal.btcmap-refresh-state", qos: .userInitiated)
     private var isV4RefreshInFlight = false
     private var pendingV4RefreshCompletions: [([Element]?) -> Void] = []
@@ -863,8 +677,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
         } else {
             Debug.logCache("Recording app version \(currentVersion); clearing any pre-tracking v4 merchant cache")
         }
-        try? FileManager.default.removeItem(at: v4ElementsFileURL)
-        try? FileManager.default.removeItem(at: v4SyncStateFileURL)
+        cacheIOQueue.sync {
+            try? FileManager.default.removeItem(at: v4ElementsFileURL)
+            try? FileManager.default.removeItem(at: v4SyncStateFileURL)
+        }
         userDefaults.set(currentVersion, forKey: lastAppVersionKey)
     }
 
@@ -1140,6 +956,12 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private func loadV4Elements() -> [Element]? {
+        cacheIOQueue.sync {
+            loadV4ElementsUnlocked()
+        }
+    }
+
+    private func loadV4ElementsUnlocked() -> [Element]? {
         do {
             let start = CFAbsoluteTimeGetCurrent()
             let data = try Data(contentsOf: v4ElementsFileURL)
@@ -1158,7 +980,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private func saveV4Elements(_ elements: [Element], reason: String = "unspecified") {
-        cacheWriteQueue.async {
+        cacheIOQueue.async {
             do {
                 let start = CFAbsoluteTimeGetCurrent()
                 let data = try JSONEncoder().encode(elements)
@@ -1180,21 +1002,25 @@ final class BTCMapRepository: BTCMapRepositoryProtocol {
     }
 
     private func hasV4CachedData() -> Bool {
-        guard FileManager.default.fileExists(atPath: v4ElementsFileURL.path) else { return false }
-        return (loadV4Elements()?.isEmpty == false)
+        cacheIOQueue.sync {
+            guard FileManager.default.fileExists(atPath: v4ElementsFileURL.path) else { return false }
+            return (loadV4ElementsUnlocked()?.isEmpty == false)
+        }
     }
 
     private func loadV4SyncState() -> V4SyncState {
-        do {
-            let data = try Data(contentsOf: v4SyncStateFileURL)
-            return try JSONDecoder().decode(V4SyncState.self, from: data)
-        } catch {
-            return .empty
+        cacheIOQueue.sync {
+            do {
+                let data = try Data(contentsOf: v4SyncStateFileURL)
+                return try JSONDecoder().decode(V4SyncState.self, from: data)
+            } catch {
+                return .empty
+            }
         }
     }
 
     private func saveV4SyncState(_ state: V4SyncState) {
-        cacheWriteQueue.async {
+        cacheIOQueue.async {
             do {
                 let data = try JSONEncoder().encode(state)
                 try data.write(to: self.v4SyncStateFileURL, options: .atomic)

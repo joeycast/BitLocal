@@ -3,7 +3,7 @@ import CoreLocation
 
 // Address caching to prevent geocoding rate limiting.
 // Thread-safe: all mutations and reads are serialized with an internal lock.
-class LRUCache<Key: Hashable, Value> {
+final class LRUCache<Key: Hashable, Value>: @unchecked Sendable {
     private final class Node {
         let key: Key
         var value: Value
@@ -170,12 +170,12 @@ struct ReverseGeocodingCacheEntry: Codable {
     let updatedAt: Date
     let retryAfter: Date?
 
-    func shouldRetry(referenceDate: Date = Date()) -> Bool {
+    func shouldRetry(referenceDate: Date = .now) -> Bool {
         guard let retryAfter else { return false }
         return referenceDate >= retryAfter
     }
 
-    static func forAddress(_ address: Address, updatedAt: Date = Date()) -> ReverseGeocodingCacheEntry {
+    static func forAddress(_ address: Address, updatedAt: Date = .now) -> ReverseGeocodingCacheEntry {
         ReverseGeocodingCacheEntry(
             address: address,
             status: address.isCompleteForReverseGeocoding ? .resolved : .partial,
@@ -184,7 +184,7 @@ struct ReverseGeocodingCacheEntry: Codable {
         )
     }
 
-    static func noResult(retryAfter: Date, updatedAt: Date = Date()) -> ReverseGeocodingCacheEntry {
+    static func noResult(retryAfter: Date, updatedAt: Date = .now) -> ReverseGeocodingCacheEntry {
         ReverseGeocodingCacheEntry(
             address: nil,
             status: .noResult,
@@ -193,7 +193,7 @@ struct ReverseGeocodingCacheEntry: Codable {
         )
     }
 
-    static func failed(retryAfter: Date, updatedAt: Date = Date()) -> ReverseGeocodingCacheEntry {
+    static func failed(retryAfter: Date, updatedAt: Date = .now) -> ReverseGeocodingCacheEntry {
         ReverseGeocodingCacheEntry(
             address: nil,
             status: .failed,
@@ -243,29 +243,13 @@ struct ReverseGeocodeResponse {
     let retryAfter: Date?
 }
 
-final class Geocoder {
+final class Geocoder: @unchecked Sendable {
     static let shared = Geocoder()
 
-    private struct PendingRequest {
-        let key: String
-        let location: CLLocation
-    }
-
-    private let geocoder = CLGeocoder()
-    private let queue = DispatchQueue(label: "reverse-geocoder.queue", qos: .utility)
-    private let successSpacing: TimeInterval
-    private let maxBackoff: TimeInterval
-
-    private var pendingRequests: [PendingRequest] = []
-    private var handlersByKey: [String: [(ReverseGeocodeResponse) -> Void]] = [:]
-    private var isRequestInFlight = false
-    private var isPumpScheduled = false
-    private var nextAllowedRequestDate = Date.distantPast
-    private var consecutiveFailureCount = 0
+    private let pump: GeocoderPump
 
     init(successSpacing: TimeInterval = 1.35, maxBackoff: TimeInterval = 60) {
-        self.successSpacing = successSpacing
-        self.maxBackoff = maxBackoff
+        self.pump = GeocoderPump(successSpacing: successSpacing, maxBackoff: maxBackoff)
     }
 
     func reverseGeocode(
@@ -274,15 +258,8 @@ final class Geocoder {
         completion: @escaping (ReverseGeocodeResponse) -> Void
     ) {
         let key = requestKey ?? ReverseGeocodingSpatialKey.key(for: location.coordinate)
-        queue.async {
-            if self.handlersByKey[key] != nil {
-                self.handlersByKey[key]?.append(completion)
-                return
-            }
-
-            self.handlersByKey[key] = [completion]
-            self.pendingRequests.append(PendingRequest(key: key, location: location))
-            self.processQueueIfNeeded()
+        Task {
+            await pump.enqueue(key: key, location: location, completion: completion)
         }
     }
 
@@ -295,43 +272,78 @@ final class Geocoder {
             completion(response.placemark)
         }
     }
+}
 
-    private func processQueueIfNeeded() {
-        guard !isRequestInFlight, !pendingRequests.isEmpty else { return }
+private actor GeocoderPump {
+    private struct PendingRequest {
+        let key: String
+        let location: CLLocation
+    }
 
-        let delay = nextAllowedRequestDate.timeIntervalSinceNow
-        if delay > 0 {
-            guard !isPumpScheduled else { return }
-            isPumpScheduled = true
-            queue.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self else { return }
-                self.isPumpScheduled = false
-                self.processQueueIfNeeded()
-            }
+    private let geocoder = CLGeocoder()
+    private let successSpacing: TimeInterval
+    private let maxBackoff: TimeInterval
+
+    private var pendingRequests: [PendingRequest] = []
+    private var handlersByKey: [String: [(ReverseGeocodeResponse) -> Void]] = [:]
+    private var isPumping = false
+    private var nextAllowedRequestDate = Date.distantPast
+    private var consecutiveFailureCount = 0
+
+    init(successSpacing: TimeInterval, maxBackoff: TimeInterval) {
+        self.successSpacing = successSpacing
+        self.maxBackoff = maxBackoff
+    }
+
+    func enqueue(
+        key: String,
+        location: CLLocation,
+        completion: @escaping (ReverseGeocodeResponse) -> Void
+    ) {
+        if handlersByKey[key] != nil {
+            handlersByKey[key]?.append(completion)
             return
         }
 
-        let request = pendingRequests.removeFirst()
-        isRequestInFlight = true
+        handlersByKey[key] = [completion]
+        pendingRequests.append(PendingRequest(key: key, location: location))
 
-        geocoder.reverseGeocodeLocation(request.location) { [weak self] placemarks, error in
-            guard let self else { return }
-            self.queue.async {
-                self.isRequestInFlight = false
-                let response = self.makeResponse(placemark: placemarks?.first, error: error)
-                let handlers = self.handlersByKey.removeValue(forKey: request.key) ?? []
+        guard !isPumping else { return }
+        isPumping = true
+        Task {
+            await runPumpLoop()
+        }
+    }
 
-                DispatchQueue.main.async {
-                    handlers.forEach { $0(response) }
-                }
+    private func runPumpLoop() async {
+        defer { isPumping = false }
 
-                self.processQueueIfNeeded()
+        while !pendingRequests.isEmpty {
+            let delay = nextAllowedRequestDate.timeIntervalSinceNow
+            if delay > 0 {
+                try? await Task.sleep(for: .seconds(delay))
+            }
+
+            guard !pendingRequests.isEmpty else { break }
+            let request = pendingRequests.removeFirst()
+
+            let response: ReverseGeocodeResponse
+            do {
+                let placemarks = try await geocoder.reverseGeocodeLocation(request.location)
+                response = makeResponse(placemark: placemarks.first, error: nil)
+            } catch {
+                response = makeResponse(placemark: nil, error: error)
+            }
+
+            let handlers = handlersByKey.removeValue(forKey: request.key) ?? []
+            await MainActor.run {
+                handlers.forEach { $0(response) }
             }
         }
     }
 
     private func makeResponse(placemark: CLPlacemark?, error: Error?) -> ReverseGeocodeResponse {
-        let now = Date()
+        let now = Date.now
 
         if let error {
             consecutiveFailureCount = min(consecutiveFailureCount + 1, 6)

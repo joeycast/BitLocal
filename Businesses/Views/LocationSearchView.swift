@@ -1,11 +1,11 @@
-import Combine
-import SwiftUI
 import MapKit
+import Observation
+import SwiftUI
 
 struct LocationSearchView: View {
     @Binding var submission: BusinessSubmission
 
-    @StateObject private var searchViewModel = LocationSearchViewModel()
+    @State private var searchViewModel = LocationSearchViewModel()
     @State private var showingManualEntry = false
     @State private var mapType: MKMapType = .hybrid
     @State private var selectedLocation: SearchLocation? {
@@ -247,19 +247,20 @@ struct SearchResult: Identifiable {
 
 // MARK: - Location Search ViewModel
 @MainActor
-class LocationSearchViewModel: NSObject, ObservableObject {
-    @Published var searchText = "" {
+@Observable
+final class LocationSearchViewModel: NSObject {
+    var searchText = "" {
         didSet {
             scheduleSearch(for: searchText)
         }
     }
-    @Published var searchResults: [SearchResult] = []
-    @Published var isSearching = false
-    @Published var searchErrorMessage: String?
-    @Published var showingSearchError = false
+    var searchResults: [SearchResult] = []
+    var isSearching = false
+    var searchErrorMessage: String?
+    var showingSearchError = false
 
-    private let searchCompleter = MKLocalSearchCompleter()
-    private var searchDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private let searchCompleter = MKLocalSearchCompleter()
+    @ObservationIgnored private var searchDebounceTask: Task<Void, Never>?
 
     override init() {
         super.init()

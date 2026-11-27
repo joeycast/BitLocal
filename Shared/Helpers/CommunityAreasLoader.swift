@@ -17,54 +17,57 @@ final class CommunityAreasLoader {
         self.maxPages = maxPages
     }
 
-    /// Loads all community-capable v2 areas, calling `onPage` on the main queue after each page merge.
+    /// Loads all community-capable v2 areas, calling `onPage` on the main actor after each page merge.
     func loadAll(
         initialAnchor: String = "2022-01-01T00:00:00.000Z",
         onPage: @escaping (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
     ) {
-        step(anchor: initialAnchor, page: 1, accumulated: [:], onPage: onPage)
-    }
+        let repository = self.repository
+        let pageLimit = self.pageLimit
+        let maxPages = self.maxPages
 
-    private func step(
-        anchor: String,
-        page: Int,
-        accumulated: [String: V2AreaRecord],
-        onPage: @escaping (_ areas: [V2AreaRecord], _ isComplete: Bool, _ error: Error?) -> Void
-    ) {
-        // Deliberately capture self strongly: callers create this loader as a
-        // local, so the in-flight completion is the only thing keeping it (and
-        // the pagination) alive. A weak capture would deallocate the loader as
-        // soon as the calling scope returns and onPage would never fire. The
-        // retain resolves when the network completion runs.
-        repository.fetchV2Areas(updatedSince: anchor, limit: pageLimit) { [self] result in
-            DispatchQueue.main.async {
-                switch result {
-                case .failure(let error):
-                    onPage(Array(accumulated.values), true, error)
+        Task {
+            var anchor = initialAnchor
+            var page = 1
+            var accumulated: [String: V2AreaRecord] = [:]
 
-                case .success(let areas):
-                    var merged = accumulated
+            while true {
+                do {
+                    let areas = try await repository.fetchV2Areas(updatedSince: anchor, limit: pageLimit)
                     for area in areas {
                         if area.isDeleted {
-                            merged.removeValue(forKey: area.id)
+                            accumulated.removeValue(forKey: area.id)
                         } else {
-                            merged[area.id] = area
+                            accumulated[area.id] = area
                         }
                     }
 
                     let nextAnchor = areas.last?.updatedAt
-                    let shouldContinue = areas.count == self.pageLimit &&
-                        page < self.maxPages &&
+                    let shouldContinue = areas.count == pageLimit &&
+                        page < maxPages &&
                         nextAnchor != nil &&
                         nextAnchor != anchor
 
+                    let snapshot = Array(accumulated.values)
                     if shouldContinue, let nextAnchor {
-                        onPage(Array(merged.values), false, nil)
-                        self.step(anchor: nextAnchor, page: page + 1, accumulated: merged, onPage: onPage)
-                        return
+                        await MainActor.run {
+                            onPage(snapshot, false, nil)
+                        }
+                        anchor = nextAnchor
+                        page += 1
+                        continue
                     }
 
-                    onPage(Array(merged.values), true, nil)
+                    await MainActor.run {
+                        onPage(snapshot, true, nil)
+                    }
+                    return
+                } catch {
+                    let snapshot = Array(accumulated.values)
+                    await MainActor.run {
+                        onPage(snapshot, true, error)
+                    }
+                    return
                 }
             }
         }

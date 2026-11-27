@@ -1,15 +1,16 @@
-import Combine
 import Foundation
 import Network
+import Observation
 
 @MainActor
-final class NetworkReachabilityMonitor: ObservableObject {
+@Observable
+final class NetworkReachabilityMonitor {
     static let shared = NetworkReachabilityMonitor()
 
-    @Published private(set) var isOffline: Bool = false
+    private(set) var isOffline: Bool = false
 
-    private let driver: PathMonitorDriver
-    private var lastAppliedGeneration: UInt64 = 0
+    @ObservationIgnored private let driver: PathMonitorDriver
+    @ObservationIgnored private var lastAppliedGeneration: UInt64 = 0
 
     init(offlineDebounceInterval: TimeInterval = 0.8, startSystemMonitor: Bool = true) {
         self.driver = PathMonitorDriver(offlineDebounceInterval: offlineDebounceInterval)

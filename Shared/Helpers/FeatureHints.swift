@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 import SwiftUI
 
 enum FeatureHintTarget: String, Hashable {
@@ -57,22 +57,23 @@ struct FeatureHintCampaign: Equatable {
 }
 
 @MainActor
-final class FeatureHintsController: ObservableObject {
+@Observable
+final class FeatureHintsController {
     private enum StorageKey {
         static let lastSeenHintCampaignID = "lastSeenHintCampaignID"
         static let shouldReplayHints = "shouldReplayHints"
     }
 
-    @Published private(set) var activeCampaign: FeatureHintCampaign?
-    @Published private(set) var currentStepIndex = 0
-    @Published private(set) var replayRequestCount = 0
-    @Published private(set) var mainUIPresentationCount = 0
+    private(set) var activeCampaign: FeatureHintCampaign?
+    private(set) var currentStepIndex = 0
+    private(set) var replayRequestCount = 0
+    private(set) var mainUIPresentationCount = 0
+    private(set) var frameRevision = 0
 
-    private let userDefaults: UserDefaults
-    private var targetFrames: [FeatureHintTarget: CGRect] = [:]
-    private var overlayWindow: UIWindow?
-    private var overlayWindowCancellable: AnyCancellable?
-    private var hasObservedMainUI = false
+    @ObservationIgnored private let userDefaults: UserDefaults
+    @ObservationIgnored private var targetFrames: [FeatureHintTarget: CGRect] = [:]
+    @ObservationIgnored private var overlayWindow: UIWindow?
+    @ObservationIgnored private var hasObservedMainUI = false
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
@@ -107,17 +108,15 @@ final class FeatureHintsController: ObservableObject {
         }
         let existing = targetFrames[target]
         targetFrames[target] = frame
-        // Notify observers when a frame first appears or moves significantly,
-        // so the overlay re-renders (targetFrames is not @Published to avoid
-        // excessive re-renders during animations).
+        // Bump frameRevision only when a frame first appears or moves significantly.
         if existing.map({ !framesAreClose($0, frame) }) ?? true {
-            objectWillChange.send()
+            frameRevision &+= 1
         }
     }
 
     func clearFrame(target: FeatureHintTarget) {
         guard targetFrames.removeValue(forKey: target) != nil else { return }
-        objectWillChange.send()
+        frameRevision &+= 1
     }
 
     private func framesAreClose(_ a: CGRect, _ b: CGRect) -> Bool {
@@ -126,7 +125,8 @@ final class FeatureHintsController: ObservableObject {
     }
 
     func frame(for target: FeatureHintTarget) -> CGRect? {
-        targetFrames[target]
+        _ = frameRevision
+        return targetFrames[target]
     }
 
     func evaluatePresentation(didCompleteOnboarding: Bool, isReadyForMainUI: Bool) {
@@ -188,7 +188,7 @@ final class FeatureHintsController: ObservableObject {
               let scene = ActiveWindowScene.current else { return }
 
         let overlay = FeatureHintsOverlay()
-            .environmentObject(self)
+            .environment(self)
 
         let hosting = UIHostingController(rootView: overlay)
         hosting.view.backgroundColor = .clear
@@ -197,15 +197,10 @@ final class FeatureHintsController: ObservableObject {
         window.windowLevel = .alert + 1
         window.backgroundColor = .clear
         window.rootViewController = hosting
-        window.isUserInteractionEnabled = false
+        window.isUserInteractionEnabled = (activeCampaign != nil)
         window.isHidden = false
 
         self.overlayWindow = window
-
-        overlayWindowCancellable = $activeCampaign
-            .sink { [weak window] campaign in
-                window?.isUserInteractionEnabled = (campaign != nil)
-            }
     }
 
     // MARK: - Private
@@ -213,6 +208,7 @@ final class FeatureHintsController: ObservableObject {
     private func beginCurrentCampaign() {
         activeCampaign = FeatureHintCampaign.current
         currentStepIndex = 0
+        overlayWindow?.isUserInteractionEnabled = true
     }
 
     private func finish(markCampaignSeen: Bool) {
@@ -223,13 +219,14 @@ final class FeatureHintsController: ObservableObject {
 
         activeCampaign = nil
         currentStepIndex = 0
+        overlayWindow?.isUserInteractionEnabled = false
     }
 }
 
 // MARK: - Anchor modifier
 
 private struct FeatureHintAnchorModifier: ViewModifier {
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @Environment(FeatureHintsController.self) private var featureHintsController
     let target: FeatureHintTarget
 
     func body(content: Content) -> some View {

@@ -1,13 +1,13 @@
-import Combine
 import CoreLocation
+import Observation
 import SwiftUI
 
 struct MerchantAlertCityPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var contentViewModel: ContentViewModel
-    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @Binding var currentDetent: PresentationDetent
-    @StateObject private var model = MerchantAlertCityPickerModel()
+    @State private var model = MerchantAlertCityPickerModel()
 
     let onSelection: (MerchantAlertCityChoice) -> Void
 
@@ -314,23 +314,24 @@ struct MerchantAlertCityPickerView: View {
 }
 
 @MainActor
-final class MerchantAlertCityPickerModel: ObservableObject {
-    @Published var searchText = "" {
+@Observable
+final class MerchantAlertCityPickerModel {
+    var searchText = "" {
         didSet {
             scheduleSearch(for: searchText)
         }
     }
-    @Published private(set) var results: [CitySearchResult] = []
-    @Published private(set) var isLoading = false
-    @Published private(set) var currentLocationCity: CityPickerContextCity?
-    @Published private(set) var activeAlertCity: MerchantAlertCityChoice?
-    @Published private(set) var recommendedCities: [CitySearchResult] = []
-    @Published private(set) var isLoadingBrowseContent = false
+    private(set) var results: [CitySearchResult] = []
+    private(set) var isLoading = false
+    private(set) var currentLocationCity: CityPickerContextCity?
+    private(set) var activeAlertCity: MerchantAlertCityChoice?
+    private(set) var recommendedCities: [CitySearchResult] = []
+    private(set) var isLoadingBrowseContent = false
 
-    private var searchTask: Task<Void, Never>?
-    private var locationTask: Task<Void, Never>?
-    private let store = CityIndexStore.shared
-    private var latestLocationKey: String?
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var locationTask: Task<Void, Never>?
+    @ObservationIgnored private let store = CityIndexStore.shared
+    @ObservationIgnored private var latestLocationKey: String?
 
     var isShowingSearchResults: Bool {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2

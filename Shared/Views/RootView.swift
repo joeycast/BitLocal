@@ -11,9 +11,9 @@ import Foundation // for Debug logging
 struct RootView: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
     @EnvironmentObject var contentViewModel: ContentViewModel
-    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
-    @StateObject private var featureHintsController = FeatureHintsController()
-    @StateObject private var releaseNotesController = ReleaseNotesController()
+    @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
+    @State private var featureHintsController = FeatureHintsController()
+    @State private var releaseNotesController = ReleaseNotesController()
     @State private var hasTriggeredInitialFetch = false // Prevent duplicate calls
     @State private var deferredInitialFetchTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,8 +22,8 @@ struct RootView: View {
         ZStack {
             ContentView()
                 .environmentObject(contentViewModel)
-                .environmentObject(featureHintsController)
-                .environmentObject(releaseNotesController)
+                .environment(featureHintsController)
+                .environment(releaseNotesController)
             
             if !didCompleteOnboarding {
                 OnboardingView()

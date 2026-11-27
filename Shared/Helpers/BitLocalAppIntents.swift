@@ -1,6 +1,6 @@
 import AppIntents
-import Combine
 import Foundation
+import Observation
 
 enum MerchantQuickFilter: String, CaseIterable, Identifiable, Hashable, AppEnum {
     case saved
@@ -75,10 +75,11 @@ enum BitLocalIntentAction: Equatable, Sendable {
 }
 
 @MainActor
-final class BitLocalAppIntentRouter: ObservableObject {
+@Observable
+final class BitLocalAppIntentRouter {
     static let shared = BitLocalAppIntentRouter()
 
-    @Published var pendingAction: BitLocalIntentAction?
+    var pendingAction: BitLocalIntentAction?
 
     init() {}
 

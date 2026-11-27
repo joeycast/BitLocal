@@ -15,7 +15,7 @@ struct IPadLayoutView: View {
     @Binding var showingSettings: Bool
     @Binding var headerHeight: CGFloat
     var selectedMapTypeBinding: Binding<MKMapType>
-    @EnvironmentObject private var appearanceManager: AppearanceManager
+    @Environment(AppearanceManager.self) private var appearanceManager
     @Environment(\.colorScheme) private var systemColorScheme
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
@@ -87,7 +87,7 @@ struct IPadLayoutView: View {
                                     }
                                 )
                                 .environmentObject(viewModel)
-                                .environmentObject(MerchantAlertsManager.shared)
+                                .environment(MerchantAlertsManager.shared)
                             }
                             .id("ipad-settings-\(appearance.rawValue)-\(systemColorScheme)")
                             .preferredColorScheme(effectiveColorScheme)
@@ -263,5 +263,5 @@ private struct SplitMapDetailView: View {
         selectedMapTypeBinding: .constant(.standard)
     )
     .environmentObject(viewModel)
-    .environmentObject(AppearanceManager())
+    .environment(AppearanceManager())
 }

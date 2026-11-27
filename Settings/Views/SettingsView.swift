@@ -9,8 +9,8 @@ struct SettingsView: View {
     var onDone: (() -> Void)? = nil
 
     @EnvironmentObject private var viewModel: ContentViewModel
-    @EnvironmentObject private var appearanceManager: AppearanceManager
-    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @Environment(AppearanceManager.self) private var appearanceManager
+    @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 
     @State private var showingAddBusinessForm = false
@@ -71,7 +71,8 @@ struct SettingsView: View {
     // MARK: - Sections
 
     private var mapAndDisplaySection: some View {
-        Section {
+        @Bindable var appearanceManager = appearanceManager
+        return Section {
             Picker(selection: $selectedMapType) {
                 Text("Standard").tag(MKMapType.standard)
                 Text("Hybrid").tag(MKMapType.hybrid)

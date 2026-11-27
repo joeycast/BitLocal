@@ -200,7 +200,7 @@ struct BusinessDetailView: View {
     @State private var hasAttemptedVerificationHydration = false
     @StateObject var elementCellViewModel: ElementCellViewModel
     @EnvironmentObject var contentViewModel: ContentViewModel
-    @ObservedObject private var savedPlacesStore = SavedPlacesStore.shared
+    private let savedPlacesStore = SavedPlacesStore.shared
 
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .auto
 

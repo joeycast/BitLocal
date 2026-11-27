@@ -33,9 +33,9 @@ struct BusinessesListView: View {
     @State private var showingAddBusinessForm = false
     @FocusState private var isSearchFieldFocused: Bool
 
-    @ObservedObject private var savedPlacesStore = SavedPlacesStore.shared
-    @ObservedObject private var reachabilityMonitor = NetworkReachabilityMonitor.shared
-    @ObservedObject private var intentRouter = BitLocalAppIntentRouter.shared
+    private let savedPlacesStore = SavedPlacesStore.shared
+    private let reachabilityMonitor = NetworkReachabilityMonitor.shared
+    private let intentRouter = BitLocalAppIntentRouter.shared
 
     init(
         elements: [Element],

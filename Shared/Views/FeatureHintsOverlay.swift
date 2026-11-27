@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 struct FeatureHintsOverlay: View {
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @Environment(FeatureHintsController.self) private var featureHintsController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {

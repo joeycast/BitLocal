@@ -28,10 +28,10 @@ struct OnboardingView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var viewModel: ContentViewModel
-    @EnvironmentObject private var merchantAlertsManager: MerchantAlertsManager
+    @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
     @State private var currentPage = 0
-    @StateObject private var alertCityPickerModel = MerchantAlertCityPickerModel()
+    @State private var alertCityPickerModel = MerchantAlertCityPickerModel()
     @State private var selectedAlertCity: MerchantAlertCityChoice?
     @State private var hasManuallySelectedAlertCity = false
     @State private var isEnablingAlerts = false

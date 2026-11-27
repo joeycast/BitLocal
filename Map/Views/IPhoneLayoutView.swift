@@ -45,8 +45,8 @@ private struct IPhoneLayoutContent: View {
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding = false
 
     var selectedMapType: MKMapType { selectedMapTypeBinding.wrappedValue }
-    @EnvironmentObject var appearanceManager: AppearanceManager
-    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
+    @Environment(AppearanceManager.self) private var appearanceManager
+    @Environment(ReleaseNotesController.self) private var releaseNotesController
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.layoutDirection) private var layoutDirection
@@ -228,7 +228,7 @@ private struct IPhoneLayoutContent: View {
                                 currentDetent: $settingsSheetDetent
                             )
                             .environmentObject(viewModel)
-                            .environmentObject(MerchantAlertsManager.shared)
+                            .environment(MerchantAlertsManager.shared)
                         }
                         .preferredColorScheme(effectiveColorScheme)
                         .presentationDetents([.medium, .large], selection: $settingsSheetDetent)

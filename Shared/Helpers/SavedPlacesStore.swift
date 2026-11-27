@@ -1,12 +1,13 @@
 import CloudKit
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class SavedPlacesStore: ObservableObject {
+@Observable
+final class SavedPlacesStore {
     static let shared = SavedPlacesStore()
 
-    @Published private(set) var savedIDs: Set<String>
+    private(set) var savedIDs: Set<String>
 
     private static let userDefaultsKey = "bitlocal.savedPlaceIDs.v1"
     private static let pendingAdditionsKey = "bitlocal.savedPlacePendingAdditions.v1"
@@ -16,12 +17,12 @@ final class SavedPlacesStore: ObservableObject {
     private static let placeIDField = "placeID"
     private static let recordNamePrefix = "saved-"
 
-    private let userDefaults: UserDefaults
-    private let enableCloudKitSync: Bool
-    private lazy var container = CKContainer(identifier: Self.cloudKitContainerIdentifier)
-    private var isSyncing = false
-    private var pendingAdditions: Set<String>
-    private var pendingRemovals: Set<String>
+    @ObservationIgnored private let userDefaults: UserDefaults
+    @ObservationIgnored private let enableCloudKitSync: Bool
+    @ObservationIgnored private lazy var container = CKContainer(identifier: Self.cloudKitContainerIdentifier)
+    @ObservationIgnored private var isSyncing = false
+    @ObservationIgnored private var pendingAdditions: Set<String>
+    @ObservationIgnored private var pendingRemovals: Set<String>
 
     var pendingAdditionIDs: Set<String> { pendingAdditions }
     var pendingRemovalIDs: Set<String> { pendingRemovals }

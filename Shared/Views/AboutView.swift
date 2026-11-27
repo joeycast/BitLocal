@@ -3,7 +3,7 @@ import SwiftUI
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
-    @EnvironmentObject private var releaseNotesController: ReleaseNotesController
+    @Environment(ReleaseNotesController.self) private var releaseNotesController
     @Binding var currentDetent: PresentationDetent
     var onDismissSheet: (() -> Void)? = nil
 
@@ -213,6 +213,6 @@ struct AboutView: View {
 #Preview {
     NavigationStack {
         AboutView()
-            .environmentObject(ReleaseNotesController())
+            .environment(ReleaseNotesController())
     }
 }

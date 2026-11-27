@@ -15,7 +15,7 @@ import Observation
 
 struct BottomSheetContentView: View {
     @EnvironmentObject var viewModel: ContentViewModel
-    @EnvironmentObject private var featureHintsController: FeatureHintsController
+    @Environment(FeatureHintsController.self) private var featureHintsController
     @Environment(\.colorScheme) private var colorScheme
 
     var visibleElements: [Element]
