@@ -121,6 +121,27 @@
 		F7C0A2033A5B100100000103 /* V4PlaceToElementMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2123A5B100100000112 /* V4PlaceToElementMapperTests.swift */; };
 		F7C0A2043A5B100100000104 /* V4SearchQueryEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */; };
 		F7C0A2053A5B100100000105 /* BTCMapMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */; };
+		F7EE00113B22000000000001 /* ElementCategorySymbols+Lookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000001 /* ElementCategorySymbols+Lookup.swift */; };
+		F7EE00113B22000000000002 /* MerchantCategoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000002 /* MerchantCategoryModels.swift */; };
+		F7EE00113B22000000000003 /* BusinessesListView+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000003 /* BusinessesListView+Helpers.swift */; };
+		F7EE00113B22000000000004 /* CommunitiesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000004 /* CommunitiesListView.swift */; };
+		F7EE00113B22000000000005 /* CommunityDetailView+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000005 /* CommunityDetailView+Helpers.swift */; };
+		F7EE00113B22000000000006 /* CommunityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000006 /* CommunityDetailView.swift */; };
+		F7EE00113B22000000000007 /* ElementCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000007 /* ElementCell.swift */; };
+		F7EE00113B22000000000008 /* ElementCellViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000008 /* ElementCellViewModel.swift */; };
+		F7EE00113B22000000000009 /* PlaceDescriptionAndReviewsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000009 /* PlaceDescriptionAndReviewsViews.swift */; };
+		F7EE00113B2200000000000A /* PlaceDetailsSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B2200000000000A /* PlaceDetailsSurface.swift */; };
+		F7EE00113B2200000000000B /* PlacePaymentRailsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B2200000000000B /* PlacePaymentRailsStrip.swift */; };
+		F7EE00113B2200000000000C /* PlaceTrustAndBoostSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B2200000000000C /* PlaceTrustAndBoostSection.swift */; };
+		F7EE00113B2200000000000D /* OnboardingView+AlertsStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B2200000000000D /* OnboardingView+AlertsStep.swift */; };
+		F7EE00113B2200000000000E /* BTCMapRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B2200000000000E /* BTCMapRepository.swift */; };
+		F7EE00113B2200000000000F /* V4PlaceToElementMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B2200000000000F /* V4PlaceToElementMapper.swift */; };
+		F7EE00113B22000000000010 /* ContentViewModel+Catalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000010 /* ContentViewModel+Catalog.swift */; };
+		F7EE00113B22000000000011 /* ContentViewModel+Communities.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000011 /* ContentViewModel+Communities.swift */; };
+		F7EE00113B22000000000012 /* ContentViewModel+LocationAndDistances.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000012 /* ContentViewModel+LocationAndDistances.swift */; };
+		F7EE00113B22000000000013 /* ContentViewModel+MapViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000013 /* ContentViewModel+MapViewport.swift */; };
+		F7EE00113B22000000000014 /* ContentViewModel+SearchAndEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000014 /* ContentViewModel+SearchAndEvents.swift */; };
+		F7EE00113B22000000000015 /* ContentViewModelModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000015 /* ContentViewModelModels.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -252,6 +273,27 @@
 		F7C0A2133A5B100100000113 /* V4SearchQueryEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4SearchQueryEncodingTests.swift; sourceTree = "<group>"; };
 		F7C0A2143A5B100100000114 /* BTCMapMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapMergeTests.swift; sourceTree = "<group>"; };
 		F7C0A2153A5B100100000115 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		F7EE00103B22000000000001 /* ElementCategorySymbols+Lookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ElementCategorySymbols+Lookup.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000002 /* MerchantCategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantCategoryModels.swift; sourceTree = "<group>"; };
+		F7EE00103B22000000000003 /* BusinessesListView+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BusinessesListView+Helpers.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000004 /* CommunitiesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunitiesListView.swift; sourceTree = "<group>"; };
+		F7EE00103B22000000000005 /* CommunityDetailView+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CommunityDetailView+Helpers.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000006 /* CommunityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityDetailView.swift; sourceTree = "<group>"; };
+		F7EE00103B22000000000007 /* ElementCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCell.swift; sourceTree = "<group>"; };
+		F7EE00103B22000000000008 /* ElementCellViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementCellViewModel.swift; sourceTree = "<group>"; };
+		F7EE00103B22000000000009 /* PlaceDescriptionAndReviewsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDescriptionAndReviewsViews.swift; sourceTree = "<group>"; };
+		F7EE00103B2200000000000A /* PlaceDetailsSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDetailsSurface.swift; sourceTree = "<group>"; };
+		F7EE00103B2200000000000B /* PlacePaymentRailsStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacePaymentRailsStrip.swift; sourceTree = "<group>"; };
+		F7EE00103B2200000000000C /* PlaceTrustAndBoostSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceTrustAndBoostSection.swift; sourceTree = "<group>"; };
+		F7EE00103B2200000000000D /* OnboardingView+AlertsStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OnboardingView+AlertsStep.swift"; sourceTree = "<group>"; };
+		F7EE00103B2200000000000E /* BTCMapRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BTCMapRepository.swift; sourceTree = "<group>"; };
+		F7EE00103B2200000000000F /* V4PlaceToElementMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V4PlaceToElementMapper.swift; sourceTree = "<group>"; };
+		F7EE00103B22000000000010 /* ContentViewModel+Catalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentViewModel+Catalog.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000011 /* ContentViewModel+Communities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentViewModel+Communities.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000012 /* ContentViewModel+LocationAndDistances.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentViewModel+LocationAndDistances.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000013 /* ContentViewModel+MapViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentViewModel+MapViewport.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000014 /* ContentViewModel+SearchAndEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentViewModel+SearchAndEvents.swift"; sourceTree = "<group>"; };
+		F7EE00103B22000000000015 /* ContentViewModelModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModelModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -321,6 +363,8 @@
 				F63E80772EFC2FD600ED1F00 /* BusinessSubmission.swift */,
 				F6004F912DEB7E30001183AE /* ElementCategorySymbols.swift */,
 				F66E0BAE2DE340CB00D68897 /* Element.swift */,
+				F7EE00103B22000000000001 /* ElementCategorySymbols+Lookup.swift */,
+				F7EE00103B22000000000002 /* MerchantCategoryModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -353,6 +397,16 @@
 				F7C0A1273A5B100100000009 /* AllRegionsListView.swift */,
 				F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */,
 				F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */,
+				F7EE00103B22000000000003 /* BusinessesListView+Helpers.swift */,
+				F7EE00103B22000000000004 /* CommunitiesListView.swift */,
+				F7EE00103B22000000000005 /* CommunityDetailView+Helpers.swift */,
+				F7EE00103B22000000000006 /* CommunityDetailView.swift */,
+				F7EE00103B22000000000007 /* ElementCell.swift */,
+				F7EE00103B22000000000008 /* ElementCellViewModel.swift */,
+				F7EE00103B22000000000009 /* PlaceDescriptionAndReviewsViews.swift */,
+				F7EE00103B2200000000000A /* PlaceDetailsSurface.swift */,
+				F7EE00103B2200000000000B /* PlacePaymentRailsStrip.swift */,
+				F7EE00103B2200000000000C /* PlaceTrustAndBoostSection.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -437,6 +491,8 @@
 				F66E0B962DE33F1200D68897 /* PreferenceKeys.swift */,
 				F7C0A1003A5B100100000001 /* BTCMapV4Contracts.swift */,
 				F7C0A1103A5B100100000002 /* BTCMapV4Support.swift */,
+				F7EE00103B2200000000000E /* BTCMapRepository.swift */,
+				F7EE00103B2200000000000F /* V4PlaceToElementMapper.swift */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -446,6 +502,12 @@
 			children = (
 				F66E0B982DE33F1200D68897 /* ContentViewModel.swift */,
 				F7EA00013B1D000000000002 /* MerchantSearchController.swift */,
+				F7EE00103B22000000000010 /* ContentViewModel+Catalog.swift */,
+				F7EE00103B22000000000011 /* ContentViewModel+Communities.swift */,
+				F7EE00103B22000000000012 /* ContentViewModel+LocationAndDistances.swift */,
+				F7EE00103B22000000000013 /* ContentViewModel+MapViewport.swift */,
+				F7EE00103B22000000000014 /* ContentViewModel+SearchAndEvents.swift */,
+				F7EE00103B22000000000015 /* ContentViewModelModels.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -546,6 +608,7 @@
 			isa = PBXGroup;
 			children = (
 				F6EFC2912DE6A07900D573E1 /* OnboardingView.swift */,
+				F7EE00103B2200000000000D /* OnboardingView+AlertsStep.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -774,6 +837,27 @@
 				F66E0BAD2DE33F1200D68897 /* InfoButtonView.swift in Sources */,
 				F7C0A1013A5B100100000001 /* BTCMapV4Contracts.swift in Sources */,
 				F7C0A1113A5B100100000002 /* BTCMapV4Support.swift in Sources */,
+				F7EE00113B22000000000001 /* ElementCategorySymbols+Lookup.swift in Sources */,
+				F7EE00113B22000000000002 /* MerchantCategoryModels.swift in Sources */,
+				F7EE00113B22000000000003 /* BusinessesListView+Helpers.swift in Sources */,
+				F7EE00113B22000000000004 /* CommunitiesListView.swift in Sources */,
+				F7EE00113B22000000000005 /* CommunityDetailView+Helpers.swift in Sources */,
+				F7EE00113B22000000000006 /* CommunityDetailView.swift in Sources */,
+				F7EE00113B22000000000007 /* ElementCell.swift in Sources */,
+				F7EE00113B22000000000008 /* ElementCellViewModel.swift in Sources */,
+				F7EE00113B22000000000009 /* PlaceDescriptionAndReviewsViews.swift in Sources */,
+				F7EE00113B2200000000000A /* PlaceDetailsSurface.swift in Sources */,
+				F7EE00113B2200000000000B /* PlacePaymentRailsStrip.swift in Sources */,
+				F7EE00113B2200000000000C /* PlaceTrustAndBoostSection.swift in Sources */,
+				F7EE00113B2200000000000D /* OnboardingView+AlertsStep.swift in Sources */,
+				F7EE00113B2200000000000E /* BTCMapRepository.swift in Sources */,
+				F7EE00113B2200000000000F /* V4PlaceToElementMapper.swift in Sources */,
+				F7EE00113B22000000000010 /* ContentViewModel+Catalog.swift in Sources */,
+				F7EE00113B22000000000011 /* ContentViewModel+Communities.swift in Sources */,
+				F7EE00113B22000000000012 /* ContentViewModel+LocationAndDistances.swift in Sources */,
+				F7EE00113B22000000000013 /* ContentViewModel+MapViewport.swift in Sources */,
+				F7EE00113B22000000000014 /* ContentViewModel+SearchAndEvents.swift in Sources */,
+				F7EE00113B22000000000015 /* ContentViewModelModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

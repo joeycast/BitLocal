@@ -131,16 +131,22 @@ rules = [
 # Value-based navigation files must not reintroduce destination-closure NavigationLink
 value_nav_files = {
     "Businesses/Views/BottomSheetContentView.swift",
+    "Businesses/Views/CommunitiesListView.swift",
+    "Businesses/Views/CommunityDetailView.swift",
     "Businesses/Views/BusinessDetailView.swift",
+    "Businesses/Views/PlaceDescriptionAndReviewsViews.swift",
     "Businesses/Views/EventsDiscoverySection.swift",
 }
 nav_closure_re = re.compile(r"\bNavigationLink\s*\{")
+max_swift_file_lines = 1000
 
 for path in iter_app_swift_files():
     rel = path.relative_to(root).as_posix()
     in_block = False
+    line_count = 0
     with path.open("r", encoding="utf-8") as fh:
         for lineno, raw_line in enumerate(fh, start=1):
+            line_count = lineno
             code, in_block = strip_comments(raw_line, in_block)
             if not code.strip():
                 continue
@@ -151,6 +157,10 @@ for path in iter_app_swift_files():
                 errors.append(
                     f"[no-mixed-navigation-link] {rel}:{lineno}: Do not mix NavigationLink {{ ... }} with NavigationStack(path:); use NavigationLink(value: BitLocalNavigationRoute...)."
                 )
+    if line_count > max_swift_file_lines:
+        errors.append(
+            f"[no-giant-files] {rel}: {line_count} lines exceeds {max_swift_file_lines}-line ceiling. Split along natural type/extension seams."
+        )
 
 # Check Info.plist resizability & launch screen invariants
 info_plist = (root / "Info.plist").read_text(encoding="utf-8")
