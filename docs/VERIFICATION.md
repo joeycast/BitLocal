@@ -27,13 +27,18 @@ maestro test bitlocal-maestro/
 
 ### Visual / Appearance / Dynamic Type Simulator Capture
 ```bash
-# Find booted simulator UDID
-xcrun simctl list devices booted
+# Automated Light & Dark Mode capture (Onboarding + Map/Sheet):
+./scripts/capture_sim_screenshots.sh \
+  --app build/DerivedData/Build/Products/Debug-iphonesimulator/bitlocal.app \
+  --output build/screenshots
 
-# Capture Light & Dark Mode screenshots
+# Or trigger automatically in CI by applying the `ui-check` label to a PR
+# or running the "UI Screenshots" workflow manually via Actions -> workflow_dispatch.
+
+# Manual one-off capture on an already-booted simulator:
+xcrun simctl list devices booted
 xcrun simctl ui <UDID> appearance light
 xcrun simctl io <UDID> screenshot /tmp/bitlocal-light.png
-
 xcrun simctl ui <UDID> appearance dark
 xcrun simctl io <UDID> screenshot /tmp/bitlocal-dark.png
 ```

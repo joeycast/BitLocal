@@ -1,0 +1,82 @@
+name: UI Screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: "Preferred iOS Simulator device name (falls back to newest available iPhone)"
+        required: false
+        default: "iPhone 17"
+        type: string
+  pull_request:
+    types: [labeled, synchronize]
+
+concurrency:
+  group: ui-screenshots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ui-check')
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Resolve iOS Simulator
+        id: sim
+        env:
+          PREFERRED_DEVICE: ${{ github.event.inputs.device || 'iPhone 17' }}
+        run: |
+          chmod +x scripts/capture_sim_screenshots.sh
+          SIM_UDID="$(./scripts/capture_sim_screenshots.sh --device "$PREFERRED_DEVICE" --resolve-udid)"
+          echo "udid=${SIM_UDID}" >> "$GITHUB_OUTPUT"
+          echo "Resolved simulator UDID: ${SIM_UDID}"
+
+      # Ad-hoc sign so the simulator bundle keeps its CloudKit entitlements.
+      - name: Build Simulator App
+        run: |
+          xcodebuild \
+            -project bitlocal.xcodeproj \
+            -scheme bitlocal \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            build
+
+      - name: Capture Light & Dark Mode Screenshots
+        run: |
+          chmod +x scripts/capture_sim_screenshots.sh
+          ./scripts/capture_sim_screenshots.sh \
+            --udid "${{ steps.sim.outputs.udid }}" \
+            --app "build/DerivedData/Build/Products/Debug-iphonesimulator/bitlocal.app" \
+            --output "build/screenshots"
+
+      - name: Upload Screenshots Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ui-screenshots
+          path: build/screenshots/*.png
+          retention-days: 7
+
+      - name: Write Summary
+        run: |
+          {
+            echo "## UI Screenshots Captured"
+            echo ""
+            echo "| File | Size |"
+            echo "|---|---|"
+            for f in build/screenshots/*.png; do
+              size="$(wc -c < "$f" | tr -d ' ')"
+              echo "| \`$(basename "$f")\` | ${size} bytes |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
