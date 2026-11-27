@@ -85,13 +85,10 @@ extension CommunityDetailView {
     }
 
     private var btcMapCommunityURL: URL? {
-        let rawSlug = area.tags?["url_alias"] ?? area.id
-        let trimmed = rawSlug.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
-            return nil
-        }
-        return URL(string: "https://btcmap.org/community/\(encoded)")
+        CommunityDetailLinkResolver.btcMapCommunityURL(
+            areaID: area.id,
+            urlAlias: area.tags?["url_alias"]
+        )
     }
 
     var shareableURL: URL? {
@@ -186,53 +183,15 @@ extension CommunityDetailView {
     }
 
     func websiteURL(from value: String) -> URL? {
-        let normalized = value.lowercased()
-        if normalized.hasPrefix("http://") || normalized.hasPrefix("https://") {
-            return URL(string: value)
-        }
-        return URL(string: "https://\(value)")
+        CommunityDetailLinkResolver.websiteURL(from: value)
     }
 
     private func socialURL(for value: String, base: String) -> URL? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        let normalized = trimmed.lowercased()
-        if normalized.hasPrefix("http://") || normalized.hasPrefix("https://") {
-            return URL(string: trimmed)
-        }
-        let handle = trimmed.replacingOccurrences(of: "@", with: "")
-        return URL(string: base + handle)
+        CommunityDetailLinkResolver.socialURL(for: value, base: base)
     }
 
     private func resolvedContactURL(forKey key: String, value: String) -> URL? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let lowered = trimmed.lowercased()
-        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
-            return URL(string: trimmed)
-        }
-
-        switch key {
-        case "contact:website", "website":
-            return websiteURL(from: trimmed)
-        case "contact:email":
-            return URL(string: "mailto:\(trimmed)")
-        case "contact:phone":
-            return URL(string: "tel:\(trimmed)")
-        case "contact:github":
-            return socialURL(for: trimmed, base: "https://github.com/")
-        case "contact:linkedin":
-            return socialURL(for: trimmed, base: "https://linkedin.com/in/")
-        case "contact:discord":
-            return socialURL(for: trimmed, base: "https://discord.gg/")
-        case "contact:whatsapp":
-            return socialURL(for: trimmed, base: "https://wa.me/")
-        case "contact:matrix":
-            return URL(string: "https://matrix.to/#/\(trimmed)")
-        default:
-            return websiteURL(from: trimmed)
-        }
+        CommunityDetailLinkResolver.resolvedContactURL(forKey: key, value: value)
     }
 
     var communityIconURL: URL? {
@@ -246,64 +205,11 @@ extension CommunityDetailView {
     }
 
     private func normalizedPayableLightningPayload(from raw: String) -> String? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let lower = trimmed.lowercased()
-
-        // Support `lightning:<payload>` URIs only when payload looks wallet-payable.
-        if lower.hasPrefix("lightning:") {
-            let payload = String(trimmed.dropFirst("lightning:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
-            return looksPayableLightningPayload(payload) ? payload : nil
-        }
-
-        return looksPayableLightningPayload(trimmed) ? trimmed : nil
-    }
-
-    private func looksPayableLightningPayload(_ value: String) -> Bool {
-        let lower = value.lowercased()
-        if lower.hasPrefix("lnbc") || lower.hasPrefix("lntb") || lower.hasPrefix("lnbcrt") {
-            return true // BOLT11 invoices
-        }
-        if lower.hasPrefix("lno1") || lower.hasPrefix("lnr1") || lower.hasPrefix("lni1") {
-            return true // BOLT12 offer / invoice request / invoice
-        }
-        if lower.hasPrefix("lnurl1") {
-            return true // Bech32 LNURL
-        }
-        if isLightningAddress(value) {
-            return true // LUD-16 identifier (name@domain)
-        }
-        return false
+        CommunityDetailLinkResolver.normalizedPayableLightningPayload(from: raw)
     }
 
     private func nonPayableTipURL(from raw: String) -> URL? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let lower = trimmed.lowercased()
-        if lower.hasPrefix("http://") || lower.hasPrefix("https://") {
-            return URL(string: trimmed)
-        }
-        if isLightningAddress(trimmed) {
-            let parts = trimmed.split(separator: "@", maxSplits: 1).map(String.init)
-            guard parts.count == 2 else { return nil }
-            let name = parts[0]
-            let domain = parts[1]
-            return URL(string: "https://\(domain)/\(name)")
-        }
-        return websiteURL(from: trimmed)
-    }
-
-    private func isLightningAddress(_ value: String) -> Bool {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = trimmed.split(separator: "@", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return false }
-        let local = parts[0]
-        let domain = parts[1]
-        guard !local.isEmpty, !domain.isEmpty else { return false }
-        guard !local.contains(" "), !domain.contains(" ") else { return false }
-        return domain.contains(".")
+        CommunityDetailLinkResolver.nonPayableTipURL(from: raw)
     }
 
     func openWallet(_ wallet: LightningWalletOption, payload: String) {
@@ -343,23 +249,7 @@ extension CommunityDetailView {
     }
 
     private func nostrLinkTarget(for value: String) -> CommunityLinkTarget? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let lowered = trimmed.lowercased()
-        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
-            return URL(string: trimmed).map { .web($0) }
-        }
-
-        let identifier: String
-        if lowered.hasPrefix("nostr:") {
-            identifier = String(trimmed.dropFirst("nostr:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        } else {
-            identifier = trimmed
-        }
-
-        guard !identifier.isEmpty else { return nil }
-        return URL(string: "nostr:\(identifier)").map { .appPreferred(appURL: $0) }
+        CommunityDetailLinkResolver.nostrLinkTarget(for: value)
     }
 
     var sameSelectedCommunity: Bool {
@@ -429,7 +319,7 @@ struct CommunitySocialLink: Identifiable {
     var isInteractive: Bool { linkTarget != nil }
 }
 
-enum CommunityLinkTarget {
+enum CommunityLinkTarget: Equatable, Sendable {
     case web(URL)
     case appPreferred(appURL: URL)
 }

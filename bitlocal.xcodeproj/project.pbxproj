@@ -79,6 +79,8 @@
 		F7F000013B20000000000001 /* ViewportClusterEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000013B20000000000002 /* ViewportClusterEngine.swift */; };
 		F7F000013B20000000000003 /* ViewportClusterEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000013B20000000000004 /* ViewportClusterEngineTests.swift */; };
 		F7F000023B20000000000003 /* MerchantDetailNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000023B20000000000004 /* MerchantDetailNavigationTests.swift */; };
+		F7F000033B20000000000005 /* OnboardingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000033B20000000000006 /* OnboardingFlowTests.swift */; };
+		F7F000033B20000000000007 /* CommunityDetailLinkResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000033B20000000000008 /* CommunityDetailLinkResolverTests.swift */; };
 		F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */; };
 		F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */; };
 		F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */; };
@@ -126,6 +128,8 @@
 		F7EE00113B22000000000001 /* ElementCategorySymbols+Lookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000001 /* ElementCategorySymbols+Lookup.swift */; };
 		F7EE00113B22000000000002 /* MerchantCategoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000002 /* MerchantCategoryModels.swift */; };
 		F7F000023B20000000000001 /* MerchantDetailNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000023B20000000000002 /* MerchantDetailNavigation.swift */; };
+		F7F000033B20000000000001 /* CommunityDetailLinkResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000033B20000000000002 /* CommunityDetailLinkResolver.swift */; };
+		F7F000033B20000000000003 /* OnboardingFlowLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000033B20000000000004 /* OnboardingFlowLogic.swift */; };
 		F7EE00113B22000000000003 /* BusinessesListView+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000003 /* BusinessesListView+Helpers.swift */; };
 		F7EE00113B22000000000004 /* CommunitiesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000004 /* CommunitiesListView.swift */; };
 		F7EE00113B22000000000005 /* CommunityDetailView+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7EE00103B22000000000005 /* CommunityDetailView+Helpers.swift */; };
@@ -224,6 +228,8 @@
 		F7F000013B20000000000002 /* ViewportClusterEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportClusterEngine.swift; sourceTree = "<group>"; };
 		F7F000013B20000000000004 /* ViewportClusterEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportClusterEngineTests.swift; sourceTree = "<group>"; };
 		F7F000023B20000000000004 /* MerchantDetailNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantDetailNavigationTests.swift; sourceTree = "<group>"; };
+		F7F000033B20000000000006 /* OnboardingFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowTests.swift; sourceTree = "<group>"; };
+		F7F000033B20000000000008 /* CommunityDetailLinkResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityDetailLinkResolverTests.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
 		F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
 		F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLayoutView.swift; sourceTree = "<group>"; };
@@ -282,6 +288,8 @@
 		F7EE00103B22000000000001 /* ElementCategorySymbols+Lookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ElementCategorySymbols+Lookup.swift"; sourceTree = "<group>"; };
 		F7EE00103B22000000000002 /* MerchantCategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantCategoryModels.swift; sourceTree = "<group>"; };
 		F7F000023B20000000000002 /* MerchantDetailNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantDetailNavigation.swift; sourceTree = "<group>"; };
+		F7F000033B20000000000002 /* CommunityDetailLinkResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityDetailLinkResolver.swift; sourceTree = "<group>"; };
+		F7F000033B20000000000004 /* OnboardingFlowLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowLogic.swift; sourceTree = "<group>"; };
 		F7EE00103B22000000000003 /* BusinessesListView+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BusinessesListView+Helpers.swift"; sourceTree = "<group>"; };
 		F7EE00103B22000000000004 /* CommunitiesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunitiesListView.swift; sourceTree = "<group>"; };
 		F7EE00103B22000000000005 /* CommunityDetailView+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CommunityDetailView+Helpers.swift"; sourceTree = "<group>"; };
@@ -375,6 +383,7 @@
 				F7EE00103B22000000000001 /* ElementCategorySymbols+Lookup.swift */,
 				F7EE00103B22000000000002 /* MerchantCategoryModels.swift */,
 				F7F000023B20000000000002 /* MerchantDetailNavigation.swift */,
+				F7F000033B20000000000002 /* CommunityDetailLinkResolver.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -608,9 +617,18 @@
 		F6EFC28F2DE6A06F00D573E1 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
+				F7F000033B20000000000009 /* Models */,
 				F6EFC2902DE6A07600D573E1 /* Views */,
 			);
 			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		F7F000033B20000000000009 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F7F000033B20000000000004 /* OnboardingFlowLogic.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		F6EFC2902DE6A07600D573E1 /* Views */ = {
@@ -649,6 +667,8 @@
 				F7ED00013B20000000000010 /* OpeningHoursAndFormattingTests.swift */,
 				F7F000013B20000000000004 /* ViewportClusterEngineTests.swift */,
 				F7F000023B20000000000004 /* MerchantDetailNavigationTests.swift */,
+				F7F000033B20000000000006 /* OnboardingFlowTests.swift */,
+				F7F000033B20000000000008 /* CommunityDetailLinkResolverTests.swift */,
 				F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */,
 				F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */,
 				F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */,
@@ -852,6 +872,8 @@
 				F7EE00113B22000000000001 /* ElementCategorySymbols+Lookup.swift in Sources */,
 				F7EE00113B22000000000002 /* MerchantCategoryModels.swift in Sources */,
 				F7F000023B20000000000001 /* MerchantDetailNavigation.swift in Sources */,
+				F7F000033B20000000000001 /* CommunityDetailLinkResolver.swift in Sources */,
+				F7F000033B20000000000003 /* OnboardingFlowLogic.swift in Sources */,
 				F7EE00113B22000000000003 /* BusinessesListView+Helpers.swift in Sources */,
 				F7EE00113B22000000000004 /* CommunitiesListView.swift in Sources */,
 				F7EE00113B22000000000005 /* CommunityDetailView+Helpers.swift in Sources */,
@@ -892,6 +914,8 @@
 				F7EB00013B1E000000000003 /* AppLayoutModeTests.swift in Sources */,
 				F7F000013B20000000000003 /* ViewportClusterEngineTests.swift in Sources */,
 				F7F000023B20000000000003 /* MerchantDetailNavigationTests.swift in Sources */,
+				F7F000033B20000000000005 /* OnboardingFlowTests.swift in Sources */,
+				F7F000033B20000000000007 /* CommunityDetailLinkResolverTests.swift in Sources */,
 				F7ED00013B20000000000001 /* AvailablePaymentMethodsChecksTests.swift in Sources */,
 				F7ED00013B20000000000003 /* BTCMapV4SyncTests.swift in Sources */,
 				F7ED00013B20000000000005 /* ElementMapVisibilityTests.swift in Sources */,
