@@ -77,10 +77,12 @@
 		F66E0B772DE33ED800D68897 /* AnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */; };
 		F66E0B782DE33ED800D68897 /* Annotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B682DE33ED800D68897 /* Annotation.swift */; };
 		F7F000013B20000000000001 /* ViewportClusterEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000013B20000000000002 /* ViewportClusterEngine.swift */; };
+		F7F000043B20000000000001 /* CommunityGeometryEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000043B20000000000002 /* CommunityGeometryEngine.swift */; };
 		F7F000013B20000000000003 /* ViewportClusterEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000013B20000000000004 /* ViewportClusterEngineTests.swift */; };
 		F7F000023B20000000000003 /* MerchantDetailNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000023B20000000000004 /* MerchantDetailNavigationTests.swift */; };
 		F7F000033B20000000000005 /* OnboardingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000033B20000000000006 /* OnboardingFlowTests.swift */; };
 		F7F000033B20000000000007 /* CommunityDetailLinkResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000033B20000000000008 /* CommunityDetailLinkResolverTests.swift */; };
+		F7F000043B20000000000003 /* CommunityGeometryEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F000043B20000000000004 /* CommunityGeometryEngineTests.swift */; };
 		F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */; };
 		F66E0B822DE33EE600D68897 /* BusinessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7D2DE33EE600D68897 /* BusinessDetailView.swift */; };
 		F66E0B832DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E0B7F2DE33EE600D68897 /* CustomiPadNavigationStackTitleView.swift */; };
@@ -226,10 +228,12 @@
 		F64093F42DE66D1700906C3E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F66E0B682DE33ED800D68897 /* Annotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotation.swift; sourceTree = "<group>"; };
 		F7F000013B20000000000002 /* ViewportClusterEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportClusterEngine.swift; sourceTree = "<group>"; };
+		F7F000043B20000000000002 /* CommunityGeometryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityGeometryEngine.swift; sourceTree = "<group>"; };
 		F7F000013B20000000000004 /* ViewportClusterEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportClusterEngineTests.swift; sourceTree = "<group>"; };
 		F7F000023B20000000000004 /* MerchantDetailNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantDetailNavigationTests.swift; sourceTree = "<group>"; };
 		F7F000033B20000000000006 /* OnboardingFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowTests.swift; sourceTree = "<group>"; };
 		F7F000033B20000000000008 /* CommunityDetailLinkResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityDetailLinkResolverTests.swift; sourceTree = "<group>"; };
+		F7F000043B20000000000004 /* CommunityGeometryEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityGeometryEngineTests.swift; sourceTree = "<group>"; };
 		F66E0B6B2DE33ED800D68897 /* AnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationView.swift; sourceTree = "<group>"; };
 		F66E0B6C2DE33ED800D68897 /* IPadLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPadLayoutView.swift; sourceTree = "<group>"; };
 		F66E0B6D2DE33ED800D68897 /* IPhoneLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPhoneLayoutView.swift; sourceTree = "<group>"; };
@@ -338,6 +342,7 @@
 			children = (
 				F66E0B682DE33ED800D68897 /* Annotation.swift */,
 				F7F000013B20000000000002 /* ViewportClusterEngine.swift */,
+				F7F000043B20000000000002 /* CommunityGeometryEngine.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -669,6 +674,7 @@
 				F7F000023B20000000000004 /* MerchantDetailNavigationTests.swift */,
 				F7F000033B20000000000006 /* OnboardingFlowTests.swift */,
 				F7F000033B20000000000008 /* CommunityDetailLinkResolverTests.swift */,
+				F7F000043B20000000000004 /* CommunityGeometryEngineTests.swift */,
 				F7E700013B1A000000000006 /* MerchantElementStoreTests.swift */,
 				F7E900013B1C000000000006 /* PlaceDeepLinkResolverTests.swift */,
 				F7E900013B1C000000000008 /* CommunityAreasLoaderTests.swift */,
@@ -807,6 +813,7 @@
 				F6EFC28E2DE69FAF00D573E1 /* RootView.swift in Sources */,
 				F66E0B782DE33ED800D68897 /* Annotation.swift in Sources */,
 				F7F000013B20000000000001 /* ViewportClusterEngine.swift in Sources */,
+				F7F000043B20000000000001 /* CommunityGeometryEngine.swift in Sources */,
 				F66E0B792DE33ED800D68897 /* IPhoneLayoutView.swift in Sources */,
 				F66E0B8D2DE33EF800D68897 /* DistanceUnit.swift in Sources */,
 				F66E0B8E2DE33EF800D68897 /* SettingsButtonView.swift in Sources */,
@@ -916,6 +923,7 @@
 				F7F000023B20000000000003 /* MerchantDetailNavigationTests.swift in Sources */,
 				F7F000033B20000000000005 /* OnboardingFlowTests.swift in Sources */,
 				F7F000033B20000000000007 /* CommunityDetailLinkResolverTests.swift in Sources */,
+				F7F000043B20000000000003 /* CommunityGeometryEngineTests.swift in Sources */,
 				F7ED00013B20000000000001 /* AvailablePaymentMethodsChecksTests.swift in Sources */,
 				F7ED00013B20000000000003 /* BTCMapV4SyncTests.swift in Sources */,
 				F7ED00013B20000000000005 /* ElementMapVisibilityTests.swift in Sources */,

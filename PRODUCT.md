@@ -47,7 +47,7 @@ A 100% native SwiftUI, zero-dependency, privacy-first Apple Maps–grade Bitcoin
 - Feature verification matrix & release checklists: [`docs/VERIFICATION.md`](docs/VERIFICATION.md)
 - Privacy policy: [`Privacy_Policy.md`](Privacy_Policy.md)
 - Release history: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)
-- Automated tests: `bitlocalTests/` (36 Swift Testing suites) and `bitlocal-maestro/` (Maestro UI flows).
+- Automated tests: `bitlocalTests/` (37 Swift Testing suites) and `bitlocal-maestro/` (Maestro UI flows).
 
 ## Product Principles
 

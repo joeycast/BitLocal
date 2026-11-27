@@ -34,6 +34,26 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
+      - name: Resolve iOS Simulator
+        id: sim
+        run: |
+          chmod +x scripts/capture_sim_screenshots.sh
+          SIM_UDID=""
+          for attempt in 1 2 3 4 5; do
+            if SIM_UDID="$(./scripts/capture_sim_screenshots.sh --device "iPhone 17" --resolve-udid 2>/dev/null)" && [[ -n "$SIM_UDID" ]]; then
+              break
+            fi
+            echo "Waiting for CoreSimulator devices (attempt $attempt)..."
+            sleep 5
+          done
+          if [[ -z "$SIM_UDID" ]]; then
+            echo "Error: no available iOS Simulator found." >&2
+            xcrun simctl list devices available >&2 || true
+            exit 1
+          fi
+          echo "udid=${SIM_UDID}" >> "$GITHUB_OUTPUT"
+          echo "Resolved simulator UDID: ${SIM_UDID}"
+
       # Ad-hoc sign instead of CODE_SIGNING_ALLOWED=NO so the simulator app keeps
       # its entitlements; CloudKit traps at launch without them, which kills the
       # test host before any test runs.
@@ -43,7 +63,7 @@ jobs:
             -project bitlocal.xcodeproj \
             -scheme bitlocal \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath build/DerivedData \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY=- \
@@ -56,7 +76,7 @@ jobs:
             -project bitlocal.xcodeproj \
             -scheme bitlocal \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath build/DerivedData \
             -only-testing:bitlocalTests \
             CODE_SIGN_STYLE=Manual \
