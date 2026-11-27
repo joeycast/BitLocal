@@ -165,11 +165,11 @@ extension ContentViewModel {
         }
 
         let edgePadding = mapListViewportInsets(for: mapView)
-        DispatchQueue.main.async {
+        Task { @MainActor in
             mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: animated)
         }
     }
-    
+
     // Zoom to element
     func zoomToElement(_ element: Element) {
         guard let mapView = mapView,
@@ -178,7 +178,9 @@ extension ContentViewModel {
             return
         }
 
-        DispatchQueue.main.async {
+        clusterZoomSelectionTask?.cancel()
+        clusterZoomSelectionTask = Task { @MainActor [weak self] in
+            guard !Task.isCancelled, let self else { return }
             let zoomDistance = self.singlePassClusterRevealDistanceMeters(
                 elementCoordinate: targetCoordinate,
                 mapView: mapView
@@ -189,7 +191,7 @@ extension ContentViewModel {
                 mapView: mapView,
                 animated: true
             )
-            self.selectElementAfterClusterZoom(
+            await self.selectElementAfterClusterZoom(
                 element,
                 mapView: mapView,
                 remainingAttempts: 5
@@ -201,33 +203,26 @@ extension ContentViewModel {
         _ element: Element,
         mapView: MKMapView,
         remainingAttempts: Int
-    ) {
-        guard remainingAttempts > 0 else {
-            if let coordinate = element.mapCoordinate {
-                centerMapWithoutZoom(to: coordinate, animated: true)
-            }
-            return
-        }
-
-        if let annotation = mapView.annotations.first(where: {
-            ($0 as? Annotation)?.element?.id == element.id
-        }) {
-            let isClustered = isAnnotationClustered(annotation, on: mapView)
-            if !isClustered {
-                if let coordinate = element.mapCoordinate {
-                    centerMapWithoutZoom(to: coordinate, animated: false)
+    ) async {
+        for _ in 0..<remainingAttempts {
+            guard !Task.isCancelled else { return }
+            if let annotation = mapView.annotations.first(where: {
+                ($0 as? Annotation)?.element?.id == element.id
+            }) {
+                if !isAnnotationClustered(annotation, on: mapView) {
+                    if let coordinate = element.mapCoordinate {
+                        centerMapWithoutZoom(to: coordinate, animated: false)
+                    }
+                    mapView.selectAnnotation(annotation, animated: true)
+                    return
                 }
-                mapView.selectAnnotation(annotation, animated: true)
-                return
             }
+            try? await Task.sleep(for: .milliseconds(450))
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-            self?.selectElementAfterClusterZoom(
-                element,
-                mapView: mapView,
-                remainingAttempts: remainingAttempts - 1
-            )
+        guard !Task.isCancelled else { return }
+        if let coordinate = element.mapCoordinate {
+            centerMapWithoutZoom(to: coordinate, animated: true)
         }
     }
 
@@ -448,7 +443,7 @@ extension ContentViewModel {
                     )
                 }
                 
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     mapView.setCameraBoundary(MKMapView.CameraBoundary(coordinateRegion: region), animated: true)
                     mapView.setVisibleMapRect(region.mapRect, edgePadding: edgePadding, animated: true)
                 }
@@ -533,7 +528,7 @@ extension ContentViewModel {
                 size: mapSize
             )
 
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 // In split sidebar mode, center with no sheet inset so the map pane centers the user dot visually.
                 if self.layoutMode == .splitSidebar {
                     let edgePadding = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
@@ -692,21 +687,14 @@ extension ContentViewModel {
     // Update map region
     func updateMapRegion(center: CLLocationCoordinate2D, span: MKCoordinateSpan? = nil, animated: Bool = true) {
         let updatedSpan = span ?? region.span
+        let shouldMarkInitial = !initialRegionSet
 
-        // If this is the first time setting the region, do it asynchronously on the main queue
-        if !initialRegionSet {
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.region = MKCoordinateRegion(center: center, span: updatedSpan)
-                self.mapView?.setRegion(self.region, animated: animated)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.region = MKCoordinateRegion(center: center, span: updatedSpan)
+            self.mapView?.setRegion(self.region, animated: animated)
+            if shouldMarkInitial {
                 self.initialRegionSet = true
-            }
-        } else {
-            // For subsequent changes, defer to avoid publishing during view updates
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.region = MKCoordinateRegion(center: center, span: updatedSpan)
-                self.mapView?.setRegion(self.region, animated: animated)
             }
         }
     }
@@ -715,7 +703,7 @@ extension ContentViewModel {
     // This avoids camera/region feedback loops during animated map interactions.
     func syncRegionFromMap(center: CLLocationCoordinate2D, span: MKCoordinateSpan) {
         let newRegion = MKCoordinateRegion(center: center, span: span)
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             self.region = newRegion
             if !self.initialRegionSet {
@@ -727,7 +715,7 @@ extension ContentViewModel {
     // Deselect the currently selected annotation
     func deselectAnnotation() {
         selectedElement = nil
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             self?.mapView?.selectedAnnotations.forEach { annotation in
                 self?.mapView?.deselectAnnotation(annotation, animated: true)
             }

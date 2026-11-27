@@ -249,7 +249,7 @@ extension ContentViewModel {
         // V3 numeric ID via url_alias so we can query the area-elements endpoint.
         resolveV3AreaID(for: area) { [weak self] resolvedID in
             guard let self, let resolvedID else {
-                DispatchQueue.main.async {
+                Task { @MainActor [weak self] in
                     self?.communityMembersIsLoading = false
                     self?.communityMembersError = String(
                         localized: "Could not resolve community",
@@ -278,7 +278,7 @@ extension ContentViewModel {
             edgePadding.bottom += 20
             edgePadding.right += 20
 
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 mapView.setVisibleMapRect(boundsRect, edgePadding: edgePadding, animated: animated)
             }
             return
@@ -538,7 +538,7 @@ extension ContentViewModel {
 
     private func fetchCommunityMembers(areaID: Int, requestID: UUID) {
         btcMapRepository.fetchV3AreaElements(areaID: areaID, updatedSince: "1970-01-01T00:00:00Z", limit: 10000) { [weak self] result in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 guard self.latestCommunitySelectionRequestID == requestID else { return }
                 switch result {
@@ -701,7 +701,7 @@ extension ContentViewModel {
         let pageLimit = 5000
         let maxPages = 12
         btcMapRepository.fetchV3Areas(updatedSince: anchor, limit: pageLimit) { [weak self] result in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
 
                 switch result {
@@ -821,7 +821,7 @@ extension ContentViewModel {
         }
 
         btcMapRepository.fetchV3AreaElements(areaID: area.id, updatedSince: "1970-01-01T00:00:00Z", limit: 5000) { [weak self] result in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 switch result {
                 case .success(let rows):
@@ -862,8 +862,8 @@ extension ContentViewModel {
 
         if record.lat != nil, record.lon != nil, merchantSearch.shouldHydrateSearchResult(record) {
             btcMapRepository.fetchPlace(id: record.idString) { [weak self] result in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
                     switch result {
                     case .success(let fullRecord):
                         let fullElement = V4PlaceToElementMapper.placeRecordToElement(fullRecord)

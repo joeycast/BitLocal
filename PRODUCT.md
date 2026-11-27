@@ -21,7 +21,7 @@ A 100% native SwiftUI, zero-dependency, privacy-first Apple Maps–grade Bitcoin
 ## Operating Context
 
 - Used on the go—often one-handed, outdoors, or while traveling internationally with intermittent connectivity (Offline Travel Mode).
-- Backed by read-only open community datasets from BTC Map (v4 primary / v2 fallback, v2/v3 community areas) and OpenStreetMap.
+- Backed by read-only open community datasets from BTC Map (v4 merchants, v2/v3 community areas) and OpenStreetMap.
 - Merchant corrections and verifications hand off cleanly to `btcmap.org/merchant/<id>` and OpenStreetMap rather than maintaining a proprietary walled-garden database.
 - Local-first persistence: cached merchant catalog on disk, private CloudKit sync for saved places and city merchant-alert digests, and "When In Use" location permission only (optional; the app remains fully usable without location sharing).
 

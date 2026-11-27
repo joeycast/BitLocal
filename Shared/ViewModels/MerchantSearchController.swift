@@ -651,7 +651,7 @@ final class MerchantSearchController {
         merchantSearchPreviewHydrationInFlight.insert(id)
 
         btcMapRepository.fetchPlace(id: id) { [weak self] result in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.merchantSearchPreviewHydrationInFlight.remove(id)
                 guard case .success(let hydratedRecord) = result else { return }

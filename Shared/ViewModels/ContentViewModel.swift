@@ -184,30 +184,20 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     @ObservationIgnored private var pendingDeepLink: AppDeepLink?
     @ObservationIgnored var latestCommunitySelectionRequestID = UUID()
     @ObservationIgnored var hasScheduledCommunityPrefetch = false
-    @ObservationIgnored var communityPrefetchWorkItem: DispatchWorkItem?
+    @ObservationIgnored var communityPrefetchTask: Task<Void, Never>?
     /// Fires when the next boosted merchant expires so pin tints update while the app stays active.
-    @ObservationIgnored private var boostExpiryRefreshWorkItem: DispatchWorkItem?
+    @ObservationIgnored private var boostExpiryRefreshTask: Task<Void, Never>?
     @ObservationIgnored var shouldReleasePostOnboardingPresentationAfterNextMapSettle = false
     @ObservationIgnored var shouldReleasePostOnboardingPresentationAfterNextMapRender = false
     @ObservationIgnored var postOnboardingPresentationFallbackTask: Task<Void, Never>?
+    @ObservationIgnored var clusterZoomSelectionTask: Task<Void, Never>?
     @ObservationIgnored private var placeholderNameHydrationInFlight = Set<String>()
     @ObservationIgnored private var placeholderNameHydrationAttempted = Set<String>()
     @ObservationIgnored private var placeholderNameHydrationPendingResults: [String: Element] = [:]
-    @ObservationIgnored private var placeholderNameHydrationApplyWorkItem: DispatchWorkItem?
+    @ObservationIgnored private var placeholderNameHydrationApplyTask: Task<Void, Never>?
     let cellViewModelCacheLimit = 250
-    
-    // Use a queue for thread-safe access to mapView
-    private let mapViewQueue = DispatchQueue(label: "mapview.queue", qos: .userInitiated)
-    @ObservationIgnored private var _mapView: MKMapView?
-    
-    var mapView: MKMapView? {
-        get {
-            return mapViewQueue.sync { _mapView }
-        }
-        set {
-            mapViewQueue.sync { _mapView = newValue }
-        }
-    }
+
+    @ObservationIgnored var mapView: MKMapView?
     
     enum AppState {
         case active, inactive, background
@@ -301,7 +291,7 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
 
         for id in batch {
             btcMapRepository.fetchPlace(id: id) { [weak self] result in
-                DispatchQueue.main.async {
+                Task { @MainActor [weak self] in
                     guard let self else { return }
                     self.placeholderNameHydrationInFlight.remove(id)
 
@@ -318,7 +308,7 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
                     // Apply immediately when the batch finishes; otherwise coalesce
                     // rapid completions so we don't rebuild allElements per place.
                     if self.placeholderNameHydrationInFlight.isEmpty {
-                        self.placeholderNameHydrationApplyWorkItem?.cancel()
+                        self.placeholderNameHydrationApplyTask?.cancel()
                         self.applyPendingPlaceholderNameHydrations()
                     } else {
                         self.schedulePlaceholderNameHydrationApply()
@@ -329,19 +319,19 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     }
 
     private func schedulePlaceholderNameHydrationApply() {
-        placeholderNameHydrationApplyWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.applyPendingPlaceholderNameHydrations()
+        placeholderNameHydrationApplyTask?.cancel()
+        placeholderNameHydrationApplyTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled, let self else { return }
+            self.applyPendingPlaceholderNameHydrations()
         }
-        placeholderNameHydrationApplyWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
     }
 
     private func applyPendingPlaceholderNameHydrations() {
         guard !placeholderNameHydrationPendingResults.isEmpty else { return }
         let pending = placeholderNameHydrationPendingResults
         placeholderNameHydrationPendingResults.removeAll(keepingCapacity: true)
-        placeholderNameHydrationApplyWorkItem = nil
+        placeholderNameHydrationApplyTask = nil
 
         upsertMerchants(Array(pending.values), forceMapRefresh: true)
 
@@ -413,15 +403,15 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
         self.pendingDeepLink = nil
         handleDeepLink(pendingDeepLink, allowQueue: false)
     }
-    
+
     func handleAppBecameActive() {
         Debug.log("App became active - previous state: \(appState)")
         let wasInactive = hasBeenInactive
-        
-        // Batch state changes to minimize UI updates
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
+
+        // Defer state mutations to the next MainActor turn to batch lifecycle updates.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
             self.appState = .active
             self.hasBeenInactive = false
             self.resolvePendingDeepLinkIfNeeded()
@@ -431,7 +421,7 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
                 self.forceMapRefresh = true
             }
             self.scheduleBoostExpiryMapRefreshIfNeeded()
-            
+
             // Only fetch if we were previously inactive/background and don't have data
             if wasInactive && (self.allElements.isEmpty || self.shouldRefreshAfterInactive()) {
                 Debug.log("App returning from inactive state - refreshing data")
@@ -444,8 +434,8 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
     /// orange pins re-tint without requiring the app to go inactive first.
     /// Caps the delay at 1 hour and re-evaluates so long-lived boosts still get covered.
     private func scheduleBoostExpiryMapRefreshIfNeeded(for elements: [Element]? = nil) {
-        boostExpiryRefreshWorkItem?.cancel()
-        boostExpiryRefreshWorkItem = nil
+        boostExpiryRefreshTask?.cancel()
+        boostExpiryRefreshTask = nil
 
         let source = elements ?? visibleElements
         let now = Date.now
@@ -456,21 +446,19 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
         guard let soonestExpiry else { return }
 
         let delay = min(max(soonestExpiry.timeIntervalSince(now) + 0.25, 0.1), 3_600)
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self else { return }
+        boostExpiryRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self else { return }
             Debug.logMap("Boost expiry timer fired — refreshing map annotations")
             self.forceMapRefresh = true
             self.scheduleBoostExpiryMapRefreshIfNeeded()
         }
-        boostExpiryRefreshWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     func handleAppBecameInactive() {
         Debug.log("App became inactive")
-        // Use async to batch potential state changes during rapid transitions
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             self.appState = .inactive
             self.hasBeenInactive = true
         }
@@ -478,9 +466,8 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
 
     func handleAppEnteredBackground() {
         Debug.log("App entered background")
-        // Background state change is final, update immediately
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             self.appState = .background
             self.hasBeenInactive = true
             self.saveGeocodingCache()
@@ -519,7 +506,7 @@ final class ContentViewModel: NSObject, CLLocationManagerDelegate, MKMapViewDele
         isSearchActive = false
 
         placeDeepLinkResolver.resolve(placeID: placeID) { [weak self] resolution in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 switch resolution {
                 case .invalidIdentifier:

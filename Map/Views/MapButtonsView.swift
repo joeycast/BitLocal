@@ -58,7 +58,7 @@ final class MapLocationRecenterController {
         locationCancellable = viewModel.userLocationSubject
             .compactMap { $0 }
             .first()
-            .receive(on: DispatchQueue.main)
+            .receive(on: RunLoop.main)
             .sink { [weak self, weak viewModel] _ in
                 guard let self, let viewModel else { return }
                 self.cancel()

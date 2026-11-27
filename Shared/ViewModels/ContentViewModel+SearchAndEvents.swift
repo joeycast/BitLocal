@@ -454,7 +454,7 @@ extension ContentViewModel {
 
         let query = V4EventsQuery(includePast: eventsIncludePast, limit: 100)
         btcMapRepository.fetchEvents(query: query) { [weak self] result in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.eventsIsLoading = false
                 switch result {

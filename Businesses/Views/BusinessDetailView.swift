@@ -735,7 +735,7 @@ private extension BusinessDetailView {
         isLoadingVerifiedAt = true
 
         repository.fetchPlace(id: element.id) { result in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 if case .success(let record) = result,
                    let verifiedAt = record.verifiedAt,
                    !verifiedAt.isEmpty {
