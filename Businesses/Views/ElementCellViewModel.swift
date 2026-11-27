@@ -3,6 +3,7 @@ import CoreLocation
 import Combine
 import Observation
 
+@MainActor
 @Observable
 final class ElementCellViewModel {
 
@@ -69,11 +70,6 @@ final class ElementCellViewModel {
                     self.viewModel.scheduleGeocodingCacheSave()
                 }
             }
-    }
-
-    deinit {
-        userLocationCancellable?.cancel()
-        regionCodeCancellable?.cancel()
     }
     
     // OPTIMIZED: Add method for manual location updates with deduplication

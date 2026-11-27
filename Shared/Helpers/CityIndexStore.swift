@@ -30,17 +30,24 @@ struct CitySearchResult: Identifiable, Hashable, Sendable {
     }
 }
 
+private final class SQLiteDatabaseHandle: @unchecked Sendable {
+    let pointer: OpaquePointer
+
+    init(pointer: OpaquePointer) {
+        self.pointer = pointer
+    }
+
+    deinit {
+        sqlite3_close(pointer)
+    }
+}
+
 actor CityIndexStore {
     static let shared = CityIndexStore()
 
-    private var database: OpaquePointer?
+    private var databaseHandle: SQLiteDatabaseHandle?
+    private var database: OpaquePointer? { databaseHandle?.pointer }
     private var openTask: Task<Void, Never>?
-
-    deinit {
-        if let database {
-            sqlite3_close(database)
-        }
-    }
 
     func preloadIfNeeded() async {
         _ = await openDatabaseIfNeeded()
@@ -264,7 +271,7 @@ actor CityIndexStore {
                 return
             }
 
-            database = openedDatabase
+            databaseHandle = SQLiteDatabaseHandle(pointer: openedDatabase)
         }
 
         openTask = task

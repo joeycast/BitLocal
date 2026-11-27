@@ -162,24 +162,32 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
             self?.finishV4Refresh(elements: elements)
         }
         let startIncremental: @Sendable (String?, [Element]?, V4SyncState?) -> Void = { [weak self] initialAnchorOverride, initialExistingOverride, initialSyncStateOverride in
+            guard let self else {
+                finishRefresh(nil)
+                return
+            }
             Debug.logTiming("sync", "starting v4 incremental sync (hadCache=\(hadV4Cache))")
-            self?.performV4IncrementalSync(
+            self.performV4IncrementalSync(
                 initialAnchorOverride: initialAnchorOverride,
                 initialExistingOverride: initialExistingOverride,
                 initialSyncStateOverride: initialSyncStateOverride,
-                completion: { result in
-                switch result {
-                case .success(let elements):
-                    Debug.logTiming("sync", "v4 incremental sync completed with \(elements.count) elements")
-                    finishRefresh(elements)
-                case .failure(let error):
-                    Debug.logAPI("BTCMap v4 incremental sync failed: \(error.localizedDescription)")
-                    if allowV2Fallback && !hadV4Cache {
-                        self?.v2Client.refreshElements(completion: finishRefresh)
-                    } else {
-                        finishRefresh(self?.loadV4Elements() ?? self?.v2Client.loadCachedElements())
+                completion: { [weak self] result in
+                    switch result {
+                    case .success(let elements):
+                        Debug.logTiming("sync", "v4 incremental sync completed with \(elements.count) elements")
+                        finishRefresh(elements)
+                    case .failure(let error):
+                        Debug.logAPI("BTCMap v4 incremental sync failed: \(error.localizedDescription)")
+                        guard let self else {
+                            finishRefresh(nil)
+                            return
+                        }
+                        if allowV2Fallback && !hadV4Cache {
+                            self.v2Client.refreshElements(completion: finishRefresh)
+                        } else {
+                            finishRefresh(self.loadV4Elements() ?? self.v2Client.loadCachedElements())
+                        }
                     }
-                }
                 }
             )
         }
@@ -245,8 +253,6 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
             ?? syncState.incrementalAnchorUpdatedSince
             ?? Self.rfc1123ToISO8601(syncState.snapshotLastModifiedRFC1123)
             ?? Self.epochISO8601
-        var merged = existing
-        var pageCount = 0
         var maxPages = 20
 
         if shouldForceFullNameBackfill(existing: existing, syncState: syncState) {
@@ -258,53 +264,75 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
 
         Debug.logTiming("sync", "incremental sync stepper ready (existing=\(existing.count), anchor=\(anchor), maxPages=\(maxPages))")
 
-        func step() {
-            pageCount += 1
-            Debug.logTiming("sync", "requesting incremental page \(pageCount) from anchor \(anchor)")
-            v4Client.fetchPlaces(updatedSince: anchor, includeDeleted: true) { [weak self] result in
-                guard let self else {
+        runV4IncrementalSyncPage(
+            anchor: anchor,
+            merged: existing,
+            syncState: syncState,
+            pageCount: 1,
+            maxPages: maxPages,
+            completion: completion
+        )
+    }
+
+    private func runV4IncrementalSyncPage(
+        anchor: String,
+        merged: [Element],
+        syncState: V4SyncState,
+        pageCount: Int,
+        maxPages: Int,
+        completion: @escaping @Sendable (Result<[Element], Error>) -> Void
+    ) {
+        Debug.logTiming("sync", "requesting incremental page \(pageCount) from anchor \(anchor)")
+        v4Client.fetchPlaces(updatedSince: anchor, includeDeleted: true) { [weak self] result in
+            guard let self else {
+                completion(.success(merged))
+                return
+            }
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let records):
+                Debug.logTiming("sync", "received incremental page \(pageCount) with \(records.count) records")
+                var nextSyncState = syncState
+                if records.isEmpty {
+                    nextSyncState.schemaVersion = V4SyncState.currentSchemaVersion
+                    nextSyncState.lastSuccessfulSyncAt = Self.currentISO8601()
+                    self.saveV4Elements(merged, reason: "incremental-empty-page")
+                    self.saveV4SyncState(nextSyncState)
                     completion(.success(merged))
                     return
                 }
-                switch result {
-                case .failure(let error):
-                    completion(.failure(error))
-                case .success(let records):
-                    Debug.logTiming("sync", "received incremental page \(pageCount) with \(records.count) records")
-                    if records.isEmpty {
-                        syncState.schemaVersion = V4SyncState.currentSchemaVersion
-                        syncState.lastSuccessfulSyncAt = Self.currentISO8601()
-                        self.saveV4Elements(merged, reason: "incremental-empty-page")
-                        self.saveV4SyncState(syncState)
-                        completion(.success(merged))
-                        return
-                    }
 
-                    let incoming = records.map(V4PlaceToElementMapper.placeRecordToElement)
-                    merged = Self.mergeElements(existing: merged, incoming: incoming)
+                let incoming = records.map(V4PlaceToElementMapper.placeRecordToElement)
+                let nextMerged = Self.mergeElements(existing: merged, incoming: incoming)
+                var nextAnchor = anchor
 
-                    if let maxUpdated = records.compactMap({ $0.updatedAt }).max(),
-                       self.parseFlexibleDate(maxUpdated) != nil {
-                        anchor = maxUpdated
-                        syncState.incrementalAnchorUpdatedSince = maxUpdated
-                    }
+                if let maxUpdated = records.compactMap({ $0.updatedAt }).max(),
+                   self.parseFlexibleDate(maxUpdated) != nil {
+                    nextAnchor = maxUpdated
+                    nextSyncState.incrementalAnchorUpdatedSince = maxUpdated
+                }
 
-                    self.saveV4SyncState(syncState)
+                self.saveV4SyncState(nextSyncState)
 
-                    if records.count >= 5000 && pageCount < maxPages {
-                        step()
-                    } else {
-                        syncState.schemaVersion = V4SyncState.currentSchemaVersion
-                        syncState.lastSuccessfulSyncAt = Self.currentISO8601()
-                        self.saveV4Elements(merged, reason: "incremental-final-page")
-                        self.saveV4SyncState(syncState)
-                        completion(.success(merged))
-                    }
+                if records.count >= 5000 && pageCount < maxPages {
+                    self.runV4IncrementalSyncPage(
+                        anchor: nextAnchor,
+                        merged: nextMerged,
+                        syncState: nextSyncState,
+                        pageCount: pageCount + 1,
+                        maxPages: maxPages,
+                        completion: completion
+                    )
+                } else {
+                    nextSyncState.schemaVersion = V4SyncState.currentSchemaVersion
+                    nextSyncState.lastSuccessfulSyncAt = Self.currentISO8601()
+                    self.saveV4Elements(nextMerged, reason: "incremental-final-page")
+                    self.saveV4SyncState(nextSyncState)
+                    completion(.success(nextMerged))
                 }
             }
         }
-
-        step()
     }
 
     private func shouldForceFullNameBackfill(existing: [Element], syncState: V4SyncState) -> Bool {
