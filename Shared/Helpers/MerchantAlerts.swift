@@ -254,9 +254,9 @@ final class MerchantAlertsManager: NSObject {
     private let keychainService = "app.bitlocal.bitlocal.merchant-alerts"
     private let keychainSubscriptionsAccount = "merchant_alert_subscriptions_v1"
     private let digestRecordType = "CityDigest"
-    private static let localNotificationKindKey = "merchant_alert_kind"
-    private static let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
-    private static let localNotificationKindDigest = "city_digest"
+    nonisolated private static let localNotificationKindKey = "merchant_alert_kind"
+    nonisolated private static let localNotificationDigestRecordNameKey = "merchant_alert_digest_record_name"
+    nonisolated private static let localNotificationKindDigest = "city_digest"
     private let digestCatchUpLimit = 1
     private var hasRegisteredForRemoteNotifications = false
     private var isRegisteringForRemoteNotifications = false
