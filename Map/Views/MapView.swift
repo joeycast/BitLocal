@@ -52,26 +52,27 @@ struct MapView: UIViewRepresentable {
         
         Debug.log("MapView.makeUIView() called - creating new MKMapView")
         
-        // Store reference to mapView in viewModel - ensure main queue
-        DispatchQueue.main.async {
+        // Store reference to mapView in viewModel on the next MainActor turn
+        Task { @MainActor in
             self.viewModel.mapView = mapView
         }
-        
+
         // Set the delegate to the Coordinator
         mapView.delegate = context.coordinator
         context.coordinator.installCommunityOverlayTapRecognizer(on: mapView)
-        
+
         // Set up clustering
         setupCluster(mapView: mapView)
-        
+
         // Show user location on the map
         mapView.showsUserLocation = true
-        
+
         // Set initial map type
         mapView.mapType = mapType
-        
+
         // FIXED: Only auto-request location if onboarding is complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
             let didCompleteOnboarding = UserDefaults.standard.bool(forKey: "didCompleteOnboarding")
             guard !self.viewModel.initialRegionSet else {
                 Debug.log("MapView.makeUIView - initial region already set, skipping auto-centering")
@@ -208,7 +209,7 @@ struct MapView: UIViewRepresentable {
                 
                 // Reset the force refresh flag after using it
                 if shouldForceUpdate {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         self.viewModel.forceMapRefresh = false
                         Debug.logMap("Reset forceMapRefresh to false")
                     }
@@ -448,7 +449,7 @@ struct MapView: UIViewRepresentable {
             }
             
             // Smoothly animate to the expanded cluster region
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 UIView.animate(withDuration: 0.7, delay: 0, options: [.curveEaseInOut], animations: {
                     mapView.setVisibleMapRect(rect, edgePadding: edgePadding, animated: false)
                 }, completion: { _ in
@@ -473,7 +474,7 @@ struct MapView: UIViewRepresentable {
                 mapView.setCamera(camera, animated: true)
             }, completion: { _ in
                 // Select the annotation after the animation completes
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     mapView.selectAnnotation(annotation, animated: true)
                 }
             })
@@ -850,7 +851,7 @@ struct MapView: UIViewRepresentable {
                     in: mapView
                 )
             } else if let annotation = view.annotation as? Annotation, let element = annotation.element {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.viewModel.setSelectionSource(.mapAnnotation)
                     self.viewModel.path = [.place(element)]
                     self.viewModel.selectedElement = element

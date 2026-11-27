@@ -279,7 +279,7 @@ struct BTCMapPlaceCommentsListView: View {
         errorText = nil
 
         repository.fetchPlaceComments(placeID: element.id) { result in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 isLoading = false
                 hasLoaded = true
                 switch result {

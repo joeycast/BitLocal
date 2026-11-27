@@ -107,7 +107,7 @@ extension ContentViewModel {
         lastSuccessfulSyncAt?.formatted(.relative(presentation: .named))
     }
 
-    // Fetch elements using the APIManager and update the published elements property.
+    // Fetch elements using BTCMapRepository and update the merchant catalog.
     // `warmupOnly` preloads merchant data without triggering onboarding-hostile side effects.
     // `forceNetworkRefresh` always joins a repository network refresh (pull-to-refresh /
     // retry) and never takes the "warm cache only" early return.
@@ -304,14 +304,13 @@ extension ContentViewModel {
         guard !hasScheduledCommunityPrefetch else { return }
         hasScheduledCommunityPrefetch = true
 
-        communityPrefetchWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self else { return }
+        communityPrefetchTask?.cancel()
+        communityPrefetchTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, let self else { return }
             Debug.logAPI("Prefetching community datasets in background")
             self.ensureCommunityMapAreasLoaded()
         }
-        communityPrefetchWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
     }
 
     // Background update check that doesn't block UI
@@ -319,8 +318,8 @@ extension ContentViewModel {
         Debug.log("Starting background update check")
 
         btcMapRepository.refreshElements { [weak self] elements in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
 
                 let refreshedElements = elements ?? []
 

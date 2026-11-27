@@ -87,6 +87,16 @@ rules = [
         "Do not use DispatchSemaphore (main-thread deadlock risk). Use Swift Concurrency (async/await, TaskGroup, actors).",
     ),
     (
+        "no-dispatch-queue-main",
+        re.compile(r"\bDispatchQueue\.main\b"),
+        "Use Task { @MainActor in } / Task.sleep(for:) / RunLoop.main instead of DispatchQueue.main.",
+    ),
+    (
+        "no-dispatch-work-item",
+        re.compile(r"\bDispatchWorkItem\b"),
+        "Use cancellable Task<Void, Never>? + Task.sleep(for:) instead of DispatchWorkItem.",
+    ),
+    (
         "no-foreground-color",
         re.compile(r"\.foregroundColor\s*\("),
         "Use .foregroundStyle(...) instead of deprecated .foregroundColor(...).",

@@ -5,15 +5,15 @@ import Foundation
 
 extension ContentViewModel {
     func requestWhenInUseLocationPermission() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
             Debug.log("Requesting location permission - current auth status: \(self.locationManager.authorizationStatus.rawValue)")
-            
+
             if self.locationManager.authorizationStatus == .notDetermined {
                 self.locationManager.requestWhenInUseAuthorization()
             }
-            
+
             if self.locationManager.authorizationStatus == .authorizedWhenInUse ||
                self.locationManager.authorizationStatus == .authorizedAlways {
                 self.isUpdatingLocation = true
