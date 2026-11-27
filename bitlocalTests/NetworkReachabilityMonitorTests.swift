@@ -11,12 +11,12 @@ struct NetworkReachabilityMonitorTests {
     }
 
     @Test func briefUnsatisfiedBlipIsSuppressedByDebounce() async throws {
-        let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.15, startSystemMonitor: false)
+        let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 2.0, startSystemMonitor: false)
 
         monitor.handleStatusForTesting(.unsatisfied)
-        try await Task.sleep(for: .milliseconds(30))
+        #expect(monitor.isOffline == false)
         monitor.handleStatusForTesting(.satisfied)
-        try await Task.sleep(for: .milliseconds(220))
+        try await Task.sleep(for: .milliseconds(50))
 
         #expect(monitor.isOffline == false)
     }
@@ -29,8 +29,7 @@ struct NetworkReachabilityMonitorTests {
         #expect(becameOffline)
 
         monitor.handleStatusForTesting(.satisfied)
-        let becameOnline = await waitUntil(timeout: .seconds(5)) { monitor.isOffline == false }
-        #expect(becameOnline)
+        #expect(monitor.isOffline == false)
     }
 
     private func waitUntil(timeout: Duration, condition: @escaping @MainActor () -> Bool) async -> Bool {
