@@ -852,6 +852,7 @@ struct MapView: UIViewRepresentable {
                 )
             } else if let annotation = view.annotation as? Annotation, let element = annotation.element {
                 Task { @MainActor in
+                    self.viewModel.clearMerchantDetailSequence()
                     self.viewModel.setSelectionSource(.mapAnnotation)
                     self.viewModel.path = [.place(element)]
                     self.viewModel.selectedElement = element

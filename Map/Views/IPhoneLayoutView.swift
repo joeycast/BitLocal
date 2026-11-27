@@ -55,13 +55,13 @@ private struct IPhoneLayoutContent: View {
     private var appearance: Appearance { appearanceManager.appearance }
     @State private var recenterController = MapLocationRecenterController()
     @State private var activeSheet: IPhoneActiveSheet?
-    @State private var bottomSheetDetent: PresentationDetent = .fraction(0.37)
+    @State private var bottomSheetDetent: PresentationDetent = BottomSheetDetents.standard
     @State private var settingsSheetDetent: PresentationDetent = .large
     @State private var hasLiveSheetMeasurement = false
     @State private var hasAcceptedDefaultLiveMeasurement = false
     @State private var pendingLaunchOutlier: CGFloat?
     private let collapsedSheetDetent: PresentationDetent = BottomSheetDetents.collapsed
-    private let defaultSheetDetent: PresentationDetent = .fraction(0.37)
+    private let defaultSheetDetent: PresentationDetent = BottomSheetDetents.standard
     private var shouldPresentBottomSheet: Bool {
         didCompleteOnboarding &&
         viewModel.isReadyForPostOnboardingPresentation &&

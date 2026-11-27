@@ -22,6 +22,7 @@ struct CommunityDetailView: View {
     @State var linkOpenErrorItem: CommunityLinkOpenError?
     @State var lightningErrorMessage: String?
     @State var memberElements: [Element] = []
+    @State private var showOnMapTask: Task<Void, Never>?
 
     init(area: V2AreaRecord, currentDetent: Binding<PresentationDetent?> = .constant(nil)) {
         self.area = area
@@ -114,6 +115,24 @@ struct CommunityDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .bitLocalDetailNavigationChrome()
             .toolbar {
+                if BottomSheetDetents.isFullScreen(currentDetent) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            BitLocalHaptics.lightTap()
+                            withAnimation(BitLocalMotion.animation(BitLocalMotion.disclosureSpring, reduceMotion: reduceMotion)) {
+                                currentDetent = BottomSheetDetents.standard
+                            }
+                            showOnMapTask?.cancel()
+                            showOnMapTask = Task { @MainActor in
+                                try? await Task.sleep(for: .milliseconds(80))
+                                guard !Task.isCancelled else { return }
+                                viewModel.showCommunityOnMap(area)
+                            }
+                        } label: {
+                            Label("Show on Map", systemImage: "map")
+                        }
+                    }
+                }
                 if isHeroScrolledPast, let shareableURL {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -124,6 +143,10 @@ struct CommunityDetailView: View {
                         }
                     }
                 }
+            }
+            .onDisappear {
+                showOnMapTask?.cancel()
+                showOnMapTask = nil
             }
             .task(id: area.id) {
                 if viewModel.selectedCommunityArea?.id != area.id || viewModel.communityMemberElements.isEmpty {
@@ -761,6 +784,12 @@ struct CommunityDetailView: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.tactileRow(cornerRadius: 10))
+                                .simultaneousGesture(
+                                    TapGesture().onEnded {
+                                        viewModel.setMerchantDetailSequence(memberElements)
+                                        viewModel.setSelectionSource(.list)
+                                    }
+                                )
                             }
                         }
                     }
