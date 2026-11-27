@@ -96,7 +96,7 @@ final class APIManager: @unchecked Sendable {
         checkAndHandleVersionChange()
     }
 
-    func fetchElements(in region: MKCoordinateRegion, completion: @escaping ([Element]?) -> Void) {
+    func fetchElements(in region: MKCoordinateRegion, completion: @escaping @Sendable ([Element]?) -> Void) {
         let minLatitude = region.center.latitude - (region.span.latitudeDelta / 2)
         let maxLatitude = region.center.latitude + (region.span.latitudeDelta / 2)
         let minLongitude = region.center.longitude - (region.span.longitudeDelta / 2)
@@ -159,7 +159,7 @@ final class APIManager: @unchecked Sendable {
         }
     }
 
-    func getElements(completion: @escaping ([Element]?) -> Void) {
+    func getElements(completion: @escaping @Sendable ([Element]?) -> Void) {
         let lastUpdate = UserDefaults.standard.string(forKey: lastUpdateKey) ?? ""
         let urlString = "https://api.btcmap.org/v2/elements?updated_since=\(lastUpdate)"
 
@@ -222,7 +222,7 @@ final class APIManager: @unchecked Sendable {
     // MARK: - Manual Cache Management (Optional)
     
     /// Force refresh all cached data - useful for debugging or manual refresh
-    func forceRefreshCache(completion: @escaping ([Element]?) -> Void) {
+    func forceRefreshCache(completion: @escaping @Sendable ([Element]?) -> Void) {
         clearCache()
         getElements(completion: completion)
     }
@@ -252,7 +252,7 @@ final class APIManager: @unchecked Sendable {
 
 // MARK: - LogManager
 
-class LogManager {
+final class LogManager: @unchecked Sendable {
     static let shared = LogManager()
     /// Soft cap so high-churn API/cache logging cannot grow without bound.
     private let maxEntries = 1_000

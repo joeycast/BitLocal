@@ -1,4 +1,5 @@
 import SwiftUI
+import Synchronization
 import UIKit
 import Foundation // for Debug logging
 import MapKit
@@ -661,16 +662,12 @@ enum ElementCategoryBadgeHelper {
         )
     }
 
-    private static let symbolCacheLock = NSLock()
-    private static var uncircledSymbolCache: [String: String] = [:]
+    private static let uncircledSymbolCache = Mutex<[String: String]>([:])
 
     static func uncircledSymbolName(from raw: String) -> String {
-        symbolCacheLock.lock()
-        if let cached = uncircledSymbolCache[raw] {
-            symbolCacheLock.unlock()
+        if let cached = uncircledSymbolCache.withLock({ $0[raw] }) {
             return cached
         }
-        symbolCacheLock.unlock()
 
         var resolved = raw
         for suffix in [".circle.fill", ".circle"] where raw.hasSuffix(suffix) {
@@ -686,9 +683,7 @@ enum ElementCategoryBadgeHelper {
             }
         }
 
-        symbolCacheLock.lock()
-        uncircledSymbolCache[raw] = resolved
-        symbolCacheLock.unlock()
+        uncircledSymbolCache.withLock { $0[raw] = resolved }
         return resolved
     }
 }

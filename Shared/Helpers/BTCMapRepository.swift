@@ -14,7 +14,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     private let cacheIOQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-io", qos: .utility)
     private let refreshStateQueue = DispatchQueue(label: "app.bitlocal.btcmap-refresh-state", qos: .userInitiated)
     private var isV4RefreshInFlight = false
-    private var pendingV4RefreshCompletions: [([Element]?) -> Void] = []
+    private var pendingV4RefreshCompletions: [@Sendable ([Element]?) -> Void] = []
 
     init(v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(), userDefaults: UserDefaults = .standard) {
         self.v4Client = v4Client
@@ -90,7 +90,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         return Self.rfc1123ToISO8601(state.snapshotLastModifiedRFC1123)
     }
 
-    func refreshElements(completion: @escaping ([Element]?) -> Void) {
+    func refreshElements(completion: @escaping @Sendable ([Element]?) -> Void) {
         switch dataSourceMode {
         case .v2Legacy:
             Debug.logAPI("BTCMapRepository: using v2 legacy mode")
@@ -104,35 +104,35 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         }
     }
 
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         v4Client.searchPlaces(query: query, completion: completion)
     }
 
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         v4Client.fetchPlace(id: id, completion: completion)
     }
 
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         v4Client.fetchEvents(query: query, completion: completion)
     }
 
-    func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
+    func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaRecord], Error>) -> Void) {
         v3Client.fetchAreas(updatedSince: updatedSince, limit: limit, completion: completion)
     }
 
-    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) {
+    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V2AreaRecord], Error>) -> Void) {
         v2AreasClient.fetchAreas(updatedSince: updatedSince, limit: limit, completion: completion)
     }
 
-    func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) {
+    func fetchV3Area(id: Int, completion: @escaping @Sendable (Result<V3AreaRecord, Error>) -> Void) {
         v3Client.fetchArea(id: id, completion: completion)
     }
 
-    func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void) {
+    func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaElementRecord], Error>) -> Void) {
         v3Client.fetchAreaElements(areaID: areaID, updatedSince: updatedSince, limit: limit, completion: completion)
     }
 
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         v4Client.fetchPlaceComments(placeID: placeID, completion: completion)
     }
 
@@ -144,7 +144,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         return mode
     }
 
-    private func refreshV4(allowV2Fallback: Bool, completion: @escaping ([Element]?) -> Void) {
+    private func refreshV4(allowV2Fallback: Bool, completion: @escaping @Sendable ([Element]?) -> Void) {
         let shouldStartRefresh = refreshStateQueue.sync { () -> Bool in
             pendingV4RefreshCompletions.append(completion)
             guard !isV4RefreshInFlight else {
@@ -158,10 +158,10 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         guard shouldStartRefresh else { return }
 
         let hadV4Cache = hasV4CachedData()
-        let finishRefresh: ([Element]?) -> Void = { [weak self] elements in
+        let finishRefresh: @Sendable ([Element]?) -> Void = { [weak self] elements in
             self?.finishV4Refresh(elements: elements)
         }
-        let startIncremental: (String?, [Element]?, V4SyncState?) -> Void = { [weak self] initialAnchorOverride, initialExistingOverride, initialSyncStateOverride in
+        let startIncremental: @Sendable (String?, [Element]?, V4SyncState?) -> Void = { [weak self] initialAnchorOverride, initialExistingOverride, initialSyncStateOverride in
             Debug.logTiming("sync", "starting v4 incremental sync (hadCache=\(hadV4Cache))")
             self?.performV4IncrementalSync(
                 initialAnchorOverride: initialAnchorOverride,
@@ -223,7 +223,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     }
 
     private func finishV4Refresh(elements: [Element]?) {
-        let completions = refreshStateQueue.sync { () -> [([Element]?) -> Void] in
+        let completions = refreshStateQueue.sync { () -> [@Sendable ([Element]?) -> Void] in
             let callbacks = pendingV4RefreshCompletions
             pendingV4RefreshCompletions.removeAll()
             isV4RefreshInFlight = false
@@ -237,7 +237,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         initialAnchorOverride: String? = nil,
         initialExistingOverride: [Element]? = nil,
         initialSyncStateOverride: V4SyncState? = nil,
-        completion: @escaping (Result<[Element], Error>) -> Void
+        completion: @escaping @Sendable (Result<[Element], Error>) -> Void
     ) {
         let existing = initialExistingOverride ?? loadV4Elements() ?? []
         var syncState = initialSyncStateOverride ?? loadV4SyncState()
@@ -444,23 +444,27 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
         BTCMapDateParser.parse(value)
     }
 
-    private static let rfc1123Lock = NSLock()
-    private static let rfc1123Formatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss z"
-        return formatter
-    }()
+    private final class LockedRFC1123Parser: @unchecked Sendable {
+        private let lock = NSLock()
+        private let formatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss z"
+            return formatter
+        }()
+
+        func parse(_ header: String) -> Date? {
+            lock.lock()
+            defer { lock.unlock() }
+            return formatter.date(from: header)
+        }
+    }
+
+    private static let rfc1123Parser = LockedRFC1123Parser()
 
     private static func rfc1123ToISO8601(_ header: String?) -> String? {
-        guard let header else { return nil }
-        let date: Date? = {
-            rfc1123Lock.lock()
-            defer { rfc1123Lock.unlock() }
-            return rfc1123Formatter.date(from: header)
-        }()
-        guard let date else { return nil }
+        guard let header, let date = rfc1123Parser.parse(header) else { return nil }
         return date.ISO8601Format()
     }
 

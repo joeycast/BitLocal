@@ -255,7 +255,7 @@ final class Geocoder: @unchecked Sendable {
     func reverseGeocode(
         location: CLLocation,
         requestKey: String? = nil,
-        completion: @escaping (ReverseGeocodeResponse) -> Void
+        completion: @escaping @Sendable (ReverseGeocodeResponse) -> Void
     ) {
         let key = requestKey ?? ReverseGeocodingSpatialKey.key(for: location.coordinate)
         Task {
@@ -266,7 +266,7 @@ final class Geocoder: @unchecked Sendable {
     func reverseGeocode(
         location: CLLocation,
         requestKey: String? = nil,
-        completion: @escaping (CLPlacemark?) -> Void
+        completion: @escaping @Sendable (CLPlacemark?) -> Void
     ) {
         reverseGeocode(location: location, requestKey: requestKey) { response in
             completion(response.placemark)
@@ -285,7 +285,7 @@ private actor GeocoderPump {
     private let maxBackoff: TimeInterval
 
     private var pendingRequests: [PendingRequest] = []
-    private var handlersByKey: [String: [(ReverseGeocodeResponse) -> Void]] = [:]
+    private var handlersByKey: [String: [@Sendable (ReverseGeocodeResponse) -> Void]] = [:]
     private var isPumping = false
     private var nextAllowedRequestDate = Date.distantPast
     private var consecutiveFailureCount = 0
@@ -298,7 +298,7 @@ private actor GeocoderPump {
     func enqueue(
         key: String,
         location: CLLocation,
-        completion: @escaping (ReverseGeocodeResponse) -> Void
+        completion: @escaping @Sendable (ReverseGeocodeResponse) -> Void
     ) {
         if handlersByKey[key] != nil {
             handlersByKey[key]?.append(completion)

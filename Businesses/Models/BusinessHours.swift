@@ -69,18 +69,14 @@ struct WeeklyHours: Codable, Equatable {
         }
     }
 
-    private static let osmTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
+    private static func formatOSMTime(_ date: Date) -> String {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", components.hour ?? 0, components.minute ?? 0)
+    }
 
     // Format to OpenStreetMap opening_hours syntax
     // Example: "Mo-We 10:00-19:00; Th 08:00-20:00"
     func toOSMFormat() -> String {
-        let timeFormatter = Self.osmTimeFormatter
-
         // Group consecutive days with same hours
         var segments: [(days: [Weekday], hours: DayHours)] = []
 
@@ -112,8 +108,8 @@ struct WeeklyHours: Codable, Equatable {
                 dayRange = "\(firstDay.rawValue)-\(lastDay.rawValue)"
             }
 
-            let openTimeStr = timeFormatter.string(from: segment.hours.openTime)
-            let closeTimeStr = timeFormatter.string(from: segment.hours.closeTime)
+            let openTimeStr = Self.formatOSMTime(segment.hours.openTime)
+            let closeTimeStr = Self.formatOSMTime(segment.hours.closeTime)
 
             return "\(dayRange) \(openTimeStr)-\(closeTimeStr)"
         }

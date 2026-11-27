@@ -71,7 +71,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
 
     private func performDecodedRequest<T: Decodable>(
         url: URL?,
-        completion: @escaping (Result<T, Error>) -> Void
+        completion: @escaping @Sendable (Result<T, Error>) -> Void
     ) {
         guard let url else {
             completion(.failure(BTCMapV4Error.invalidURL))
@@ -89,7 +89,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
         }
     }
 
-    func fetchSnapshot(completion: @escaping (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
+    func fetchSnapshot(completion: @escaping @Sendable (Result<(records: [V4PlaceSnapshotRecord], lastModified: String?), Error>) -> Void) {
         var request = makeRequest(url: snapshotURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 30
@@ -105,7 +105,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
         }
     }
 
-    func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func fetchPlaces(updatedSince: String, includeDeleted: Bool, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         guard var components = URLComponents(url: baseURL.appendingPathComponent("places"), resolvingAgainstBaseURL: false) else {
             completion(.failure(BTCMapV4Error.invalidURL))
             return
@@ -119,7 +119,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
         performDecodedRequest(url: components.url, completion: completion)
     }
 
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         guard !query.isEmpty else {
             completion(.failure(BTCMapV4Error.emptyQuery))
             return
@@ -134,7 +134,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
         performDecodedRequest(url: components.url, completion: completion)
     }
 
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         guard let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
               var components = URLComponents(url: baseURL.appendingPathComponent("places/\(encodedID)"), resolvingAgainstBaseURL: false) else {
             completion(.failure(BTCMapV4Error.invalidURL))
@@ -146,7 +146,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
         performDecodedRequest(url: components.url, completion: completion)
     }
 
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         guard var components = URLComponents(url: baseURL.appendingPathComponent("events"), resolvingAgainstBaseURL: false) else {
             completion(.failure(BTCMapV4Error.invalidURL))
             return
@@ -155,7 +155,7 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
         performDecodedRequest(url: components.url, completion: completion)
     }
 
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         guard let encodedID = placeID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
               let url = URL(string: "https://api.btcmap.org/v4/places/\(encodedID)/comments") else {
             completion(.failure(BTCMapV4Error.invalidURL))
@@ -172,7 +172,7 @@ struct BTCMapV2Client {
         apiManager.loadElementsFromFile()
     }
 
-    func refreshElements(completion: @escaping ([Element]?) -> Void) {
+    func refreshElements(completion: @escaping @Sendable ([Element]?) -> Void) {
         let existing = apiManager.loadElementsFromFile() ?? []
         apiManager.getElements { updates in
             let merged = BTCMapRepository.mergeElements(existing: existing, incoming: updates ?? [])
@@ -225,7 +225,7 @@ final class BTCMapV3AreasClient: @unchecked Sendable {
         return data
     }
 
-    func fetchAreas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
+    func fetchAreas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaRecord], Error>) -> Void) {
         guard var components = URLComponents(url: baseURL.appendingPathComponent("areas"), resolvingAgainstBaseURL: false) else {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
@@ -237,12 +237,12 @@ final class BTCMapV3AreasClient: @unchecked Sendable {
         performRequest(url: components.url, completion: completion)
     }
 
-    func fetchArea(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) {
+    func fetchArea(id: Int, completion: @escaping @Sendable (Result<V3AreaRecord, Error>) -> Void) {
         let url = baseURL.appendingPathComponent("areas").appendingPathComponent(String(id))
         performSingleRequest(url: url, completion: completion)
     }
 
-    func fetchAreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void) {
+    func fetchAreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaElementRecord], Error>) -> Void) {
         let pageLimit = max(1, limit)
         let maxPages = 50
         Task {
@@ -290,7 +290,7 @@ final class BTCMapV3AreasClient: @unchecked Sendable {
         }
     }
 
-    private func performRequest<T: Decodable>(url: URL?, completion: @escaping (Result<[T], Error>) -> Void) {
+    private func performRequest<T: Decodable>(url: URL?, completion: @escaping @Sendable (Result<[T], Error>) -> Void) {
         guard let url else {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
@@ -306,7 +306,7 @@ final class BTCMapV3AreasClient: @unchecked Sendable {
         }
     }
 
-    private func performSingleRequest<T: Decodable>(url: URL?, completion: @escaping (Result<T, Error>) -> Void) {
+    private func performSingleRequest<T: Decodable>(url: URL?, completion: @escaping @Sendable (Result<T, Error>) -> Void) {
         guard let url else {
             completion(.failure(BTCMapV3Error.invalidURL))
             return
@@ -345,7 +345,7 @@ final class BTCMapV2AreasClient: @unchecked Sendable {
         return request
     }
 
-    func fetchAreas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) {
+    func fetchAreas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V2AreaRecord], Error>) -> Void) {
         guard var components = URLComponents(url: baseURL.appendingPathComponent("areas"), resolvingAgainstBaseURL: false) else {
             completion(.failure(BTCMapV3Error.invalidURL))
             return

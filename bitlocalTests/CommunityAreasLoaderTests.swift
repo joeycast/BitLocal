@@ -72,7 +72,7 @@ private final class AsyncStubRepository: BTCMapRepositoryProtocol, @unchecked Se
     var pages: [[V2AreaRecord]] = []
     private var nextPageIndex = 0
 
-    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V2AreaRecord], Error>) -> Void) {
+    func fetchV2Areas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V2AreaRecord], Error>) -> Void) {
         let page = nextPageIndex < pages.count ? pages[nextPageIndex] : []
         nextPageIndex += 1
         Task {
@@ -83,27 +83,27 @@ private final class AsyncStubRepository: BTCMapRepositoryProtocol, @unchecked Se
 
     func loadCachedElements() -> [Element]? { nil }
     func hasCachedData() -> Bool { false }
-    func refreshElements(completion: @escaping ([Element]?) -> Void) { completion(nil) }
+    func refreshElements(completion: @escaping @Sendable ([Element]?) -> Void) { completion(nil) }
     func lastSuccessfulSyncAtISO8601() -> String? { nil }
-    func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaRecord], Error>) -> Void) {
+    func fetchV3Areas(updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func fetchV3Area(id: Int, completion: @escaping (Result<V3AreaRecord, Error>) -> Void) {
+    func fetchV3Area(id: Int, completion: @escaping @Sendable (Result<V3AreaRecord, Error>) -> Void) {
         completion(.failure(NSError(domain: "test", code: 1)))
     }
-    func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping (Result<[V3AreaElementRecord], Error>) -> Void) {
+    func fetchV3AreaElements(areaID: Int, updatedSince: String, limit: Int, completion: @escaping @Sendable (Result<[V3AreaElementRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func searchPlaces(query: V4SearchQuery, completion: @escaping (Result<[V4PlaceRecord], Error>) -> Void) {
+    func searchPlaces(query: V4SearchQuery, completion: @escaping @Sendable (Result<[V4PlaceRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func fetchPlace(id: String, completion: @escaping (Result<V4PlaceRecord, Error>) -> Void) {
+    func fetchPlace(id: String, completion: @escaping @Sendable (Result<V4PlaceRecord, Error>) -> Void) {
         completion(.failure(NSError(domain: "test", code: 1)))
     }
-    func fetchEvents(query: V4EventsQuery, completion: @escaping (Result<[V4EventRecord], Error>) -> Void) {
+    func fetchEvents(query: V4EventsQuery, completion: @escaping @Sendable (Result<[V4EventRecord], Error>) -> Void) {
         completion(.success([]))
     }
-    func fetchPlaceComments(placeID: String, completion: @escaping (Result<[V4PlaceCommentRecord], Error>) -> Void) {
+    func fetchPlaceComments(placeID: String, completion: @escaping @Sendable (Result<[V4PlaceCommentRecord], Error>) -> Void) {
         completion(.success([]))
     }
 }

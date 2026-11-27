@@ -1,4 +1,5 @@
 import SwiftUI
+import Synchronization
 
 extension ElementCategorySymbols {
     // MARK: - Internal Lookup
@@ -152,8 +153,7 @@ extension ElementCategorySymbols {
             }
     }()
 
-    private static let iconGroupCacheLock = NSLock()
-    private static var iconGroupCache: [String: [MerchantCategoryGroup]] = [:]
+    private static let iconGroupCache = Mutex<[String: [MerchantCategoryGroup]]>([:])
 
     static func merchantCategoryGroups(for element: Element) -> [MerchantCategoryGroup] {
         var iconCandidates = Set<String>()
@@ -201,12 +201,9 @@ extension ElementCategorySymbols {
         guard let icon, !icon.isEmpty else { return [] }
         let key = icon.lowercased()
 
-        iconGroupCacheLock.lock()
-        if let cached = iconGroupCache[key] {
-            iconGroupCacheLock.unlock()
+        if let cached = iconGroupCache.withLock({ $0[key] }) {
             return cached
         }
-        iconGroupCacheLock.unlock()
 
         let iconSet: Set<String> = [key]
         var termCandidates = Set<String>()
@@ -223,11 +220,11 @@ extension ElementCategorySymbols {
             }
         }
 
-        iconGroupCacheLock.lock()
-        if iconGroupCache.count < 1_024 {
-            iconGroupCache[key] = matched
+        iconGroupCache.withLock { cache in
+            if cache.count < 1_024 {
+                cache[key] = matched
+            }
         }
-        iconGroupCacheLock.unlock()
         return matched
     }
 
