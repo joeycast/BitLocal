@@ -234,6 +234,28 @@ enum MerchantAlertsCityNormalizer {
     }
 }
 
+struct PendingMerchantDigestRequest: Equatable, Sendable {
+    let id: UUID
+    let digest: CityDigest
+    /// When set (e.g. tapping "Latest Update" inside a specific window's Settings),
+    /// only that window may claim the digest. When `nil` (OS push/catch-up), the
+    /// active foreground window claims it once.
+    let targetSceneID: UUID?
+
+    init(id: UUID = UUID(), digest: CityDigest, targetSceneID: UUID? = nil) {
+        self.id = id
+        self.digest = digest
+        self.targetSceneID = targetSceneID
+    }
+
+    func canBeClaimed(bySceneID sceneID: UUID, isSceneActive: Bool) -> Bool {
+        if let targetSceneID {
+            return targetSceneID == sceneID
+        }
+        return isSceneActive
+    }
+}
+
 @MainActor
 @Observable
 final class MerchantAlertsManager: NSObject {
@@ -243,9 +265,8 @@ final class MerchantAlertsManager: NSObject {
     private(set) var notificationSettings: UNNotificationSettings?
     private(set) var cloudKitAccountStatus: CKAccountStatus = .couldNotDetermine
     private(set) var isRefreshingStatus = false
-    var activeDigest: CityDigest?
+    private(set) var pendingDigestRequest: PendingMerchantDigestRequest?
     var lastDigest: CityDigest?
-    var errorMessage: String?
 
     @ObservationIgnored private let userDefaults: UserDefaults
     @ObservationIgnored private let notificationCenter: UNUserNotificationCenter
@@ -314,15 +335,17 @@ final class MerchantAlertsManager: NSObject {
         loadPersistedState()
     }
 
-    func refreshStatus() async {
+    @discardableResult
+    func refreshStatus() async -> String? {
         isRefreshingStatus = true
         defer { isRefreshingStatus = false }
 
+        var statusError: String?
         do {
             cloudKitAccountStatus = try await container.accountStatus()
         } catch {
             cloudKitAccountStatus = .couldNotDetermine
-            errorMessage = error.localizedDescription
+            statusError = error.localizedDescription
         }
 
         notificationSettings = await notificationCenter.notificationSettings()
@@ -333,24 +356,24 @@ final class MerchantAlertsManager: NSObject {
 
         registerForRemoteNotificationsIfNeeded()
         await catchUpMissedDigestIfNeeded()
+        return statusError
     }
 
-    func enableNotifications(for choice: MerchantAlertCityChoice) async {
-        errorMessage = nil
+    @discardableResult
+    func enableNotifications(for choice: MerchantAlertCityChoice) async -> String? {
+        let refreshError = await refreshStatus()
+        guard isCloudKitAvailable else { return refreshError }
 
-        await refreshStatus()
-        guard isCloudKitAvailable else { return }
-
-        let granted = await requestAuthorizationIfNeeded()
-        guard granted else {
-            errorMessage = String(
+        let authResult = await requestAuthorizationIfNeeded()
+        guard authResult.granted else {
+            return authResult.errorMessage ?? String(
                 localized: "BitLocal needs permission to send you notifications. You can turn this on in Settings.",
                 comment: "Error shown when notification permissions are denied"
             )
-            return
         }
 
         let subscription = CitySubscription(choice: choice)
+        var actionError: String?
 
         do {
             if let previous = currentSubscription, previous.locationID != subscription.locationID {
@@ -362,52 +385,54 @@ final class MerchantAlertsManager: NSObject {
             persistSubscriptions()
             registerForRemoteNotificationsIfNeeded()
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
             Debug.log("Merchant alerts: failed to enable notifications for \(subscription.locationID): \(error.localizedDescription)")
         }
 
-        await refreshStatus()
+        let postRefreshError = await refreshStatus()
+        return actionError ?? postRefreshError
     }
 
-    func disableNotifications() async {
-        errorMessage = nil
+    @discardableResult
+    func disableNotifications() async -> String? {
+        var actionError: String?
 
         if let subscription = currentSubscription {
             do {
                 try await deleteCloudKitSubscription(for: subscription)
             } catch {
-                errorMessage = error.localizedDescription
+                actionError = error.localizedDescription
             }
         }
 
         subscriptions = []
         persistSubscriptions()
-        activeDigest = nil
+        pendingDigestRequest = nil
         lastDigest = nil
         userDefaults.removeObject(forKey: lastDigestKey)
-        await refreshStatus()
+        let postRefreshError = await refreshStatus()
+        return actionError ?? postRefreshError
     }
 
-    func requestAuthorizationIfNeeded() async -> Bool {
+    func requestAuthorizationIfNeeded() async -> (granted: Bool, errorMessage: String?) {
         let settings = await notificationCenter.notificationSettings()
         notificationSettings = settings
 
         switch settings.authorizationStatus {
         case .authorized, .provisional:
-            return true
+            return (true, nil)
         case .denied:
-            return false
+            return (false, nil)
         case .notDetermined, .ephemeral:
             do {
                 let granted = try await notificationCenter.requestAuthorization(options: [.alert, .badge, .sound])
                 notificationSettings = await notificationCenter.notificationSettings()
-                return granted
+                return (granted, nil)
             } catch {
-                errorMessage = error.localizedDescription
-                return false
+                return (false, error.localizedDescription)
             }
         @unknown default:
-            return false
+            return (false, nil)
         }
     }
 
@@ -416,9 +441,28 @@ final class MerchantAlertsManager: NSObject {
         UIApplication.shared.open(url)
     }
 
-    func presentLastDigest() {
+    func enqueueDigestPresentation(_ digest: CityDigest, targetSceneID: UUID? = nil) {
+        pendingDigestRequest = PendingMerchantDigestRequest(
+            digest: digest,
+            targetSceneID: targetSceneID
+        )
+    }
+
+    func presentLastDigest(forSceneID sceneID: UUID? = nil) {
         guard let lastDigest else { return }
-        activeDigest = lastDigest
+        enqueueDigestPresentation(lastDigest, targetSceneID: sceneID)
+    }
+
+    /// Claims the queued digest for a specific scene. Targeted requests (from a
+    /// window's Settings screen) can only be claimed by that exact window; untargeted
+    /// requests (from push notifications) are claimed once by an active foreground window.
+    func claimPendingDigest(forSceneID sceneID: UUID, isSceneActive: Bool) -> CityDigest? {
+        guard let request = pendingDigestRequest,
+              request.canBeClaimed(bySceneID: sceneID, isSceneActive: isSceneActive) else {
+            return nil
+        }
+        pendingDigestRequest = nil
+        return request.digest
     }
 
     func handleRemoteNotification(userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
@@ -430,13 +474,12 @@ final class MerchantAlertsManager: NSObject {
             persistLastDigest()
 
             if UIApplication.shared.applicationState == .active {
-                activeDigest = digest
+                enqueueDigestPresentation(digest)
             }
 
             try await scheduleLocalNotification(for: digest)
             return .newData
         } catch {
-            errorMessage = error.localizedDescription
             Debug.log("Merchant alerts: failed handling remote notification: \(error.localizedDescription)")
             return .failed
         }
@@ -452,9 +495,8 @@ final class MerchantAlertsManager: NSObject {
             let digest = try await fetchDigest(recordID: CKRecord.ID(recordName: digestRecordName))
             lastDigest = digest
             persistLastDigest()
-            activeDigest = digest
+            enqueueDigestPresentation(digest)
         } catch {
-            errorMessage = error.localizedDescription
             Debug.log("Merchant alerts: failed handling notification response: \(error.localizedDescription)")
         }
     }
@@ -603,7 +645,7 @@ final class MerchantAlertsManager: NSObject {
             persistLastDigest()
 
             if UIApplication.shared.applicationState == .active {
-                activeDigest = digest
+                enqueueDigestPresentation(digest)
             }
 
             try await scheduleLocalNotification(for: digest)

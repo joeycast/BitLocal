@@ -9,7 +9,8 @@ import Foundation
 struct ContentView: View {
     @Environment(ContentViewModel.self) private var viewModel
     @Environment(FeatureHintsController.self) private var featureHintsController
-    private let intentRouter = BitLocalAppIntentRouter.shared
+    @Environment(BitLocalAppIntentRouter.self) private var intentRouter
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.isVerticalToolbarActive) private var isVerticalToolbarActive
@@ -92,8 +93,13 @@ struct ContentView: View {
         .onChange(of: layoutMode) { _, newMode in
             syncLayoutMode(newMode)
         }
-        .onChange(of: intentRouter.pendingAction) { _, _ in
+        .onChange(of: intentRouter.pendingRequest?.id) { _, _ in
             routePendingAppIntent()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                routePendingAppIntent()
+            }
         }
         .onChange(of: featureHintsController.activeTarget) { _, target in
             if target == .merchantAlerts {
@@ -109,21 +115,27 @@ struct ContentView: View {
     }
 
     private func routePendingAppIntent() {
-        guard let action = intentRouter.pendingAction else { return }
+        guard let action = intentRouter.claimPendingAction(isSceneActive: scenePhase == .active) else {
+            return
+        }
         switch action {
         case .openCommunities:
-            _ = intentRouter.consumePendingAction()
             showingSettings = false
             viewModel.path = []
             viewModel.setMapDisplayMode(.communities)
-        case .openMerchants:
-            // Switch to merchants mode if needed so BusinessesListView mounts and consumes the filter/query.
+        case .openMerchants(let filter, let query):
             showingSettings = false
             if !viewModel.path.isEmpty {
                 viewModel.path = []
             }
             if viewModel.mapDisplayMode != .merchants {
                 viewModel.setMapDisplayMode(.merchants)
+            }
+            if let filter {
+                viewModel.activeQuickFilters = [filter]
+            }
+            if let query {
+                viewModel.unifiedSearchText = query
             }
         }
     }

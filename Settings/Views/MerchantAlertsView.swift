@@ -2,8 +2,10 @@ import SwiftUI
 
 struct MerchantAlertsView: View {
     @Environment(MerchantAlertsManager.self) private var merchantAlertsManager
+    @Environment(\.bitLocalWindowSceneID) private var windowSceneID
     @Binding var currentDetent: PresentationDetent
     @State private var showingCityPicker = false
+    @State private var alertsErrorMessage: String?
     @ScaledMetric(relativeTo: .largeTitle) private var welcomeIconSize: CGFloat = 40
 
     var body: some View {
@@ -28,12 +30,14 @@ struct MerchantAlertsView: View {
         .navigationDestination(isPresented: $showingCityPicker) {
             MerchantAlertCityPickerView(currentDetent: $currentDetent) { choice in
                 Task {
-                    await merchantAlertsManager.enableNotifications(for: choice)
+                    alertsErrorMessage = await merchantAlertsManager.enableNotifications(for: choice)
                 }
             }
         }
         .task {
-            await merchantAlertsManager.refreshStatus()
+            if let refreshError = await merchantAlertsManager.refreshStatus() {
+                alertsErrorMessage = refreshError
+            }
         }
     }
 
@@ -42,7 +46,7 @@ struct MerchantAlertsView: View {
     private var showsStatusSection: Bool {
         !merchantAlertsManager.isCloudKitAvailable
             || merchantAlertsManager.notificationSettings?.authorizationStatus == .denied
-            || merchantAlertsManager.errorMessage != nil
+            || alertsErrorMessage != nil
     }
 
     private var statusSection: some View {
@@ -67,7 +71,7 @@ struct MerchantAlertsView: View {
                 }
             }
 
-            if let errorMessage = merchantAlertsManager.errorMessage {
+            if let errorMessage = alertsErrorMessage {
                 Text(errorMessage)
                     .foregroundStyle(.red)
             }
@@ -146,7 +150,7 @@ struct MerchantAlertsView: View {
         } footer: {
             Button("Stop Alerts", role: .destructive) {
                 Task {
-                    await merchantAlertsManager.disableNotifications()
+                    alertsErrorMessage = await merchantAlertsManager.disableNotifications()
                 }
             }
             .font(.footnote)
@@ -161,7 +165,7 @@ struct MerchantAlertsView: View {
         Section("Latest Update") {
             if let digest = merchantAlertsManager.lastDigest {
                 Button {
-                    merchantAlertsManager.presentLastDigest()
+                    merchantAlertsManager.presentLastDigest(forSceneID: windowSceneID)
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {

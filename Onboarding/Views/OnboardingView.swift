@@ -35,6 +35,7 @@ struct OnboardingView: View {
     @State var selectedAlertCity: MerchantAlertCityChoice?
     @State var hasManuallySelectedAlertCity = false
     @State var isEnablingAlerts = false
+    @State var alertsErrorMessage: String?
     @State private var locationPermissionAdvanceTask: Task<Void, Never>?
 
     @ScaledMetric(relativeTo: .largeTitle) private var iPadSmallTitleSize: CGFloat = 36
@@ -208,7 +209,9 @@ struct OnboardingView: View {
         }
         .task(id: alertContextRefreshID) {
             guard pages[currentPage].kind == .alertsSetup else { return }
-            await merchantAlertsManager.refreshStatus()
+            if let refreshError = await merchantAlertsManager.refreshStatus() {
+                alertsErrorMessage = refreshError
+            }
             await alertCityPickerModel.syncContext(
                 userLocation: viewModel.userLocation,
                 authorizationStatus: viewModel.locationManager.authorizationStatus,
