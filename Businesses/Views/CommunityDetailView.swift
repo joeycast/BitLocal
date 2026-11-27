@@ -50,7 +50,7 @@ struct CommunityDetailView: View {
                 })
             ) {
                 if let copyValue = linkOpenErrorItem?.copyValue {
-                    Button(String(format: NSLocalizedString("Copy %@", comment: "Button title to copy a value label"), "npub")) {
+                    Button(String(localized: "Copy \("npub")", comment: "Button title to copy a value label")) {
                         UIPasteboard.general.string = copyValue
                         BitLocalHaptics.success()
                     }
@@ -66,7 +66,7 @@ struct CommunityDetailView: View {
             .alert("Tip This Community", isPresented: $showLightningAlert) {
                 if let lastWallet = knownWallets.first(where: { $0.id == lastLightningWalletID }),
                    let payload = payableLightningPayload {
-                    Button(String(format: NSLocalizedString("Copy and Open %@", comment: "Button title to copy a value and open the selected wallet"), lastWallet.name)) {
+                    Button(String(localized: "Copy and Open \(lastWallet.name)", comment: "Button title to copy a value and open the selected wallet")) {
                         openWallet(lastWallet, payload: payload)
                     }
                 }
@@ -469,8 +469,8 @@ struct CommunityDetailView: View {
     @ViewBuilder
     private func communityContactRow(_ item: CommunitySocialLink) -> some View {
         let copyTitle = String(
-            format: NSLocalizedString("Copy %@", comment: "Context menu title to copy a labeled value"),
-            item.label
+            localized: "Copy \(item.label)",
+            comment: "Context menu title to copy a labeled value"
         )
         HStack(alignment: .center, spacing: 4) {
             if item.isInteractive {
@@ -549,8 +549,8 @@ struct CommunityDetailView: View {
     @ViewBuilder
     private func communitySocialLink(_ social: CommunitySocialLink) -> some View {
         let copyTitle = String(
-            format: NSLocalizedString("Copy %@", comment: "Context menu title to copy a labeled value"),
-            social.label
+            localized: "Copy \(social.label)",
+            comment: "Context menu title to copy a labeled value"
         )
         let content = HStack(spacing: 5) {
             if let icon = social.icon {

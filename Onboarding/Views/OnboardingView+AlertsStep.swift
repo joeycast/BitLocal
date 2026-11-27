@@ -389,15 +389,15 @@ extension OnboardingView {
 
     private var alertPrimaryButtonTitle: String {
         if selectedAlertCity != nil, alertCityPickerModel.currentLocationCity != nil {
-            return NSLocalizedString("Turn On Alerts", comment: "Primary onboarding button title for enabling merchant alerts")
+            return String(localized: "Turn On Alerts", comment: "Primary onboarding button title for enabling merchant alerts")
         }
         if let selectedAlertCity {
             return String(
-                format: NSLocalizedString("Turn On Alerts for %@", comment: "Primary onboarding button title for enabling merchant alerts for the selected city"),
-                selectedAlertCity.city
+                localized: "Turn On Alerts for \(selectedAlertCity.city)",
+                comment: "Primary onboarding button title for enabling merchant alerts for the selected city"
             )
         }
-        return NSLocalizedString("Choose a City First", comment: "Disabled onboarding alert button title shown before the user selects a city")
+        return String(localized: "Choose a City First", comment: "Disabled onboarding alert button title shown before the user selects a city")
     }
 
     private var isLocationAuthorizedForAlerts: Bool {
@@ -411,15 +411,15 @@ extension OnboardingView {
         }
 
         if isLocationAuthorizedForAlerts {
-            return NSLocalizedString("Search any city, or use the suggestion when it appears.", comment: "Helper text shown in onboarding when alert city suggestions may appear")
+            return String(localized: "Search any city, or use the suggestion when it appears.", comment: "Helper text shown in onboarding when alert city suggestions may appear")
         }
 
-        return NSLocalizedString("Search for a city to turn on alerts.", comment: "Helper text shown in onboarding when the user must search to choose an alert city")
+        return String(localized: "Search for a city to turn on alerts.", comment: "Helper text shown in onboarding when the user must search to choose an alert city")
     }
 
     private var alertEmptyBrowseText: String? {
         if isLocationAuthorizedForAlerts {
-            return NSLocalizedString("We’ll suggest your current city when it’s ready, or you can search for any city.", comment: "Empty state text shown while the current city suggestion is not yet available during onboarding")
+            return String(localized: "We’ll suggest your current city when it’s ready, or you can search for any city.", comment: "Empty state text shown while the current city suggestion is not yet available during onboarding")
         }
 
         return nil

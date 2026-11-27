@@ -11,7 +11,7 @@ struct PlaceDescriptionSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(NSLocalizedString("business_description_section", comment: "Section header for business description"))
+            Text(String(localized: "business_description_section", comment: "Section header for business description"))
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.leading, 4)
@@ -261,7 +261,7 @@ struct BTCMapPlaceCommentsListView: View {
                 HStack(spacing: 2) {
                     Image(systemName: "bolt.fill")
                         .font(.caption2)
-                    Text(String(format: NSLocalizedString("~%lld sats", comment: "Approximate sats amount label"), sats))
+                    Text(String(localized: "~\(sats) sats", comment: "Approximate sats amount label"))
                         .font(.caption)
                 }
                 .foregroundStyle(.orange)

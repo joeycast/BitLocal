@@ -80,7 +80,7 @@ struct PlaceDetailsSurface: View {
                         if hasHours { rowDivider }
                         contactRow(
                             icon: "mappin.and.ellipse",
-                            label: NSLocalizedString("address_label", comment: "Label for address"),
+                            label: String(localized: "address_label", comment: "Label for address"),
                             value: addressDisplayText.isEmpty ? "Open in Apple Maps" : addressDisplayText,
                             copyValue: addressDisplayText.isEmpty ? nil : addressDisplayText,
                             copyTitle: "Copy Address",
@@ -99,7 +99,7 @@ struct PlaceDetailsSurface: View {
                         if hasHours || hasAddress { rowDivider }
                         contactRow(
                             icon: "globe",
-                            label: NSLocalizedString("website_label", comment: "Label for website"),
+                            label: String(localized: "website_label", comment: "Label for website"),
                             value: website.display,
                             copyValue: website.display,
                             copyTitle: "Copy Website",
@@ -115,7 +115,7 @@ struct PlaceDetailsSurface: View {
                         if hasHours || hasAddress || hasWebsite { rowDivider }
                         contactRow(
                             icon: "phone",
-                            label: NSLocalizedString("phone_label", comment: "Label for phone"),
+                            label: String(localized: "phone_label", comment: "Label for phone"),
                             value: phone.display,
                             copyValue: phone.display,
                             copyTitle: "Copy Phone",
@@ -183,7 +183,7 @@ struct PlaceDetailsSurface: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 5) {
-                                Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
+                                Text(String(localized: "opening_hours_label", comment: "Label for opening hours"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Text("·")
@@ -257,7 +257,7 @@ struct PlaceDetailsSurface: View {
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(NSLocalizedString("opening_hours_label", comment: "Label for opening hours"))
+                    Text(String(localized: "opening_hours_label", comment: "Label for opening hours"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(rawOpeningHours)
@@ -386,7 +386,7 @@ struct PlaceDetailsSurface: View {
     @ViewBuilder
     private func hoursText(for day: OSMOpeningHoursDaySchedule, isToday: Bool) -> some View {
         if day.ranges.isEmpty {
-            Text(NSLocalizedString("hours_closed", comment: "Closed label for business hours"))
+            Text(String(localized: "hours_closed", comment: "Closed label for business hours"))
                 .font(.footnote)
                 .fontWeight(isToday ? .semibold : .regular)
                 .foregroundStyle(.secondary)
@@ -416,19 +416,19 @@ struct PlaceDetailsSurface: View {
         let localizedWeekday: String
         switch weekday {
         case .monday:
-            localizedWeekday = NSLocalizedString("weekday_mo", comment: "Monday abbreviation for business hours")
+            localizedWeekday = String(localized: "weekday_mo", comment: "Monday abbreviation for business hours")
         case .tuesday:
-            localizedWeekday = NSLocalizedString("weekday_tu", comment: "Tuesday abbreviation for business hours")
+            localizedWeekday = String(localized: "weekday_tu", comment: "Tuesday abbreviation for business hours")
         case .wednesday:
-            localizedWeekday = NSLocalizedString("weekday_we", comment: "Wednesday abbreviation for business hours")
+            localizedWeekday = String(localized: "weekday_we", comment: "Wednesday abbreviation for business hours")
         case .thursday:
-            localizedWeekday = NSLocalizedString("weekday_th", comment: "Thursday abbreviation for business hours")
+            localizedWeekday = String(localized: "weekday_th", comment: "Thursday abbreviation for business hours")
         case .friday:
-            localizedWeekday = NSLocalizedString("weekday_fr", comment: "Friday abbreviation for business hours")
+            localizedWeekday = String(localized: "weekday_fr", comment: "Friday abbreviation for business hours")
         case .saturday:
-            localizedWeekday = NSLocalizedString("weekday_sa", comment: "Saturday abbreviation for business hours")
+            localizedWeekday = String(localized: "weekday_sa", comment: "Saturday abbreviation for business hours")
         case .sunday:
-            localizedWeekday = NSLocalizedString("weekday_su", comment: "Sunday abbreviation for business hours")
+            localizedWeekday = String(localized: "weekday_su", comment: "Sunday abbreviation for business hours")
         }
 
         let trimmed = localizedWeekday.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -455,7 +455,7 @@ enum PlaceHoursSummaryFormatter {
         }
         guard let today = schedule.days.first(where: { $0.weekday == weekday }),
               !today.ranges.isEmpty else {
-            return [NSLocalizedString("hours_closed", comment: "Closed label for business hours")]
+            return [String(localized: "hours_closed", comment: "Closed label for business hours")]
         }
         if today.ranges.count == 1, today.ranges[0].isAllDay {
             return ["24/7"]

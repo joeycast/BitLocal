@@ -162,7 +162,7 @@ extension CommunityDetailView {
                 icon: "checkmark.seal.fill",
                 tint: .green,
                 title: "Verified",
-                statusText: String(format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"), formattedDate),
+                statusText: String(localized: "Last verified: \(formattedDate)", comment: "Verification status date label"),
                 explanation: "Someone physically confirmed this community within the past year."
             )
         }
@@ -170,7 +170,7 @@ extension CommunityDetailView {
             icon: "exclamationmark.triangle.fill",
             tint: .orange,
             title: "Not Recently Verified",
-            statusText: String(format: NSLocalizedString("Last verified: %@", comment: "Verification status date label"), formattedDate),
+            statusText: String(localized: "Last verified: \(formattedDate)", comment: "Verification status date label"),
             explanation: "It has been more than a year since this community was verified."
         )
     }
@@ -215,7 +215,7 @@ extension CommunityDetailView {
     func openWallet(_ wallet: LightningWalletOption, payload: String) {
         let appURL = wallet.appURLs.first(where: { UIApplication.shared.canOpenURL($0) }) ?? wallet.appURLs.first
         guard let appURL else {
-            lightningErrorMessage = NSLocalizedString("The selected wallet could not be opened.", comment: "Error shown when no wallet URL can be opened")
+            lightningErrorMessage = String(localized: "The selected wallet could not be opened.", comment: "Error shown when no wallet URL can be opened")
             return
         }
         UIPasteboard.general.string = payload
@@ -224,11 +224,8 @@ extension CommunityDetailView {
                 lastLightningWalletID = wallet.id
             } else {
                 lightningErrorMessage = String(
-                    format: NSLocalizedString(
-                        "Could not open %@. The lightning value has been copied so you can paste it manually.",
-                        comment: "Error shown when opening a specific wallet fails"
-                    ),
-                    wallet.name
+                    localized: "Could not open \(wallet.name). The lightning value has been copied so you can paste it manually.",
+                    comment: "Error shown when opening a specific wallet fails"
                 )
             }
         }
@@ -330,7 +327,7 @@ struct CommunityLinkOpenError {
 
     static func nostr(copyValue: String) -> Self {
         Self(
-            message: NSLocalizedString("It doesn't look like you have a Nostr app installed.", comment: "Error shown when trying to open a nostr profile without a compatible app"),
+            message: String(localized: "It doesn't look like you have a Nostr app installed.", comment: "Error shown when trying to open a nostr profile without a compatible app"),
             copyValue: copyValue
         )
     }

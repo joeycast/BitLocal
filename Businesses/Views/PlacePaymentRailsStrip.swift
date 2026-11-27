@@ -25,7 +25,7 @@ struct PlacePaymentRailsStrip: View {
                     id: "lightning",
                     icon: "bolt.fill",
                     shortLabel: "Lightning",
-                    accessibilityLabel: NSLocalizedString("accepts_bitcoin_lightning", comment: "Label for accepting Bitcoin over Lightning"),
+                    accessibilityLabel: String(localized: "accepts_bitcoin_lightning", comment: "Label for accepting Bitcoin over Lightning"),
                     tint: .orange
                 )
             )
@@ -36,7 +36,7 @@ struct PlacePaymentRailsStrip: View {
                     id: "nfc",
                     icon: "wave.3.right",
                     shortLabel: "NFC",
-                    accessibilityLabel: NSLocalizedString("accepts_contactless_lightning", comment: "Label for accepting Contactless Lightning"),
+                    accessibilityLabel: String(localized: "accepts_contactless_lightning", comment: "Label for accepting Contactless Lightning"),
                     tint: .accentColor
                 )
             )
@@ -47,7 +47,7 @@ struct PlacePaymentRailsStrip: View {
                     id: "onchain",
                     icon: "bitcoinsign",
                     shortLabel: "On-Chain",
-                    accessibilityLabel: NSLocalizedString("accepts_bitcoin_onchain", comment: "Label for accepting Bitcoin on Chain"),
+                    accessibilityLabel: String(localized: "accepts_bitcoin_onchain", comment: "Label for accepting Bitcoin on Chain"),
                     tint: .orange
                 )
             )
@@ -57,8 +57,8 @@ struct PlacePaymentRailsStrip: View {
                 PaymentRail(
                     id: "bitcoin",
                     icon: "bitcoinsign",
-                    shortLabel: NSLocalizedString("accepts_bitcoin", comment: "Label for accepting Bitcoin"),
-                    accessibilityLabel: NSLocalizedString("accepts_bitcoin", comment: "Label for accepting Bitcoin"),
+                    shortLabel: String(localized: "accepts_bitcoin", comment: "Label for accepting Bitcoin"),
+                    accessibilityLabel: String(localized: "accepts_bitcoin", comment: "Label for accepting Bitcoin"),
                     tint: .orange
                 )
             )

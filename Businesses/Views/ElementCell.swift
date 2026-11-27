@@ -60,7 +60,7 @@ struct ElementCell: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(
                             viewModel.element.displayNameForUI ??
-                            NSLocalizedString("name_not_available", comment: "Fallback name for unavailable business name")
+                            String(localized: "name_not_available", comment: "Fallback name for unavailable business name")
                         )
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
@@ -73,7 +73,7 @@ struct ElementCell: View {
                                     Image(systemName: "bookmark.fill")
                                         .font(.caption2)
                                         .foregroundStyle(Color.accentColor)
-                                        .accessibilityLabel(NSLocalizedString("Saved", comment: "VoiceOver label for saved place indicator"))
+                                        .accessibilityLabel(String(localized: "Saved", comment: "VoiceOver label for saved place indicator"))
                                 }
 
                                 if let distance = formattedDistance {
@@ -163,19 +163,19 @@ struct PaymentIcons: View {
             if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
                 Image(systemName: "bitcoinsign.circle.fill")
                     .foregroundStyle(.accent)
-                    .accessibilityLabel(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
+                    .accessibilityLabel(String(localized: "On-chain Bitcoin", comment: "VoiceOver payment method"))
             }
 
             if acceptsLightning(element: element) {
                 Image(systemName: "bolt.circle.fill")
                     .foregroundStyle(.accent)
-                    .accessibilityLabel(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
+                    .accessibilityLabel(String(localized: "Lightning", comment: "VoiceOver payment method"))
             }
 
             if acceptsContactlessLightning(element: element) {
                 Image(systemName: "wave.3.right.circle.fill")
                     .foregroundStyle(.accent)
-                    .accessibilityLabel(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
+                    .accessibilityLabel(String(localized: "Contactless Lightning", comment: "VoiceOver payment method"))
             }
         }
         .font(.subheadline)
@@ -186,20 +186,21 @@ struct PaymentIcons: View {
     private var paymentMethodsAccessibilityLabel: String {
         var methods: [String] = []
         if acceptsBitcoin(element: element) || acceptsBitcoinOnChain(element: element) {
-            methods.append(NSLocalizedString("On-chain Bitcoin", comment: "VoiceOver payment method"))
+            methods.append(String(localized: "On-chain Bitcoin", comment: "VoiceOver payment method"))
         }
         if acceptsLightning(element: element) {
-            methods.append(NSLocalizedString("Lightning", comment: "VoiceOver payment method"))
+            methods.append(String(localized: "Lightning", comment: "VoiceOver payment method"))
         }
         if acceptsContactlessLightning(element: element) {
-            methods.append(NSLocalizedString("Contactless Lightning", comment: "VoiceOver payment method"))
+            methods.append(String(localized: "Contactless Lightning", comment: "VoiceOver payment method"))
         }
         if methods.isEmpty {
-            return NSLocalizedString("Payment methods unavailable", comment: "VoiceOver when no payment method icons are shown")
+            return String(localized: "Payment methods unavailable", comment: "VoiceOver when no payment method icons are shown")
         }
+        let formattedMethods = methods.formatted(.list(type: .and))
         return String(
-            format: NSLocalizedString("Accepts %@", comment: "VoiceOver summary of accepted payment methods"),
-            methods.formatted(.list(type: .and))
+            localized: "Accepts \(formattedMethods)",
+            comment: "VoiceOver summary of accepted payment methods"
         )
     }
 }

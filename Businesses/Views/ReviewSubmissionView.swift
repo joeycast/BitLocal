@@ -97,18 +97,18 @@ struct ReviewSubmissionView: View {
             if custom.isEmpty {
                 return nil
             }
-            let groupLabel = NSLocalizedString("osm_feature_group_other", comment: "")
+            let groupLabel = String(localized: "osm_feature_group_other", comment: "")
             return "\(groupLabel): \(custom)"
         }
         if submission.osmFeatureType == .unset {
             return nil
         }
         if let groupKey = OSMFeatureType.groupedOptions.first(where: { $0.1.contains(submission.osmFeatureType) })?.0 {
-            let groupLabel = NSLocalizedString(groupKey, comment: "")
-            let typeLabel = NSLocalizedString(submission.osmFeatureType.localizedKey, comment: "")
+            let groupLabel = String(localized: String.LocalizationValue(groupKey))
+            let typeLabel = String(localized: String.LocalizationValue(submission.osmFeatureType.localizedKey))
             return "\(groupLabel): \(typeLabel)"
         }
-        return NSLocalizedString(submission.osmFeatureType.localizedKey, comment: "")
+        return String(localized: String.LocalizationValue(submission.osmFeatureType.localizedKey))
     }
 
     private func formatAddress() -> String {
@@ -126,13 +126,13 @@ struct ReviewSubmissionView: View {
     private func formatPaymentMethods() -> String {
         var methods: [String] = []
         if submission.acceptsOnChain {
-            methods.append(NSLocalizedString("payment_onchain_label", comment: ""))
+            methods.append(String(localized: "payment_onchain_label", comment: ""))
         }
         if submission.acceptsLightning {
-            methods.append(NSLocalizedString("payment_lightning_label", comment: ""))
+            methods.append(String(localized: "payment_lightning_label", comment: ""))
         }
         if submission.acceptsContactlessLightning {
-            methods.append(NSLocalizedString("payment_lightning_contactless_label", comment: ""))
+            methods.append(String(localized: "payment_lightning_contactless_label", comment: ""))
         }
         return methods.formatted()
     }

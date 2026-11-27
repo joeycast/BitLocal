@@ -263,15 +263,15 @@ struct SettingsView: View {
 
     private var merchantRefreshSubtitle: String {
         if isRefreshingMerchants || viewModel.isLoading {
-            return NSLocalizedString("Updating…", comment: "Status while merchant catalog refresh is in progress")
+            return String(localized: "Updating…", comment: "Status while merchant catalog refresh is in progress")
         }
         if let relative = viewModel.lastSuccessfulSyncRelativeDescription {
             return String(
-                format: NSLocalizedString("Updated %@", comment: "Relative last-synced label, e.g. Updated 5 minutes ago"),
-                relative
+                localized: "Updated \(relative)",
+                comment: "Relative last-synced label, e.g. Updated 5 minutes ago"
             )
         }
-        return NSLocalizedString(
+        return String(localized:
             "Fetch new and changed merchants since the last sync.",
             comment: "About subtitle explaining incremental merchant refresh"
         )

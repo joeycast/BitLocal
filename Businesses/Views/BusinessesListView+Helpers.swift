@@ -48,13 +48,13 @@ extension BusinessesListView {
 
     var searchStatusText: String? {
         if viewModel.merchantSearchIsWaitingForLocalDebounce {
-            return NSLocalizedString("Searching nearby…", comment: "Status shown while nearby merchant search is in progress")
+            return String(localized: "Searching nearby…", comment: "Status shown while nearby merchant search is in progress")
         }
         return nil
     }
 
     var noResultsText: String {
-        NSLocalizedString("No locations match your search", comment: "Empty state for merchant search with no matches")
+        String(localized: "No locations match your search", comment: "Empty state for merchant search with no matches")
     }
 
     private var browseSourceElements: [Element] {
@@ -143,8 +143,8 @@ extension BusinessesListView {
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                     .accessibilityHint(
                         isSelected
-                            ? NSLocalizedString("Double-tap to clear filter", comment: "VoiceOver hint for selected quick filter chip")
-                            : NSLocalizedString("Double-tap to filter merchants", comment: "VoiceOver hint for unselected quick filter chip")
+                            ? String(localized: "Double-tap to clear filter", comment: "VoiceOver hint for selected quick filter chip")
+                            : String(localized: "Double-tap to filter merchants", comment: "VoiceOver hint for unselected quick filter chip")
                     )
                 }
 
@@ -197,8 +197,8 @@ extension BusinessesListView {
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                     .accessibilityHint(
                         isSelected
-                            ? NSLocalizedString("Double-tap to clear category filter", comment: "VoiceOver hint for selected category chip")
-                            : NSLocalizedString("Double-tap to filter nearby merchants", comment: "VoiceOver hint for unselected category chip")
+                            ? String(localized: "Double-tap to clear category filter", comment: "VoiceOver hint for selected category chip")
+                            : String(localized: "Double-tap to filter nearby merchants", comment: "VoiceOver hint for unselected category chip")
                     )
                 }
             }
@@ -400,7 +400,7 @@ extension BusinessesListView {
             VStack(alignment: .leading, spacing: 3) {
                 Text(
                     String(
-                        format: NSLocalizedString("showing_locations_footer", comment: "Footer: Showing N of N locations"),
+                        format: String(localized: "showing_locations_footer", comment: "Footer: Showing N of N locations"),
                         topSortedElements.count,
                         totalDiscoveryCount
                     )
