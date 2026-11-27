@@ -165,26 +165,6 @@ final class BTCMapV4Client: BTCMapV4ClientProtocol, @unchecked Sendable {
     }
 }
 
-struct BTCMapV2Client {
-    private let apiManager = APIManager.shared
-
-    func loadCachedElements() -> [Element]? {
-        apiManager.loadElementsFromFile()
-    }
-
-    func refreshElements(completion: @escaping @Sendable ([Element]?) -> Void) {
-        let existing = apiManager.loadElementsFromFile() ?? []
-        apiManager.getElements { updates in
-            let merged = BTCMapRepository.mergeElements(existing: existing, incoming: updates ?? [])
-            completion(merged.isEmpty ? (updates ?? existing) : merged)
-        }
-    }
-
-    func hasCachedData() -> Bool {
-        apiManager.hasCachedData()
-    }
-}
-
 enum BTCMapV3Error: LocalizedError {
     case invalidURL
     case invalidResponse
