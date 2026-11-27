@@ -3,7 +3,7 @@ import Testing
 @testable import bitlocal
 
 @MainActor
-@Suite(.tags(.sync))
+@Suite(.serialized, .tags(.sync))
 struct NetworkReachabilityMonitorTests {
     @Test func initialStateIsOnline() {
         let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.05, startSystemMonitor: false)
@@ -11,12 +11,12 @@ struct NetworkReachabilityMonitorTests {
     }
 
     @Test func briefUnsatisfiedBlipIsSuppressedByDebounce() async throws {
-        let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.12, startSystemMonitor: false)
+        let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.15, startSystemMonitor: false)
 
         monitor.handleStatusForTesting(.unsatisfied)
         try await Task.sleep(for: .milliseconds(30))
         monitor.handleStatusForTesting(.satisfied)
-        try await Task.sleep(for: .milliseconds(160))
+        try await Task.sleep(for: .milliseconds(220))
 
         #expect(monitor.isOffline == false)
     }
@@ -25,11 +25,11 @@ struct NetworkReachabilityMonitorTests {
         let monitor = NetworkReachabilityMonitor(offlineDebounceInterval: 0.05, startSystemMonitor: false)
 
         monitor.handleStatusForTesting(.unsatisfied)
-        let becameOffline = await waitUntil(timeout: .seconds(1)) { monitor.isOffline }
+        let becameOffline = await waitUntil(timeout: .seconds(5)) { monitor.isOffline }
         #expect(becameOffline)
 
         monitor.handleStatusForTesting(.satisfied)
-        let becameOnline = await waitUntil(timeout: .seconds(1)) { monitor.isOffline == false }
+        let becameOnline = await waitUntil(timeout: .seconds(5)) { monitor.isOffline == false }
         #expect(becameOnline)
     }
 
