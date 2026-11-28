@@ -1,5 +1,26 @@
 import Foundation
 
+private actor BTCMapRefreshCoordinator {
+    private var isInFlight = false
+    private var pendingCompletions: [@Sendable ([Element]?) -> Void] = []
+
+    func enqueue(_ completion: @escaping @Sendable ([Element]?) -> Void) -> Bool {
+        pendingCompletions.append(completion)
+        guard !isInFlight else {
+            return false
+        }
+        isInFlight = true
+        return true
+    }
+
+    func finish() -> [@Sendable ([Element]?) -> Void] {
+        let callbacks = pendingCompletions
+        pendingCompletions.removeAll()
+        isInFlight = false
+        return callbacks
+    }
+}
+
 final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     static let shared = BTCMapRepository()
     static let epochISO8601 = "1970-01-01T00:00:00Z"
@@ -11,9 +32,7 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     private let cacheDirectory: URL
     private let lastAppVersionKey = "btcmap_last_app_version"
     private let cacheIOQueue = DispatchQueue(label: "app.bitlocal.btcmap-cache-io", qos: .utility)
-    private let refreshStateQueue = DispatchQueue(label: "app.bitlocal.btcmap-refresh-state", qos: .userInitiated)
-    private var isV4RefreshInFlight = false
-    private var pendingV4RefreshCompletions: [@Sendable ([Element]?) -> Void] = []
+    private let refreshCoordinator = BTCMapRefreshCoordinator()
 
     init(
         v4Client: BTCMapV4ClientProtocol = BTCMapV4Client(),
@@ -115,92 +134,99 @@ final class BTCMapRepository: BTCMapRepositoryProtocol, @unchecked Sendable {
     }
 
     private func refreshV4(completion: @escaping @Sendable ([Element]?) -> Void) {
-        let shouldStartRefresh = refreshStateQueue.sync { () -> Bool in
-            pendingV4RefreshCompletions.append(completion)
-            guard !isV4RefreshInFlight else {
+        let coordinator = refreshCoordinator
+        Task { [weak self] in
+            let shouldStartRefresh = await coordinator.enqueue(completion)
+            guard shouldStartRefresh else {
                 Debug.logTiming("sync", "coalescing refresh onto in-flight v4 sync")
-                return false
-            }
-            isV4RefreshInFlight = true
-            return true
-        }
-
-        guard shouldStartRefresh else { return }
-
-        let hadV4Cache = hasV4CachedData()
-        let finishRefresh: @Sendable ([Element]?) -> Void = { [weak self] elements in
-            self?.finishV4Refresh(elements: elements)
-        }
-        let startIncremental: @Sendable (String?, [Element]?, V4SyncState?) -> Void = { [weak self] initialAnchorOverride, initialExistingOverride, initialSyncStateOverride in
-            guard let self else {
-                finishRefresh(nil)
                 return
             }
-            Debug.logTiming("sync", "starting v4 incremental sync (hadCache=\(hadV4Cache))")
-            self.performV4IncrementalSync(
-                initialAnchorOverride: initialAnchorOverride,
-                initialExistingOverride: initialExistingOverride,
-                initialSyncStateOverride: initialSyncStateOverride,
-                completion: { [weak self] result in
-                    switch result {
-                    case .success(let elements):
-                        Debug.logTiming("sync", "v4 incremental sync completed with \(elements.count) elements")
-                        finishRefresh(elements)
-                    case .failure(let error):
-                        Debug.logAPI("BTCMap v4 incremental sync failed: \(error.localizedDescription)")
-                        guard let self else {
-                            finishRefresh(nil)
-                            return
-                        }
-                        finishRefresh(self.loadV4Elements())
+
+            guard let self else {
+                let completions = await coordinator.finish()
+                completions.forEach { $0(nil) }
+                return
+            }
+
+            let hadV4Cache = self.hasV4CachedData()
+            let finishRefresh: @Sendable ([Element]?) -> Void = { [weak self] elements in
+                if let self {
+                    self.finishV4Refresh(elements: elements)
+                } else {
+                    Task {
+                        let completions = await coordinator.finish()
+                        completions.forEach { $0(elements) }
                     }
                 }
-            )
-        }
-
-        if !hadV4Cache {
-            Debug.logAPI("BTCMapRepository: no v4 cache, bootstrapping snapshot")
-            Debug.logTiming("sync", "starting v4 snapshot bootstrap")
-            v4Client.fetchSnapshot { [weak self] result in
+            }
+            let startIncremental: @Sendable (String?, [Element]?, V4SyncState?) -> Void = { [weak self] initialAnchorOverride, initialExistingOverride, initialSyncStateOverride in
                 guard let self else {
-                    completion(nil)
+                    finishRefresh(nil)
                     return
                 }
-                switch result {
-                case .success(let payload):
-                    let fallbackTimestamp = Self.rfc1123ToISO8601(payload.lastModified) ?? Self.currentISO8601()
-                    let initialIncrementalAnchor = Self.rfc1123ToISO8601(payload.lastModified) ?? fallbackTimestamp
-                    let mapped = payload.records.map { V4PlaceToElementMapper.snapshotRecordToElement($0, fallbackTimestamp: fallbackTimestamp) }
-                    Debug.logTiming("sync", "snapshot bootstrap fetched \(mapped.count) records; initial anchor=\(initialIncrementalAnchor)")
-                    self.saveV4Elements(mapped, reason: "snapshot-bootstrap")
-                    var syncState = self.loadV4SyncState()
-                    syncState.snapshotLastModifiedRFC1123 = payload.lastModified
-                    // Follow BTC Map's recommended flow: bootstrap from the CDN snapshot,
-                    // then incrementally apply only changes newer than the snapshot.
-                    syncState.incrementalAnchorUpdatedSince = initialIncrementalAnchor
-                    syncState.schemaVersion = V4SyncState.currentSchemaVersion
-                    self.saveV4SyncState(syncState)
-                    startIncremental(initialIncrementalAnchor, mapped, syncState)
-                case .failure(let error):
-                    Debug.logAPI("BTCMap v4 snapshot bootstrap failed: \(error.localizedDescription)")
-                    finishRefresh(nil)
-                }
+                Debug.logTiming("sync", "starting v4 incremental sync (hadCache=\(hadV4Cache))")
+                self.performV4IncrementalSync(
+                    initialAnchorOverride: initialAnchorOverride,
+                    initialExistingOverride: initialExistingOverride,
+                    initialSyncStateOverride: initialSyncStateOverride,
+                    completion: { [weak self] result in
+                        switch result {
+                        case .success(let elements):
+                            Debug.logTiming("sync", "v4 incremental sync completed with \(elements.count) elements")
+                            finishRefresh(elements)
+                        case .failure(let error):
+                            Debug.logAPI("BTCMap v4 incremental sync failed: \(error.localizedDescription)")
+                            guard let self else {
+                                finishRefresh(nil)
+                                return
+                            }
+                            finishRefresh(self.loadV4Elements())
+                        }
+                    }
+                )
             }
-            return
-        }
 
-        startIncremental(nil, nil, nil)
+            if !hadV4Cache {
+                Debug.logAPI("BTCMapRepository: no v4 cache, bootstrapping snapshot")
+                Debug.logTiming("sync", "starting v4 snapshot bootstrap")
+                self.v4Client.fetchSnapshot { [weak self] result in
+                    guard let self else {
+                        finishRefresh(nil)
+                        return
+                    }
+                    switch result {
+                    case .success(let payload):
+                        let fallbackTimestamp = Self.rfc1123ToISO8601(payload.lastModified) ?? Self.currentISO8601()
+                        let initialIncrementalAnchor = Self.rfc1123ToISO8601(payload.lastModified) ?? fallbackTimestamp
+                        let mapped = payload.records.map { V4PlaceToElementMapper.snapshotRecordToElement($0, fallbackTimestamp: fallbackTimestamp) }
+                        Debug.logTiming("sync", "snapshot bootstrap fetched \(mapped.count) records; initial anchor=\(initialIncrementalAnchor)")
+                        self.saveV4Elements(mapped, reason: "snapshot-bootstrap")
+                        var syncState = self.loadV4SyncState()
+                        syncState.snapshotLastModifiedRFC1123 = payload.lastModified
+                        // Follow BTC Map's recommended flow: bootstrap from the CDN snapshot,
+                        // then incrementally apply only changes newer than the snapshot.
+                        syncState.incrementalAnchorUpdatedSince = initialIncrementalAnchor
+                        syncState.schemaVersion = V4SyncState.currentSchemaVersion
+                        self.saveV4SyncState(syncState)
+                        startIncremental(initialIncrementalAnchor, mapped, syncState)
+                    case .failure(let error):
+                        Debug.logAPI("BTCMap v4 snapshot bootstrap failed: \(error.localizedDescription)")
+                        finishRefresh(nil)
+                    }
+                }
+                return
+            }
+
+            startIncremental(nil, nil, nil)
+        }
     }
 
     private func finishV4Refresh(elements: [Element]?) {
-        let completions = refreshStateQueue.sync { () -> [@Sendable ([Element]?) -> Void] in
-            let callbacks = pendingV4RefreshCompletions
-            pendingV4RefreshCompletions.removeAll()
-            isV4RefreshInFlight = false
-            return callbacks
+        let coordinator = refreshCoordinator
+        Task {
+            let completions = await coordinator.finish()
+            completions.forEach { $0(elements) }
         }
-
-        completions.forEach { $0(elements) }
     }
 
     private func performV4IncrementalSync(
