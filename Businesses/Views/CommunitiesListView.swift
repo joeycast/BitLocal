@@ -192,7 +192,9 @@ struct CommunitiesListView: View {
 
     private var emptyStateMessage: String {
         let q = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return q.isEmpty ? "No communities in current map view" : "No communities found"
+        return q.isEmpty
+            ? String(localized: "No communities in current map view", comment: "Empty state when no Bitcoin communities appear in the visible map area")
+            : String(localized: "No communities found", comment: "Empty state when a community search returns no results")
     }
 
     private func metadataPrewarmKey(for areas: [V2AreaRecord]) -> String {

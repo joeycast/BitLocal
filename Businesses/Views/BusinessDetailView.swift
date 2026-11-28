@@ -428,14 +428,14 @@ struct BusinessDetailView: View {
                     Button {
                         _ = stepToAdjacentMerchant(.previous)
                     } label: {
-                        Label("Previous place", systemImage: "chevron.left")
+                        Label("Previous Place", systemImage: "chevron.left")
                     }
                     .disabled(!sequenceNavigator.canStepPrevious)
 
                     Button {
                         _ = stepToAdjacentMerchant(.next)
                     } label: {
-                        Label("Next place", systemImage: "chevron.right")
+                        Label("Next Place", systemImage: "chevron.right")
                     }
                     .disabled(!sequenceNavigator.canStepNext)
                 }
@@ -547,7 +547,11 @@ private extension BusinessDetailView {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.tactilePress(scale: 0.92))
-                .accessibilityLabel(isSaved ? "Remove from Saved" : "Save Place")
+                .accessibilityLabel(
+                    isSaved
+                        ? String(localized: "Remove from Saved", comment: "VoiceOver label for unsaving a saved place")
+                        : String(localized: "Save Place", comment: "VoiceOver label for saving a place")
+                )
             }
 
             // Quiet inline status metadata (no extra capsule clutter)
@@ -868,7 +872,10 @@ private struct ShareActivityView: UIViewControllerRepresentable {
 
 extension View {
     @ViewBuilder
-    func copyValueContextMenu(_ value: String?, title: String = "Copy") -> some View {
+    func copyValueContextMenu(
+        _ value: String?,
+        title: String = String(localized: "Copy", comment: "Context menu title to copy a value")
+    ) -> some View {
         if let value, !value.isEmpty {
             self.contextMenu {
                 Button(title, systemImage: "doc.on.doc") {

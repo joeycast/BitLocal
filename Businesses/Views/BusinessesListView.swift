@@ -317,7 +317,7 @@ struct BusinessesListView: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text("Offline · Browsing \(viewModel.allElements.count.formatted()) cached places")
+            Text("Offline · Browsing \(viewModel.allElements.count) cached places")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

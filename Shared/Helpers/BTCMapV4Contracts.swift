@@ -597,7 +597,7 @@ struct V3AreaRecord: Codable, Hashable, Identifiable {
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !trimmed.isEmpty { return trimmed }
         if let tagName = tags?["name"], !tagName.isEmpty { return tagName }
-        return "Area #\(id)"
+        return String(localized: "Area #\(id)", comment: "Fallback display name for an unnamed BTC Map v3 area")
     }
 }
 
@@ -742,7 +742,7 @@ struct V2AreaRecord: Codable, Hashable, Identifiable {
 
     var displayName: String {
         if let name = tags?["name"], !name.isEmpty { return name }
-        return "Area \(id)"
+        return String(localized: "Area \(id)", comment: "Fallback display name for an unnamed BTC Map v2 area")
     }
 
     var isDeleted: Bool {

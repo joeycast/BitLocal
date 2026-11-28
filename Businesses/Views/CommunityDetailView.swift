@@ -319,7 +319,7 @@ struct CommunityDetailView: View {
     }
 
     private var heroVerificationTitle: String {
-        verificationStatus?.title ?? "Unverified"
+        verificationStatus?.title ?? String(localized: "Unverified", comment: "Fallback status label when a community has no verification date")
     }
 
     private var heroVerificationTint: Color {
@@ -649,7 +649,10 @@ struct CommunityDetailView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.tactileRow(cornerRadius: 10))
-                    .copyValueContextMenu(payload, title: "Copy Lightning Address")
+                    .copyValueContextMenu(
+                        payload,
+                        title: String(localized: "Copy Lightning Address", comment: "Context menu title to copy a community Lightning address")
+                    )
 
                     Button {
                         BitLocalHaptics.selection()
@@ -666,7 +669,7 @@ struct CommunityDetailView: View {
 
                     TactileCopyButton(
                         value: payload,
-                        accessibilityLabel: "Copy Lightning Address"
+                        accessibilityLabel: String(localized: "Copy Lightning Address", comment: "VoiceOver label for copying a community Lightning address")
                     )
                 }
             }
@@ -712,11 +715,14 @@ struct CommunityDetailView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.tactileRow(cornerRadius: 10))
-                    .copyValueContextMenu(url.absoluteString, title: "Copy Support Link")
+                    .copyValueContextMenu(
+                        url.absoluteString,
+                        title: String(localized: "Copy Support Link", comment: "Context menu title to copy a community support URL")
+                    )
 
                     TactileCopyButton(
                         value: url.absoluteString,
-                        accessibilityLabel: "Copy Support Link"
+                        accessibilityLabel: String(localized: "Copy Support Link", comment: "VoiceOver label for copying a community support URL")
                     )
                 }
             }

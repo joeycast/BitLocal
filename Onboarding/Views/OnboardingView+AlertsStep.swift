@@ -162,17 +162,17 @@ extension OnboardingView {
     private var alertCloudKitStatusTitle: String {
         switch merchantAlertsManager.cloudKitAccountStatus {
         case .couldNotDetermine:
-            return "Checking iCloud"
+            return String(localized: "Checking iCloud", comment: "Onboarding iCloud status title while checking availability")
         case .temporarilyUnavailable:
-            return "iCloud is temporarily unavailable"
+            return String(localized: "iCloud is temporarily unavailable", comment: "Onboarding iCloud status title when temporarily unavailable")
         case .restricted:
-            return "iCloud isn't available"
+            return String(localized: "iCloud isn't available", comment: "Onboarding iCloud status title when restricted")
         case .noAccount:
-            return "iCloud Required"
+            return String(localized: "iCloud Required", comment: "Onboarding iCloud status title when signed out")
         case .available:
-            return "iCloud is ready"
+            return String(localized: "iCloud is ready", comment: "Onboarding iCloud status title when available")
         @unknown default:
-            return "iCloud is unavailable"
+            return String(localized: "iCloud is unavailable", comment: "Onboarding iCloud status fallback title")
         }
     }
 

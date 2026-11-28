@@ -16,9 +16,9 @@ enum DistanceUnit: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
     var label: String {
         switch self {
-        case .auto: return "Auto"
-        case .miles: return "Miles"
-        case .kilometers: return "Kilometers"
+        case .auto: return String(localized: "Auto", comment: "Automatic distance unit option")
+        case .miles: return String(localized: "Miles", comment: "Miles distance unit option")
+        case .kilometers: return String(localized: "Kilometers", comment: "Kilometers distance unit option")
         }
     }
 }
