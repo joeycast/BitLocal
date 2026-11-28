@@ -180,9 +180,9 @@ struct OpeningHoursLiveStatus {
         now: Date = .now,
         calendar: Calendar = .current
     ) -> OpeningHoursLiveStatus {
-        let open247Label = String(localized: "Open 24/7", comment: "Status badge when a place is open 24 hours a day, 7 days a week")
-        let openLabel = String(localized: "Open", comment: "Status badge when a place is currently open")
-        let closedLabel = String(localized: "Closed", comment: "Status badge when a place is currently closed")
+        let open247Label: LocalizedStringKey = "Open 24/7"
+        let openLabel: LocalizedStringKey = "Open"
+        let closedLabel: LocalizedStringKey = "Closed"
 
         if schedule.isTwentyFourSeven {
             return OpeningHoursLiveStatus(isOpen: true, shortLabel: open247Label)
