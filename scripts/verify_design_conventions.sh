@@ -212,6 +212,63 @@ for folder_excluded in [excluded_dirs - {"bitlocalTests"}]:
                         f"[pbxproj-unregistered] {rel}: Swift file is not referenced in bitlocal.xcodeproj/project.pbxproj."
                     )
 
+# Check Localizable.xcstrings integrity across all supported locales
+import json
+
+xcstrings_path = root / "Shared" / "Helpers" / "Localizable.xcstrings"
+required_locales = ("de", "es", "es-419", "fr", "fr-CA", "it", "nl", "th")
+specifier_re = re.compile(r"%(?:(?:\d+)\$)?(?:[0-9.]*)(?:lld|ld|d|@|f|u)")
+
+def normalized_specifiers(text: str) -> list[str]:
+    cleaned = []
+    for tok in specifier_re.findall(text):
+        cleaned.append(re.sub(r"^%\d+\$", "%", tok))
+    return sorted(cleaned)
+
+def extract_translated_values(loc_entry: dict) -> list[str]:
+    values: list[str] = []
+    if "stringUnit" in loc_entry:
+        su = loc_entry["stringUnit"]
+        if su.get("state") == "translated" and su.get("value"):
+            values.append(su["value"])
+    plural = loc_entry.get("variations", {}).get("plural", {})
+    for form_entry in plural.values():
+        su = form_entry.get("stringUnit", {})
+        if su.get("state") == "translated" and su.get("value"):
+            values.append(su["value"])
+    return values
+
+try:
+    catalog = json.loads(xcstrings_path.read_text(encoding="utf-8"))
+except Exception as exc:
+    errors.append(f"[xcstrings-json] Shared/Helpers/Localizable.xcstrings failed to parse as JSON: {exc}")
+    catalog = {}
+
+for key, entry in catalog.get("strings", {}).items():
+    if not key or entry.get("shouldTranslate") is False:
+        continue
+    localizations = entry.get("localizations", {})
+    en_values = extract_translated_values(localizations.get("en", {}))
+    expected_specs = normalized_specifiers(en_values[0]) if en_values else normalized_specifiers(key)
+    for locale in required_locales:
+        loc_entry = localizations.get(locale)
+        if not loc_entry:
+            errors.append(f"[xcstrings-missing-locale] Key {key!r} is missing translation for locale '{locale}'.")
+            continue
+        values = extract_translated_values(loc_entry)
+        if not values:
+            errors.append(f"[xcstrings-untranslated] Key {key!r} has no translated value for locale '{locale}'.")
+            continue
+        for val in values:
+            if normalized_specifiers(val) != expected_specs:
+                errors.append(
+                    f"[xcstrings-specifier-mismatch] Key {key!r} locale '{locale}' has specifiers {normalized_specifiers(val)} != expected {expected_specs}."
+                )
+            if "inflect:" in val or "^[" in val:
+                errors.append(
+                    f"[xcstrings-raw-inflect] Key {key!r} locale '{locale}' contains raw grammar-inflection syntax: {val!r}."
+                )
+
 if errors:
     print(f"❌ Design & convention verification failed with {len(errors)} issue(s):\n", file=sys.stderr)
     for err in errors:

@@ -43,11 +43,14 @@ extension CommunityDetailView {
 
     var contactInformationLinks: [CommunitySocialLink] {
         let tags = area.tags ?? [:]
+        let websiteLabel = String(localized: "Website", comment: "Contact label for a community website")
+        let emailLabel = String(localized: "Email", comment: "Contact label for a community email")
+        let phoneLabel = String(localized: "phone_label", comment: "Label for phone")
         let candidates: [(label: String, icon: String, key: String)] = [
-            ("Website", "globe", "contact:website"),
-            ("Website", "globe", "website"),
-            ("Email", "envelope", "contact:email"),
-            ("Phone", "phone", "contact:phone"),
+            (websiteLabel, "globe", "contact:website"),
+            (websiteLabel, "globe", "website"),
+            (emailLabel, "envelope", "contact:email"),
+            (phoneLabel, "phone", "contact:phone"),
             ("Discord", "message", "contact:discord"),
             ("Eventbrite", "ticket", "contact:eventbrite"),
             ("Geyser", "bolt", "contact:geyser"),
@@ -161,17 +164,23 @@ extension CommunityDetailView {
             return .init(
                 icon: "checkmark.seal.fill",
                 tint: .green,
-                title: "Verified",
+                title: String(localized: "Verified", comment: "Community verification badge title"),
                 statusText: String(localized: "Last verified: \(formattedDate)", comment: "Verification status date label"),
-                explanation: "Someone physically confirmed this community within the past year."
+                explanation: String(
+                    localized: "Someone physically confirmed this community within the past year.",
+                    comment: "Explanation shown when a community was verified within the past year"
+                )
             )
         }
         return .init(
             icon: "exclamationmark.triangle.fill",
             tint: .orange,
-            title: "Not Recently Verified",
+            title: String(localized: "Not Recently Verified", comment: "Community verification badge title when verification is older than a year"),
             statusText: String(localized: "Last verified: \(formattedDate)", comment: "Verification status date label"),
-            explanation: "It has been more than a year since this community was verified."
+            explanation: String(
+                localized: "It has been more than a year since this community was verified.",
+                comment: "Explanation shown when a community has not been verified in over a year"
+            )
         )
     }
 

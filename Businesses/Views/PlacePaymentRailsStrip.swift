@@ -24,7 +24,7 @@ struct PlacePaymentRailsStrip: View {
                 PaymentRail(
                     id: "lightning",
                     icon: "bolt.fill",
-                    shortLabel: "Lightning",
+                    shortLabel: String(localized: "Lightning", comment: "Short payment rail pill label for Lightning"),
                     accessibilityLabel: String(localized: "accepts_bitcoin_lightning", comment: "Label for accepting Bitcoin over Lightning"),
                     tint: .orange
                 )
@@ -35,7 +35,7 @@ struct PlacePaymentRailsStrip: View {
                 PaymentRail(
                     id: "nfc",
                     icon: "wave.3.right",
-                    shortLabel: "NFC",
+                    shortLabel: String(localized: "NFC", comment: "Short payment rail pill label for contactless NFC Lightning"),
                     accessibilityLabel: String(localized: "accepts_contactless_lightning", comment: "Label for accepting Contactless Lightning"),
                     tint: .accentColor
                 )
@@ -46,7 +46,7 @@ struct PlacePaymentRailsStrip: View {
                 PaymentRail(
                     id: "onchain",
                     icon: "bitcoinsign",
-                    shortLabel: "On-Chain",
+                    shortLabel: String(localized: "On-Chain", comment: "Short payment rail pill label for on-chain Bitcoin"),
                     accessibilityLabel: String(localized: "accepts_bitcoin_onchain", comment: "Label for accepting Bitcoin on Chain"),
                     tint: .orange
                 )
@@ -180,8 +180,12 @@ struct OpeningHoursLiveStatus {
         now: Date = .now,
         calendar: Calendar = .current
     ) -> OpeningHoursLiveStatus {
+        let open247Label: LocalizedStringKey = "Open 24/7"
+        let openLabel: LocalizedStringKey = "Open"
+        let closedLabel: LocalizedStringKey = "Closed"
+
         if schedule.isTwentyFourSeven {
-            return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open 24/7")
+            return OpeningHoursLiveStatus(isOpen: true, shortLabel: open247Label)
         }
 
         let today = weekday(for: calendar.component(.weekday, from: now))
@@ -191,15 +195,15 @@ struct OpeningHoursLiveStatus {
         if let todaySchedule = schedule.days.first(where: { $0.weekday == today }) {
             for range in todaySchedule.ranges {
                 if range.isAllDay {
-                    return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                    return OpeningHoursLiveStatus(isOpen: true, shortLabel: openLabel)
                 }
                 if range.endMinutes >= range.startMinutes {
                     if nowMinutes >= range.startMinutes && nowMinutes < range.endMinutes {
-                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: openLabel)
                     }
                 } else {
                     if nowMinutes >= range.startMinutes {
-                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: openLabel)
                     }
                 }
             }
@@ -212,16 +216,16 @@ struct OpeningHoursLiveStatus {
                     if range.endMinutes > 24 * 60 {
                         let spilloverEnd = range.endMinutes - 24 * 60
                         if nowMinutes < spilloverEnd {
-                            return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                            return OpeningHoursLiveStatus(isOpen: true, shortLabel: openLabel)
                         }
                     } else if range.endMinutes < range.startMinutes && nowMinutes < range.endMinutes {
-                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: "Open")
+                        return OpeningHoursLiveStatus(isOpen: true, shortLabel: openLabel)
                     }
                 }
             }
         }
 
-        return OpeningHoursLiveStatus(isOpen: false, shortLabel: "Closed")
+        return OpeningHoursLiveStatus(isOpen: false, shortLabel: closedLabel)
     }
 
     static func weekday(for calendarWeekday: Int) -> WeeklyHours.Weekday {

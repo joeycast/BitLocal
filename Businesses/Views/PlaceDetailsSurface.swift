@@ -81,9 +81,11 @@ struct PlaceDetailsSurface: View {
                         contactRow(
                             icon: "mappin.and.ellipse",
                             label: String(localized: "address_label", comment: "Label for address"),
-                            value: addressDisplayText.isEmpty ? "Open in Apple Maps" : addressDisplayText,
+                            value: addressDisplayText.isEmpty
+                                ? String(localized: "Open in Apple Maps", comment: "Fallback address row action when street address is unavailable")
+                                : addressDisplayText,
                             copyValue: addressDisplayText.isEmpty ? nil : addressDisplayText,
-                            copyTitle: "Copy Address",
+                            copyTitle: String(localized: "Copy Address", comment: "Context menu title to copy a place address"),
                             valueLineLimit: 3
                         ) {
                             BitLocalHaptics.lightTap()
@@ -102,7 +104,7 @@ struct PlaceDetailsSurface: View {
                             label: String(localized: "website_label", comment: "Label for website"),
                             value: website.display,
                             copyValue: website.display,
-                            copyTitle: "Copy Website",
+                            copyTitle: String(localized: "Copy Website", comment: "Context menu title to copy a place website"),
                             valueLineLimit: 2,
                             truncationMode: .middle
                         ) {
@@ -118,7 +120,7 @@ struct PlaceDetailsSurface: View {
                             label: String(localized: "phone_label", comment: "Label for phone"),
                             value: phone.display,
                             copyValue: phone.display,
-                            copyTitle: "Copy Phone",
+                            copyTitle: String(localized: "Copy Phone", comment: "Context menu title to copy a place phone number"),
                             valueLineLimit: 1,
                             truncationMode: .middle
                         ) {
@@ -131,10 +133,10 @@ struct PlaceDetailsSurface: View {
                         if hasHours || hasAddress || hasWebsite || hasPhone { rowDivider }
                         contactRow(
                             icon: "envelope",
-                            label: "Email",
+                            label: String(localized: "Email", comment: "Label for email"),
                             value: email.display,
                             copyValue: email.display,
-                            copyTitle: "Copy Email",
+                            copyTitle: String(localized: "Copy Email", comment: "Context menu title to copy an email address"),
                             valueLineLimit: 2,
                             truncationMode: .middle
                         ) {
@@ -186,7 +188,7 @@ struct PlaceDetailsSurface: View {
                                 Text(String(localized: "opening_hours_label", comment: "Label for opening hours"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("·")
+                                Text(verbatim: "·")
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
                                 Text(status.shortLabel)
@@ -219,7 +221,11 @@ struct PlaceDetailsSurface: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.tactileRow(cornerRadius: 10))
-                .accessibilityHint(isHoursExpanded ? "Double-tap to collapse weekly hours" : "Double-tap to view weekly hours")
+                .accessibilityHint(
+                    isHoursExpanded
+                        ? String(localized: "Double-tap to collapse weekly hours", comment: "VoiceOver hint for collapsing weekly opening hours")
+                        : String(localized: "Double-tap to view weekly hours", comment: "VoiceOver hint for expanding weekly opening hours")
+                )
 
                 if isHoursExpanded {
                     VStack(alignment: .leading, spacing: 7) {
@@ -359,6 +365,11 @@ struct PlaceDetailsSurface: View {
         .contentShape(Rectangle())
         .accessibilityLabel(social.label)
 
+        let copyTitle = String(
+            localized: "Copy \(social.label)",
+            comment: "Context menu title to copy a social handle"
+        )
+
         if let url = social.url {
             Button {
                 BitLocalHaptics.lightTap()
@@ -367,10 +378,10 @@ struct PlaceDetailsSurface: View {
                 content
             }
             .buttonStyle(.tactilePress(scale: 0.96))
-            .copyValueContextMenu(social.value, title: "Copy \(social.label)")
+            .copyValueContextMenu(social.value, title: copyTitle)
         } else {
             content
-                .copyValueContextMenu(social.value, title: "Copy \(social.label)")
+                .copyValueContextMenu(social.value, title: copyTitle)
         }
     }
 

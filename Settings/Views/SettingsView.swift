@@ -258,7 +258,10 @@ struct SettingsView: View {
         if let subscription = merchantAlertsManager.currentSubscription {
             return subscription.displayName
         }
-        return "Get notified when new merchants appear in your city."
+        return String(
+            localized: "Get notified when new merchants appear in your city.",
+            comment: "Settings subtitle explaining Merchant Alerts before a city is selected"
+        )
     }
 
     private var merchantRefreshSubtitle: String {

@@ -173,7 +173,9 @@ struct LocationSearchView: View {
                     .listRowInsets(EdgeInsets())
                     .overlay(alignment: .bottomTrailing) {
                         Button(
-                            mapType == .standard ? "Switch to Hybrid Map" : "Switch to Standard Map",
+                            mapType == .standard
+                                ? String(localized: "Switch to Hybrid Map", comment: "Button label to switch map preview to satellite hybrid mode")
+                                : String(localized: "Switch to Standard Map", comment: "Button label to switch map preview to standard mode"),
                             systemImage: mapType == .standard ? "globe.americas.fill" : "map.fill"
                         ) {
                             mapType = (mapType == .standard) ? .hybrid : .standard

@@ -168,7 +168,9 @@ struct MapControlToolbarContent: ToolbarContent {
             selectedMapTypeBinding.wrappedValue = (selectedMapType == .standard) ? .hybrid : .standard
         } label: {
             Label(
-                selectedMapType == .standard ? "Show satellite map" : "Show standard map",
+                selectedMapType == .standard
+                    ? LocalizedStringKey("Show satellite map")
+                    : LocalizedStringKey("Show standard map"),
                 systemImage: selectedMapType == .hybrid ? "map.fill" : "globe.americas.fill"
             )
             .foregroundStyle(.primary)
@@ -196,14 +198,20 @@ struct MapControlToolbarContent: ToolbarContent {
             viewModel.toggleMapMode()
         } label: {
             Label(
-                isCommunities ? "Show merchants" : "Show communities",
+                isCommunities
+                    ? LocalizedStringKey("Show merchants")
+                    : LocalizedStringKey("Show communities"),
                 systemImage: isCommunities ? "mappin.and.ellipse" : "person.2.fill"
             )
             .foregroundStyle(.primary)
             .id("map-mode-\(isCommunities)-\(colorScheme == .dark)")
         }
         .tint(.primary)
-        .accessibilityValue(isCommunities ? "Communities map" : "Merchants map")
+        .accessibilityValue(
+            isCommunities
+                ? LocalizedStringKey("Communities map")
+                : LocalizedStringKey("Merchants map")
+        )
         .accessibilityHint("Switches between merchant pins and community areas")
         .featureHintAnchor(.communityToggle)
     }
@@ -261,7 +269,11 @@ struct MapButtonsView: View {
                 mapTypeIcon
                     .frame(width: controlWidth, height: controlHeight)
             }
-            .accessibilityLabel(selectedMapType == .standard ? "Show satellite map" : "Show standard map")
+            .accessibilityLabel(
+                selectedMapType == .standard
+                    ? LocalizedStringKey("Show satellite map")
+                    : LocalizedStringKey("Show standard map")
+            )
 
             Divider()
                 .padding(.horizontal, 8)

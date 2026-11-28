@@ -13,7 +13,7 @@ struct ReviewSubmissionView: View {
                     .font(.caption)
                     .textSelection(.enabled)
             } header: {
-                Text("Debug Email Preview")
+                Text(verbatim: "Debug Email Preview")
             }
 #endif
         }

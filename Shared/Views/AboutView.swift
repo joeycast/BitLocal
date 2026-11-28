@@ -41,9 +41,9 @@ struct AboutView: View {
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
         switch (shortVersion, build) {
         case let (v?, b?) where !v.isEmpty && !b.isEmpty:
-            return "Version \(v) (\(b))"
+            return String(localized: "Version \(v) (\(b))", comment: "App version and build number label")
         case let (v?, _) where !v.isEmpty:
-            return "Version \(v)"
+            return String(localized: "Version \(v)", comment: "App version label")
         default:
             return nil
         }
